@@ -50,13 +50,13 @@ struct Column(Copyable, Movable):
         self._data = ColumnData(List[PythonObject]())
         self._index = List[PythonObject]()
 
-    fn __init__(out self, name: String, owned data: ColumnData, dtype: BisonDtype):
+    fn __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype):
         self.name  = name
         self.dtype = dtype
         self._data = data^
         self._index = List[PythonObject]()
 
-    fn __init__(out self, name: String, owned data: ColumnData, dtype: BisonDtype, owned index: List[PythonObject]):
+    fn __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: List[PythonObject]):
         self.name  = name
         self.dtype = dtype
         self._data = data^

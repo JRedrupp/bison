@@ -22,7 +22,7 @@ struct Series(Copyable, Movable):
         self._col = Column()
         self.name = ""
 
-    fn __init__(out self, owned col: Column):
+    fn __init__(out self, var col: Column):
         self.name = col.name
         self._col = col^
 

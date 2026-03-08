@@ -19,7 +19,7 @@ struct DataFrame(Copyable, Movable):
         """Empty DataFrame — used as stub return placeholder."""
         self._cols = List[Column]()
 
-    fn __init__(out self, owned cols: List[Column]):
+    fn __init__(out self, var cols: List[Column]):
         self._cols = cols^
 
     fn __init__(out self, pd_df: PythonObject) raises:
