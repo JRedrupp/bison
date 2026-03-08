@@ -1,5 +1,6 @@
 from python import PythonObject
 from .._errors import _not_implemented
+from ..dataframe import DataFrame
 
 
 fn concat(
@@ -9,7 +10,7 @@ fn concat(
     ignore_index: Bool = False,
     keys: PythonObject = PythonObject(None),
     sort: Bool = False,
-) raises -> PythonObject:
+) raises -> DataFrame:
     """Concatenate bison objects along an axis. STUB."""
     _not_implemented("concat")
-    return PythonObject(None)
+    return DataFrame(PythonObject(None))

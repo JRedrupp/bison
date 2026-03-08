@@ -81,16 +81,16 @@ struct DataFrame(Copyable, Movable):
     fn ndim(self) -> Int:
         return 2
 
-    fn dtypes(self) raises -> PythonObject:
+    fn dtypes(self) raises -> Series:
         _not_implemented("DataFrame.dtypes")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     fn info(self) raises:
         _not_implemented("DataFrame.info")
 
-    fn memory_usage(self, deep: Bool = False) raises -> PythonObject:
+    fn memory_usage(self, deep: Bool = False) raises -> Series:
         _not_implemented("DataFrame.memory_usage")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     # ------------------------------------------------------------------
     # Selection / indexing
@@ -131,49 +131,49 @@ struct DataFrame(Copyable, Movable):
     # Aggregation
     # ------------------------------------------------------------------
 
-    fn sum(self, axis: Int = 0, skipna: Bool = True) raises -> PythonObject:
+    fn sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.sum")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn mean(self, axis: Int = 0, skipna: Bool = True) raises -> PythonObject:
+    fn mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.mean")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn median(self, axis: Int = 0, skipna: Bool = True) raises -> PythonObject:
+    fn median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.median")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn min(self, axis: Int = 0, skipna: Bool = True) raises -> PythonObject:
+    fn min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.min")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn max(self, axis: Int = 0, skipna: Bool = True) raises -> PythonObject:
+    fn max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.max")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> PythonObject:
+    fn std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.std")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> PythonObject:
+    fn var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.var")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn count(self, axis: Int = 0) raises -> PythonObject:
+    fn count(self, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.count")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn nunique(self, axis: Int = 0) raises -> PythonObject:
+    fn nunique(self, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.nunique")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     fn describe(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
         return DataFrame(self._pd_df)
 
-    fn quantile(self, q: Float64 = 0.5, axis: Int = 0) raises -> PythonObject:
+    fn quantile(self, q: Float64 = 0.5, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.quantile")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     fn abs(self) raises -> DataFrame:
         _not_implemented("DataFrame.abs")
@@ -195,17 +195,17 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.cummax")
         return DataFrame(self._pd_df)
 
-    fn agg(self, func: PythonObject, axis: Int = 0) raises -> PythonObject:
+    fn agg(self, func: PythonObject, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn aggregate(self, func: PythonObject, axis: Int = 0) raises -> PythonObject:
+    fn aggregate(self, func: PythonObject, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.aggregate")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn apply(self, func: PythonObject, axis: Int = 0) raises -> PythonObject:
+    fn apply(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.apply")
-        return PythonObject(None)
+        return DataFrame(self._pd_df)
 
     fn applymap(self, func: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.applymap")
@@ -215,17 +215,17 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.transform")
         return DataFrame(self._pd_df)
 
-    fn eval(self, expr: String) raises -> PythonObject:
+    fn eval(self, expr: String) raises -> Series:
         _not_implemented("DataFrame.eval")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     fn query(self, expr: String) raises -> DataFrame:
         _not_implemented("DataFrame.query")
         return DataFrame(self._pd_df)
 
-    fn pipe(self, func: PythonObject) raises -> PythonObject:
+    fn pipe(self, func: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
-        return PythonObject(None)
+        return DataFrame(self._pd_df)
 
     # ------------------------------------------------------------------
     # Missing data
@@ -307,9 +307,9 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.drop_duplicates")
         return DataFrame(self._pd_df)
 
-    fn duplicated(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> PythonObject:
+    fn duplicated(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> Series:
         _not_implemented("DataFrame.duplicated")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
     fn pivot(self, index: String = "", columns: String = "", values: String = "") raises -> DataFrame:
         _not_implemented("DataFrame.pivot")
@@ -323,13 +323,13 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.melt")
         return DataFrame(self._pd_df)
 
-    fn stack(self, level: Int = -1) raises -> PythonObject:
+    fn stack(self, level: Int = -1) raises -> Series:
         _not_implemented("DataFrame.stack")
-        return PythonObject(None)
+        return Series(PythonObject(None))
 
-    fn unstack(self, level: Int = -1) raises -> PythonObject:
+    fn unstack(self, level: Int = -1) raises -> DataFrame:
         _not_implemented("DataFrame.unstack")
-        return PythonObject(None)
+        return DataFrame(self._pd_df)
 
     fn transpose(self) raises -> DataFrame:
         _not_implemented("DataFrame.transpose")
@@ -462,16 +462,16 @@ struct DataFrame(Copyable, Movable):
     # IO
     # ------------------------------------------------------------------
 
-    fn to_csv(self, path_or_buf: String = "", sep: String = ",", index: Bool = True) raises -> PythonObject:
+    fn to_csv(self, path_or_buf: String = "", sep: String = ",", index: Bool = True) raises -> String:
         _not_implemented("DataFrame.to_csv")
-        return PythonObject(None)
+        return String("")
 
     fn to_parquet(self, path: String, engine: String = "auto", compression: String = "snappy") raises:
         _not_implemented("DataFrame.to_parquet")
 
-    fn to_json(self, path_or_buf: String = "", orient: String = "") raises -> PythonObject:
+    fn to_json(self, path_or_buf: String = "", orient: String = "") raises -> String:
         _not_implemented("DataFrame.to_json")
-        return PythonObject(None)
+        return String("")
 
     fn to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
         _not_implemented("DataFrame.to_excel")

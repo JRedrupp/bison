@@ -1,6 +1,7 @@
 from python import PythonObject
 from collections import Optional
 from .._errors import _not_implemented
+from ..dataframe import DataFrame
 
 
 fn read_parquet(
@@ -8,10 +9,10 @@ fn read_parquet(
     engine: String = "auto",
     columns: Optional[PythonObject] = None,
     filters: Optional[PythonObject] = None,
-) raises -> PythonObject:
+) raises -> DataFrame:
     """Read a Parquet file into a DataFrame. STUB."""
     _not_implemented("read_parquet")
-    return PythonObject(None)
+    return DataFrame(PythonObject(None))
 
 
 fn to_parquet(

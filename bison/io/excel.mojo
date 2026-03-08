@@ -1,6 +1,7 @@
 from python import PythonObject
 from collections import Optional
 from .._errors import _not_implemented
+from ..dataframe import DataFrame
 
 
 fn read_excel(
@@ -12,10 +13,10 @@ fn read_excel(
     dtype: Optional[PythonObject] = None,
     skiprows: Optional[PythonObject] = None,
     nrows: Optional[PythonObject] = None,
-) raises -> PythonObject:
+) raises -> DataFrame:
     """Read an Excel file into a DataFrame. STUB."""
     _not_implemented("read_excel")
-    return PythonObject(None)
+    return DataFrame(PythonObject(None))
 
 
 fn to_excel(
