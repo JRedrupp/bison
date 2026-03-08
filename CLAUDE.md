@@ -68,6 +68,31 @@ Run a single file: `mojo run tests/test_dataframe.mojo`
 
 Every stub category has a corresponding issue on GitHub. When implementing a group of methods, reference the issue number in the PR description.
 
+## Session notes
+
+At the start of every session create `SESSION.md` at the project root if it does not already exist. While reading files and doing work, append an entry for every tech debt item, bug, or refactoring opportunity noticed. Do not wait until the end — add entries as they are found.
+
+### Entry format
+
+```
+### <Short title>
+
+- **File**: `path/to/file.mojo` (line N if relevant)
+- **Type**: Tech Debt | Bug | Refactoring | Design Pattern
+- **Classification**: <name from refactoring.guru>
+- **Details**: What the problem is and what the fix should be.
+```
+
+### Classification vocabulary
+
+Use names from the refactoring.guru catalogs:
+
+- **Code smells**: Bloaters, OO-Abusers, Change Preventers, Dispensables, Couplers and the named smells within each group.
+- **Refactoring techniques**: E.g. Extract Method, Replace Temp with Query, Introduce Null Object, Replace Conditional with Polymorphism.
+- **Design patterns**: Creational, Structural, or Behavioral — use the exact pattern name (e.g. Strategy, Factory Method, Decorator).
+
+`SESSION.md` is for Claude's working notes only — it is gitignored and must never be committed.
+
 ## Constraints
 
 - `.CLAUDE` and `.claude/` are in `.gitignore` — never commit them.

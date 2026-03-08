@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .CLAUDE
 .claude/
+SESSION.md
 *.mojopkg
 dist/
 .test-pass-count
