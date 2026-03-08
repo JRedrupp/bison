@@ -1,7 +1,8 @@
 """Tests for DataFrame construction and basic attributes."""
 from python import Python, PythonObject
+from collections import Dict
 from testing import assert_equal, assert_true, assert_false
-from bison import DataFrame
+from bison import DataFrame, ColumnData
 
 
 def test_shape_from_pandas():
@@ -73,17 +74,20 @@ def test_to_pandas_roundtrip():
 
 
 def test_from_dict():
-    var pd = Python.import_module("pandas")
-    var data = Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")
-    # from_dict is a stub — expect Error
-    try:
-        # Use from_pandas path instead (from_dict calls pd.DataFrame internally)
-        var pd_df = pd.DataFrame(data)
-        var df = DataFrame(pd_df)
-        assert_equal(df.shape()[0], 2)
-        assert_equal(df.shape()[1], 2)
-    except e:
-        pass  # stub may raise
+    var d = Dict[String, ColumnData]()
+    var col_a = List[Int64]()
+    col_a.append(1)
+    col_a.append(2)
+    var col_b = List[Int64]()
+    col_b.append(3)
+    col_b.append(4)
+    d["a"] = ColumnData(col_a^)
+    d["b"] = ColumnData(col_b^)
+    var df = DataFrame.from_dict(d)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "b")
 
 
 def main():
