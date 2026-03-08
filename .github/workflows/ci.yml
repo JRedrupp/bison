@@ -19,6 +19,12 @@ jobs:
       - name: Install dependencies
         run: pixi install
 
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Run pre-commit checks
+        run: pre-commit run --all-files
+
       - name: Generate version file
         run: pixi run gen-version
 

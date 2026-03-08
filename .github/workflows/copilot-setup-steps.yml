@@ -36,3 +36,9 @@ jobs:
 
       - name: Verify Mojo is available
         run: mojo --version
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Install pre-commit hooks
+        run: pre-commit install

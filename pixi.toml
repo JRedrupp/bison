@@ -19,6 +19,7 @@ test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version"
 update-compat = "python scripts/update_compat.py"
 fmt           = "mojo format bison/"
 check         = "mojo build bison/"
+lint          = "pre-commit run --all-files"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }

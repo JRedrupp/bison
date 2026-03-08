@@ -22,6 +22,7 @@ pixi run test           # regenerates version then runs all tests
 pixi run update-compat  # rewrite compat table in README.md
 pixi run fmt            # mojo format bison/
 pixi run check          # mojo build bison/
+pixi run lint           # pre-commit run --all-files
 ```
 
 ## Versioning
