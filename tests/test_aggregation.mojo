@@ -4,14 +4,14 @@ from testing import assert_true
 from bison import DataFrame, Series
 
 
-def _raises(name: String, raised: Bool) raises:
+def _raises(name: String, raised: Bool):
     if not raised:
         raise Error(name + " should have raised")
 
 
-def test_df_sum_stub() raises:
+def test_df_sum_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 2, 3]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var raised = False
     try:
         _ = df.sum()
@@ -20,9 +20,9 @@ def test_df_sum_stub() raises:
     _raises("DataFrame.sum", raised)
 
 
-def test_df_mean_stub() raises:
+def test_df_mean_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1.0, 2.0]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
     var raised = False
     try:
         _ = df.mean()
@@ -31,9 +31,9 @@ def test_df_mean_stub() raises:
     _raises("DataFrame.mean", raised)
 
 
-def test_df_describe_stub() raises:
+def test_df_describe_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 2, 3]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var raised = False
     try:
         _ = df.describe()
@@ -42,9 +42,9 @@ def test_df_describe_stub() raises:
     _raises("DataFrame.describe", raised)
 
 
-def test_series_mean_stub() raises:
+def test_series_mean_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series([1.0, 2.0, 3.0]))
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var raised = False
     try:
         _ = s.mean()
@@ -53,9 +53,9 @@ def test_series_mean_stub() raises:
     _raises("Series.mean", raised)
 
 
-def test_series_value_counts_stub() raises:
+def test_series_value_counts_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(["a", "b", "a"]))
+    var s = Series(pd.Series(Python.evaluate("['a', 'b', 'a']")))
     var raised = False
     try:
         _ = s.value_counts()
@@ -64,7 +64,7 @@ def test_series_value_counts_stub() raises:
     _raises("Series.value_counts", raised)
 
 
-def main() raises:
+def main():
     test_df_sum_stub()
     test_df_mean_stub()
     test_df_describe_stub()

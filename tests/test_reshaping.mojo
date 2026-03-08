@@ -4,9 +4,9 @@ from testing import assert_true
 from bison import DataFrame, Series
 
 
-def test_sort_values_stub() raises:
+def test_sort_values_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [3, 1, 2]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var raised = False
     try:
         _ = df.sort_values(PythonObject("a"))
@@ -15,9 +15,9 @@ def test_sort_values_stub() raises:
     assert_true(raised)
 
 
-def test_pivot_stub() raises:
+def test_pivot_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1], "b": [2], "c": [3]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var raised = False
     try:
         _ = df.pivot(index="a", columns="b", values="c")
@@ -26,9 +26,9 @@ def test_pivot_stub() raises:
     assert_true(raised)
 
 
-def test_melt_stub() raises:
+def test_melt_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"id": [1], "val": [10]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'id': [1], 'val': [10]}")))
     var raised = False
     try:
         _ = df.melt()
@@ -37,9 +37,9 @@ def test_melt_stub() raises:
     assert_true(raised)
 
 
-def test_transpose_stub() raises:
+def test_transpose_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 2]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var raised = False
     try:
         _ = df.transpose()
@@ -48,9 +48,9 @@ def test_transpose_stub() raises:
     assert_true(raised)
 
 
-def test_drop_duplicates_stub() raises:
+def test_drop_duplicates_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 1, 2]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var raised = False
     try:
         _ = df.drop_duplicates()
@@ -59,9 +59,9 @@ def test_drop_duplicates_stub() raises:
     assert_true(raised)
 
 
-def test_series_sort_values_stub() raises:
+def test_series_sort_values_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series([3, 1, 2]))
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
     var raised = False
     try:
         _ = s.sort_values()
@@ -70,7 +70,7 @@ def test_series_sort_values_stub() raises:
     assert_true(raised)
 
 
-def main() raises:
+def main():
     test_sort_values_stub()
     test_pivot_stub()
     test_melt_stub()

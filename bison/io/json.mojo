@@ -1,11 +1,12 @@
 from python import PythonObject
+from collections import Optional
 from .._errors import _not_implemented
 
 
 fn read_json(
     path_or_buf: String,
     orient: String = "",
-    dtype: PythonObject = PythonObject(None),
+    dtype: Optional[PythonObject] = None,
     lines: Bool = False,
 ) raises -> PythonObject:
     """Read a JSON file into a DataFrame. STUB."""

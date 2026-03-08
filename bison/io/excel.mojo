@@ -1,16 +1,17 @@
 from python import PythonObject
+from collections import Optional
 from .._errors import _not_implemented
 
 
 fn read_excel(
     io: String,
-    sheet_name: PythonObject = PythonObject(0),
+    sheet_name: Int = 0,
     header: Int = 0,
-    index_col: PythonObject = PythonObject(None),
-    usecols: PythonObject = PythonObject(None),
-    dtype: PythonObject = PythonObject(None),
-    skiprows: PythonObject = PythonObject(None),
-    nrows: PythonObject = PythonObject(None),
+    index_col: Optional[PythonObject] = None,
+    usecols: Optional[PythonObject] = None,
+    dtype: Optional[PythonObject] = None,
+    skiprows: Optional[PythonObject] = None,
+    nrows: Optional[PythonObject] = None,
 ) raises -> PythonObject:
     """Read an Excel file into a DataFrame. STUB."""
     _not_implemented("read_excel")

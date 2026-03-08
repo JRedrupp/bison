@@ -1,13 +1,21 @@
 from ._errors import _not_implemented
 
 
-struct Index:
+struct Index(Copyable, Movable):
     var _data: List[String]
     var name: String
 
     fn __init__(out self, data: List[String], name: String = ""):
         self._data = data
         self.name = name
+
+    fn __copyinit__(out self, existing: Self):
+        self._data = existing._data.copy()
+        self.name = existing.name
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self._data = existing._data^
+        self.name = existing.name^
 
     fn __len__(self) -> Int:
         return len(self._data)
@@ -36,11 +44,11 @@ struct Index:
 
     fn unique(self) raises -> Index:
         _not_implemented("Index.unique")
-        return self
+        return Index(self._data.copy(), self.name)
 
     fn sort_values(self, ascending: Bool = True) raises -> Index:
         _not_implemented("Index.sort_values")
-        return self
+        return Index(self._data.copy(), self.name)
 
 
 struct RangeIndex:
@@ -65,7 +73,7 @@ struct RangeIndex:
 
     fn __repr__(self) -> String:
         return (
-            "RangeIndex(start=" + str(self.start)
-            + ", stop=" + str(self.stop)
-            + ", step=" + str(self.step) + ")"
+            "RangeIndex(start=" + String(self.start)
+            + ", stop=" + String(self.stop)
+            + ", step=" + String(self.step) + ")"
         )

@@ -4,10 +4,10 @@ from testing import assert_true
 from bison import DataFrame
 
 
-def test_merge_stub() raises:
+def test_merge_stub():
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame({"key": [1, 2], "a": [10, 20]}))
-    var right = DataFrame(pd.DataFrame({"key": [1, 2], "b": [30, 40]}))
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'a': [10, 20]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'b': [30, 40]}")))
     var raised = False
     try:
         _ = left.merge(right, on=PythonObject("key"))
@@ -16,10 +16,10 @@ def test_merge_stub() raises:
     assert_true(raised)
 
 
-def test_join_stub() raises:
+def test_join_stub():
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame({"a": [1, 2]}))
-    var right = DataFrame(pd.DataFrame({"b": [3, 4]}))
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
     var raised = False
     try:
         _ = left.join(right)
@@ -28,10 +28,10 @@ def test_join_stub() raises:
     assert_true(raised)
 
 
-def test_append_stub() raises:
+def test_append_stub():
     var pd = Python.import_module("pandas")
-    var df1 = DataFrame(pd.DataFrame({"a": [1]}))
-    var df2 = DataFrame(pd.DataFrame({"a": [2]}))
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2]}")))
     var raised = False
     try:
         _ = df1.append(df2)
@@ -40,7 +40,7 @@ def test_append_stub() raises:
     assert_true(raised)
 
 
-def main() raises:
+def main():
     test_merge_stub()
     test_join_stub()
     test_append_stub()

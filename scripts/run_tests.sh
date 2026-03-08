@@ -9,7 +9,7 @@ ERRORS=()
 
 for f in "$TESTS_DIR"/test_*.mojo; do
     echo "Running $f ..."
-    if mojo run "$f"; then
+    if mojo run -I "$REPO_ROOT" "$f"; then
         PASS=$((PASS + 1))
     else
         FAIL=$((FAIL + 1))

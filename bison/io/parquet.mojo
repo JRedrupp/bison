@@ -1,12 +1,13 @@
 from python import PythonObject
+from collections import Optional
 from .._errors import _not_implemented
 
 
 fn read_parquet(
     path: String,
     engine: String = "auto",
-    columns: PythonObject = PythonObject(None),
-    filters: PythonObject = PythonObject(None),
+    columns: Optional[PythonObject] = None,
+    filters: Optional[PythonObject] = None,
 ) raises -> PythonObject:
     """Read a Parquet file into a DataFrame. STUB."""
     _not_implemented("read_parquet")

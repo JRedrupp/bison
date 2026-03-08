@@ -4,7 +4,7 @@ from testing import assert_true
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
 
 
-def test_read_csv_stub() raises:
+def test_read_csv_stub():
     var raised = False
     try:
         _ = read_csv("/tmp/nonexistent.csv")
@@ -13,7 +13,7 @@ def test_read_csv_stub() raises:
     assert_true(raised)
 
 
-def test_read_parquet_stub() raises:
+def test_read_parquet_stub():
     var raised = False
     try:
         _ = read_parquet("/tmp/nonexistent.parquet")
@@ -22,7 +22,7 @@ def test_read_parquet_stub() raises:
     assert_true(raised)
 
 
-def test_read_json_stub() raises:
+def test_read_json_stub():
     var raised = False
     try:
         _ = read_json("/tmp/nonexistent.json")
@@ -31,7 +31,7 @@ def test_read_json_stub() raises:
     assert_true(raised)
 
 
-def test_read_excel_stub() raises:
+def test_read_excel_stub():
     var raised = False
     try:
         _ = read_excel("/tmp/nonexistent.xlsx")
@@ -40,9 +40,9 @@ def test_read_excel_stub() raises:
     assert_true(raised)
 
 
-def test_to_csv_stub() raises:
+def test_to_csv_stub():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 2]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var raised = False
     try:
         _ = df.to_csv()
@@ -51,7 +51,7 @@ def test_to_csv_stub() raises:
     assert_true(raised)
 
 
-def main() raises:
+def main():
     test_read_csv_stub()
     test_read_parquet_stub()
     test_read_json_stub()
