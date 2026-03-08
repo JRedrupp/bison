@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from python import Python, PythonObject
 from testing import assert_equal, assert_true
-from bison import DataFrame, Series
+from bison import DataFrame, Series, Column
 
 
 def test_df_from_pandas_preserves_shape():
@@ -65,6 +65,35 @@ def test_quickstart_example():
     testing.assert_frame_equal(pd_df, original)
 
 
+def test_column_typed_storage():
+    """Verify from_pandas routes values into the correct Variant arm."""
+    var pd = Python.import_module("pandas")
+
+    # int64 column -> List[Int64] arm
+    var s_int = pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64", name="i")
+    var col_int = Column.from_pandas(s_int, "i")
+    assert_true(col_int._data.isa[List[Int64]](), "int column should use List[Int64]")
+    assert_equal(col_int.__len__(), 3)
+
+    # float64 column -> List[Float64] arm
+    var s_float = pd.Series(Python.evaluate("[1.1, 2.2]"), dtype="float64", name="f")
+    var col_float = Column.from_pandas(s_float, "f")
+    assert_true(col_float._data.isa[List[Float64]](), "float column should use List[Float64]")
+    assert_equal(col_float.__len__(), 2)
+
+    # bool column -> List[Bool] arm
+    var s_bool = pd.Series(Python.evaluate("[True, False]"), dtype="bool", name="b")
+    var col_bool = Column.from_pandas(s_bool, "b")
+    assert_true(col_bool._data.isa[List[Bool]](), "bool column should use List[Bool]")
+    assert_equal(col_bool.__len__(), 2)
+
+    # object column -> List[PythonObject] arm
+    var s_obj = pd.Series(Python.evaluate("['x', 'y']"), dtype="object", name="o")
+    var col_obj = Column.from_pandas(s_obj, "o")
+    assert_true(col_obj._data.isa[List[PythonObject]](), "object column should use List[PythonObject]")
+    assert_equal(col_obj.__len__(), 2)
+
+
 def main():
     test_df_from_pandas_preserves_shape()
     test_df_to_pandas_identity()
@@ -72,4 +101,5 @@ def main():
     test_series_to_pandas_identity()
     test_df_columns_match()
     test_quickstart_example()
+    test_column_typed_storage()
     print("test_interop: all tests passed")

@@ -1,4 +1,5 @@
 from python import Python, PythonObject
+from utils import Variant
 from .dtypes import (
     BisonDtype,
     int8, int16, int32, int64,
@@ -8,18 +9,34 @@ from .dtypes import (
     datetime64_ns, timedelta64_ns,
 )
 
+# One active arm per Column instance, selected by dtype:
+#   List[Int64]        — int8/16/32/64, uint8/16/32/64
+#   List[Float64]      — float32/float64
+#   List[Bool]         — bool
+#   List[String]       — string / pandas StringDtype
+#   List[PythonObject] — object, datetime64, timedelta64 (fallback)
+alias ColumnData = Variant[
+    List[Int64],
+    List[Float64],
+    List[Bool],
+    List[String],
+    List[PythonObject],
+]
+
 
 struct Column(Copyable, Movable):
     """A single typed array representing one column of a DataFrame or a Series.
 
-    Data is stored as a ``List[PythonObject]`` (one element per row).  The
-    ``dtype`` field records the pandas-compatible dtype string so that
-    round-trips through ``to_pandas`` preserve the original dtype.
+    Data is stored as a ``ColumnData`` Variant — one typed list per column,
+    selected by ``dtype``.  Only the arm matching the dtype is populated;
+    all other arms are empty.  The ``dtype`` field records the
+    pandas-compatible dtype string so that round-trips through ``to_pandas``
+    preserve the original dtype.
     """
 
     var name: String
     var dtype: BisonDtype
-    var _data: List[PythonObject]
+    var _data: ColumnData
 
     # ------------------------------------------------------------------
     # Constructors
@@ -29,21 +46,21 @@ struct Column(Copyable, Movable):
         """Empty column with object dtype — used as stub placeholder."""
         self.name  = ""
         self.dtype = object_
-        self._data = List[PythonObject]()
+        self._data = ColumnData(List[PythonObject]())
 
-    fn __init__(out self, name: String, owned data: List[PythonObject], dtype: BisonDtype = object_):
+    fn __init__(out self, name: String, owned data: ColumnData, dtype: BisonDtype):
         self.name  = name
         self.dtype = dtype
         self._data = data^
 
     # ------------------------------------------------------------------
-    # Traits
+    # Traits — Variant is Copyable so __copyinit__ is trivial
     # ------------------------------------------------------------------
 
     fn __copyinit__(out self, existing: Self):
         self.name  = existing.name
         self.dtype = existing.dtype
-        self._data = existing._data.copy()
+        self._data = existing._data
 
     fn __moveinit__(out self, deinit existing: Self):
         self.name  = existing.name^
@@ -51,20 +68,61 @@ struct Column(Copyable, Movable):
         self._data = existing._data^
 
     # ------------------------------------------------------------------
+    # Typed accessor helpers — the only sites that call isa/get
+    # ------------------------------------------------------------------
+
+    fn _int64_data(ref self) -> ref [self._data] List[Int64]:
+        return self._data[List[Int64]]
+
+    fn _float64_data(ref self) -> ref [self._data] List[Float64]:
+        return self._data[List[Float64]]
+
+    fn _bool_data(ref self) -> ref [self._data] List[Bool]:
+        return self._data[List[Bool]]
+
+    fn _str_data(ref self) -> ref [self._data] List[String]:
+        return self._data[List[String]]
+
+    fn _obj_data(ref self) -> ref [self._data] List[PythonObject]:
+        return self._data[List[PythonObject]]
+
+    # ------------------------------------------------------------------
     # Explicit copy helper (used by Series / DataFrame __copyinit__)
     # ------------------------------------------------------------------
 
     fn copy(self) -> Column:
         """Return an independent copy of this Column."""
-        var new_data = self._data.copy()
-        return Column(self.name, new_data^, self.dtype)
+        if self._data.isa[List[Int64]]():
+            var d = self._data[List[Int64]].copy()
+            return Column(self.name, ColumnData(d^), self.dtype)
+        elif self._data.isa[List[Float64]]():
+            var d = self._data[List[Float64]].copy()
+            return Column(self.name, ColumnData(d^), self.dtype)
+        elif self._data.isa[List[Bool]]():
+            var d = self._data[List[Bool]].copy()
+            return Column(self.name, ColumnData(d^), self.dtype)
+        elif self._data.isa[List[String]]():
+            var d = self._data[List[String]].copy()
+            return Column(self.name, ColumnData(d^), self.dtype)
+        else:
+            var d = self._data[List[PythonObject]].copy()
+            return Column(self.name, ColumnData(d^), self.dtype)
 
     # ------------------------------------------------------------------
     # Length
     # ------------------------------------------------------------------
 
     fn __len__(self) -> Int:
-        return len(self._data)
+        if self._data.isa[List[Int64]]():
+            return len(self._data[List[Int64]])
+        elif self._data.isa[List[Float64]]():
+            return len(self._data[List[Float64]])
+        elif self._data.isa[List[Bool]]():
+            return len(self._data[List[Bool]])
+        elif self._data.isa[List[String]]():
+            return len(self._data[List[String]])
+        else:
+            return len(self._data[List[PythonObject]])
 
     # ------------------------------------------------------------------
     # Pandas interop
@@ -96,15 +154,49 @@ struct Column(Copyable, Movable):
         else:
             bison_dtype = object_
 
-        var data = List[PythonObject]()
-        for i in range(n):
-            data.append(py_list[i])
-        return Column(name, data^, bison_dtype)
+        if bison_dtype == int64:
+            var data = List[Int64]()
+            for i in range(n):
+                data.append(Int64(Int(py=py_list[i])))
+            return Column(name, ColumnData(data^), bison_dtype)
+        elif bison_dtype == float64:
+            var data = List[Float64]()
+            for i in range(n):
+                data.append(Float64(String(py_list[i])))
+            return Column(name, ColumnData(data^), bison_dtype)
+        elif bison_dtype == bool_:
+            var data = List[Bool]()
+            for i in range(n):
+                data.append(Bool(py_list[i].__bool__()))
+            return Column(name, ColumnData(data^), bison_dtype)
+        elif dtype_str == "string":
+            var data = List[String]()
+            for i in range(n):
+                data.append(String(py_list[i]))
+            return Column(name, ColumnData(data^), object_)
+        else:
+            var data = List[PythonObject]()
+            for i in range(n):
+                data.append(py_list[i])
+            return Column(name, ColumnData(data^), bison_dtype)
 
     fn to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
         var pd = Python.import_module("pandas")
         var py_list = Python.evaluate("[]")
-        for i in range(len(self._data)):
-            _ = py_list.append(self._data[i])
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                _ = py_list.append(self._data[List[Int64]][i])
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                _ = py_list.append(self._data[List[Float64]][i])
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                _ = py_list.append(self._data[List[Bool]][i])
+        elif self._data.isa[List[String]]():
+            for i in range(len(self._data[List[String]])):
+                _ = py_list.append(self._data[List[String]][i])
+        else:
+            for i in range(len(self._data[List[PythonObject]])):
+                _ = py_list.append(self._data[List[PythonObject]][i])
         return pd.Series(py_list, name=self.name, dtype=self.dtype.name)
