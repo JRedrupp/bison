@@ -13,4 +13,4 @@ fn concat(
 ) raises -> DataFrame:
     """Concatenate bison objects along an axis. STUB."""
     _not_implemented("concat")
-    return DataFrame(PythonObject(None))
+    return DataFrame()

@@ -1,10 +1,18 @@
-struct BisonDtype:
+struct BisonDtype(ImplicitlyCopyable, Movable):
     var name: String
     var itemsize: Int
 
     fn __init__(out self, name: String, itemsize: Int):
         self.name = name
         self.itemsize = itemsize
+
+    fn __copyinit__(out self, existing: Self):
+        self.name = existing.name
+        self.itemsize = existing.itemsize
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self.name = existing.name^
+        self.itemsize = existing.itemsize
 
     fn __str__(self) -> String:
         return self.name
