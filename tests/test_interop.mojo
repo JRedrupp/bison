@@ -94,6 +94,33 @@ def test_column_typed_storage():
     assert_equal(col_obj.__len__(), 2)
 
 
+def test_series_index_roundtrip():
+    """Custom string index must survive from_pandas → to_pandas."""
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_s = pd.Series(
+        Python.evaluate("[1, 2, 3]"),
+        index=Python.evaluate("['a', 'b', 'c']"),
+        name="x",
+    )
+    var s = Series.from_pandas(pd_s)
+    var back = s.to_pandas()
+    testing.assert_series_equal(pd_s, back)
+
+
+def test_df_index_roundtrip():
+    """Custom string index on a DataFrame must survive from_pandas → to_pandas."""
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'v': [10, 20]}"),
+        index=Python.evaluate("['r0', 'r1']"),
+    )
+    var df = DataFrame.from_pandas(pd_df)
+    var back = df.to_pandas()
+    testing.assert_frame_equal(pd_df, back)
+
+
 def main():
     test_df_from_pandas_preserves_shape()
     test_df_to_pandas_identity()
@@ -102,4 +129,6 @@ def main():
     test_df_columns_match()
     test_quickstart_example()
     test_column_typed_storage()
+    test_series_index_roundtrip()
+    test_df_index_roundtrip()
     print("test_interop: all tests passed")
