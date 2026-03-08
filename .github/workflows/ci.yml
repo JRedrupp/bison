@@ -23,7 +23,7 @@ jobs:
         run: pip install pre-commit
 
       - name: Run pre-commit checks
-        run: pre-commit run --all-files
+        run: pixi run lint
 
       - name: Generate version file
         run: pixi run gen-version
@@ -37,6 +37,7 @@ jobs:
           python scripts/update_compat.py --passing "$PASSING"
 
       - name: Commit updated README
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

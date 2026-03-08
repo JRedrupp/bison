@@ -4,39 +4,39 @@ from testing import assert_equal, assert_true, assert_false
 from bison import DataFrame
 
 
-def test_shape_from_pandas() raises:
+def test_shape_from_pandas():
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
     var s = df.shape()
     assert_equal(s[0], 3)
     assert_equal(s[1], 2)
 
 
-def test_len() raises:
+def test_len():
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame({"x": [10, 20]})
+    var pd_df = pd.DataFrame(Python.evaluate("{'x': [10, 20]}"))
     var df = DataFrame(pd_df)
     assert_equal(df.__len__(), 2)
 
 
-def test_empty_false() raises:
+def test_empty_false():
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame({"a": [1]})
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1]}"))
     var df = DataFrame(pd_df)
     assert_false(df.empty())
 
 
-def test_empty_true() raises:
+def test_empty_true():
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame()
     var df = DataFrame(pd_df)
     assert_true(df.empty())
 
 
-def test_columns() raises:
+def test_columns():
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame({"col1": [1], "col2": [2]})
+    var pd_df = pd.DataFrame(Python.evaluate("{'col1': [1], 'col2': [2]}"))
     var df = DataFrame(pd_df)
     var cols = df.columns()
     assert_equal(len(cols), 2)
@@ -44,37 +44,37 @@ def test_columns() raises:
     assert_equal(cols[1], "col2")
 
 
-def test_ndim() raises:
+def test_ndim():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     assert_equal(df.ndim(), 2)
 
 
-def test_size() raises:
+def test_size():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1, 2], "b": [3, 4]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     assert_equal(df.size(), 4)
 
 
-def test_contains() raises:
+def test_contains():
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame({"a": [1], "b": [2]}))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     assert_true(df.__contains__("a"))
     assert_false(df.__contains__("z"))
 
 
-def test_to_pandas_roundtrip() raises:
+def test_to_pandas_roundtrip():
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame({"a": [1, 2, 3]})
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
     var df = DataFrame.from_pandas(pd_df)
     var back = df.to_pandas()
     # length should match
-    assert_equal(int(back.__len__()), 3)
+    assert_equal(back.__len__(), 3)
 
 
-def test_from_dict() raises:
+def test_from_dict():
     var pd = Python.import_module("pandas")
-    var data = pd.dict([("a", [1, 2]), ("b", [3, 4])])
+    var data = Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")
     # from_dict is a stub — expect Error
     try:
         # Use from_pandas path instead (from_dict calls pd.DataFrame internally)
@@ -86,7 +86,7 @@ def test_from_dict() raises:
         pass  # stub may raise
 
 
-def main() raises:
+def main():
     test_shape_from_pandas()
     test_len()
     test_empty_false()

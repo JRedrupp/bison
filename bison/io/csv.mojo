@@ -1,4 +1,5 @@
 from python import PythonObject
+from collections import Optional
 from .._errors import _not_implemented
 
 
@@ -6,12 +7,12 @@ fn read_csv(
     filepath: String,
     sep: String = ",",
     header: Int = 0,
-    index_col: PythonObject = PythonObject(None),
-    usecols: PythonObject = PythonObject(None),
-    dtype: PythonObject = PythonObject(None),
-    nrows: PythonObject = PythonObject(None),
-    skiprows: PythonObject = PythonObject(None),
-    na_values: PythonObject = PythonObject(None),
+    index_col: Optional[PythonObject] = None,
+    usecols: Optional[PythonObject] = None,
+    dtype: Optional[PythonObject] = None,
+    nrows: Optional[PythonObject] = None,
+    skiprows: Optional[PythonObject] = None,
+    na_values: Optional[PythonObject] = None,
     encoding: String = "utf-8",
     parse_dates: Bool = False,
 ) raises -> PythonObject:

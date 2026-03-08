@@ -1,11 +1,12 @@
 from python import Python, PythonObject
+from collections import Optional
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
 
-struct Series:
+struct Series(Copyable, Movable):
     """A one-dimensional labeled array, mirroring the pandas Series API."""
 
     var _pd_s: PythonObject   # backing pandas Series — stub stage only
@@ -20,13 +21,23 @@ struct Series:
         self._pd_s = pd_s
         self.name = name
         try:
-            self._len = int(pd_s.__len__())
+            self._len = pd_s.__len__()
         except:
             self._len = 0
 
+    fn __copyinit__(out self, existing: Self):
+        self._pd_s = existing._pd_s
+        self.name = existing.name
+        self._len = existing._len
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self._pd_s = existing._pd_s^
+        self.name = existing.name^
+        self._len = existing._len
+
     @staticmethod
     fn from_pandas(pd_s: PythonObject) raises -> Series:
-        var name = str(pd_s.name)
+        var name = String(pd_s.name)
         return Series(pd_s, name)
 
     fn to_pandas(self) -> PythonObject:
@@ -55,11 +66,11 @@ struct Series:
 
     fn head(self, n: Int = 5) raises -> Series:
         _not_implemented("Series.head")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn tail(self, n: Int = 5) raises -> Series:
         _not_implemented("Series.tail")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn iloc(self, i: Int) raises -> PythonObject:
         _not_implemented("Series.iloc")
@@ -75,59 +86,59 @@ struct Series:
 
     fn add(self, other: Series) raises -> Series:
         _not_implemented("Series.add")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn sub(self, other: Series) raises -> Series:
         _not_implemented("Series.sub")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn mul(self, other: Series) raises -> Series:
         _not_implemented("Series.mul")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn div(self, other: Series) raises -> Series:
         _not_implemented("Series.div")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn floordiv(self, other: Series) raises -> Series:
         _not_implemented("Series.floordiv")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn mod(self, other: Series) raises -> Series:
         _not_implemented("Series.mod")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn pow(self, other: Series) raises -> Series:
         _not_implemented("Series.pow")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn radd(self, other: Series) raises -> Series:
         _not_implemented("Series.radd")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rsub(self, other: Series) raises -> Series:
         _not_implemented("Series.rsub")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rmul(self, other: Series) raises -> Series:
         _not_implemented("Series.rmul")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rdiv(self, other: Series) raises -> Series:
         _not_implemented("Series.rdiv")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rfloordiv(self, other: Series) raises -> Series:
         _not_implemented("Series.rfloordiv")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rmod(self, other: Series) raises -> Series:
         _not_implemented("Series.rmod")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rpow(self, other: Series) raises -> Series:
         _not_implemented("Series.rpow")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Comparison
@@ -135,27 +146,27 @@ struct Series:
 
     fn eq(self, other: Series) raises -> Series:
         _not_implemented("Series.eq")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn ne(self, other: Series) raises -> Series:
         _not_implemented("Series.ne")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn lt(self, other: Series) raises -> Series:
         _not_implemented("Series.lt")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn le(self, other: Series) raises -> Series:
         _not_implemented("Series.le")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn gt(self, other: Series) raises -> Series:
         _not_implemented("Series.gt")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn ge(self, other: Series) raises -> Series:
         _not_implemented("Series.ge")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Aggregation
@@ -199,11 +210,11 @@ struct Series:
 
     fn describe(self) raises -> Series:
         _not_implemented("Series.describe")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Series:
         _not_implemented("Series.value_counts")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn quantile(self, q: Float64 = 0.5) raises -> PythonObject:
         _not_implemented("Series.quantile")
@@ -211,19 +222,19 @@ struct Series:
 
     fn cumsum(self) raises -> Series:
         _not_implemented("Series.cumsum")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn cumprod(self) raises -> Series:
         _not_implemented("Series.cumprod")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn cummin(self) raises -> Series:
         _not_implemented("Series.cummin")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn cummax(self) raises -> Series:
         _not_implemented("Series.cummax")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Missing data
@@ -231,35 +242,35 @@ struct Series:
 
     fn isna(self) raises -> Series:
         _not_implemented("Series.isna")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn isnull(self) raises -> Series:
         _not_implemented("Series.isnull")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn notna(self) raises -> Series:
         _not_implemented("Series.notna")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn notnull(self) raises -> Series:
         _not_implemented("Series.notnull")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn fillna(self, value: PythonObject) raises -> Series:
         _not_implemented("Series.fillna")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn dropna(self) raises -> Series:
         _not_implemented("Series.dropna")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn ffill(self) raises -> Series:
         _not_implemented("Series.ffill")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn bfill(self) raises -> Series:
         _not_implemented("Series.bfill")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Sorting
@@ -267,19 +278,19 @@ struct Series:
 
     fn sort_values(self, ascending: Bool = True) raises -> Series:
         _not_implemented("Series.sort_values")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn sort_index(self, ascending: Bool = True) raises -> Series:
         _not_implemented("Series.sort_index")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn argsort(self) raises -> Series:
         _not_implemented("Series.argsort")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rank(self) raises -> Series:
         _not_implemented("Series.rank")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Reshaping / transformations
@@ -287,39 +298,39 @@ struct Series:
 
     fn apply(self, func: PythonObject) raises -> Series:
         _not_implemented("Series.apply")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn map(self, func: PythonObject) raises -> Series:
         _not_implemented("Series.map")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn astype(self, dtype: String) raises -> Series:
         _not_implemented("Series.astype")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn copy(self) raises -> Series:
         _not_implemented("Series.copy")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn reset_index(self, drop: Bool = False) raises -> Series:
         _not_implemented("Series.reset_index")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn rename(self, new_name: String) raises -> Series:
         _not_implemented("Series.rename")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn clip(self, lower: PythonObject, upper: PythonObject) raises -> Series:
         _not_implemented("Series.clip")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn abs(self) raises -> Series:
         _not_implemented("Series.abs")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn round(self, decimals: Int = 0) raises -> Series:
         _not_implemented("Series.round")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn unique(self) raises -> PythonObject:
         _not_implemented("Series.unique")
@@ -327,19 +338,19 @@ struct Series:
 
     fn isin(self, values: PythonObject) raises -> Series:
         _not_implemented("Series.isin")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn between(self, left: PythonObject, right: PythonObject) raises -> Series:
         _not_implemented("Series.between")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn where(self, cond: Series) raises -> Series:
         _not_implemented("Series.where")
-        return self
+        return Series(self._pd_s, self.name)
 
     fn mask(self, cond: Series) raises -> Series:
         _not_implemented("Series.mask")
-        return self
+        return Series(self._pd_s, self.name)
 
     # ------------------------------------------------------------------
     # Interop
@@ -386,7 +397,7 @@ struct Series:
     # ------------------------------------------------------------------
 
     fn __repr__(self) raises -> String:
-        return str(self._pd_s)
+        return String(self._pd_s)
 
     fn __len__(self) -> Int:
         return self._len

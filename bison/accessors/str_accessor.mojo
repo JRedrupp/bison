@@ -1,10 +1,14 @@
+from python import PythonObject
 from .._errors import _not_implemented
 
 
 struct StringMethods:
     """Vectorized string operations on a Series (.str accessor)."""
 
-    fn contains(self, pat: String, case: Bool = True, na: Bool = False) raises -> PythonObject:
+    fn __init__(out self):
+        pass
+
+    fn contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> PythonObject:
         _not_implemented("Series.str.contains")
         return PythonObject(None)
 

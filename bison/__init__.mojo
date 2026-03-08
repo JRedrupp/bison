@@ -16,4 +16,4 @@ from .indexing import LocIndexer, ILocIndexer, AtIndexer, IAtIndexer
 from .io import read_csv, read_parquet, read_json, read_excel
 from .reshape import concat
 
-alias __version__ = VERSION
+comptime __version__ = VERSION

@@ -4,9 +4,9 @@ from testing import assert_true
 from bison import Series
 
 
-def test_str_upper_stub() raises:
+def test_str_upper_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(["foo", "bar"]))
+    var s = Series(pd.Series(Python.evaluate("['foo', 'bar']")))
     var raised = False
     try:
         var acc = s.str()
@@ -16,9 +16,9 @@ def test_str_upper_stub() raises:
     assert_true(raised)
 
 
-def test_str_contains_stub() raises:
+def test_str_contains_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(["hello", "world"]))
+    var s = Series(pd.Series(Python.evaluate("['hello', 'world']")))
     var raised = False
     try:
         var acc = s.str()
@@ -28,9 +28,9 @@ def test_str_contains_stub() raises:
     assert_true(raised)
 
 
-def test_dt_year_stub() raises:
+def test_dt_year_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(pd.to_datetime(["2020-01-01", "2021-06-15"])))
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01', '2021-06-15']"))))
     var raised = False
     try:
         var acc = s.dt()
@@ -40,9 +40,9 @@ def test_dt_year_stub() raises:
     assert_true(raised)
 
 
-def test_dt_month_stub() raises:
+def test_dt_month_stub():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(pd.to_datetime(["2020-01-01"])))
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01']"))))
     var raised = False
     try:
         var acc = s.dt()
@@ -52,7 +52,7 @@ def test_dt_month_stub() raises:
     assert_true(raised)
 
 
-def main() raises:
+def main():
     test_str_upper_stub()
     test_str_contains_stub()
     test_dt_year_stub()

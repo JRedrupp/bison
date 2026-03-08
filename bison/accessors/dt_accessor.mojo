@@ -1,8 +1,12 @@
+from python import PythonObject
 from .._errors import _not_implemented
 
 
 struct DatetimeMethods:
     """Accessor for datetime properties on a Series (.dt accessor)."""
+
+    fn __init__(out self):
+        pass
 
     fn year(self) raises -> PythonObject:
         _not_implemented("Series.dt.year")

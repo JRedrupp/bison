@@ -16,4 +16,4 @@ fn assert_series_equal(left: PythonObject, right: PythonObject) raises:
 fn make_simple_df() raises -> PythonObject:
     """Return a small pandas DataFrame for use in tests."""
     var pd = Python.import_module("pandas")
-    return pd.DataFrame({"a": pd.array([1, 2, 3]), "b": pd.array([4.0, 5.0, 6.0]), "c": pd.array(["x", "y", "z"])})
+    return pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0], 'c': ['x', 'y', 'z']}"))
