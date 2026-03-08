@@ -1,6 +1,7 @@
 from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
+from .column import Column
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -8,47 +9,45 @@ from .groupby import DataFrameGroupBy
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API."""
 
-    var _pd_df: PythonObject   # backing pandas DataFrame — stub stage only
-    var _columns: List[String]
-    var _nrows: Int
-    var _ncols: Int
+    var _cols: List[Column]
 
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
 
-    fn __init__(out self, pd_df: PythonObject):
-        self._pd_df = pd_df
-        self._columns = List[String]()
-        try:
-            var cols = pd_df.columns.tolist()
-            var n = cols.__len__()
-            for i in range(n):
-                self._columns.append(String(cols[i]))
-            self._nrows = pd_df.__len__()
-            self._ncols = n
-        except:
-            self._nrows = 0
-            self._ncols = 0
+    fn __init__(out self):
+        """Empty DataFrame — used as stub return placeholder."""
+        self._cols = List[Column]()
+
+    fn __init__(out self, owned cols: List[Column]):
+        self._cols = cols^
+
+    fn __init__(out self, pd_df: PythonObject) raises:
+        """Convenience constructor: wraps a pandas DataFrame via Column.from_pandas."""
+        var pd_cols = pd_df.columns.tolist()
+        var n = Int(pd_df.columns.__len__())
+        self._cols = List[Column]()
+        for i in range(n):
+            var col_name = String(pd_cols[i])
+            self._cols.append(Column.from_pandas(pd_df[pd_cols[i]], col_name))
 
     fn __copyinit__(out self, existing: Self):
-        self._pd_df = existing._pd_df
-        self._columns = existing._columns.copy()
-        self._nrows = existing._nrows
-        self._ncols = existing._ncols
+        self._cols = existing._cols.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
-        self._pd_df = existing._pd_df^
-        self._columns = existing._columns^
-        self._nrows = existing._nrows
-        self._ncols = existing._ncols
+        self._cols = existing._cols^
 
     @staticmethod
     fn from_pandas(pd_df: PythonObject) raises -> DataFrame:
         return DataFrame(pd_df)
 
-    fn to_pandas(self) -> PythonObject:
-        return self._pd_df
+    fn to_pandas(self) raises -> PythonObject:
+        var pd = Python.import_module("pandas")
+        var dict_ = Python.evaluate("{}")
+        for i in range(self._cols.__len__()):
+            var pd_series = self._cols[i].to_pandas()
+            dict_[self._cols[i].name] = pd_series
+        return pd.DataFrame(dict_)
 
     @staticmethod
     fn from_dict(data: PythonObject) raises -> DataFrame:
@@ -67,30 +66,39 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn shape(self) -> Tuple[Int, Int]:
-        return (self._nrows, self._ncols)
+        var ncols = self._cols.__len__()
+        if ncols == 0:
+            return (0, 0)
+        return (self._cols[0].__len__(), ncols)
 
     fn size(self) -> Int:
-        return self._nrows * self._ncols
+        var s = self.shape()
+        return s[0] * s[1]
 
     fn empty(self) -> Bool:
-        return self._nrows == 0 or self._ncols == 0
+        if self._cols.__len__() == 0:
+            return True
+        return self._cols[0].__len__() == 0
 
     fn columns(self) -> List[String]:
-        return self._columns.copy()
+        var result = List[String]()
+        for i in range(self._cols.__len__()):
+            result.append(self._cols[i].name)
+        return result^
 
     fn ndim(self) -> Int:
         return 2
 
     fn dtypes(self) raises -> Series:
         _not_implemented("DataFrame.dtypes")
-        return Series(PythonObject(None))
+        return Series()
 
     fn info(self) raises:
         _not_implemented("DataFrame.info")
 
     fn memory_usage(self, deep: Bool = False) raises -> Series:
         _not_implemented("DataFrame.memory_usage")
-        return Series(PythonObject(None))
+        return Series()
 
     # ------------------------------------------------------------------
     # Selection / indexing
@@ -98,7 +106,7 @@ struct DataFrame(Copyable, Movable):
 
     fn __getitem__(self, key: String) raises -> Series:
         _not_implemented("DataFrame.__getitem__")
-        return Series(PythonObject(None))
+        return Series()
 
     fn __setitem__(inout self, key: String, value: PythonObject) raises:
         _not_implemented("DataFrame.__setitem__")
@@ -109,23 +117,23 @@ struct DataFrame(Copyable, Movable):
 
     fn head(self, n: Int = 5) raises -> DataFrame:
         _not_implemented("DataFrame.head")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn tail(self, n: Int = 5) raises -> DataFrame:
         _not_implemented("DataFrame.tail")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn sample(self, n: Int = 1, frac: Optional[PythonObject] = None, random_state: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.sample")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn filter(self, items: Optional[PythonObject] = None, like: String = "", regex: String = "", axis: Int = 1) raises -> DataFrame:
         _not_implemented("DataFrame.filter")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn select_dtypes(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.select_dtypes")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # Aggregation
@@ -133,99 +141,99 @@ struct DataFrame(Copyable, Movable):
 
     fn sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.sum")
-        return Series(PythonObject(None))
+        return Series()
 
     fn mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.mean")
-        return Series(PythonObject(None))
+        return Series()
 
     fn median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.median")
-        return Series(PythonObject(None))
+        return Series()
 
     fn min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.min")
-        return Series(PythonObject(None))
+        return Series()
 
     fn max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.max")
-        return Series(PythonObject(None))
+        return Series()
 
     fn std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.std")
-        return Series(PythonObject(None))
+        return Series()
 
     fn var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.var")
-        return Series(PythonObject(None))
+        return Series()
 
     fn count(self, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.count")
-        return Series(PythonObject(None))
+        return Series()
 
     fn nunique(self, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.nunique")
-        return Series(PythonObject(None))
+        return Series()
 
     fn describe(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn quantile(self, q: Float64 = 0.5, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.quantile")
-        return Series(PythonObject(None))
+        return Series()
 
     fn abs(self) raises -> DataFrame:
         _not_implemented("DataFrame.abs")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn cumsum(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.cumsum")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn cumprod(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.cumprod")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn cummin(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.cummin")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn cummax(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.cummax")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn agg(self, func: PythonObject, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
-        return Series(PythonObject(None))
+        return Series()
 
     fn aggregate(self, func: PythonObject, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.aggregate")
-        return Series(PythonObject(None))
+        return Series()
 
     fn apply(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.apply")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn applymap(self, func: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.applymap")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn transform(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.transform")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn eval(self, expr: String) raises -> Series:
         _not_implemented("DataFrame.eval")
-        return Series(PythonObject(None))
+        return Series()
 
     fn query(self, expr: String) raises -> DataFrame:
         _not_implemented("DataFrame.query")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn pipe(self, func: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # Missing data
@@ -233,39 +241,39 @@ struct DataFrame(Copyable, Movable):
 
     fn isna(self) raises -> DataFrame:
         _not_implemented("DataFrame.isna")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn isnull(self) raises -> DataFrame:
         _not_implemented("DataFrame.isnull")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn notna(self) raises -> DataFrame:
         _not_implemented("DataFrame.notna")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn notnull(self) raises -> DataFrame:
         _not_implemented("DataFrame.notnull")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn fillna(self, value: PythonObject, method: String = "", axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.fillna")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn dropna(self, axis: Int = 0, how: String = "any", thresh: Optional[PythonObject] = None, subset: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.dropna")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn ffill(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.ffill")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn bfill(self, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.bfill")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn interpolate(self, method: String = "linear", axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.interpolate")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # Reshaping / sorting
@@ -273,122 +281,122 @@ struct DataFrame(Copyable, Movable):
 
     fn sort_values(self, by: PythonObject, ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
         _not_implemented("DataFrame.sort_values")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn sort_index(self, axis: Int = 0, ascending: Bool = True) raises -> DataFrame:
         _not_implemented("DataFrame.sort_index")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn reset_index(self, drop: Bool = False) raises -> DataFrame:
         _not_implemented("DataFrame.reset_index")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn set_index(self, keys: PythonObject, drop: Bool = True) raises -> DataFrame:
         _not_implemented("DataFrame.set_index")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn rename(self, columns: Optional[PythonObject] = None, index: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.rename")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn rename_axis(self, mapper: Optional[PythonObject] = None, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.rename_axis")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn reindex(self, labels: Optional[PythonObject] = None, axis: Int = 0, fill_value: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.reindex")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn drop(self, labels: Optional[PythonObject] = None, axis: Int = 0, columns: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.drop")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn drop_duplicates(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> DataFrame:
         _not_implemented("DataFrame.drop_duplicates")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn duplicated(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> Series:
         _not_implemented("DataFrame.duplicated")
-        return Series(PythonObject(None))
+        return Series()
 
     fn pivot(self, index: String = "", columns: String = "", values: String = "") raises -> DataFrame:
         _not_implemented("DataFrame.pivot")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn pivot_table(self, values: Optional[PythonObject] = None, index: Optional[PythonObject] = None, columns: Optional[PythonObject] = None, aggfunc: String = "mean") raises -> DataFrame:
         _not_implemented("DataFrame.pivot_table")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn melt(self, id_vars: Optional[PythonObject] = None, value_vars: Optional[PythonObject] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
         _not_implemented("DataFrame.melt")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn stack(self, level: Int = -1) raises -> Series:
         _not_implemented("DataFrame.stack")
-        return Series(PythonObject(None))
+        return Series()
 
     fn unstack(self, level: Int = -1) raises -> DataFrame:
         _not_implemented("DataFrame.unstack")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn transpose(self) raises -> DataFrame:
         _not_implemented("DataFrame.transpose")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn T(self) raises -> DataFrame:
         _not_implemented("DataFrame.T")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn swaplevel(self, i: Int = -2, j: Int = -1, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.swaplevel")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn explode(self, column: String) raises -> DataFrame:
         _not_implemented("DataFrame.explode")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn clip(self, lower: Optional[PythonObject] = None, upper: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.clip")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn round(self, decimals: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.round")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn astype(self, dtype: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.astype")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn copy(self, deep: Bool = True) raises -> DataFrame:
         _not_implemented("DataFrame.copy")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn assign(self, **kwargs: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.assign")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn insert(inout self, loc: Int, column: String, value: PythonObject) raises:
         _not_implemented("DataFrame.insert")
 
     fn pop(inout self, item: String) raises -> Series:
         _not_implemented("DataFrame.pop")
-        return Series(PythonObject(None))
+        return Series()
 
     fn where(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.where")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn mask(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.mask")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn isin(self, values: PythonObject) raises -> DataFrame:
         _not_implemented("DataFrame.isin")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn combine_first(self, other: DataFrame) raises -> DataFrame:
         _not_implemented("DataFrame.combine_first")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn update(inout self, other: DataFrame) raises:
         _not_implemented("DataFrame.update")
@@ -409,7 +417,7 @@ struct DataFrame(Copyable, Movable):
         suffixes: Optional[PythonObject] = None,
     ) raises -> DataFrame:
         _not_implemented("DataFrame.merge")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn join(
         self,
@@ -421,11 +429,11 @@ struct DataFrame(Copyable, Movable):
         sort: Bool = False,
     ) raises -> DataFrame:
         _not_implemented("DataFrame.join")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     fn append(self, other: DataFrame, ignore_index: Bool = False) raises -> DataFrame:
         _not_implemented("DataFrame.append")
-        return DataFrame(self._pd_df)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # GroupBy
@@ -505,14 +513,16 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn __repr__(self) raises -> String:
-        return String(self._pd_df)
+        return String(self.to_pandas())
 
     fn __len__(self) -> Int:
-        return self._nrows
+        if self._cols.__len__() == 0:
+            return 0
+        return self._cols[0].__len__()
 
     fn __contains__(self, key: String) -> Bool:
-        for col in self._columns:
-            if col == key:
+        for i in range(self._cols.__len__()):
+            if self._cols[i].name == key:
                 return True
         return False
 
