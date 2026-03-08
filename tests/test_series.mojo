@@ -45,17 +45,10 @@ def test_to_pandas_roundtrip():
     assert_equal(back.__len__(), 3)
 
 
-def test_stub_raises_sum():
-    """Stub methods must raise with 'not implemented'."""
+def test_sum():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
-    var raised = False
-    try:
-        _ = s.sum()
-    except e:
-        raised = True
-        assert_true(String(e).__contains__("not implemented"))
-    assert_true(raised)
+    assert_true(s.sum() == 6.0)
 
 
 def test_stub_raises_head():
@@ -76,6 +69,6 @@ def main():
     test_empty_true()
     test_shape()
     test_to_pandas_roundtrip()
-    test_stub_raises_sum()
+    test_sum()
     test_stub_raises_head()
     print("test_series: all tests passed")

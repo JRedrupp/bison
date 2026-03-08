@@ -2,6 +2,7 @@ from python import Python, PythonObject
 from collections import Optional, Dict
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
+from .dtypes import float64 as _float64
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -148,8 +149,16 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.sum")
-        return Series()
+        # skipna is accepted but not enforced: Column has no null mask yet.
+        if axis != 0:
+            raise Error("DataFrame.sum: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].sum())
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         _not_implemented("DataFrame.mean")
