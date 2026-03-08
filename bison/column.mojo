@@ -15,7 +15,7 @@ from .dtypes import (
 #   List[Bool]         — bool
 #   List[String]       — string / pandas StringDtype
 #   List[PythonObject] — object, datetime64, timedelta64 (fallback)
-alias ColumnData = Variant[
+comptime ColumnData = Variant[
     List[Int64],
     List[Float64],
     List[Bool],
