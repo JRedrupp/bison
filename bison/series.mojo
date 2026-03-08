@@ -181,9 +181,9 @@ struct Series(Copyable, Movable):
     # Aggregation
     # ------------------------------------------------------------------
 
-    fn sum(self) raises -> Float64:
-        _not_implemented("Series.sum")
-        return Float64(0)
+    fn sum(self, skipna: Bool = True) raises -> Float64:
+        # skipna is accepted but not enforced: Column has no null mask yet.
+        return self._col.sum()
 
     fn mean(self) raises -> Float64:
         _not_implemented("Series.mean")
