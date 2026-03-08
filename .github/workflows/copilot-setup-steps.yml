@@ -35,7 +35,7 @@ jobs:
         run: pixi run gen-version
 
       - name: Verify Mojo is available
-        run: mojo --version
+        run: pixi run mojo --version
 
       - name: Install pre-commit
         run: pip install pre-commit
