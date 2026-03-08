@@ -37,6 +37,7 @@ struct Column(Copyable, Movable):
     var name: String
     var dtype: BisonDtype
     var _data: ColumnData
+    var _index: List[PythonObject]
 
     # ------------------------------------------------------------------
     # Constructors
@@ -47,11 +48,19 @@ struct Column(Copyable, Movable):
         self.name  = ""
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
+        self._index = List[PythonObject]()
 
     fn __init__(out self, name: String, owned data: ColumnData, dtype: BisonDtype):
         self.name  = name
         self.dtype = dtype
         self._data = data^
+        self._index = List[PythonObject]()
+
+    fn __init__(out self, name: String, owned data: ColumnData, dtype: BisonDtype, owned index: List[PythonObject]):
+        self.name  = name
+        self.dtype = dtype
+        self._data = data^
+        self._index = index^
 
     # ------------------------------------------------------------------
     # Traits — Variant is Copyable so __copyinit__ is trivial
@@ -61,11 +70,13 @@ struct Column(Copyable, Movable):
         self.name  = existing.name
         self.dtype = existing.dtype
         self._data = existing._data
+        self._index = existing._index.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
         self.name  = existing.name^
         self.dtype = existing.dtype^
         self._data = existing._data^
+        self._index = existing._index^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — the only sites that call isa/get
@@ -94,19 +105,24 @@ struct Column(Copyable, Movable):
         """Return an independent copy of this Column."""
         if self._data.isa[List[Int64]]():
             var d = self._data[List[Int64]].copy()
-            return Column(self.name, ColumnData(d^), self.dtype)
+            var idx = self._index.copy()
+            return Column(self.name, ColumnData(d^), self.dtype, idx^)
         elif self._data.isa[List[Float64]]():
             var d = self._data[List[Float64]].copy()
-            return Column(self.name, ColumnData(d^), self.dtype)
+            var idx = self._index.copy()
+            return Column(self.name, ColumnData(d^), self.dtype, idx^)
         elif self._data.isa[List[Bool]]():
             var d = self._data[List[Bool]].copy()
-            return Column(self.name, ColumnData(d^), self.dtype)
+            var idx = self._index.copy()
+            return Column(self.name, ColumnData(d^), self.dtype, idx^)
         elif self._data.isa[List[String]]():
             var d = self._data[List[String]].copy()
-            return Column(self.name, ColumnData(d^), self.dtype)
+            var idx = self._index.copy()
+            return Column(self.name, ColumnData(d^), self.dtype, idx^)
         else:
             var d = self._data[List[PythonObject]].copy()
-            return Column(self.name, ColumnData(d^), self.dtype)
+            var idx = self._index.copy()
+            return Column(self.name, ColumnData(d^), self.dtype, idx^)
 
     # ------------------------------------------------------------------
     # Length
@@ -134,6 +150,10 @@ struct Column(Copyable, Movable):
         var dtype_str = String(pd_series.dtype)
         var n = Int(pd_series.__len__())
         var py_list = pd_series.tolist()
+        var py_index = pd_series.index.tolist()
+        var idx_list = List[PythonObject]()
+        for i in range(n):
+            idx_list.append(py_index[i])
 
         var bison_dtype: BisonDtype
         if (
@@ -158,27 +178,27 @@ struct Column(Copyable, Movable):
             var data = List[Int64]()
             for i in range(n):
                 data.append(Int64(Int(py=py_list[i])))
-            return Column(name, ColumnData(data^), bison_dtype)
+            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
         elif bison_dtype == float64:
             var data = List[Float64]()
             for i in range(n):
                 data.append(Float64(String(py_list[i])))
-            return Column(name, ColumnData(data^), bison_dtype)
+            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
         elif bison_dtype == bool_:
             var data = List[Bool]()
             for i in range(n):
                 data.append(Bool(py_list[i].__bool__()))
-            return Column(name, ColumnData(data^), bison_dtype)
+            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
         elif dtype_str == "string":
             var data = List[String]()
             for i in range(n):
                 data.append(String(py_list[i]))
-            return Column(name, ColumnData(data^), object_)
+            return Column(name, ColumnData(data^), object_, idx_list^)
         else:
             var data = List[PythonObject]()
             for i in range(n):
                 data.append(py_list[i])
-            return Column(name, ColumnData(data^), bison_dtype)
+            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
 
     fn to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
@@ -199,4 +219,9 @@ struct Column(Copyable, Movable):
         else:
             for i in range(len(self._data[List[PythonObject]])):
                 _ = py_list.append(self._data[List[PythonObject]][i])
+        if len(self._index) > 0:
+            var idx_py = Python.evaluate("[]")
+            for i in range(len(self._index)):
+                _ = idx_py.append(self._index[i])
+            return pd.Series(py_list, name=self.name, dtype=self.dtype.name, index=idx_py)
         return pd.Series(py_list, name=self.name, dtype=self.dtype.name)
