@@ -25,6 +25,11 @@ jobs:
       - name: Run pre-commit checks
         run: pixi run lint
 
+      - name: Check Mojo formatting
+        run: |
+          pixi run fmt
+          git diff --exit-code -- '*.mojo' || (echo "Mojo files are not properly formatted. Run 'pixi run fmt' to fix."; exit 1)
+
       - name: Generate version file
         run: pixi run gen-version
 
