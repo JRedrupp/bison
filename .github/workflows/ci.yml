@@ -23,9 +23,7 @@ jobs:
         run: pip install pre-commit
 
       - name: Run pre-commit checks
-        run: |
-          export PATH="$GITHUB_WORKSPACE/.pixi/envs/default/bin:$PATH"
-          pre-commit run --all-files
+        run: pixi run lint
 
       - name: Generate version file
         run: pixi run gen-version
