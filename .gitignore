@@ -1,0 +1,8 @@
+.pixi/
+__pycache__/
+*.pyc
+.CLAUDE
+.claude/
+*.mojopkg
+dist/
+.test-pass-count
