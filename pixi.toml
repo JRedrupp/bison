@@ -7,7 +7,7 @@ requires-pixi = ">=0.41.0"
 channels = ["conda-forge", "https://conda.modular.com/max"]
 
 [dependencies]
-max = "==26.1.*"
+max = "26.1.*"
 
 [feature.dev.dependencies]
 pandas = ">=2.0"
