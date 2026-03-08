@@ -1,6 +1,7 @@
 from python import PythonObject
 from collections import Optional
 from .._errors import _not_implemented
+from ..dataframe import DataFrame
 
 
 fn read_csv(
@@ -15,10 +16,10 @@ fn read_csv(
     na_values: Optional[PythonObject] = None,
     encoding: String = "utf-8",
     parse_dates: Bool = False,
-) raises -> PythonObject:
+) raises -> DataFrame:
     """Read a CSV file into a DataFrame. STUB."""
     _not_implemented("read_csv")
-    return PythonObject(None)
+    return DataFrame(PythonObject(None))
 
 
 fn to_csv(
@@ -28,7 +29,7 @@ fn to_csv(
     index: Bool = True,
     header: Bool = True,
     encoding: String = "utf-8",
-) raises -> PythonObject:
+) raises -> String:
     """Write a DataFrame to CSV. STUB."""
     _not_implemented("DataFrame.to_csv")
-    return PythonObject(None)
+    return String("")

@@ -172,33 +172,33 @@ struct Series(Copyable, Movable):
     # Aggregation
     # ------------------------------------------------------------------
 
-    fn sum(self) raises -> PythonObject:
+    fn sum(self) raises -> Float64:
         _not_implemented("Series.sum")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn mean(self) raises -> PythonObject:
+    fn mean(self) raises -> Float64:
         _not_implemented("Series.mean")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn median(self) raises -> PythonObject:
+    fn median(self) raises -> Float64:
         _not_implemented("Series.median")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn min(self) raises -> PythonObject:
+    fn min(self) raises -> Float64:
         _not_implemented("Series.min")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn max(self) raises -> PythonObject:
+    fn max(self) raises -> Float64:
         _not_implemented("Series.max")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn std(self, ddof: Int = 1) raises -> PythonObject:
+    fn std(self, ddof: Int = 1) raises -> Float64:
         _not_implemented("Series.std")
-        return PythonObject(None)
+        return Float64(0)
 
-    fn var(self, ddof: Int = 1) raises -> PythonObject:
+    fn var(self, ddof: Int = 1) raises -> Float64:
         _not_implemented("Series.var")
-        return PythonObject(None)
+        return Float64(0)
 
     fn count(self) raises -> Int:
         _not_implemented("Series.count")
@@ -216,9 +216,9 @@ struct Series(Copyable, Movable):
         _not_implemented("Series.value_counts")
         return Series(self._pd_s, self.name)
 
-    fn quantile(self, q: Float64 = 0.5) raises -> PythonObject:
+    fn quantile(self, q: Float64 = 0.5) raises -> Float64:
         _not_implemented("Series.quantile")
-        return PythonObject(None)
+        return Float64(0)
 
     fn cumsum(self) raises -> Series:
         _not_implemented("Series.cumsum")
@@ -332,9 +332,9 @@ struct Series(Copyable, Movable):
         _not_implemented("Series.round")
         return Series(self._pd_s, self.name)
 
-    fn unique(self) raises -> PythonObject:
+    fn unique(self) raises -> Series:
         _not_implemented("Series.unique")
-        return PythonObject(None)
+        return Series(self._pd_s, self.name)
 
     fn isin(self, values: PythonObject) raises -> Series:
         _not_implemented("Series.isin")
@@ -372,13 +372,13 @@ struct Series(Copyable, Movable):
         _not_implemented("Series.to_dict")
         return PythonObject(None)
 
-    fn to_csv(self, path: String = "") raises -> PythonObject:
+    fn to_csv(self, path: String = "") raises -> String:
         _not_implemented("Series.to_csv")
-        return PythonObject(None)
+        return String("")
 
-    fn to_json(self, path: String = "") raises -> PythonObject:
+    fn to_json(self, path: String = "") raises -> String:
         _not_implemented("Series.to_json")
-        return PythonObject(None)
+        return String("")
 
     # ------------------------------------------------------------------
     # String / Datetime accessors (return accessor structs)

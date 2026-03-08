@@ -1,6 +1,7 @@
 from python import PythonObject
 from collections import Optional
 from .._errors import _not_implemented
+from ..dataframe import DataFrame
 
 
 fn read_json(
@@ -8,10 +9,10 @@ fn read_json(
     orient: String = "",
     dtype: Optional[PythonObject] = None,
     lines: Bool = False,
-) raises -> PythonObject:
+) raises -> DataFrame:
     """Read a JSON file into a DataFrame. STUB."""
     _not_implemented("read_json")
-    return PythonObject(None)
+    return DataFrame(PythonObject(None))
 
 
 fn to_json(
@@ -20,7 +21,7 @@ fn to_json(
     orient: String = "",
     lines: Bool = False,
     indent: Int = 0,
-) raises -> PythonObject:
+) raises -> String:
     """Write a DataFrame to JSON. STUB."""
     _not_implemented("DataFrame.to_json")
-    return PythonObject(None)
+    return String("")
