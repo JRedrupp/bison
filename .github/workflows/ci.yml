@@ -46,5 +46,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git diff --cached --quiet || git commit -m "chore: update compatibility table [skip ci]"
-          git push
+          if ! git diff --cached --quiet; then
+            git commit --amend --no-edit
+            git push --force-with-lease origin HEAD:main
+          fi
