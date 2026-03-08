@@ -145,6 +145,31 @@ struct Column(Copyable, Movable):
             return len(self._data[List[PythonObject]])
 
     # ------------------------------------------------------------------
+    # Aggregation
+    # ------------------------------------------------------------------
+
+    fn sum(self) raises -> Float64:
+        """Return the sum of all values as Float64. Raises for non-numeric types."""
+        if self._data.isa[List[Int64]]():
+            var total = Float64(0)
+            for i in range(len(self._data[List[Int64]])):
+                total += Float64(self._data[List[Int64]][i])
+            return total
+        elif self._data.isa[List[Float64]]():
+            var total = Float64(0)
+            for i in range(len(self._data[List[Float64]])):
+                total += self._data[List[Float64]][i]
+            return total
+        elif self._data.isa[List[Bool]]():
+            var total = Float64(0)
+            for i in range(len(self._data[List[Bool]])):
+                if self._data[List[Bool]][i]:
+                    total += 1.0
+            return total
+        else:
+            raise Error("sum: non-numeric column type")
+
+    # ------------------------------------------------------------------
     # Pandas interop
     # ------------------------------------------------------------------
 
