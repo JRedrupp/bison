@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A Mojo DataFrame library with a pandas-compatible API"
 license = "Apache-2.0"
 requires-pixi = ">=0.41.0"
+channels = ["conda-forge", "https://conda.modular.com/max"]
 
 [dependencies]
 max = "==26.1.*"
