@@ -1,7 +1,7 @@
 from python import Python, PythonObject
-from collections import Optional
+from collections import Optional, Dict
 from ._errors import _not_implemented
-from .column import Column
+from .column import Column, ColumnData, DFScalar
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -50,16 +50,24 @@ struct DataFrame(Copyable, Movable):
         return pd.DataFrame(dict_)
 
     @staticmethod
-    fn from_dict(data: PythonObject) raises -> DataFrame:
-        """Create DataFrame from a dict-like PythonObject."""
-        var pd = Python.import_module("pandas")
-        return DataFrame(pd.DataFrame(data))
+    fn from_dict(data: Dict[String, ColumnData]) raises -> DataFrame:
+        """Create DataFrame from a native dict mapping column names to column data."""
+        var cols = List[Column]()
+        for entry in data.items():
+            var col_data = entry.value
+            var dtype = Column._sniff_dtype(col_data)
+            cols.append(Column(entry.key, col_data^, dtype))
+        return DataFrame(cols^)
 
     @staticmethod
-    fn from_records(records: PythonObject, columns: Optional[PythonObject] = None) raises -> DataFrame:
-        """Create DataFrame from a list of dicts/tuples."""
-        var pd = Python.import_module("pandas")
-        return DataFrame(pd.DataFrame.from_records(records, columns=columns))
+    fn from_records(
+        records: List[Dict[String, DFScalar]],
+        columns: Optional[List[String]] = None,
+    ) raises -> DataFrame:
+        """Create DataFrame from a list of row dicts."""
+        # TODO(#47): row-to-column transposition is non-trivial; implement natively.
+        _not_implemented("DataFrame.from_records")
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # Attributes

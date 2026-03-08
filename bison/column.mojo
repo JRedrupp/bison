@@ -23,6 +23,10 @@ comptime ColumnData = Variant[
     List[PythonObject],
 ]
 
+# Scalar type for a single cell in row-oriented input (from_records).
+# No PythonObject arm — record values must be explicitly typed.
+comptime DFScalar = Variant[Int64, Float64, Bool, String]
+
 
 struct Column(Copyable, Movable):
     """A single typed array representing one column of a DataFrame or a Series.
@@ -199,6 +203,18 @@ struct Column(Copyable, Movable):
             for i in range(n):
                 data.append(py_list[i])
             return Column(name, ColumnData(data^), bison_dtype, idx_list^)
+
+    @staticmethod
+    fn _sniff_dtype(data: ColumnData) -> BisonDtype:
+        """Return the BisonDtype that matches the active ColumnData arm."""
+        if data.isa[List[Int64]]():
+            return int64
+        elif data.isa[List[Float64]]():
+            return float64
+        elif data.isa[List[Bool]]():
+            return bool_
+        else:
+            return object_  # List[String] and List[PythonObject] both map to object_
 
     fn to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
