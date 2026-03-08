@@ -48,10 +48,28 @@ def test_df_columns_match():
     assert_equal(cols[2], "gamma")
 
 
+def test_quickstart_example():
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
+
+    var df = DataFrame.from_pandas(pd_df)
+    assert_equal(df.shape()[0], 3)
+    assert_equal(df.shape()[1], 2)
+
+    var cols = df.columns()
+    assert_equal(cols[0], "a")
+    assert_equal(cols[1], "b")
+
+    var original = df.to_pandas()
+    var testing = Python.import_module("pandas.testing")
+    testing.assert_frame_equal(pd_df, original)
+
+
 def main():
     test_df_from_pandas_preserves_shape()
     test_df_to_pandas_identity()
     test_series_from_pandas_preserves_name()
     test_series_to_pandas_identity()
     test_df_columns_match()
+    test_quickstart_example()
     print("test_interop: all tests passed")
