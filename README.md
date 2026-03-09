@@ -4,20 +4,21 @@ A Mojo DataFrame library with a pandas-compatible API.
 
 bison aims to be a drop-in replacement for pandas. The goal is that swapping
 `import pandas as pd` for `import bison as bs` requires minimal changes to
-calling code. At this stage the library provides the full pandas DataFrame and
-Series API as stubs; methods raise an error until they are implemented natively
-in Mojo.
+calling code. The library provides the full pandas DataFrame and Series API;
+methods that are not yet implemented natively raise an error until they are
+ported to Mojo.
 
 ## Status
 
-All methods are stubbed. Calling any stub raises:
+Core aggregation, statistics, and interop methods are implemented natively in
+Mojo. Methods that are not yet ported raise:
 
 ```
 bison.<method>: not implemented
 ```
 
-`from_pandas()` and `to_pandas()` work at the stub stage — they wrap and
-unwrap a pandas object without any native computation.
+`from_pandas()` and `to_pandas()` are available for wrapping and unwrapping
+pandas objects. See the compatibility table below for the current counts.
 
 ## Install
 
@@ -26,7 +27,7 @@ the environment.
 
 ```bash
 curl -fsSL https://pixi.sh/install.sh | sh
-git clone https://github.com/your-org/bison.git
+git clone https://github.com/JRedrupp/bison.git
 cd bison
 pixi install
 ```
@@ -46,11 +47,11 @@ def main() raises:
     print(df.shape())      # (3, 2)
     print(df.columns())    # ["a", "b"]
 
+    # Sum each column natively
+    var totals = df.sum()  # Series: a=6.0, b=15.0
+
     # Get the backing pandas object back
     var original = df.to_pandas()
-
-    # Stub methods raise until implemented
-    # df.sum()  ->  Error: bison.DataFrame.sum: not implemented
 ```
 
 ## Version
@@ -96,7 +97,8 @@ In CI it runs after the test suite and the result is committed back to the branc
 
 1. Pick a stub method from the table above.
 2. Replace the `_not_implemented` call with a native Mojo implementation.
-3. Remove the `# STUB` marker from the corresponding test.
+3. Update the corresponding test: remove the "expect raise" assertion and add
+   real assertions comparing against pandas output.
 4. Submit a pull request.
 
 ## License
