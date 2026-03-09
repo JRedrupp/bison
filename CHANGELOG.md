@@ -6,6 +6,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Pinned `max` (Mojo) dependency to `==26.1.0` for reproducibility
+
 ## [0.1.0] - 2026-03-08
 
 ### Added
