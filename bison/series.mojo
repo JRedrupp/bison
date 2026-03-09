@@ -209,12 +209,12 @@ struct Series(Copyable, Movable):
         return self._col.nunique()
 
     fn describe(self) raises -> Series:
-        _not_implemented("Series.describe")
-        return Series()
+        """Return summary statistics as a Series (count, mean, std, min, quartiles, max)."""
+        return Series(self._col.describe())
 
     fn value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Series:
-        _not_implemented("Series.value_counts")
-        return Series()
+        """Return a Series with the count (or proportion) of each unique value."""
+        return Series(self._col.value_counts(normalize, sort))
 
     fn quantile(self, q: Float64 = 0.5) raises -> Float64:
         return self._col.quantile(q)

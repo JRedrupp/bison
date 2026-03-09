@@ -277,19 +277,16 @@ def test_df_describe_stub():
 
 
 # ---------------------------------------------------------------------------
-# value_counts (still a stub)
+# value_counts
 # ---------------------------------------------------------------------------
 
-def test_series_value_counts_stub():
+def test_series_value_counts():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(Python.evaluate("['a', 'b', 'a']")))
-    var raised = False
-    try:
-        _ = s.value_counts()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.value_counts should have raised")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 2, 3, 3, 3]")))
+    var vc = s.value_counts()
+    # 3 unique values; first element should have the highest count (3)
+    assert_true(vc.size() == 3)
+    assert_true(vc.to_pandas().iloc[0] == 3)
 
 
 def main():
