@@ -1,7 +1,7 @@
 from python import Python, PythonObject
 from utils import Variant
 from memory import bitcast
-from collections import Dict
+from collections import Dict, Set
 from math import sqrt
 from .dtypes import (
     BisonDtype,
@@ -430,28 +430,39 @@ struct Column(Copyable, Movable):
     fn nunique(self) raises -> Int:
         """Return the number of unique non-null values.
 
-        Raises for non-numeric column types.
+        Raises for non-numeric and non-string column types.
         """
-        var seen = Dict[String, Bool]()
         var has_mask = len(self._null_mask) > 0
         if self._data.isa[List[Int64]]():
+            var seen = Set[Int64]()
             for i in range(len(self._data[List[Int64]])):
                 if has_mask and self._null_mask[i]:
                     continue
-                seen[String(self._data[List[Int64]][i])] = True
+                seen.add(self._data[List[Int64]][i])
+            return len(seen)
         elif self._data.isa[List[Float64]]():
+            var seen = Set[Float64]()
             for i in range(len(self._data[List[Float64]])):
                 if has_mask and self._null_mask[i]:
                     continue
-                seen[String(self._data[List[Float64]][i])] = True
+                seen.add(self._data[List[Float64]][i])
+            return len(seen)
         elif self._data.isa[List[Bool]]():
+            var seen = Set[Bool]()
             for i in range(len(self._data[List[Bool]])):
                 if has_mask and self._null_mask[i]:
                     continue
-                seen[String(self._data[List[Bool]][i])] = True
+                seen.add(self._data[List[Bool]][i])
+            return len(seen)
+        elif self._data.isa[List[String]]():
+            var seen = Set[String]()
+            for i in range(len(self._data[List[String]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                seen.add(self._data[List[String]][i])
+            return len(seen)
         else:
-            raise Error("nunique: non-numeric column type")
-        return len(seen)
+            raise Error("nunique: unsupported column type")
 
     fn quantile(self, q: Float64 = 0.5) raises -> Float64:
         """Return the q-th quantile using linear interpolation.
