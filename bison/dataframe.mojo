@@ -149,12 +149,11 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        # skipna is accepted but not enforced: Column has no null mask yet.
         if axis != 0:
             raise Error("DataFrame.sum: axis=1 not yet implemented")
         var values = List[Float64]()
         for i in range(len(self._cols)):
-            values.append(self._cols[i].sum())
+            values.append(self._cols[i].sum(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
         var result_col = Column("", col_data^, dtype)

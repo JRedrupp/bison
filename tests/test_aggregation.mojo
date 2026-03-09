@@ -1,6 +1,7 @@
 """Tests aggregation methods (sum implemented; others are stubs)."""
 from python import Python
 from testing import assert_true
+from math import isnan
 from bison import DataFrame, Series
 
 
@@ -24,8 +25,23 @@ def test_series_sum_float():
 def test_series_sum_skipna_flag():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0]")))
-    # skipna flag is accepted; behaviour is identical until Column gains a null mask
+    # No nulls: skipna=False still returns the full sum.
     assert_true(s.sum(skipna=False) == 3.0)
+
+
+def test_series_sum_skipna_true_nan():
+    """NaN values are skipped when skipna=True (default); returns sum of the rest."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, float('nan'), 3.0]")))
+    assert_true(s.sum(skipna=True) == 4.0)
+
+
+def test_series_sum_skipna_false_nan():
+    """Returns NaN when any element is null/NaN and skipna=False."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, float('nan'), 3.0]")))
+    var result = s.sum(skipna=False)
+    assert_true(isnan(result))
 
 
 def test_df_sum():
@@ -85,6 +101,8 @@ def main():
     test_series_sum_int()
     test_series_sum_float()
     test_series_sum_skipna_flag()
+    test_series_sum_skipna_true_nan()
+    test_series_sum_skipna_false_nan()
     test_df_sum()
     test_df_mean_stub()
     test_df_describe_stub()

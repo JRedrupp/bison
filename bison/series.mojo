@@ -182,8 +182,7 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn sum(self, skipna: Bool = True) raises -> Float64:
-        # skipna is accepted but not enforced: Column has no null mask yet.
-        return self._col.sum()
+        return self._col.sum(skipna)
 
     fn mean(self) raises -> Float64:
         _not_implemented("Series.mean")
