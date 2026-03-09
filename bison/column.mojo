@@ -74,13 +74,20 @@ struct Column(Copyable, Movable):
         self._null_mask = List[Bool]()
 
     # ------------------------------------------------------------------
-    # Traits — Variant is Copyable so __copyinit__ is trivial
+    # Traits
+    # NOTE: List[PythonObject] is NOT ImplicitlyCopyable because
+    # PythonObject does not implement ImplicitlyCopyable.  Any field of
+    # type List[PythonObject] (currently _index) MUST use an explicit
+    # .copy() call here; implicit assignment will not compile.  If you
+    # add more List[PythonObject] fields to Column, remember to copy
+    # them explicitly in __copyinit__ as well.
     # ------------------------------------------------------------------
 
     fn __copyinit__(out self, existing: Self):
         self.name  = existing.name
         self.dtype = existing.dtype
         self._data = existing._data
+        # PythonObject is not ImplicitlyCopyable — explicit .copy() required.
         self._index = existing._index.copy()
         self._null_mask = existing._null_mask.copy()
 
