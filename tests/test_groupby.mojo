@@ -1,6 +1,6 @@
 """Tests that groupby stubs raise 'not implemented'."""
 from python import Python, PythonObject
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import DataFrame
 
 
@@ -30,6 +30,4 @@ def test_groupby_sum_stub():
 
 
 def main():
-    test_groupby_stub()
-    test_groupby_sum_stub()
-    print("test_groupby: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

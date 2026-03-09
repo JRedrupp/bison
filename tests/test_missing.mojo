@@ -1,6 +1,6 @@
 """Tests that missing-data stubs raise 'not implemented'."""
 from python import Python, PythonObject
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import DataFrame, Series
 
 
@@ -60,9 +60,4 @@ def test_series_fillna_stub():
 
 
 def main():
-    test_df_isna_stub()
-    test_df_fillna_stub()
-    test_df_dropna_stub()
-    test_df_ffill_stub()
-    test_series_fillna_stub()
-    print("test_missing: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

@@ -1,6 +1,6 @@
 """Tests for Series construction and basic attributes."""
 from python import Python, PythonObject
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import Series
 
 
@@ -63,12 +63,4 @@ def test_stub_raises_head():
 
 
 def main():
-    test_from_pandas()
-    test_size()
-    test_empty_false()
-    test_empty_true()
-    test_shape()
-    test_to_pandas_roundtrip()
-    test_sum()
-    test_stub_raises_head()
-    print("test_series: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

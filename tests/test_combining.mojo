@@ -1,6 +1,6 @@
 """Tests that combining stubs raise 'not implemented'."""
 from python import Python, PythonObject
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import DataFrame
 
 
@@ -41,7 +41,4 @@ def test_append_stub():
 
 
 def main():
-    test_merge_stub()
-    test_join_stub()
-    test_append_stub()
-    print("test_combining: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

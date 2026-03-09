@@ -1,7 +1,7 @@
 """Tests for DataFrame construction and basic attributes."""
 from python import Python, PythonObject
 from collections import Dict
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import DataFrame, ColumnData
 
 
@@ -91,14 +91,4 @@ def test_from_dict():
 
 
 def main():
-    test_shape_from_pandas()
-    test_len()
-    test_empty_false()
-    test_empty_true()
-    test_columns()
-    test_ndim()
-    test_size()
-    test_contains()
-    test_to_pandas_roundtrip()
-    test_from_dict()
-    print("test_dataframe: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

@@ -1,6 +1,6 @@
 """Tests aggregation methods (sum implemented; others are stubs)."""
 from python import Python
-from testing import assert_true
+from testing import assert_true, TestSuite
 from math import isnan
 from bison import DataFrame, Series
 
@@ -98,14 +98,4 @@ def test_series_value_counts_stub():
 
 
 def main():
-    test_series_sum_int()
-    test_series_sum_float()
-    test_series_sum_skipna_flag()
-    test_series_sum_skipna_true_nan()
-    test_series_sum_skipna_false_nan()
-    test_df_sum()
-    test_df_mean_stub()
-    test_df_describe_stub()
-    test_series_mean_stub()
-    test_series_value_counts_stub()
-    print("test_aggregation: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

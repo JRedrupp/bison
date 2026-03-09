@@ -1,6 +1,6 @@
 """Tests that .str and .dt accessor stubs raise 'not implemented'."""
 from python import Python
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import Series
 
 
@@ -53,8 +53,4 @@ def test_dt_month_stub():
 
 
 def main():
-    test_str_upper_stub()
-    test_str_contains_stub()
-    test_dt_year_stub()
-    test_dt_month_stub()
-    print("test_accessors: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

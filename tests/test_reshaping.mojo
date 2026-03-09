@@ -1,6 +1,6 @@
 """Tests that reshaping stubs raise 'not implemented'."""
 from python import Python, PythonObject
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import DataFrame, Series
 
 
@@ -71,10 +71,4 @@ def test_series_sort_values_stub():
 
 
 def main():
-    test_sort_values_stub()
-    test_pivot_stub()
-    test_melt_stub()
-    test_transpose_stub()
-    test_drop_duplicates_stub()
-    test_series_sort_values_stub()
-    print("test_reshaping: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()

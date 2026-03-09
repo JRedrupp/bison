@@ -1,6 +1,6 @@
 """Tests that IO stubs raise 'not implemented'."""
 from python import Python
-from testing import assert_true
+from testing import assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
 
 
@@ -52,9 +52,4 @@ def test_to_csv_stub():
 
 
 def main():
-    test_read_csv_stub()
-    test_read_parquet_stub()
-    test_read_json_stub()
-    test_read_excel_stub()
-    test_to_csv_stub()
-    print("test_io: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()
