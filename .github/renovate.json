@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "pixi": {
+    "managerFilePatterns": [
+      "/(^|/)pyproject\\.toml$/",
+      "/(^|/)pixi\\.toml$/"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["pixi"],
+      "groupName": "pixi dependencies"
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 4am on monday"]
+  },
+  "constraints": {
+    "pixi": ">=0.41.0"
+  }
+}
