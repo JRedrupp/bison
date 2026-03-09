@@ -1,5 +1,6 @@
 from python import Python, PythonObject
 from utils import Variant
+from memory import bitcast
 from .dtypes import (
     BisonDtype,
     int8, int16, int32, int64,
@@ -327,11 +328,16 @@ struct Column(Copyable, Movable):
             return col^
         elif bison_dtype == float64:
             var data = List[Float64]()
+            var struct_mod = Python.import_module("struct")
+            var pack_fmt = "d"   # pack as IEEE-754 double-precision float
+            var unpack_fmt = "q" # unpack as signed 64-bit integer (same bytes, avoids overflow in Int)
             for i in range(n):
                 if null_mask[i]:
                     data.append(Float64(0))  # placeholder for null
                 else:
-                    data.append(Float64(String(py_list[i])))
+                    var packed = struct_mod.unpack(unpack_fmt, struct_mod.pack(pack_fmt, py_list[i]))
+                    var bits = Int64(Int(py=packed[0]))
+                    data.append(bitcast[DType.float64](bits))
             var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
             col._null_mask = null_mask.copy()
             return col^
