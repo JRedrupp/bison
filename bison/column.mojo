@@ -507,6 +507,124 @@ struct Column(Copyable, Movable):
             return zero / zero
         return self.quantile(0.5)
 
+    fn describe(self) raises -> Column:
+        """Return summary statistics as a new Column with a string index.
+
+        Produces 8 elements: count, mean, std, min, 25%, 50%, 75%, max.
+        Raises for non-numeric column types (the underlying aggregation
+        methods propagate the error).
+        """
+        var data = List[Float64]()
+        data.append(Float64(self.count()))
+        data.append(self.mean())
+        data.append(self.std())
+        data.append(self.min())
+        data.append(self.quantile(0.25))
+        data.append(self.quantile(0.50))
+        data.append(self.quantile(0.75))
+        data.append(self.max())
+
+        var idx = List[PythonObject]()
+        idx.append(PythonObject("count"))
+        idx.append(PythonObject("mean"))
+        idx.append(PythonObject("std"))
+        idx.append(PythonObject("min"))
+        idx.append(PythonObject("25%"))
+        idx.append(PythonObject("50%"))
+        idx.append(PythonObject("75%"))
+        idx.append(PythonObject("max"))
+
+        return Column(self.name, ColumnData(data^), float64, idx^)
+
+    fn value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Column:
+        """Return a Column of counts (or proportions) per unique value.
+
+        The index holds the original values; the data holds the counts.
+        sort=True (default) orders results by count descending.
+        Raises for object/datetime column types.
+        """
+        var has_mask = len(self._null_mask) > 0
+        var unique_keys = List[String]()
+        var counts_dict = Dict[String, Int]()
+
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var k = String(self._data[List[Int64]][i])
+                if k not in counts_dict:
+                    unique_keys.append(k)
+                counts_dict[k] = counts_dict.get(k, 0) + 1
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var k = String(self._data[List[Float64]][i])
+                if k not in counts_dict:
+                    unique_keys.append(k)
+                counts_dict[k] = counts_dict.get(k, 0) + 1
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var k = String(self._data[List[Bool]][i])
+                if k not in counts_dict:
+                    unique_keys.append(k)
+                counts_dict[k] = counts_dict.get(k, 0) + 1
+        else:
+            raise Error("value_counts: unsupported column type")
+
+        var n = len(unique_keys)
+
+        # Materialise per-key counts in insertion order.
+        var count_vals = List[Int]()
+        for i in range(n):
+            count_vals.append(counts_dict[unique_keys[i]])
+
+        # Compute a sorted permutation (insertion sort, stable, count desc).
+        var sorted_order = List[Int]()
+        for i in range(n):
+            sorted_order.append(i)
+        if sort:
+            for i in range(1, n):
+                var key_idx = sorted_order[i]
+                var key_cnt = count_vals[key_idx]
+                var j = i - 1
+                while j >= 0 and count_vals[sorted_order[j]] < key_cnt:
+                    sorted_order[j + 1] = sorted_order[j]
+                    j -= 1
+                sorted_order[j + 1] = key_idx
+
+        # Build result index (original values) and counts.
+        var builtins = Python.import_module("builtins")
+        var result_counts = List[Int64]()
+        var result_idx = List[PythonObject]()
+
+        if self._data.isa[List[Int64]]():
+            for i in range(n):
+                var si = sorted_order[i]
+                result_counts.append(Int64(count_vals[si]))
+                result_idx.append(builtins.int(unique_keys[si]))
+        elif self._data.isa[List[Float64]]():
+            for i in range(n):
+                var si = sorted_order[i]
+                result_counts.append(Int64(count_vals[si]))
+                result_idx.append(builtins.float(unique_keys[si]))
+        else:  # Bool — only remaining arm after the raise above
+            for i in range(n):
+                var si = sorted_order[i]
+                result_counts.append(Int64(count_vals[si]))
+                result_idx.append(PythonObject(unique_keys[si] == "True"))
+
+        if normalize:
+            var total = Float64(self.count())
+            var norm_data = List[Float64]()
+            for i in range(n):
+                norm_data.append(Float64(result_counts[i]) / total)
+            return Column("count", ColumnData(norm_data^), float64, result_idx^)
+
+        return Column("count", ColumnData(result_counts^), int64, result_idx^)
+
     # ------------------------------------------------------------------
     # Pandas interop
     # ------------------------------------------------------------------

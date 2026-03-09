@@ -51,6 +51,76 @@ def test_sum():
     assert_true(s.sum() == 6.0)
 
 
+def test_mean():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    assert_true(s.mean() == 2.0)
+
+
+def test_median():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    assert_true(s.median() == 2.0)
+
+
+def test_min():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
+    assert_true(s.min() == 1.0)
+
+
+def test_max():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
+    assert_true(s.max() == 3.0)
+
+
+def test_std():
+    var pd = Python.import_module("pandas")
+    # std([1, 3, 5], ddof=1) == 2.0
+    var s = Series(pd.Series(Python.evaluate("[1, 3, 5]")))
+    assert_true(s.std() == 2.0)
+
+
+def test_var():
+    var pd = Python.import_module("pandas")
+    # var([1, 3, 5], ddof=1) == 4.0
+    var s = Series(pd.Series(Python.evaluate("[1, 3, 5]")))
+    assert_true(s.var() == 4.0)
+
+
+def test_count():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    assert_equal(s.count(), 3)
+
+
+def test_nunique():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 2, 3, 3, 3]")))
+    assert_equal(s.nunique(), 3)
+
+
+def test_quantile():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    assert_true(s.quantile(0.5) == 3.0)
+
+
+def test_describe():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    var d = s.describe()
+    assert_equal(d.size(), 8)
+
+
+def test_value_counts():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 2, 3, 3, 3]")))
+    var vc = s.value_counts()
+    assert_equal(vc.size(), 3)
+
+
 def test_stub_raises_head():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
