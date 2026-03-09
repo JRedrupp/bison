@@ -1,6 +1,6 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from python import Python, PythonObject
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_true, TestSuite
 from bison import DataFrame, Series, Column
 
 
@@ -122,13 +122,4 @@ def test_df_index_roundtrip():
 
 
 def main():
-    test_df_from_pandas_preserves_shape()
-    test_df_to_pandas_identity()
-    test_series_from_pandas_preserves_name()
-    test_series_to_pandas_identity()
-    test_df_columns_match()
-    test_quickstart_example()
-    test_column_typed_storage()
-    test_series_index_roundtrip()
-    test_df_index_roundtrip()
-    print("test_interop: all tests passed")
+    TestSuite.discover_tests[__functions_in_module()]().run()
