@@ -1,6 +1,8 @@
 from python import Python, PythonObject
 from utils import Variant
 from memory import bitcast
+from collections import Dict
+from math import sqrt
 from .dtypes import (
     BisonDtype,
     int8, int16, int32, int64,
@@ -275,6 +277,235 @@ struct Column(Copyable, Movable):
             return total
         else:
             raise Error("sum: non-numeric column type")
+
+    fn count(self) -> Int:
+        """Return the number of non-null elements."""
+        var n = self.__len__()
+        if len(self._null_mask) == 0:
+            return n
+        var result = 0
+        for i in range(n):
+            if not self._null_mask[i]:
+                result += 1
+        return result
+
+    fn mean(self, skipna: Bool = True) raises -> Float64:
+        """Return the mean of all values as Float64.
+
+        Returns NaN when all elements are null or the column is empty.
+        Raises for non-numeric column types.
+        """
+        var n = self.count() if skipna else self.__len__()
+        if n == 0:
+            var zero = Float64(0)
+            return zero / zero
+        return self.sum(skipna) / Float64(n)
+
+    fn min(self, skipna: Bool = True) raises -> Float64:
+        """Return the minimum value as Float64.
+
+        Returns NaN when no non-null elements exist.
+        Raises for non-numeric column types.
+        """
+        if not skipna and self.has_nulls():
+            var zero = Float64(0)
+            return zero / zero
+        var has_mask = len(self._null_mask) > 0
+        var found = False
+        var result = Float64(0)
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = Float64(self._data[List[Int64]][i])
+                if not found or v < result:
+                    result = v
+                    found = True
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = self._data[List[Float64]][i]
+                if not found or v < result:
+                    result = v
+                    found = True
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                if not found or v < result:
+                    result = v
+                    found = True
+        else:
+            raise Error("min: non-numeric column type")
+        if not found:
+            var zero = Float64(0)
+            return zero / zero
+        return result
+
+    fn max(self, skipna: Bool = True) raises -> Float64:
+        """Return the maximum value as Float64.
+
+        Returns NaN when no non-null elements exist.
+        Raises for non-numeric column types.
+        """
+        if not skipna and self.has_nulls():
+            var zero = Float64(0)
+            return zero / zero
+        var has_mask = len(self._null_mask) > 0
+        var found = False
+        var result = Float64(0)
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = Float64(self._data[List[Int64]][i])
+                if not found or v > result:
+                    result = v
+                    found = True
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = self._data[List[Float64]][i]
+                if not found or v > result:
+                    result = v
+                    found = True
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                if not found or v > result:
+                    result = v
+                    found = True
+        else:
+            raise Error("max: non-numeric column type")
+        if not found:
+            var zero = Float64(0)
+            return zero / zero
+        return result
+
+    fn var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+        """Return the variance with Bessel correction (ddof=1 by default).
+
+        Returns NaN when n - ddof <= 0.
+        Raises for non-numeric column types.
+        """
+        var n = self.count() if skipna else self.__len__()
+        if n - ddof <= 0:
+            var zero = Float64(0)
+            return zero / zero
+        var m = self.mean(skipna)
+        var has_mask = len(self._null_mask) > 0
+        var total = Float64(0)
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var diff = Float64(self._data[List[Int64]][i]) - m
+                total += diff * diff
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var diff = self._data[List[Float64]][i] - m
+                total += diff * diff
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                var diff = v - m
+                total += diff * diff
+        else:
+            raise Error("var: non-numeric column type")
+        return total / Float64(n - ddof)
+
+    fn std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+        """Return the standard deviation (square root of variance)."""
+        return sqrt(self.var(ddof, skipna))
+
+    fn nunique(self) raises -> Int:
+        """Return the number of unique non-null values.
+
+        Raises for non-numeric column types.
+        """
+        var seen = Dict[String, Bool]()
+        var has_mask = len(self._null_mask) > 0
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                seen[String(self._data[List[Int64]][i])] = True
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                seen[String(self._data[List[Float64]][i])] = True
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                seen[String(self._data[List[Bool]][i])] = True
+        else:
+            raise Error("nunique: non-numeric column type")
+        return len(seen)
+
+    fn quantile(self, q: Float64 = 0.5) raises -> Float64:
+        """Return the q-th quantile using linear interpolation.
+
+        Always skips null elements (matches pandas default behaviour).
+        Raises for non-numeric column types.
+        """
+        var vals = List[Float64]()
+        var has_mask = len(self._null_mask) > 0
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                vals.append(Float64(self._data[List[Int64]][i]))
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                vals.append(self._data[List[Float64]][i])
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
+                vals.append(Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0))
+        else:
+            raise Error("quantile: non-numeric column type")
+        if len(vals) == 0:
+            var zero = Float64(0)
+            return zero / zero
+        # Insertion sort (values list is typically small).
+        for i in range(1, len(vals)):
+            var key = vals[i]
+            var j = i - 1
+            while j >= 0 and vals[j] > key:
+                vals[j + 1] = vals[j]
+                j -= 1
+            vals[j + 1] = key
+        var idx = q * Float64(len(vals) - 1)
+        var lo = Int(idx)
+        var hi = lo + 1
+        if hi >= len(vals):
+            return vals[lo]
+        var frac = idx - Float64(lo)
+        return vals[lo] * (1.0 - frac) + vals[hi] * frac
+
+    fn median(self, skipna: Bool = True) raises -> Float64:
+        """Return the median value.
+
+        When skipna=False and nulls are present, returns NaN.
+        """
+        if not skipna and self.has_nulls():
+            var zero = Float64(0)
+            return zero / zero
+        return self.quantile(0.5)
 
     # ------------------------------------------------------------------
     # Pandas interop

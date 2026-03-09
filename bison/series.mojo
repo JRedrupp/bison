@@ -184,37 +184,29 @@ struct Series(Copyable, Movable):
     fn sum(self, skipna: Bool = True) raises -> Float64:
         return self._col.sum(skipna)
 
-    fn mean(self) raises -> Float64:
-        _not_implemented("Series.mean")
-        return Float64(0)
+    fn mean(self, skipna: Bool = True) raises -> Float64:
+        return self._col.mean(skipna)
 
-    fn median(self) raises -> Float64:
-        _not_implemented("Series.median")
-        return Float64(0)
+    fn median(self, skipna: Bool = True) raises -> Float64:
+        return self._col.median(skipna)
 
-    fn min(self) raises -> Float64:
-        _not_implemented("Series.min")
-        return Float64(0)
+    fn min(self, skipna: Bool = True) raises -> Float64:
+        return self._col.min(skipna)
 
-    fn max(self) raises -> Float64:
-        _not_implemented("Series.max")
-        return Float64(0)
+    fn max(self, skipna: Bool = True) raises -> Float64:
+        return self._col.max(skipna)
 
-    fn std(self, ddof: Int = 1) raises -> Float64:
-        _not_implemented("Series.std")
-        return Float64(0)
+    fn std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+        return self._col.std(ddof, skipna)
 
-    fn var(self, ddof: Int = 1) raises -> Float64:
-        _not_implemented("Series.var")
-        return Float64(0)
+    fn var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+        return self._col.var(ddof, skipna)
 
-    fn count(self) raises -> Int:
-        _not_implemented("Series.count")
-        return 0
+    fn count(self) -> Int:
+        return self._col.count()
 
     fn nunique(self) raises -> Int:
-        _not_implemented("Series.nunique")
-        return 0
+        return self._col.nunique()
 
     fn describe(self) raises -> Series:
         _not_implemented("Series.describe")
@@ -225,8 +217,7 @@ struct Series(Copyable, Movable):
         return Series()
 
     fn quantile(self, q: Float64 = 0.5) raises -> Float64:
-        _not_implemented("Series.quantile")
-        return Float64(0)
+        return self._col.quantile(q)
 
     fn cumsum(self) raises -> Series:
         _not_implemented("Series.cumsum")
