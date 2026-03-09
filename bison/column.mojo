@@ -29,6 +29,88 @@ comptime ColumnData = Variant[
 comptime DFScalar = Variant[Int64, Float64, Bool, String]
 
 
+# ------------------------------------------------------------------
+# Visit primitive — the single canonical dispatch site for ColumnData
+# ------------------------------------------------------------------
+
+trait ColumnDataVisitor:
+    """Protocol for visiting the active arm of a ``ColumnData`` Variant.
+
+    Implement one ``on_*`` method per arm.  Use a ``mut self`` field to
+    accumulate or return a result.  Pass an instance to
+    ``visit_col_data``, which contains the **only** ``isa`` chain in the
+    codebase; all callers should delegate here instead of writing their
+    own discriminant checks.
+    """
+
+    fn on_int64(mut self, data: List[Int64]): ...
+    fn on_float64(mut self, data: List[Float64]): ...
+    fn on_bool(mut self, data: List[Bool]): ...
+    fn on_str(mut self, data: List[String]): ...
+    fn on_obj(mut self, data: List[PythonObject]): ...
+
+
+fn visit_col_data[V: ColumnDataVisitor](mut visitor: V, data: ColumnData):
+    """Dispatch *visitor* to the active ``ColumnData`` arm.
+
+    This is the **only** place in the codebase that reads the ``ColumnData``
+    discriminant via ``isa``.  Add new ``ColumnData`` arms here and in the
+    ``ColumnDataVisitor`` trait — every other dispatch site is then updated
+    automatically because it delegates here.
+    """
+    if data.isa[List[Int64]]():
+        visitor.on_int64(data[List[Int64]])
+    elif data.isa[List[Float64]]():
+        visitor.on_float64(data[List[Float64]])
+    elif data.isa[List[Bool]]():
+        visitor.on_bool(data[List[Bool]])
+    elif data.isa[List[String]]():
+        visitor.on_str(data[List[String]])
+    else:
+        visitor.on_obj(data[List[PythonObject]])
+
+
+# ------------------------------------------------------------------
+# Private visitor implementations used by Column methods
+# ------------------------------------------------------------------
+
+struct _LenVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Visitor that computes the length of the active ColumnData arm."""
+    var result: Int
+    fn __init__(out self): self.result = 0
+    fn on_int64(mut self, data: List[Int64]): self.result = len(data)
+    fn on_float64(mut self, data: List[Float64]): self.result = len(data)
+    fn on_bool(mut self, data: List[Bool]): self.result = len(data)
+    fn on_str(mut self, data: List[String]): self.result = len(data)
+    fn on_obj(mut self, data: List[PythonObject]): self.result = len(data)
+
+
+struct _DtypeSniffVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Visitor that maps the active ColumnData arm to its BisonDtype."""
+    var result: BisonDtype
+    # object_ is the safe fallback: both List[String] and List[PythonObject]
+    # map to object_.  The field is always overwritten by on_*.
+    fn __init__(out self): self.result = object_
+    fn on_int64(mut self, data: List[Int64]): self.result = int64
+    fn on_float64(mut self, data: List[Float64]): self.result = float64
+    fn on_bool(mut self, data: List[Bool]): self.result = bool_
+    fn on_str(mut self, data: List[String]): self.result = object_
+    fn on_obj(mut self, data: List[PythonObject]): self.result = object_
+
+
+struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Visitor that produces an independent copy of the active ColumnData arm."""
+    var result: ColumnData
+    # Initialised with the fallback arm (List[PythonObject]) so that the field
+    # is always valid.  on_* immediately replaces it with the copied data.
+    fn __init__(out self): self.result = ColumnData(List[PythonObject]())
+    fn on_int64(mut self, data: List[Int64]): self.result = ColumnData(data.copy())
+    fn on_float64(mut self, data: List[Float64]): self.result = ColumnData(data.copy())
+    fn on_bool(mut self, data: List[Bool]): self.result = ColumnData(data.copy())
+    fn on_str(mut self, data: List[String]): self.result = ColumnData(data.copy())
+    fn on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
+
+
 struct Column(Copyable, Movable):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -100,7 +182,8 @@ struct Column(Copyable, Movable):
         self._null_mask = existing._null_mask^
 
     # ------------------------------------------------------------------
-    # Typed accessor helpers — the only sites that call isa/get
+    # Typed accessor helpers — unsafe direct Variant subscripts; callers
+    # are responsible for checking the active arm before calling these.
     # ------------------------------------------------------------------
 
     fn _int64_data(ref self) -> ref [self._data] List[Int64]:
@@ -124,57 +207,22 @@ struct Column(Copyable, Movable):
 
     fn copy(self) -> Column:
         """Return an independent copy of this Column."""
-        if self._data.isa[List[Int64]]():
-            var d = self._data[List[Int64]].copy()
-            var idx = self._index.copy()
-            var mask = self._null_mask.copy()
-            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
-            col._null_mask = mask^
-            return col^
-        elif self._data.isa[List[Float64]]():
-            var d = self._data[List[Float64]].copy()
-            var idx = self._index.copy()
-            var mask = self._null_mask.copy()
-            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
-            col._null_mask = mask^
-            return col^
-        elif self._data.isa[List[Bool]]():
-            var d = self._data[List[Bool]].copy()
-            var idx = self._index.copy()
-            var mask = self._null_mask.copy()
-            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
-            col._null_mask = mask^
-            return col^
-        elif self._data.isa[List[String]]():
-            var d = self._data[List[String]].copy()
-            var idx = self._index.copy()
-            var mask = self._null_mask.copy()
-            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
-            col._null_mask = mask^
-            return col^
-        else:
-            var d = self._data[List[PythonObject]].copy()
-            var idx = self._index.copy()
-            var mask = self._null_mask.copy()
-            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
-            col._null_mask = mask^
-            return col^
+        var visitor = _CopyDataVisitor()
+        visit_col_data(visitor, self._data)
+        var idx = self._index.copy()
+        var mask = self._null_mask.copy()
+        var col = Column(self.name, visitor^.result, self.dtype, idx^)
+        col._null_mask = mask^
+        return col^
 
     # ------------------------------------------------------------------
     # Length
     # ------------------------------------------------------------------
 
     fn __len__(self) -> Int:
-        if self._data.isa[List[Int64]]():
-            return len(self._data[List[Int64]])
-        elif self._data.isa[List[Float64]]():
-            return len(self._data[List[Float64]])
-        elif self._data.isa[List[Bool]]():
-            return len(self._data[List[Bool]])
-        elif self._data.isa[List[String]]():
-            return len(self._data[List[String]])
-        else:
-            return len(self._data[List[PythonObject]])
+        var visitor = _LenVisitor()
+        visit_col_data(visitor, self._data)
+        return visitor.result
 
     # ------------------------------------------------------------------
     # Null tracking
@@ -324,14 +372,9 @@ struct Column(Copyable, Movable):
     @staticmethod
     fn _sniff_dtype(data: ColumnData) -> BisonDtype:
         """Return the BisonDtype that matches the active ColumnData arm."""
-        if data.isa[List[Int64]]():
-            return int64
-        elif data.isa[List[Float64]]():
-            return float64
-        elif data.isa[List[Bool]]():
-            return bool_
-        else:
-            return object_  # List[String] and List[PythonObject] both map to object_
+        var visitor = _DtypeSniffVisitor()
+        visit_col_data(visitor, data)
+        return visitor.result
 
     fn to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
