@@ -36,12 +36,16 @@ struct Column(Copyable, Movable):
     all other arms are empty.  The ``dtype`` field records the
     pandas-compatible dtype string so that round-trips through ``to_pandas``
     preserve the original dtype.
+
+    Null tracking: ``_null_mask`` is a parallel ``List[Bool]`` where ``True``
+    marks a null/NaN element.  An empty mask means no nulls are present.
     """
 
     var name: String
     var dtype: BisonDtype
     var _data: ColumnData
     var _index: List[PythonObject]
+    var _null_mask: List[Bool]
 
     # ------------------------------------------------------------------
     # Constructors
@@ -53,18 +57,21 @@ struct Column(Copyable, Movable):
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
         self._index = List[PythonObject]()
+        self._null_mask = List[Bool]()
 
     fn __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype):
         self.name  = name
         self.dtype = dtype
         self._data = data^
         self._index = List[PythonObject]()
+        self._null_mask = List[Bool]()
 
     fn __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: List[PythonObject]):
         self.name  = name
         self.dtype = dtype
         self._data = data^
         self._index = index^
+        self._null_mask = List[Bool]()
 
     # ------------------------------------------------------------------
     # Traits — Variant is Copyable so __copyinit__ is trivial
@@ -75,12 +82,14 @@ struct Column(Copyable, Movable):
         self.dtype = existing.dtype
         self._data = existing._data
         self._index = existing._index.copy()
+        self._null_mask = existing._null_mask.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
         self.name  = existing.name^
         self.dtype = existing.dtype^
         self._data = existing._data^
         self._index = existing._index^
+        self._null_mask = existing._null_mask^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — the only sites that call isa/get
@@ -110,23 +119,38 @@ struct Column(Copyable, Movable):
         if self._data.isa[List[Int64]]():
             var d = self._data[List[Int64]].copy()
             var idx = self._index.copy()
-            return Column(self.name, ColumnData(d^), self.dtype, idx^)
+            var mask = self._null_mask.copy()
+            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
+            col._null_mask = mask^
+            return col^
         elif self._data.isa[List[Float64]]():
             var d = self._data[List[Float64]].copy()
             var idx = self._index.copy()
-            return Column(self.name, ColumnData(d^), self.dtype, idx^)
+            var mask = self._null_mask.copy()
+            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
+            col._null_mask = mask^
+            return col^
         elif self._data.isa[List[Bool]]():
             var d = self._data[List[Bool]].copy()
             var idx = self._index.copy()
-            return Column(self.name, ColumnData(d^), self.dtype, idx^)
+            var mask = self._null_mask.copy()
+            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
+            col._null_mask = mask^
+            return col^
         elif self._data.isa[List[String]]():
             var d = self._data[List[String]].copy()
             var idx = self._index.copy()
-            return Column(self.name, ColumnData(d^), self.dtype, idx^)
+            var mask = self._null_mask.copy()
+            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
+            col._null_mask = mask^
+            return col^
         else:
             var d = self._data[List[PythonObject]].copy()
             var idx = self._index.copy()
-            return Column(self.name, ColumnData(d^), self.dtype, idx^)
+            var mask = self._null_mask.copy()
+            var col = Column(self.name, ColumnData(d^), self.dtype, idx^)
+            col._null_mask = mask^
+            return col^
 
     # ------------------------------------------------------------------
     # Length
@@ -145,24 +169,51 @@ struct Column(Copyable, Movable):
             return len(self._data[List[PythonObject]])
 
     # ------------------------------------------------------------------
+    # Null tracking
+    # ------------------------------------------------------------------
+
+    fn has_nulls(self) -> Bool:
+        """Return True if any element is marked null/NaN."""
+        for i in range(len(self._null_mask)):
+            if self._null_mask[i]:
+                return True
+        return False
+
+    # ------------------------------------------------------------------
     # Aggregation
     # ------------------------------------------------------------------
 
-    fn sum(self) raises -> Float64:
-        """Return the sum of all values as Float64. Raises for non-numeric types."""
+    fn sum(self, skipna: Bool = True) raises -> Float64:
+        """Return the sum of all values as Float64.
+
+        When ``skipna=True`` (default) null/NaN elements are skipped.
+        When ``skipna=False`` the result is NaN if any null is present.
+        Raises for non-numeric column types.
+        """
+        if not skipna and self.has_nulls():
+            # Return NaN (IEEE 754: 0/0 → quiet NaN).
+            var zero = Float64(0)
+            return zero / zero
+        var has_mask = len(self._null_mask) > 0
         if self._data.isa[List[Int64]]():
             var total = Float64(0)
             for i in range(len(self._data[List[Int64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
                 total += Float64(self._data[List[Int64]][i])
             return total
         elif self._data.isa[List[Float64]]():
             var total = Float64(0)
             for i in range(len(self._data[List[Float64]])):
+                if has_mask and self._null_mask[i]:
+                    continue
                 total += self._data[List[Float64]][i]
             return total
         elif self._data.isa[List[Bool]]():
             var total = Float64(0)
             for i in range(len(self._data[List[Bool]])):
+                if has_mask and self._null_mask[i]:
+                    continue
                 if self._data[List[Bool]][i]:
                     total += 1.0
             return total
@@ -183,6 +234,12 @@ struct Column(Copyable, Movable):
         var idx_list = List[PythonObject]()
         for i in range(n):
             idx_list.append(py_index[i])
+
+        # Build the null mask once, used by every branch below.
+        var null_list = pd_series.isna().tolist()
+        var null_mask = List[Bool]()
+        for i in range(n):
+            null_mask.append(Bool(null_list[i].__bool__()))
 
         var bison_dtype: BisonDtype
         if (
@@ -206,28 +263,50 @@ struct Column(Copyable, Movable):
         if bison_dtype == int64:
             var data = List[Int64]()
             for i in range(n):
-                data.append(Int64(Int(py=py_list[i])))
-            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
+                if null_mask[i]:
+                    data.append(Int64(0))  # placeholder for null
+                else:
+                    data.append(Int64(Int(py=py_list[i])))
+            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            col._null_mask = null_mask.copy()
+            return col^
         elif bison_dtype == float64:
             var data = List[Float64]()
             for i in range(n):
-                data.append(Float64(String(py_list[i])))
-            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
+                if null_mask[i]:
+                    data.append(Float64(0))  # placeholder for null
+                else:
+                    data.append(Float64(String(py_list[i])))
+            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            col._null_mask = null_mask.copy()
+            return col^
         elif bison_dtype == bool_:
             var data = List[Bool]()
             for i in range(n):
-                data.append(Bool(py_list[i].__bool__()))
-            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
+                if null_mask[i]:
+                    data.append(False)  # placeholder for null
+                else:
+                    data.append(Bool(py_list[i].__bool__()))
+            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            col._null_mask = null_mask.copy()
+            return col^
         elif dtype_str == "string":
             var data = List[String]()
             for i in range(n):
-                data.append(String(py_list[i]))
-            return Column(name, ColumnData(data^), object_, idx_list^)
+                if null_mask[i]:
+                    data.append(String(""))  # placeholder for null
+                else:
+                    data.append(String(py_list[i]))
+            var col = Column(name, ColumnData(data^), object_, idx_list^)
+            col._null_mask = null_mask.copy()
+            return col^
         else:
             var data = List[PythonObject]()
             for i in range(n):
                 data.append(py_list[i])
-            return Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            col._null_mask = null_mask^
+            return col^
 
     @staticmethod
     fn _sniff_dtype(data: ColumnData) -> BisonDtype:
@@ -245,18 +324,32 @@ struct Column(Copyable, Movable):
         """Reconstruct a pandas Series from stored values."""
         var pd = Python.import_module("pandas")
         var py_list = Python.evaluate("[]")
+        var py_none = Python.evaluate("None")
+        var has_mask = len(self._null_mask) > 0
         if self._data.isa[List[Int64]]():
             for i in range(len(self._data[List[Int64]])):
-                _ = py_list.append(self._data[List[Int64]][i])
+                if has_mask and self._null_mask[i]:
+                    _ = py_list.append(py_none)
+                else:
+                    _ = py_list.append(self._data[List[Int64]][i])
         elif self._data.isa[List[Float64]]():
             for i in range(len(self._data[List[Float64]])):
-                _ = py_list.append(self._data[List[Float64]][i])
+                if has_mask and self._null_mask[i]:
+                    _ = py_list.append(py_none)
+                else:
+                    _ = py_list.append(self._data[List[Float64]][i])
         elif self._data.isa[List[Bool]]():
             for i in range(len(self._data[List[Bool]])):
-                _ = py_list.append(self._data[List[Bool]][i])
+                if has_mask and self._null_mask[i]:
+                    _ = py_list.append(py_none)
+                else:
+                    _ = py_list.append(self._data[List[Bool]][i])
         elif self._data.isa[List[String]]():
             for i in range(len(self._data[List[String]])):
-                _ = py_list.append(self._data[List[String]][i])
+                if has_mask and self._null_mask[i]:
+                    _ = py_list.append(py_none)
+                else:
+                    _ = py_list.append(self._data[List[String]][i])
         else:
             for i in range(len(self._data[List[PythonObject]])):
                 _ = py_list.append(self._data[List[PythonObject]][i])
