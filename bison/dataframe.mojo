@@ -160,44 +160,107 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     fn mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.mean")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.mean: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].mean(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.median")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.median: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].median(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.min")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.min: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].min(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.max")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.max: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].max(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.std")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.std: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].std(ddof, skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.var")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.var: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].var(ddof, skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn count(self, axis: Int = 0) raises -> Series:
-        _not_implemented("DataFrame.count")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.count: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(Float64(self._cols[i].count()))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn nunique(self, axis: Int = 0) raises -> Series:
-        _not_implemented("DataFrame.nunique")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.nunique: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(Float64(self._cols[i].nunique()))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn describe(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
         return DataFrame()
 
     fn quantile(self, q: Float64 = 0.5, axis: Int = 0) raises -> Series:
-        _not_implemented("DataFrame.quantile")
-        return Series()
+        if axis != 0:
+            raise Error("DataFrame.quantile: axis=1 not yet implemented")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].quantile(q))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column("", col_data^, dtype)
+        return Series(result_col^)
 
     fn abs(self) raises -> DataFrame:
         _not_implemented("DataFrame.abs")
