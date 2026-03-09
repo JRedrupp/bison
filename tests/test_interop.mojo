@@ -121,5 +121,31 @@ def test_df_index_roundtrip():
     testing.assert_frame_equal(pd_df, back)
 
 
+def test_float64_bitcast_roundtrip():
+    """Float64 values must survive from_pandas with exact bit-for-bit fidelity.
+
+    Uses Python struct to verify that the bits stored in the Column exactly
+    match the original Python float IEEE-754 representation, catching any
+    precision loss introduced by the String round-trip.
+    """
+    var pd = Python.import_module("pandas")
+    var struct_mod = Python.import_module("struct")
+    # Build a Series with values that cover the full float64 range:
+    # smallest subnormal, a near-max value, negative, zero, and a repeating decimal.
+    var py_values = Python.evaluate(
+        "[5e-324, 1.7976931348623157e+308, -1.7976931348623157e+308, 0.0, 1.0/3.0]"
+    )
+    var pd_s = pd.Series(py_values, dtype="float64", name="f")
+    var col = Column.from_pandas(pd_s, "f")
+    var data = col._float64_data().copy()  # internal access needed for bit-level verification
+    for i in range(5):
+        var py_val = py_values[i]
+        var packed_expected = struct_mod.unpack("q", struct_mod.pack("d", py_val))
+        var expected_bits = Int64(Int(py=packed_expected[0]))
+        var packed_got = struct_mod.unpack("q", struct_mod.pack("d", data[i]))
+        var got_bits = Int64(Int(py=packed_got[0]))
+        assert_equal(got_bits, expected_bits)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()
