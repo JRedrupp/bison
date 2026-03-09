@@ -732,32 +732,37 @@ struct Column(Copyable, Movable):
         var py_none = Python.evaluate("None")
         var has_mask = len(self._null_mask) > 0
         if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
+            ref d = self._data[List[Int64]]
+            for i in range(len(d)):
                 if has_mask and self._null_mask[i]:
                     _ = py_list.append(py_none)
                 else:
-                    _ = py_list.append(self._data[List[Int64]][i])
+                    _ = py_list.append(d[i])
         elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
+            ref d = self._data[List[Float64]]
+            for i in range(len(d)):
                 if has_mask and self._null_mask[i]:
                     _ = py_list.append(py_none)
                 else:
-                    _ = py_list.append(self._data[List[Float64]][i])
+                    _ = py_list.append(d[i])
         elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
+            ref d = self._data[List[Bool]]
+            for i in range(len(d)):
                 if has_mask and self._null_mask[i]:
                     _ = py_list.append(py_none)
                 else:
-                    _ = py_list.append(self._data[List[Bool]][i])
+                    _ = py_list.append(d[i])
         elif self._data.isa[List[String]]():
-            for i in range(len(self._data[List[String]])):
+            ref d = self._data[List[String]]
+            for i in range(len(d)):
                 if has_mask and self._null_mask[i]:
                     _ = py_list.append(py_none)
                 else:
-                    _ = py_list.append(self._data[List[String]][i])
+                    _ = py_list.append(d[i])
         else:
-            for i in range(len(self._data[List[PythonObject]])):
-                _ = py_list.append(self._data[List[PythonObject]][i])
+            ref d = self._data[List[PythonObject]]
+            for i in range(len(d)):
+                _ = py_list.append(d[i])
         if len(self._index) > 0:
             var idx_py = Python.evaluate("[]")
             for i in range(len(self._index)):
