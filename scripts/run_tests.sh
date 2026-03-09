@@ -20,9 +20,6 @@ done
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 
-# Write pass count to a file so update_compat.py can read it in CI
-echo "$PASS" > "$REPO_ROOT/.test-pass-count"
-
 if [ ${#ERRORS[@]} -gt 0 ]; then
     echo "Failed:"
     for e in "${ERRORS[@]}"; do
