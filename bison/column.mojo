@@ -637,6 +637,334 @@ struct Column(Copyable, Movable):
         return Column("count", ColumnData(result_counts^), int64, result_idx^)
 
     # ------------------------------------------------------------------
+    # Cumulative operations
+    # ------------------------------------------------------------------
+
+    fn cumsum(self, skipna: Bool = True) raises -> Column:
+        """Return a Column of cumulative sums as Float64.
+
+        When ``skipna=True`` (default), null elements produce NaN in the
+        output but do not affect subsequent cumulative values.
+        When ``skipna=False``, a null element propagates NaN to all
+        subsequent positions.
+        Raises for non-numeric column types.
+        """
+        var has_mask = len(self._null_mask) > 0
+        var running = Float64(0)
+        var propagate_nan = False
+        var result_data = List[Float64]()
+        var result_mask = List[Bool]()
+        var nan = Float64(0) / Float64(0)
+
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running += Float64(self._data[List[Int64]][i])
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running += self._data[List[Float64]][i]
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running += Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                    result_data.append(running)
+                    result_mask.append(False)
+        else:
+            raise Error("cumsum: non-numeric column type")
+
+        var col_data = ColumnData(result_data^)
+        var dtype = Column._sniff_dtype(col_data)
+        var col = Column(self.name, col_data^, dtype)
+        var has_any_null = False
+        for i in range(len(result_mask)):
+            if result_mask[i]:
+                has_any_null = True
+                break
+        if has_any_null:
+            col._null_mask = result_mask^
+        return col^
+
+    fn cumprod(self, skipna: Bool = True) raises -> Column:
+        """Return a Column of cumulative products as Float64.
+
+        When ``skipna=True`` (default), null elements produce NaN in the
+        output but do not affect subsequent cumulative values.
+        When ``skipna=False``, a null element propagates NaN to all
+        subsequent positions.
+        Raises for non-numeric column types.
+        """
+        var has_mask = len(self._null_mask) > 0
+        var running = Float64(1)
+        var propagate_nan = False
+        var result_data = List[Float64]()
+        var result_mask = List[Bool]()
+        var nan = Float64(0) / Float64(0)
+
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running *= Float64(self._data[List[Int64]][i])
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running *= self._data[List[Float64]][i]
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    running *= Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                    result_data.append(running)
+                    result_mask.append(False)
+        else:
+            raise Error("cumprod: non-numeric column type")
+
+        var col_data = ColumnData(result_data^)
+        var dtype = Column._sniff_dtype(col_data)
+        var col = Column(self.name, col_data^, dtype)
+        var has_any_null = False
+        for i in range(len(result_mask)):
+            if result_mask[i]:
+                has_any_null = True
+                break
+        if has_any_null:
+            col._null_mask = result_mask^
+        return col^
+
+    fn cummin(self, skipna: Bool = True) raises -> Column:
+        """Return a Column of cumulative minimums as Float64.
+
+        When ``skipna=True`` (default), null elements produce NaN in the
+        output but do not affect subsequent cumulative values.
+        When ``skipna=False``, a null element propagates NaN to all
+        subsequent positions.
+        Raises for non-numeric column types.
+        """
+        var has_mask = len(self._null_mask) > 0
+        var running = Float64(0)
+        var found = False
+        var propagate_nan = False
+        var result_data = List[Float64]()
+        var result_mask = List[Bool]()
+        var nan = Float64(0) / Float64(0)
+
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = Float64(self._data[List[Int64]][i])
+                    if not found or v < running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = self._data[List[Float64]][i]
+                    if not found or v < running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                    if not found or v < running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        else:
+            raise Error("cummin: non-numeric column type")
+
+        var col_data = ColumnData(result_data^)
+        var dtype = Column._sniff_dtype(col_data)
+        var col = Column(self.name, col_data^, dtype)
+        var has_any_null = False
+        for i in range(len(result_mask)):
+            if result_mask[i]:
+                has_any_null = True
+                break
+        if has_any_null:
+            col._null_mask = result_mask^
+        return col^
+
+    fn cummax(self, skipna: Bool = True) raises -> Column:
+        """Return a Column of cumulative maximums as Float64.
+
+        When ``skipna=True`` (default), null elements produce NaN in the
+        output but do not affect subsequent cumulative values.
+        When ``skipna=False``, a null element propagates NaN to all
+        subsequent positions.
+        Raises for non-numeric column types.
+        """
+        var has_mask = len(self._null_mask) > 0
+        var running = Float64(0)
+        var found = False
+        var propagate_nan = False
+        var result_data = List[Float64]()
+        var result_mask = List[Bool]()
+        var nan = Float64(0) / Float64(0)
+
+        if self._data.isa[List[Int64]]():
+            for i in range(len(self._data[List[Int64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = Float64(self._data[List[Int64]][i])
+                    if not found or v > running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Float64]]():
+            for i in range(len(self._data[List[Float64]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = self._data[List[Float64]][i]
+                    if not found or v > running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        elif self._data.isa[List[Bool]]():
+            for i in range(len(self._data[List[Bool]])):
+                var is_null = has_mask and self._null_mask[i]
+                if is_null:
+                    if not skipna:
+                        propagate_nan = True
+                    result_data.append(nan)
+                    result_mask.append(True)
+                elif propagate_nan:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                else:
+                    var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
+                    if not found or v > running:
+                        running = v
+                        found = True
+                    result_data.append(running)
+                    result_mask.append(False)
+        else:
+            raise Error("cummax: non-numeric column type")
+
+        var col_data = ColumnData(result_data^)
+        var dtype = Column._sniff_dtype(col_data)
+        var col = Column(self.name, col_data^, dtype)
+        var has_any_null = False
+        for i in range(len(result_mask)):
+            if result_mask[i]:
+                has_any_null = True
+                break
+        if has_any_null:
+            col._null_mask = result_mask^
+        return col^
+
+    # ------------------------------------------------------------------
     # Pandas interop
     # ------------------------------------------------------------------
 

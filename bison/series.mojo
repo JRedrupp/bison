@@ -219,21 +219,17 @@ struct Series(Copyable, Movable):
     fn quantile(self, q: Float64 = 0.5) raises -> Float64:
         return self._col.quantile(q)
 
-    fn cumsum(self) raises -> Series:
-        _not_implemented("Series.cumsum")
-        return Series()
+    fn cumsum(self, skipna: Bool = True) raises -> Series:
+        return Series(self._col.cumsum(skipna))
 
-    fn cumprod(self) raises -> Series:
-        _not_implemented("Series.cumprod")
-        return Series()
+    fn cumprod(self, skipna: Bool = True) raises -> Series:
+        return Series(self._col.cumprod(skipna))
 
-    fn cummin(self) raises -> Series:
-        _not_implemented("Series.cummin")
-        return Series()
+    fn cummin(self, skipna: Bool = True) raises -> Series:
+        return Series(self._col.cummin(skipna))
 
-    fn cummax(self) raises -> Series:
-        _not_implemented("Series.cummax")
-        return Series()
+    fn cummax(self, skipna: Bool = True) raises -> Series:
+        return Series(self._col.cummax(skipna))
 
     # ------------------------------------------------------------------
     # Missing data
