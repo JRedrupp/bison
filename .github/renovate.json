@@ -1,5 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "repositories": ["JRedrupp/bison"],
+  "gitAuthor": "Renovate Bot <renovate-bot@renovateapp.com>",
   "extends": [
     "config:recommended"
   ],
