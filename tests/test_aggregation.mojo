@@ -289,5 +289,158 @@ def test_series_value_counts():
     assert_true(vc.to_pandas().iloc[0] == 3)
 
 
+# ---------------------------------------------------------------------------
+# cumsum
+# ---------------------------------------------------------------------------
+
+def test_series_cumsum_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var result_pd = s.cumsum().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 3.0)
+    assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+
+
+def test_series_cumsum_float():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var result_pd = s.cumsum().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 3.0)
+    assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+
+
+def test_series_cumsum_skipna_true():
+    """Null elements produce NaN but do not break the running sum."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, float('nan'), 3.0]")))
+    var result_pd = s.cumsum().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(isnan(Float64(String(result_pd.iloc[1]))))
+    assert_true(Float64(String(result_pd.iloc[2])) == 4.0)
+
+
+def test_series_cumsum_skipna_false():
+    """Once a null is encountered, all subsequent values are NaN."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, float('nan'), 3.0]")))
+    var result_pd = s.cumsum(skipna=False).to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(isnan(Float64(String(result_pd.iloc[1]))))
+    assert_true(isnan(Float64(String(result_pd.iloc[2]))))
+
+
+def test_df_cumsum():
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.cumsum().to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 3.0)
+    assert_true(Float64(String(result_pd["a"].iloc[2])) == 6.0)
+    assert_true(Float64(String(result_pd["b"].iloc[0])) == 4.0)
+    assert_true(Float64(String(result_pd["b"].iloc[2])) == 15.0)
+
+
+# ---------------------------------------------------------------------------
+# cumprod
+# ---------------------------------------------------------------------------
+
+def test_series_cumprod_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var result_pd = s.cumprod().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 2.0)
+    assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+
+
+def test_series_cumprod_skipna_true():
+    """Null elements produce NaN but do not break the running product."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[2.0, float('nan'), 3.0]")))
+    var result_pd = s.cumprod().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 2.0)
+    assert_true(isnan(Float64(String(result_pd.iloc[1]))))
+    assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+
+
+def test_df_cumprod():
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 4]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.cumprod().to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 2.0)
+    assert_true(Float64(String(result_pd["a"].iloc[2])) == 8.0)
+
+
+# ---------------------------------------------------------------------------
+# cummin
+# ---------------------------------------------------------------------------
+
+def test_series_cummin_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
+    var result_pd = s.cummin().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 1.0)
+    assert_true(Float64(String(result_pd.iloc[2])) == 1.0)
+
+
+def test_series_cummin_skipna_true():
+    """Null elements produce NaN but do not break the running minimum."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, float('nan'), 1.0]")))
+    var result_pd = s.cummin().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
+    assert_true(isnan(Float64(String(result_pd.iloc[1]))))
+    assert_true(Float64(String(result_pd.iloc[2])) == 1.0)
+
+
+def test_df_cummin():
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.cummin().to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == 3.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[2])) == 1.0)
+
+
+# ---------------------------------------------------------------------------
+# cummax
+# ---------------------------------------------------------------------------
+
+def test_series_cummax_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 5]")))
+    var result_pd = s.cummax().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 3.0)
+    assert_true(Float64(String(result_pd.iloc[2])) == 5.0)
+
+
+def test_series_cummax_skipna_true():
+    """Null elements produce NaN but do not break the running maximum."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, float('nan'), 5.0]")))
+    var result_pd = s.cummax().to_pandas()
+    assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
+    assert_true(isnan(Float64(String(result_pd.iloc[1]))))
+    assert_true(Float64(String(result_pd.iloc[2])) == 5.0)
+
+
+def test_df_cummax():
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.cummax().to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == 3.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 3.0)
+    assert_true(Float64(String(result_pd["a"].iloc[2])) == 5.0)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()

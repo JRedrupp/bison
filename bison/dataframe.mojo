@@ -266,21 +266,37 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.abs")
         return DataFrame()
 
-    fn cumsum(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.cumsum")
-        return DataFrame()
+    fn cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
+        if axis != 0:
+            raise Error("DataFrame.cumsum: axis=1 not yet implemented")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].cumsum(skipna))
+        return DataFrame(result_cols^)
 
-    fn cumprod(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.cumprod")
-        return DataFrame()
+    fn cumprod(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
+        if axis != 0:
+            raise Error("DataFrame.cumprod: axis=1 not yet implemented")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].cumprod(skipna))
+        return DataFrame(result_cols^)
 
-    fn cummin(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.cummin")
-        return DataFrame()
+    fn cummin(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
+        if axis != 0:
+            raise Error("DataFrame.cummin: axis=1 not yet implemented")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].cummin(skipna))
+        return DataFrame(result_cols^)
 
-    fn cummax(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.cummax")
-        return DataFrame()
+    fn cummax(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
+        if axis != 0:
+            raise Error("DataFrame.cummax: axis=1 not yet implemented")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].cummax(skipna))
+        return DataFrame(result_cols^)
 
     fn agg(self, func: PythonObject, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
