@@ -18,7 +18,7 @@
     },
     {
       "matchPackageNames": ["max"],
-      "enabled": false
+      "registryUrls": ["https://prefix.dev/max/"]
     }
   ],
   "lockFileMaintenance": {
