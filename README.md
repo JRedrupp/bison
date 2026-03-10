@@ -87,10 +87,10 @@ In CI it runs after the test suite and the result is committed back to the branc
 | GroupBy (Series) | 15 | 1 |
 | String accessor | 18 | 1 |
 | Datetime accessor | 17 | 1 |
-| Index | 3 | 11 |
+| Index | 0 | 14 |
 | IO | 12 | 0 |
 | Reshape | 1 | 0 |
-| **Total** | **226** | **73** |
+| **Total** | **223** | **76** |
 <!-- COMPAT_TABLE_END -->
 
 ## Contributing

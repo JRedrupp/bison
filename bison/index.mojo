@@ -1,12 +1,13 @@
-from ._errors import _not_implemented
+from collections import Set
+from builtin.sort import sort
 
 
 struct Index(Copyable, Movable):
     var _data: List[String]
     var name: String
 
-    fn __init__(out self, data: List[String], name: String = ""):
-        self._data = data
+    fn __init__(out self, var data: List[String], name: String = ""):
+        self._data = data^
         self.name = name
 
     fn __copyinit__(out self, existing: Self):
@@ -24,7 +25,7 @@ struct Index(Copyable, Movable):
         return self._data[i]
 
     fn tolist(self) -> List[String]:
-        return self._data
+        return self._data.copy()
 
     fn __repr__(self) -> String:
         var s = String("Index([")
@@ -39,16 +40,30 @@ struct Index(Copyable, Movable):
         return s
 
     fn get_loc(self, key: String) raises -> Int:
-        _not_implemented("Index.get_loc")
-        return -1
+        for i in range(len(self._data)):
+            if self._data[i] == key:
+                return i
+        raise Error("KeyError: '" + key + "'")
 
     fn unique(self) raises -> Index:
-        _not_implemented("Index.unique")
-        return Index(self._data.copy(), self.name)
+        var seen = Set[String]()
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._data[i] not in seen:
+                seen.add(self._data[i])
+                result.append(self._data[i])
+        return Index(result^, self.name)
 
     fn sort_values(self, ascending: Bool = True) raises -> Index:
-        _not_implemented("Index.sort_values")
-        return Index(self._data.copy(), self.name)
+        var result = self._data.copy()
+        sort(result)
+        if not ascending:
+            var n = len(result)
+            for i in range(n // 2):
+                var tmp = result[i]
+                result[i] = result[n - 1 - i]
+                result[n - 1 - i] = tmp
+        return Index(result^, self.name)
 
 
 struct RangeIndex:
