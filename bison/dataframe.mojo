@@ -7,6 +7,47 @@ from .series import Series
 from .groupby import DataFrameGroupBy
 
 
+# ------------------------------------------------------------------
+# CSV serialisation helpers (used by DataFrame.to_csv)
+# ------------------------------------------------------------------
+
+fn _csv_quote_field(field: String, sep: String) -> String:
+    """Return *field* quoted for CSV output if it contains *sep*, a
+    newline, or a double-quote character; otherwise return *field* as-is.
+    Double-quote characters inside the field are escaped by doubling them.
+    """
+    var needs_quote = (
+        field.find(sep) >= 0
+        or field.find("\n") >= 0
+        or field.find('"') >= 0
+    )
+    if not needs_quote:
+        return field
+    return '"' + field.replace('"', '""') + '"'
+
+
+fn _col_cell_str(col: Column, row: Int) raises -> String:
+    """Return the string representation of cell *row* in *col*.
+
+    Null cells (masked entries) are returned as an empty string.
+    """
+    var has_mask = len(col._null_mask) > 0
+    if has_mask and row < len(col._null_mask) and col._null_mask[row]:
+        return String("")
+    if col._data.isa[List[Int64]]():
+        return String(Int(col._data[List[Int64]][row]))
+    elif col._data.isa[List[Float64]]():
+        return String(col._data[List[Float64]][row])
+    elif col._data.isa[List[Bool]]():
+        if col._data[List[Bool]][row]:
+            return String("True")
+        return String("False")
+    elif col._data.isa[List[String]]():
+        return col._data[List[String]][row]
+    else:
+        return String(col._data[List[PythonObject]][row])
+
+
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API."""
 
@@ -697,8 +738,49 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn to_csv(self, path_or_buf: String = "", sep: String = ",", index: Bool = True) raises -> String:
-        _not_implemented("DataFrame.to_csv")
-        return String("")
+        """Serialize the DataFrame to a CSV-formatted string or file.
+
+        Parameters
+        ----------
+        path_or_buf : File path to write. If empty (default) the CSV text is
+                      returned as a ``String`` instead of being written.
+        sep         : Field delimiter (default ``","``).
+        index       : Whether to include the row index (default ``True``).
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var result = String()
+
+        # Header row
+        var header_parts = List[String]()
+        if index:
+            header_parts.append(String(""))  # empty label for the index column
+        for ci in range(ncols):
+            header_parts.append(self._cols[ci].name)
+        var hline = String()
+        for i in range(len(header_parts)):
+            if i > 0:
+                hline += sep
+            hline += _csv_quote_field(header_parts[i], sep)
+        result += hline + "\n"
+
+        # Data rows
+        for ri in range(nrows):
+            var line = String()
+            if index:
+                line += String(ri) + sep
+            for ci in range(ncols):
+                if ci > 0:
+                    line += sep
+                line += _csv_quote_field(_col_cell_str(self._cols[ci], ri), sep)
+            result += line + "\n"
+
+        # Write to file or return string.
+        if len(path_or_buf) > 0:
+            with open(path_or_buf, "w") as f:
+                f.write(result)
+            return String("")
+        return result^
 
     fn to_parquet(self, path: String, engine: String = "auto", compression: String = "snappy") raises:
         _not_implemented("DataFrame.to_parquet")
