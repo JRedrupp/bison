@@ -754,7 +754,7 @@ struct DataFrame(Copyable, Movable):
         # Header row
         var header_parts = List[String]()
         if index:
-            header_parts.append(String(""))  # empty label for the index column
+            header_parts.append(String(""))  # pandas convention: index column has no header
         for ci in range(ncols):
             header_parts.append(self._cols[ci].name)
         var hline = String()

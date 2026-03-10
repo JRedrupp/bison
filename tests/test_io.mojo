@@ -80,6 +80,9 @@ def test_to_csv_no_index():
     var csv_str = df.to_csv(index=False)
     # Header line should start with "x", not ",x"
     assert_true(csv_str.startswith("x\n"))
+    # Data rows should contain the values
+    assert_true(csv_str.find("10") >= 0)
+    assert_true(csv_str.find("20") >= 0)
 
 
 def test_csv_roundtrip():

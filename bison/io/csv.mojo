@@ -1,10 +1,9 @@
 from python import Python, PythonObject
-from memory import bitcast
 from collections import Optional
 from .._errors import _not_implemented
 from ..dataframe import DataFrame
 from ..column import Column, ColumnData
-from ..dtypes import int64, float64, object_, BisonDtype
+from ..dtypes import int64, float64, object_
 
 
 # ------------------------------------------------------------------
@@ -29,21 +28,20 @@ fn _infer_and_build_column(
     Priority: Int64 > Float64 > String (object_).
     Null-mask is set for any cell whose value is in *na_set*.
     """
-    var py_builtins = Python.import_module("builtins")
     var n = len(raw)
 
     if n == 0:
         return Column(name, ColumnData(List[String]()), object_)
 
     # ------------------------------------------------------------------
-    # Try Int64
+    # Try Int64 — atol() raises for anything that isn't a decimal integer.
     # ------------------------------------------------------------------
     var all_int = True
     for i in range(n):
         if _in_na_set(raw[i], na_set):
             continue
         try:
-            _ = py_builtins.int(raw[i])
+            _ = atol(raw[i])
         except:
             all_int = False
             break
@@ -58,7 +56,7 @@ fn _infer_and_build_column(
                 null_mask.append(True)
                 has_null = True
             else:
-                data.append(Int64(Int(py=py_builtins.int(raw[i]))))
+                data.append(Int64(atol(raw[i])))
                 null_mask.append(False)
         var col_data = ColumnData(data^)
         var col = Column(name, col_data^, int64)
@@ -67,20 +65,19 @@ fn _infer_and_build_column(
         return col^
 
     # ------------------------------------------------------------------
-    # Try Float64
+    # Try Float64 — atof() raises for non-numeric strings.
     # ------------------------------------------------------------------
     var all_float = True
     for i in range(n):
         if _in_na_set(raw[i], na_set):
             continue
         try:
-            _ = py_builtins.float(raw[i])
+            _ = atof(raw[i])
         except:
             all_float = False
             break
 
     if all_float:
-        var struct_mod = Python.import_module("struct")
         var data = List[Float64]()
         var null_mask = List[Bool]()
         var has_null = False
@@ -90,11 +87,7 @@ fn _infer_and_build_column(
                 null_mask.append(True)
                 has_null = True
             else:
-                var packed = struct_mod.unpack(
-                    "q", struct_mod.pack("d", py_builtins.float(raw[i]))
-                )
-                var bits = Int64(Int(py=packed[0]))
-                data.append(bitcast[DType.float64](bits))
+                data.append(atof(raw[i]))
                 null_mask.append(False)
         var col_data = ColumnData(data^)
         var col = Column(name, col_data^, float64)
@@ -240,8 +233,7 @@ fn read_csv(
                 na_set.append(String(nv[i]))
         except:
             # Single value rather than a list.
-            if na_values:
-                na_set.append(String(na_values.value()))
+            na_set.append(String(na_values.value()))
 
     # ------------------------------------------------------------------
     # Resolve which column indices (and their output names) to keep.
