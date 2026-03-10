@@ -227,6 +227,152 @@ struct Column(Copyable, Movable):
         return visitor.result
 
     # ------------------------------------------------------------------
+    # Row selection helpers
+    # ------------------------------------------------------------------
+
+    fn slice(self, start: Int, end: Int) -> Column:
+        """Return a new Column containing rows [start, end).
+
+        Negative indices are not supported; out-of-range bounds are clamped.
+        """
+        var n = self.__len__()
+        var s = start
+        if s < 0:
+            s = 0
+        if s > n:
+            s = n
+        var e = end
+        if e < 0:
+            e = 0
+        if e > n:
+            e = n
+        var has_mask = len(self._null_mask) > 0
+        var new_mask = List[Bool]()
+        if has_mask:
+            for i in range(s, e):
+                new_mask.append(self._null_mask[i])
+        if self._data.isa[List[Int64]]():
+            var result = List[Int64]()
+            ref d = self._data[List[Int64]]
+            for i in range(s, e):
+                result.append(d[i])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[Float64]]():
+            var result = List[Float64]()
+            ref d = self._data[List[Float64]]
+            for i in range(s, e):
+                result.append(d[i])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[Bool]]():
+            var result = List[Bool]()
+            ref d = self._data[List[Bool]]
+            for i in range(s, e):
+                result.append(d[i])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[String]]():
+            var result = List[String]()
+            ref d = self._data[List[String]]
+            for i in range(s, e):
+                result.append(d[i])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        else:
+            var result = List[PythonObject]()
+            ref d = self._data[List[PythonObject]]
+            for i in range(s, e):
+                result.append(d[i])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+
+    fn take(self, indices: List[Int]) -> Column:
+        """Return a new Column with rows selected by *indices* (arbitrary order)."""
+        var has_mask = len(self._null_mask) > 0
+        var new_mask = List[Bool]()
+        if self._data.isa[List[Int64]]():
+            var result = List[Int64]()
+            ref d = self._data[List[Int64]]
+            for k in range(len(indices)):
+                var idx = indices[k]
+                result.append(d[idx])
+                if has_mask:
+                    new_mask.append(self._null_mask[idx])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[Float64]]():
+            var result = List[Float64]()
+            ref d = self._data[List[Float64]]
+            for k in range(len(indices)):
+                var idx = indices[k]
+                result.append(d[idx])
+                if has_mask:
+                    new_mask.append(self._null_mask[idx])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[Bool]]():
+            var result = List[Bool]()
+            ref d = self._data[List[Bool]]
+            for k in range(len(indices)):
+                var idx = indices[k]
+                result.append(d[idx])
+                if has_mask:
+                    new_mask.append(self._null_mask[idx])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        elif self._data.isa[List[String]]():
+            var result = List[String]()
+            ref d = self._data[List[String]]
+            for k in range(len(indices)):
+                var idx = indices[k]
+                result.append(d[idx])
+                if has_mask:
+                    new_mask.append(self._null_mask[idx])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+        else:
+            var result = List[PythonObject]()
+            ref d = self._data[List[PythonObject]]
+            for k in range(len(indices)):
+                var idx = indices[k]
+                result.append(d[idx])
+                if has_mask:
+                    new_mask.append(self._null_mask[idx])
+            var col_data = ColumnData(result^)
+            var col = Column(self.name, col_data^, self.dtype)
+            if len(new_mask) > 0:
+                col._null_mask = new_mask^
+            return col^
+
+    # ------------------------------------------------------------------
     # Null tracking
     # ------------------------------------------------------------------
 
