@@ -15,6 +15,10 @@
     {
       "matchManagers": ["pixi"],
       "groupName": "pixi dependencies"
+    },
+    {
+      "matchPackageNames": ["max"],
+      "registryUrls": ["https://prefix.dev/max/"]
     }
   ],
   "lockFileMaintenance": {
