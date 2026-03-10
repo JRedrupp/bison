@@ -114,35 +114,166 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn __getitem__(self, key: String) raises -> Series:
-        _not_implemented("DataFrame.__getitem__")
-        return Series()
+        for i in range(len(self._cols)):
+            if self._cols[i].name == key:
+                return Series(self._cols[i].copy())
+        raise Error("DataFrame.__getitem__: column not found: " + key)
 
-    fn __setitem__(inout self, key: String, value: PythonObject) raises:
-        _not_implemented("DataFrame.__setitem__")
+    fn __setitem__(mut self, key: String, value: Series) raises:
+        var new_col = value._col.copy()
+        new_col.name = key
+        for i in range(len(self._cols)):
+            if self._cols[i].name == key:
+                self._cols[i] = new_col^
+                return
+        self._cols.append(new_col^)
 
-    fn get(self, key: String, default: Optional[PythonObject] = None) raises -> PythonObject:
-        _not_implemented("DataFrame.get")
+    fn get(self, key: String, default: Optional[Series] = None) -> Optional[Series]:
+        for i in range(len(self._cols)):
+            if self._cols[i].name == key:
+                return Series(self._cols[i].copy())
         return default
 
-    fn head(self, n: Int = 5) raises -> DataFrame:
-        _not_implemented("DataFrame.head")
-        return DataFrame()
+    fn head(self, n: Int = 5) -> DataFrame:
+        var nrows = self.shape()[0]
+        var take = n
+        if take > nrows:
+            take = nrows
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].slice(0, take))
+        return DataFrame(result_cols^)
 
-    fn tail(self, n: Int = 5) raises -> DataFrame:
-        _not_implemented("DataFrame.tail")
-        return DataFrame()
+    fn tail(self, n: Int = 5) -> DataFrame:
+        var nrows = self.shape()[0]
+        var take = n
+        if take > nrows:
+            take = nrows
+        var start = nrows - take
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].slice(start, nrows))
+        return DataFrame(result_cols^)
 
-    fn sample(self, n: Int = 1, frac: Optional[PythonObject] = None, random_state: Optional[PythonObject] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.sample")
-        return DataFrame()
+    fn sample(
+        self,
+        n: Int = 1,
+        frac: Optional[Float64] = None,
+        random_state: Optional[Int] = None,
+    ) raises -> DataFrame:
+        """Return a random sample of rows.
 
-    fn filter(self, items: Optional[PythonObject] = None, like: String = "", regex: String = "", axis: Int = 1) raises -> DataFrame:
-        _not_implemented("DataFrame.filter")
-        return DataFrame()
+        Uses a Fisher-Yates shuffle driven by a 32-bit xorshift PRNG.
+        Pass *random_state* (any non-zero integer) for reproducibility.
+        """
+        var nrows = self.shape()[0]
+        if nrows == 0:
+            return DataFrame()
+        var take: Int
+        if frac:
+            var frac_val = frac.value()
+            take = Int(Float64(nrows) * frac_val)
+        else:
+            take = n
+        if take > nrows:
+            take = nrows
+        # Build index list [0, 1, ..., nrows-1]
+        var indices = List[Int]()
+        for i in range(nrows):
+            indices.append(i)
+        # Fisher-Yates shuffle — xorshift32 PRNG
+        var state: Int = 1
+        if random_state:
+            state = random_state.value()
+        if state == 0:
+            state = 1  # xorshift must not start at 0
+        for i in range(nrows):
+            # xorshift32 step (kept positive via masking)
+            state = state ^ (state << 13)
+            state = state ^ (state >> 17)
+            state = state ^ (state << 5)
+            state = state & 0x7FFFFFFF
+            var j = i + (state % (nrows - i))
+            var tmp = indices[i]
+            indices[i] = indices[j]
+            indices[j] = tmp
+        # Collect the first `take` shuffled indices
+        var selected = List[Int]()
+        for i in range(take):
+            selected.append(indices[i])
+        var result_cols = List[Column]()
+        for ci in range(len(self._cols)):
+            result_cols.append(self._cols[ci].take(selected))
+        return DataFrame(result_cols^)
 
-    fn select_dtypes(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.select_dtypes")
-        return DataFrame()
+    fn filter(
+        self,
+        items: Optional[List[String]] = None,
+        like: String = "",
+        regex: String = "",
+        axis: Int = 1,
+    ) raises -> DataFrame:
+        """Select columns by label.
+
+        *items*: keep only columns whose name is in the list.
+        *like*:  keep columns whose name contains the substring.
+        *regex*: keep columns whose name matches the pattern (uses Python re).
+        """
+        if axis != 1:
+            raise Error("DataFrame.filter: axis=0 not yet implemented")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var col_name = self._cols[i].name
+            var keep = False
+            if items:
+                ref items_list = items.value()
+                for j in range(len(items_list)):
+                    if col_name == items_list[j]:
+                        keep = True
+                        break
+            elif like != "":
+                keep = col_name.find(like) != -1
+            elif regex != "":
+                # Regex requires Python's re module — there is no native
+                # regex engine in Mojo's standard library yet.
+                var re_mod = Python.import_module("re")
+                keep = Bool(re_mod.search(regex, col_name).__bool__())
+            else:
+                keep = True
+            if keep:
+                result_cols.append(self._cols[i].copy())
+        return DataFrame(result_cols^)
+
+    fn select_dtypes(
+        self,
+        include: Optional[List[String]] = None,
+        exclude: Optional[List[String]] = None,
+    ) -> DataFrame:
+        """Return a subset of columns matching *include* and not in *exclude*.
+
+        Both parameters accept a list of dtype name strings (e.g. ``"int64"``,
+        ``"float64"``, ``"object"``).
+        """
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var dtype_name = self._cols[i].dtype.name
+            var included = True
+            if include:
+                ref inc_list = include.value()
+                included = False
+                for j in range(len(inc_list)):
+                    if dtype_name == inc_list[j]:
+                        included = True
+                        break
+            if included and exclude:
+                ref exc_list = exclude.value()
+                for j in range(len(exc_list)):
+                    if dtype_name == exc_list[j]:
+                        included = False
+                        break
+            if included:
+                result_cols.append(self._cols[i].copy())
+        return DataFrame(result_cols^)
 
     # ------------------------------------------------------------------
     # Aggregation
