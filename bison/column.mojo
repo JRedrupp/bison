@@ -113,6 +113,18 @@ struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
     fn on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
 
 
+# ------------------------------------------------------------------
+# Compile-time operation selectors for Column._arith_op
+# ------------------------------------------------------------------
+comptime _ARITH_ADD      = 0
+comptime _ARITH_SUB      = 1
+comptime _ARITH_MUL      = 2
+comptime _ARITH_DIV      = 3
+comptime _ARITH_FLOORDIV = 4
+comptime _ARITH_MOD      = 5
+comptime _ARITH_POW      = 6
+
+
 struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -817,9 +829,15 @@ struct Column(Copyable, Movable, Sized):
             col._null_mask = result_mask^
         return col^
 
-    fn _arith_add(self, other: Column) raises -> Column:
+    fn _arith_op[op: Int](self, op_name: String, other: Column) raises -> Column:
+        """Core element-wise binary arithmetic kernel.
+
+        ``op`` is a compile-time constant (``_ARITH_*``) that selects the
+        operation; ``@parameter if`` folds the branch at compile time so each
+        specialisation compiles to a tight scalar loop with no runtime dispatch.
+        """
         if len(self) != len(other):
-            raise Error("add: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -835,141 +853,48 @@ struct Column(Copyable, Movable, Sized):
                 result_mask.append(True)
                 has_any_null = True
             else:
-                result.append(a[i] + b[i])
+                var v: Float64
+                @parameter
+                if op == _ARITH_ADD:
+                    v = a[i] + b[i]
+                elif op == _ARITH_SUB:
+                    v = a[i] - b[i]
+                elif op == _ARITH_MUL:
+                    v = a[i] * b[i]
+                elif op == _ARITH_DIV:
+                    v = a[i] / b[i]
+                elif op == _ARITH_FLOORDIV:
+                    v = floor(a[i] / b[i])
+                elif op == _ARITH_MOD:
+                    v = a[i] - floor(a[i] / b[i]) * b[i]
+                elif op == _ARITH_POW:
+                    v = a[i] ** b[i]
+                else:
+                    v = Float64(0)  # unreachable: compile-time guard
+                result.append(v)
                 result_mask.append(False)
         return self._arith_build(result^, result_mask^, has_any_null)
+
+    fn _arith_add(self, other: Column) raises -> Column:
+        return self._arith_op[_ARITH_ADD]("add", other)
 
     fn _arith_sub(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("sub: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(a[i] - b[i])
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_SUB]("sub", other)
 
     fn _arith_mul(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("mul: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(a[i] * b[i])
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_MUL]("mul", other)
 
     fn _arith_div(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("div: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(a[i] / b[i])
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_DIV]("div", other)
 
     fn _arith_floordiv(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("floordiv: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(floor(a[i] / b[i]))
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_FLOORDIV]("floordiv", other)
 
     fn _arith_mod(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("mod: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(a[i] - floor(a[i] / b[i]) * b[i])
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_MOD]("mod", other)
 
     fn _arith_pow(self, other: Column) raises -> Column:
-        if len(self) != len(other):
-            raise Error("pow: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        var result = List[Float64]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(nan)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                result.append(a[i] ** b[i])
-                result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._arith_op[_ARITH_POW]("pow", other)
 
     # ------------------------------------------------------------------
     # Cumulative operations
