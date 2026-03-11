@@ -113,7 +113,7 @@ struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
     fn on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
 
 
-struct Column(Copyable, Movable):
+struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
     Data is stored as a ``ColumnData`` Variant — one typed list per column,
@@ -235,7 +235,7 @@ struct Column(Copyable, Movable):
 
         Negative indices are not supported; out-of-range bounds are clamped.
         """
-        var n = self.__len__()
+        var n = len(self)
         var s = start
         if s < 0:
             s = 0
@@ -426,7 +426,7 @@ struct Column(Copyable, Movable):
 
     fn count(self) -> Int:
         """Return the number of non-null elements."""
-        var n = self.__len__()
+        var n = len(self)
         if len(self._null_mask) == 0:
             return n
         var result = 0
@@ -441,7 +441,7 @@ struct Column(Copyable, Movable):
         Returns NaN when all elements are null or the column is empty.
         Raises for non-numeric column types.
         """
-        var n = self.count() if skipna else self.__len__()
+        var n = self.count() if skipna else len(self)
         if n == 0:
             var zero = Float64(0)
             return zero / zero
@@ -539,7 +539,7 @@ struct Column(Copyable, Movable):
         Returns NaN when n - ddof <= 0.
         Raises for non-numeric column types.
         """
-        var n = self.count() if skipna else self.__len__()
+        var n = self.count() if skipna else len(self)
         if n - ddof <= 0:
             var zero = Float64(0)
             return zero / zero
@@ -818,8 +818,8 @@ struct Column(Copyable, Movable):
         return col^
 
     fn _arith_add(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("add: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("add: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -840,8 +840,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_sub(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("sub: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("sub: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -862,8 +862,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_mul(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("mul: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("mul: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -884,8 +884,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_div(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("div: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("div: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -906,8 +906,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_floordiv(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("floordiv: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("floordiv: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -928,8 +928,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_mod(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("mod: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("mod: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
@@ -950,8 +950,8 @@ struct Column(Copyable, Movable):
         return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_pow(self, other: Column) raises -> Column:
-        if self.__len__() != other.__len__():
-            raise Error("pow: length mismatch (" + String(self.__len__()) + " vs " + String(other.__len__()) + ")")
+        if len(self) != len(other):
+            raise Error("pow: length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         var has_a_mask = len(self._null_mask) > 0
