@@ -30,6 +30,11 @@ comptime ColumnData = Variant[
 # No PythonObject arm — record values must be explicitly typed.
 comptime DFScalar = Variant[Int64, Float64, Bool, String]
 
+# Scalar type returned by Series.iloc / Series.at.
+# Covers all five ColumnData arm types; the PythonObject arm is used only
+# for object/datetime/timedelta columns that have no native Mojo equivalent.
+comptime SeriesScalar = Variant[Int64, Float64, Bool, String, PythonObject]
+
 
 # ------------------------------------------------------------------
 # Visit primitive — the single canonical dispatch site for ColumnData

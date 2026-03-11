@@ -2,7 +2,7 @@ from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_
-from .column import Column
+from .column import Column, SeriesScalar
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -74,20 +74,49 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn head(self, n: Int = 5) raises -> Series:
-        _not_implemented("Series.head")
-        return Series()
+        var size = self._col.__len__()
+        var end = n
+        if end > size:
+            end = size
+        if end < 0:
+            end = 0
+        return Series(self._col.slice(0, end))
 
     fn tail(self, n: Int = 5) raises -> Series:
-        _not_implemented("Series.tail")
-        return Series()
+        var size = self._col.__len__()
+        var start = size - n
+        if start < 0:
+            start = 0
+        return Series(self._col.slice(start, size))
 
-    fn iloc(self, i: Int) raises -> PythonObject:
-        _not_implemented("Series.iloc")
-        return PythonObject(None)
+    fn iloc(self, i: Int) raises -> SeriesScalar:
+        var size = self._col.__len__()
+        var idx = i
+        if idx < 0:
+            idx = size + idx
+        if idx < 0 or idx >= size:
+            raise Error(
+                "index "
+                + String(i)
+                + " is out of bounds for Series of length "
+                + String(size)
+            )
+        if self._col._data.isa[List[Int64]]():
+            return SeriesScalar(self._col._data[List[Int64]][idx])
+        elif self._col._data.isa[List[Float64]]():
+            return SeriesScalar(self._col._data[List[Float64]][idx])
+        elif self._col._data.isa[List[Bool]]():
+            return SeriesScalar(self._col._data[List[Bool]][idx])
+        elif self._col._data.isa[List[String]]():
+            return SeriesScalar(self._col._data[List[String]][idx])
+        else:
+            return SeriesScalar(self._col._data[List[PythonObject]][idx])
 
-    fn at(self, label: String) raises -> PythonObject:
-        _not_implemented("Series.at")
-        return PythonObject(None)
+    fn at(self, label: String) raises -> SeriesScalar:
+        for i in range(len(self._col._index)):
+            if String(self._col._index[i]) == label:
+                return self.iloc(i)
+        raise Error("Series.at: label '" + label + "' not found in index")
 
     # ------------------------------------------------------------------
     # Arithmetic
