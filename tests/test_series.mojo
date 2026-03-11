@@ -366,5 +366,172 @@ def test_add_length_mismatch():
     assert_true(raised)
 
 
+def test_isna():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var na = s.isna()
+    assert_equal(na.size(), 3)
+    assert_false(na.iloc(0)[Bool])
+    assert_true(na.iloc(1)[Bool])
+    assert_false(na.iloc(2)[Bool])
+
+
+def test_isna_no_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var na = s.isna()
+    assert_false(na.iloc(0)[Bool])
+    assert_false(na.iloc(1)[Bool])
+    assert_false(na.iloc(2)[Bool])
+
+
+def test_isnull():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var na = s.isnull()
+    assert_false(na.iloc(0)[Bool])
+    assert_true(na.iloc(1)[Bool])
+    assert_false(na.iloc(2)[Bool])
+
+
+def test_notna():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var na = s.notna()
+    assert_equal(na.size(), 3)
+    assert_true(na.iloc(0)[Bool])
+    assert_false(na.iloc(1)[Bool])
+    assert_true(na.iloc(2)[Bool])
+
+
+def test_notnull():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var na = s.notnull()
+    assert_true(na.iloc(0)[Bool])
+    assert_false(na.iloc(1)[Bool])
+    assert_true(na.iloc(2)[Bool])
+
+
+def test_fillna():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var filled = s.fillna(Python.evaluate("0.0"))
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 0.0)
+    assert_true(Float64(String(rp.iloc[2])) == 3.0)
+
+
+def test_fillna_no_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var filled = s.fillna(Python.evaluate("0.0"))
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[1])) == 2.0)
+
+
+def test_fillna_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, None, 3]"), dtype="float64"))
+    var filled = s.fillna(Python.evaluate("9"))
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[1])) == 9.0)
+
+
+def test_dropna():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var dropped = s.dropna()
+    assert_equal(dropped.size(), 2)
+    var rp = dropped.to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+
+
+def test_dropna_no_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var dropped = s.dropna()
+    assert_equal(dropped.size(), 3)
+
+
+def test_dropna_all_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[None, None]"), dtype="float64"))
+    var dropped = s.dropna()
+    assert_equal(dropped.size(), 0)
+
+
+def test_ffill():
+    var pd = Python.import_module("pandas")
+    # [1.0, NaN, 3.0] → ffill → [1.0, 1.0, 3.0]
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var filled = s.ffill()
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 1.0)
+    assert_true(Float64(String(rp.iloc[2])) == 3.0)
+
+
+def test_ffill_leading_null():
+    var pd = Python.import_module("pandas")
+    # [NaN, 2.0, NaN] → ffill → [NaN, 2.0, 2.0]
+    var s = Series(pd.Series(Python.evaluate("[None, 2.0, None]")))
+    var filled = s.ffill()
+    # leading null stays null, trailing null filled
+    assert_true(filled.isna().iloc(0)[Bool])
+    assert_false(filled.isna().iloc(1)[Bool])
+    assert_false(filled.isna().iloc(2)[Bool])
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[1])) == 2.0)
+    assert_true(Float64(String(rp.iloc[2])) == 2.0)
+
+
+def test_ffill_no_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var filled = s.ffill()
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[1])) == 2.0)
+
+
+def test_bfill():
+    var pd = Python.import_module("pandas")
+    # [1.0, NaN, 3.0] → bfill → [1.0, 3.0, 3.0]
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var filled = s.bfill()
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+    assert_true(Float64(String(rp.iloc[2])) == 3.0)
+
+
+def test_bfill_trailing_null():
+    var pd = Python.import_module("pandas")
+    # [NaN, 2.0, NaN] → bfill → [2.0, 2.0, NaN]
+    var s = Series(pd.Series(Python.evaluate("[None, 2.0, None]")))
+    var filled = s.bfill()
+    assert_false(filled.isna().iloc(0)[Bool])
+    assert_false(filled.isna().iloc(1)[Bool])
+    assert_true(filled.isna().iloc(2)[Bool])
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 2.0)
+
+
+def test_bfill_no_nulls():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var filled = s.bfill()
+    assert_equal(filled.size(), 3)
+    var rp = filled.to_pandas()
+    assert_true(Float64(String(rp.iloc[1])) == 2.0)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()

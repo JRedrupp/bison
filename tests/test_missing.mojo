@@ -48,15 +48,11 @@ def test_df_ffill_stub():
     assert_true(raised)
 
 
-def test_series_fillna_stub():
+def test_series_fillna_works():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0]")))
-    var raised = False
-    try:
-        _ = s.fillna(PythonObject(0))
-    except:
-        raised = True
-    assert_true(raised)
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 2.0]")))
+    var filled = s.fillna(PythonObject(0))
+    assert_true(filled.size() == 3)
 
 
 def main():
