@@ -132,5 +132,157 @@ def test_stub_raises_head():
     assert_true(raised)
 
 
+def test_add():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.add(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 5.0)
+    assert_true(Float64(String(rp.iloc[1])) == 7.0)
+    assert_true(Float64(String(rp.iloc[2])) == 9.0)
+
+
+def test_sub():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.sub(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == -3.0)
+    assert_true(Float64(String(rp.iloc[1])) == -3.0)
+    assert_true(Float64(String(rp.iloc[2])) == -3.0)
+
+
+def test_mul():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.mul(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 4.0)
+    assert_true(Float64(String(rp.iloc[1])) == 10.0)
+    assert_true(Float64(String(rp.iloc[2])) == 18.0)
+
+
+def test_div():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
+    var rp = s1.div(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 0.25)
+    assert_true(Float64(String(rp.iloc[1])) == 0.4)
+    assert_true(Float64(String(rp.iloc[2])) == 0.5)
+
+
+def test_floordiv():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.floordiv(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 0.0)
+    assert_true(Float64(String(rp.iloc[1])) == 0.0)
+    assert_true(Float64(String(rp.iloc[2])) == 0.0)
+
+
+def test_mod():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[10, 7, 9]")))
+    var s2 = Series(pd.Series(Python.evaluate("[3, 4, 5]")))
+    var rp = s1.mod(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_pow():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[2, 3, 4]")))
+    var s2 = Series(pd.Series(Python.evaluate("[3, 2, 1]")))
+    var rp = s1.pow(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 8.0)
+    assert_true(Float64(String(rp.iloc[1])) == 9.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_radd():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.radd(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 5.0)
+    assert_true(Float64(String(rp.iloc[1])) == 7.0)
+    assert_true(Float64(String(rp.iloc[2])) == 9.0)
+
+
+def test_rsub():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.rsub(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 3.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+    assert_true(Float64(String(rp.iloc[2])) == 3.0)
+
+
+def test_rmul():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var rp = s1.rmul(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 4.0)
+    assert_true(Float64(String(rp.iloc[1])) == 10.0)
+    assert_true(Float64(String(rp.iloc[2])) == 18.0)
+
+
+def test_rdiv():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var rp = s1.rdiv(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 0.25)
+    assert_true(Float64(String(rp.iloc[1])) == 0.4)
+    assert_true(Float64(String(rp.iloc[2])) == 0.5)
+
+
+def test_rfloordiv():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var rp = s1.rfloordiv(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 0.0)
+    assert_true(Float64(String(rp.iloc[1])) == 0.0)
+    assert_true(Float64(String(rp.iloc[2])) == 0.0)
+
+
+def test_rmod():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[3, 4, 5]")))
+    var s2 = Series(pd.Series(Python.evaluate("[10, 7, 9]")))
+    var rp = s1.rmod(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_rpow():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[3, 2, 1]")))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 3, 4]")))
+    var rp = s1.rpow(s2).to_pandas()
+    assert_true(Float64(String(rp.iloc[0])) == 8.0)
+    assert_true(Float64(String(rp.iloc[1])) == 9.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_add_length_mismatch():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1]")))
+    var raised = False
+    try:
+        _ = s1.add(s2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()

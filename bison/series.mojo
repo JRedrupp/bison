@@ -94,60 +94,46 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn add(self, other: Series) raises -> Series:
-        _not_implemented("Series.add")
-        return Series()
+        return Series(self._col._arith_add(other._col))
 
     fn sub(self, other: Series) raises -> Series:
-        _not_implemented("Series.sub")
-        return Series()
+        return Series(self._col._arith_sub(other._col))
 
     fn mul(self, other: Series) raises -> Series:
-        _not_implemented("Series.mul")
-        return Series()
+        return Series(self._col._arith_mul(other._col))
 
     fn div(self, other: Series) raises -> Series:
-        _not_implemented("Series.div")
-        return Series()
+        return Series(self._col._arith_div(other._col))
 
     fn floordiv(self, other: Series) raises -> Series:
-        _not_implemented("Series.floordiv")
-        return Series()
+        return Series(self._col._arith_floordiv(other._col))
 
     fn mod(self, other: Series) raises -> Series:
-        _not_implemented("Series.mod")
-        return Series()
+        return Series(self._col._arith_mod(other._col))
 
     fn pow(self, other: Series) raises -> Series:
-        _not_implemented("Series.pow")
-        return Series()
+        return Series(self._col._arith_pow(other._col))
 
     fn radd(self, other: Series) raises -> Series:
-        _not_implemented("Series.radd")
-        return Series()
+        return Series(other._col._arith_add(self._col))
 
     fn rsub(self, other: Series) raises -> Series:
-        _not_implemented("Series.rsub")
-        return Series()
+        return Series(other._col._arith_sub(self._col))
 
     fn rmul(self, other: Series) raises -> Series:
-        _not_implemented("Series.rmul")
-        return Series()
+        return Series(other._col._arith_mul(self._col))
 
     fn rdiv(self, other: Series) raises -> Series:
-        _not_implemented("Series.rdiv")
-        return Series()
+        return Series(other._col._arith_div(self._col))
 
     fn rfloordiv(self, other: Series) raises -> Series:
-        _not_implemented("Series.rfloordiv")
-        return Series()
+        return Series(other._col._arith_floordiv(self._col))
 
     fn rmod(self, other: Series) raises -> Series:
-        _not_implemented("Series.rmod")
-        return Series()
+        return Series(other._col._arith_mod(self._col))
 
     fn rpow(self, other: Series) raises -> Series:
-        _not_implemented("Series.rpow")
-        return Series()
+        return Series(other._col._arith_pow(self._col))
 
     # ------------------------------------------------------------------
     # Comparison
