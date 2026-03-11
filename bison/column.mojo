@@ -808,7 +808,7 @@ struct Column(Copyable, Movable):
             raise Error("arith: non-numeric column type")
         return result^
 
-    fn _arith_build(self, other: Column, var result: List[Float64], var result_mask: List[Bool], has_any_null: Bool) -> Column:
+    fn _arith_build(self, var result: List[Float64], var result_mask: List[Bool], has_any_null: Bool) -> Column:
         """Wrap a computed Float64 list into a Column, attaching mask only if needed."""
         var col_data = ColumnData(result^)
         var dtype = Column._sniff_dtype(col_data)
@@ -837,7 +837,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] + b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_sub(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -859,7 +859,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] - b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_mul(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -881,7 +881,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] * b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_div(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -903,7 +903,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] / b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_floordiv(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -925,7 +925,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(floor(a[i] / b[i]))
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_mod(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -947,7 +947,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] - floor(a[i] / b[i]) * b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     fn _arith_pow(self, other: Column) raises -> Column:
         if self.__len__() != other.__len__():
@@ -969,7 +969,7 @@ struct Column(Copyable, Movable):
             else:
                 result.append(a[i] ** b[i])
                 result_mask.append(False)
-        return self._arith_build(other, result^, result_mask^, has_any_null)
+        return self._arith_build(result^, result_mask^, has_any_null)
 
     # ------------------------------------------------------------------
     # Cumulative operations
