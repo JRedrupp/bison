@@ -115,25 +115,25 @@ struct Series(Copyable, Movable):
         return Series(self._col._arith_pow(other._col))
 
     fn radd(self, other: Series) raises -> Series:
-        return Series(other._col._arith_add(self._col))
+        return other.add(self)
 
     fn rsub(self, other: Series) raises -> Series:
-        return Series(other._col._arith_sub(self._col))
+        return other.sub(self)
 
     fn rmul(self, other: Series) raises -> Series:
-        return Series(other._col._arith_mul(self._col))
+        return other.mul(self)
 
     fn rdiv(self, other: Series) raises -> Series:
-        return Series(other._col._arith_div(self._col))
+        return other.div(self)
 
     fn rfloordiv(self, other: Series) raises -> Series:
-        return Series(other._col._arith_floordiv(self._col))
+        return other.floordiv(self)
 
     fn rmod(self, other: Series) raises -> Series:
-        return Series(other._col._arith_mod(self._col))
+        return other.mod(self)
 
     fn rpow(self, other: Series) raises -> Series:
-        return Series(other._col._arith_pow(self._col))
+        return other.pow(self)
 
     # ------------------------------------------------------------------
     # Comparison
