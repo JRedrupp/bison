@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
           - max-version: locked   # exact versions from pixi.lock
-            pixi-flags: "--locked"
+            pixi-locked: true
           - max-version: latest   # newest MAX satisfying >=26.1
-            pixi-flags: ""
+            pixi-locked: false
 
     steps:
       - uses: actions/checkout@v6
@@ -28,7 +28,7 @@ jobs:
 
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          frozen: ${{ matrix.max-version == 'locked' }}
+          locked: ${{ matrix.pixi-locked }}
 
       - name: Install pre-commit
         run: pip install pre-commit
