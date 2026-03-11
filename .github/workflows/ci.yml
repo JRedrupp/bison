@@ -7,15 +7,28 @@ on:
 
 jobs:
   test:
+    name: test (${{ matrix.max-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - max-version: locked   # exact versions from pixi.lock
+            pixi-locked: true
+          - max-version: latest   # newest MAX satisfying >=26.1
+            pixi-locked: false
+
     steps:
       - uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          locked: ${{ matrix.pixi-locked }}
 
       - name: Install pre-commit
         run: pip install pre-commit
@@ -30,12 +43,16 @@ jobs:
         run: pixi run test
 
       - name: Update compatibility table
+        if: matrix.max-version == 'locked'
         run: |
           PASSING=$(cat .test-pass-count 2>/dev/null || echo 0)
           python scripts/update_compat.py --passing "$PASSING"
 
       - name: Commit updated README
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >
+          matrix.max-version == 'locked' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
