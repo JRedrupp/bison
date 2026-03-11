@@ -121,12 +121,94 @@ def test_value_counts():
     assert_equal(vc.size(), 3)
 
 
-def test_stub_raises_head():
+def test_head():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    var h = s.head(3)
+    assert_equal(h.size(), 3)
+    assert_true(Float64(String(h.to_pandas().iloc[0])) == 1.0)
+    assert_true(Float64(String(h.to_pandas().iloc[2])) == 3.0)
+
+
+def test_head_default():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5, 6, 7]")))
+    var h = s.head()
+    assert_equal(h.size(), 5)
+
+
+def test_head_clamps():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2]")))
+    var h = s.head(10)
+    assert_equal(h.size(), 2)
+
+
+def test_tail():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    var t = s.tail(3)
+    assert_equal(t.size(), 3)
+    assert_true(Float64(String(t.to_pandas().iloc[0])) == 3.0)
+    assert_true(Float64(String(t.to_pandas().iloc[2])) == 5.0)
+
+
+def test_tail_default():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5, 6, 7]")))
+    var t = s.tail()
+    assert_equal(t.size(), 5)
+
+
+def test_tail_clamps():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2]")))
+    var t = s.tail(10)
+    assert_equal(t.size(), 2)
+
+
+def test_iloc():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
+    assert_true(Float64(String(s.iloc(0))) == 10.0)
+    assert_true(Float64(String(s.iloc(1))) == 20.0)
+    assert_true(Float64(String(s.iloc(2))) == 30.0)
+
+
+def test_iloc_negative():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
+    assert_true(Float64(String(s.iloc(-1))) == 30.0)
+    assert_true(Float64(String(s.iloc(-3))) == 10.0)
+
+
+def test_iloc_out_of_bounds():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var raised = False
     try:
-        _ = s.head()
+        _ = s.iloc(5)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_at():
+    var pd = Python.import_module("pandas")
+    var idx = Python.evaluate("['a', 'b', 'c']")
+    var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), index=idx))
+    assert_true(Float64(String(s.at("a"))) == 10.0)
+    assert_true(Float64(String(s.at("b"))) == 20.0)
+    assert_true(Float64(String(s.at("c"))) == 30.0)
+
+
+def test_at_missing_label():
+    var pd = Python.import_module("pandas")
+    var idx = Python.evaluate("['x', 'y']")
+    var s = Series(pd.Series(Python.evaluate("[1, 2]"), index=idx))
+    var raised = False
+    try:
+        _ = s.at("z")
     except:
         raised = True
     assert_true(raised)
