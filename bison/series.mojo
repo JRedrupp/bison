@@ -2,7 +2,7 @@ from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_
-from .column import Column, ColumnData, SeriesScalar
+from .column import Column, ColumnData, DFScalar, SeriesScalar
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -280,7 +280,7 @@ struct Series(Copyable, Movable):
         """Alias for notna()."""
         return self.notna()
 
-    fn fillna(self, value: PythonObject) raises -> Series:
+    fn fillna(self, value: DFScalar) raises -> Series:
         """Return a copy of the Series with null/NaN values replaced by *value*."""
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
@@ -288,7 +288,15 @@ struct Series(Copyable, Movable):
         var n = len(self._col)
         var idx = self._col._index.copy()
         if self._col._data.isa[List[Int64]]():
-            var fill_val = Int64(Int(py=value))
+            var fill_val: Int64
+            if value.isa[Int64]():
+                fill_val = value[Int64]
+            elif value.isa[Float64]():
+                fill_val = Int64(Int(value[Float64]))
+            elif value.isa[Bool]():
+                fill_val = Int64(1) if value[Bool] else Int64(0)
+            else:
+                raise Error("fillna: cannot fill Int64 column with String value")
             var data = List[Int64]()
             ref d = self._col._data[List[Int64]]
             for i in range(n):
@@ -300,7 +308,15 @@ struct Series(Copyable, Movable):
             var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
             return Series(col^)
         elif self._col._data.isa[List[Float64]]():
-            var fill_val = Float64(String(value))
+            var fill_val: Float64
+            if value.isa[Float64]():
+                fill_val = value[Float64]
+            elif value.isa[Int64]():
+                fill_val = Float64(value[Int64])
+            elif value.isa[Bool]():
+                fill_val = Float64(1.0) if value[Bool] else Float64(0.0)
+            else:
+                raise Error("fillna: cannot fill Float64 column with String value")
             var data = List[Float64]()
             ref d = self._col._data[List[Float64]]
             for i in range(n):
@@ -312,7 +328,15 @@ struct Series(Copyable, Movable):
             var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
             return Series(col^)
         elif self._col._data.isa[List[Bool]]():
-            var fill_val = Bool(value.__bool__())
+            var fill_val: Bool
+            if value.isa[Bool]():
+                fill_val = value[Bool]
+            elif value.isa[Int64]():
+                fill_val = value[Int64] != Int64(0)
+            elif value.isa[Float64]():
+                fill_val = value[Float64] != Float64(0.0)
+            else:
+                raise Error("fillna: cannot fill Bool column with String value")
             var data = List[Bool]()
             ref d = self._col._data[List[Bool]]
             for i in range(n):
@@ -324,7 +348,15 @@ struct Series(Copyable, Movable):
             var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
             return Series(col^)
         elif self._col._data.isa[List[String]]():
-            var fill_val = String(value)
+            var fill_val: String
+            if value.isa[String]():
+                fill_val = value[String]
+            elif value.isa[Int64]():
+                fill_val = String(Int(value[Int64]))
+            elif value.isa[Float64]():
+                fill_val = String(value[Float64])
+            else:
+                fill_val = String("True") if value[Bool] else String("False")
             var data = List[String]()
             ref d = self._col._data[List[String]]
             for i in range(n):
@@ -336,16 +368,7 @@ struct Series(Copyable, Movable):
             var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
             return Series(col^)
         else:
-            var data = List[PythonObject]()
-            ref d = self._col._data[List[PythonObject]]
-            for i in range(n):
-                if self._col._null_mask[i]:
-                    data.append(value)
-                else:
-                    data.append(d[i])
-            var col_data = ColumnData(data^)
-            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
-            return Series(col^)
+            raise Error("fillna: PythonObject columns are not supported")
 
     fn dropna(self) raises -> Series:
         """Return a new Series with null/NaN elements removed."""

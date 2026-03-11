@@ -1,7 +1,7 @@
 """Tests for Series construction and basic attributes."""
 from python import Python, PythonObject
 from testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import Series, SeriesScalar
+from bison import Series, SeriesScalar, DFScalar
 
 
 def test_from_pandas():
@@ -416,7 +416,7 @@ def test_notnull():
 def test_fillna():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
-    var filled = s.fillna(Python.evaluate("0.0"))
+    var filled = s.fillna(DFScalar(Float64(0.0)))
     assert_equal(filled.size(), 3)
     var rp = filled.to_pandas()
     assert_true(Float64(String(rp.iloc[0])) == 1.0)
@@ -427,7 +427,7 @@ def test_fillna():
 def test_fillna_no_nulls():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var filled = s.fillna(Python.evaluate("0.0"))
+    var filled = s.fillna(DFScalar(Float64(0.0)))
     assert_equal(filled.size(), 3)
     var rp = filled.to_pandas()
     assert_true(Float64(String(rp.iloc[1])) == 2.0)
@@ -436,7 +436,7 @@ def test_fillna_no_nulls():
 def test_fillna_int():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, None, 3]"), dtype="float64"))
-    var filled = s.fillna(Python.evaluate("9"))
+    var filled = s.fillna(DFScalar(Float64(9.0)))
     var rp = filled.to_pandas()
     assert_true(Float64(String(rp.iloc[1])) == 9.0)
 
