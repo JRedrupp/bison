@@ -1,7 +1,7 @@
 """Tests for Series construction and basic attributes."""
 from python import Python, PythonObject
 from testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import Series
+from bison import Series, SeriesScalar
 
 
 def test_from_pandas():
@@ -170,16 +170,16 @@ def test_tail_clamps():
 def test_iloc():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
-    assert_true(Float64(String(s.iloc(0))) == 10.0)
-    assert_true(Float64(String(s.iloc(1))) == 20.0)
-    assert_true(Float64(String(s.iloc(2))) == 30.0)
+    assert_equal(s.iloc(0)[Int64], 10)
+    assert_equal(s.iloc(1)[Int64], 20)
+    assert_equal(s.iloc(2)[Int64], 30)
 
 
 def test_iloc_negative():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
-    assert_true(Float64(String(s.iloc(-1))) == 30.0)
-    assert_true(Float64(String(s.iloc(-3))) == 10.0)
+    assert_equal(s.iloc(-1)[Int64], 30)
+    assert_equal(s.iloc(-3)[Int64], 10)
 
 
 def test_iloc_out_of_bounds():
@@ -197,9 +197,9 @@ def test_at():
     var pd = Python.import_module("pandas")
     var idx = Python.evaluate("['a', 'b', 'c']")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), index=idx))
-    assert_true(Float64(String(s.at("a"))) == 10.0)
-    assert_true(Float64(String(s.at("b"))) == 20.0)
-    assert_true(Float64(String(s.at("c"))) == 30.0)
+    assert_equal(s.at("a")[Int64], 10)
+    assert_equal(s.at("b")[Int64], 20)
+    assert_equal(s.at("c")[Int64], 30)
 
 
 def test_at_missing_label():

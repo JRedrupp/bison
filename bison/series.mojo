@@ -2,7 +2,7 @@ from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_
-from .column import Column
+from .column import Column, SeriesScalar
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -89,7 +89,7 @@ struct Series(Copyable, Movable):
             start = 0
         return Series(self._col.slice(start, size))
 
-    fn iloc(self, i: Int) raises -> PythonObject:
+    fn iloc(self, i: Int) raises -> SeriesScalar:
         var size = self._col.__len__()
         var idx = i
         if idx < 0:
@@ -102,17 +102,17 @@ struct Series(Copyable, Movable):
                 + String(size)
             )
         if self._col._data.isa[List[Int64]]():
-            return PythonObject(Int(self._col._data[List[Int64]][idx]))
+            return SeriesScalar(self._col._data[List[Int64]][idx])
         elif self._col._data.isa[List[Float64]]():
-            return PythonObject(self._col._data[List[Float64]][idx])
+            return SeriesScalar(self._col._data[List[Float64]][idx])
         elif self._col._data.isa[List[Bool]]():
-            return PythonObject(self._col._data[List[Bool]][idx])
+            return SeriesScalar(self._col._data[List[Bool]][idx])
         elif self._col._data.isa[List[String]]():
-            return PythonObject(self._col._data[List[String]][idx])
+            return SeriesScalar(self._col._data[List[String]][idx])
         else:
-            return self._col._data[List[PythonObject]][idx]
+            return SeriesScalar(self._col._data[List[PythonObject]][idx])
 
-    fn at(self, label: String) raises -> PythonObject:
+    fn at(self, label: String) raises -> SeriesScalar:
         for i in range(len(self._col._index)):
             if String(self._col._index[i]) == label:
                 return self.iloc(i)
