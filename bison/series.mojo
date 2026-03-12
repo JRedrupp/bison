@@ -1,8 +1,8 @@
 from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
-from .dtypes import BisonDtype, object_
-from .column import Column, SeriesScalar
+from .dtypes import BisonDtype, object_, bool_
+from .column import Column, ColumnData, DFScalar, SeriesScalar
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -251,36 +251,476 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn isna(self) raises -> Series:
-        _not_implemented("Series.isna")
-        return Series()
+        """Return a boolean Series that is True where values are null/NaN."""
+        var n = len(self._col)
+        var has_mask = len(self._col._null_mask) > 0
+        var result = List[Bool]()
+        for i in range(n):
+            result.append(has_mask and self._col._null_mask[i])
+        var col_data = ColumnData(result^)
+        var col = Column(self._col.name, col_data^, bool_)
+        return Series(col^)
 
     fn isnull(self) raises -> Series:
-        _not_implemented("Series.isnull")
-        return Series()
+        """Alias for isna()."""
+        return self.isna()
 
     fn notna(self) raises -> Series:
-        _not_implemented("Series.notna")
-        return Series()
+        """Return a boolean Series that is True where values are not null/NaN."""
+        var n = len(self._col)
+        var has_mask = len(self._col._null_mask) > 0
+        var result = List[Bool]()
+        for i in range(n):
+            result.append(not (has_mask and self._col._null_mask[i]))
+        var col_data = ColumnData(result^)
+        var col = Column(self._col.name, col_data^, bool_)
+        return Series(col^)
 
     fn notnull(self) raises -> Series:
-        _not_implemented("Series.notnull")
-        return Series()
+        """Alias for notna()."""
+        return self.notna()
 
-    fn fillna(self, value: PythonObject) raises -> Series:
-        _not_implemented("Series.fillna")
-        return Series()
+    fn fillna(self, value: DFScalar) raises -> Series:
+        """Return a copy of the Series with null/NaN values replaced by *value*."""
+        var has_mask = len(self._col._null_mask) > 0
+        if not has_mask:
+            return Series(self._col.copy())
+        var n = len(self._col)
+        var idx = self._col._index.copy()
+        if self._col._data.isa[List[Int64]]():
+            var fill_val: Int64
+            if value.isa[Int64]():
+                fill_val = value[Int64]
+            elif value.isa[Float64]():
+                fill_val = Int64(Int(value[Float64]))
+            elif value.isa[Bool]():
+                fill_val = Int64(1) if value[Bool] else Int64(0)
+            else:
+                raise Error("fillna: cannot fill Int64 column with String value")
+            var data = List[Int64]()
+            ref d = self._col._data[List[Int64]]
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    data.append(fill_val)
+                else:
+                    data.append(d[i])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            return Series(col^)
+        elif self._col._data.isa[List[Float64]]():
+            var fill_val: Float64
+            if value.isa[Float64]():
+                fill_val = value[Float64]
+            elif value.isa[Int64]():
+                fill_val = Float64(value[Int64])
+            elif value.isa[Bool]():
+                fill_val = Float64(1.0) if value[Bool] else Float64(0.0)
+            else:
+                raise Error("fillna: cannot fill Float64 column with String value")
+            var data = List[Float64]()
+            ref d = self._col._data[List[Float64]]
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    data.append(fill_val)
+                else:
+                    data.append(d[i])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            return Series(col^)
+        elif self._col._data.isa[List[Bool]]():
+            var fill_val: Bool
+            if value.isa[Bool]():
+                fill_val = value[Bool]
+            elif value.isa[Int64]():
+                fill_val = value[Int64] != Int64(0)
+            elif value.isa[Float64]():
+                fill_val = value[Float64] != Float64(0.0)
+            else:
+                raise Error("fillna: cannot fill Bool column with String value")
+            var data = List[Bool]()
+            ref d = self._col._data[List[Bool]]
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    data.append(fill_val)
+                else:
+                    data.append(d[i])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            return Series(col^)
+        elif self._col._data.isa[List[String]]():
+            var fill_val: String
+            if value.isa[String]():
+                fill_val = value[String]
+            elif value.isa[Int64]():
+                fill_val = String(Int(value[Int64]))
+            elif value.isa[Float64]():
+                fill_val = String(value[Float64])
+            else:
+                fill_val = String("True") if value[Bool] else String("False")
+            var data = List[String]()
+            ref d = self._col._data[List[String]]
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    data.append(fill_val)
+                else:
+                    data.append(d[i])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            return Series(col^)
+        else:
+            raise Error("fillna: PythonObject columns are not supported")
 
     fn dropna(self) raises -> Series:
-        _not_implemented("Series.dropna")
-        return Series()
+        """Return a new Series with null/NaN elements removed."""
+        var has_mask = len(self._col._null_mask) > 0
+        if not has_mask:
+            return Series(self._col.copy())
+        var keep = List[Int]()
+        for i in range(len(self._col._null_mask)):
+            if not self._col._null_mask[i]:
+                keep.append(i)
+        var result_col = self._col.take(keep)
+        # All kept elements are non-null; clear the mask.
+        result_col._null_mask = List[Bool]()
+        return Series(result_col^)
 
     fn ffill(self) raises -> Series:
-        _not_implemented("Series.ffill")
-        return Series()
+        """Forward-fill: propagate the last non-null value forward over nulls."""
+        var has_mask = len(self._col._null_mask) > 0
+        if not has_mask:
+            return Series(self._col.copy())
+        var n = len(self._col)
+        var idx = self._col._index.copy()
+        if self._col._data.isa[List[Int64]]():
+            ref d = self._col._data[List[Int64]]
+            var data = List[Int64]()
+            var new_mask = List[Bool]()
+            var last_val = Int64(0)
+            var found = False
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    if found:
+                        data.append(last_val)
+                        new_mask.append(False)
+                    else:
+                        data.append(Int64(0))
+                        new_mask.append(True)
+                else:
+                    last_val = d[i]
+                    found = True
+                    data.append(d[i])
+                    new_mask.append(False)
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[Float64]]():
+            ref d = self._col._data[List[Float64]]
+            var data = List[Float64]()
+            var new_mask = List[Bool]()
+            var last_val = Float64(0)
+            var found = False
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    if found:
+                        data.append(last_val)
+                        new_mask.append(False)
+                    else:
+                        data.append(Float64(0))
+                        new_mask.append(True)
+                else:
+                    last_val = d[i]
+                    found = True
+                    data.append(d[i])
+                    new_mask.append(False)
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[Bool]]():
+            ref d = self._col._data[List[Bool]]
+            var data = List[Bool]()
+            var new_mask = List[Bool]()
+            var last_val = False
+            var found = False
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    if found:
+                        data.append(last_val)
+                        new_mask.append(False)
+                    else:
+                        data.append(False)
+                        new_mask.append(True)
+                else:
+                    last_val = d[i]
+                    found = True
+                    data.append(d[i])
+                    new_mask.append(False)
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            var data = List[String]()
+            var new_mask = List[Bool]()
+            var last_val = String("")
+            var found = False
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    if found:
+                        data.append(last_val)
+                        new_mask.append(False)
+                    else:
+                        data.append(String(""))
+                        new_mask.append(True)
+                else:
+                    last_val = d[i]
+                    found = True
+                    data.append(d[i])
+                    new_mask.append(False)
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        else:
+            ref d = self._col._data[List[PythonObject]]
+            var data = List[PythonObject]()
+            var new_mask = List[Bool]()
+            var none_val = Python.evaluate("None")
+            var last_val = none_val
+            var found = False
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    if found:
+                        data.append(last_val)
+                        new_mask.append(False)
+                    else:
+                        data.append(none_val)
+                        new_mask.append(True)
+                else:
+                    last_val = d[i]
+                    found = True
+                    data.append(d[i])
+                    new_mask.append(False)
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
 
     fn bfill(self) raises -> Series:
-        _not_implemented("Series.bfill")
-        return Series()
+        """Backward-fill: propagate the next non-null value backward over nulls."""
+        var has_mask = len(self._col._null_mask) > 0
+        if not has_mask:
+            return Series(self._col.copy())
+        var n = len(self._col)
+        var idx = self._col._index.copy()
+        if self._col._data.isa[List[Int64]]():
+            ref d = self._col._data[List[Int64]]
+            var rev_data = List[Int64]()
+            var rev_mask = List[Bool]()
+            var next_val = Int64(0)
+            var found = False
+            for ri in range(n):
+                var i = n - 1 - ri
+                if not self._col._null_mask[i]:
+                    next_val = d[i]
+                    found = True
+                    rev_data.append(d[i])
+                    rev_mask.append(False)
+                else:
+                    if found:
+                        rev_data.append(next_val)
+                        rev_mask.append(False)
+                    else:
+                        rev_data.append(Int64(0))
+                        rev_mask.append(True)
+            var data = List[Int64]()
+            var new_mask = List[Bool]()
+            for ri in range(n):
+                data.append(rev_data[n - 1 - ri])
+                new_mask.append(rev_mask[n - 1 - ri])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[Float64]]():
+            ref d = self._col._data[List[Float64]]
+            var rev_data = List[Float64]()
+            var rev_mask = List[Bool]()
+            var next_val = Float64(0)
+            var found = False
+            for ri in range(n):
+                var i = n - 1 - ri
+                if not self._col._null_mask[i]:
+                    next_val = d[i]
+                    found = True
+                    rev_data.append(d[i])
+                    rev_mask.append(False)
+                else:
+                    if found:
+                        rev_data.append(next_val)
+                        rev_mask.append(False)
+                    else:
+                        rev_data.append(Float64(0))
+                        rev_mask.append(True)
+            var data = List[Float64]()
+            var new_mask = List[Bool]()
+            for ri in range(n):
+                data.append(rev_data[n - 1 - ri])
+                new_mask.append(rev_mask[n - 1 - ri])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[Bool]]():
+            ref d = self._col._data[List[Bool]]
+            var rev_data = List[Bool]()
+            var rev_mask = List[Bool]()
+            var next_val = False
+            var found = False
+            for ri in range(n):
+                var i = n - 1 - ri
+                if not self._col._null_mask[i]:
+                    next_val = d[i]
+                    found = True
+                    rev_data.append(d[i])
+                    rev_mask.append(False)
+                else:
+                    if found:
+                        rev_data.append(next_val)
+                        rev_mask.append(False)
+                    else:
+                        rev_data.append(False)
+                        rev_mask.append(True)
+            var data = List[Bool]()
+            var new_mask = List[Bool]()
+            for ri in range(n):
+                data.append(rev_data[n - 1 - ri])
+                new_mask.append(rev_mask[n - 1 - ri])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        elif self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            var rev_data = List[String]()
+            var rev_mask = List[Bool]()
+            var next_val = String("")
+            var found = False
+            for ri in range(n):
+                var i = n - 1 - ri
+                if not self._col._null_mask[i]:
+                    next_val = d[i]
+                    found = True
+                    rev_data.append(d[i])
+                    rev_mask.append(False)
+                else:
+                    if found:
+                        rev_data.append(next_val)
+                        rev_mask.append(False)
+                    else:
+                        rev_data.append(String(""))
+                        rev_mask.append(True)
+            var data = List[String]()
+            var new_mask = List[Bool]()
+            for ri in range(n):
+                data.append(rev_data[n - 1 - ri])
+                new_mask.append(rev_mask[n - 1 - ri])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
+        else:
+            ref d = self._col._data[List[PythonObject]]
+            var none_val = Python.evaluate("None")
+            var rev_data = List[PythonObject]()
+            var rev_mask = List[Bool]()
+            var next_val = none_val
+            var found = False
+            for ri in range(n):
+                var i = n - 1 - ri
+                if not self._col._null_mask[i]:
+                    next_val = d[i]
+                    found = True
+                    rev_data.append(d[i])
+                    rev_mask.append(False)
+                else:
+                    if found:
+                        rev_data.append(next_val)
+                        rev_mask.append(False)
+                    else:
+                        rev_data.append(none_val)
+                        rev_mask.append(True)
+            var data = List[PythonObject]()
+            var new_mask = List[Bool]()
+            for ri in range(n):
+                data.append(rev_data[n - 1 - ri])
+                new_mask.append(rev_mask[n - 1 - ri])
+            var col_data = ColumnData(data^)
+            var col = Column(self._col.name, col_data^, self._col.dtype, idx^)
+            var has_any_null = False
+            for i in range(len(new_mask)):
+                if new_mask[i]:
+                    has_any_null = True
+                    break
+            if has_any_null:
+                col._null_mask = new_mask^
+            return Series(col^)
 
     # ------------------------------------------------------------------
     # Sorting
