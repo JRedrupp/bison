@@ -130,6 +130,17 @@ comptime _ARITH_MOD      = 5
 comptime _ARITH_POW      = 6
 
 
+# ------------------------------------------------------------------
+# Compile-time operation selectors for Column._cmp_op
+# ------------------------------------------------------------------
+comptime _CMP_EQ = 0
+comptime _CMP_NE = 1
+comptime _CMP_LT = 2
+comptime _CMP_LE = 3
+comptime _CMP_GT = 4
+comptime _CMP_GE = 5
+
+
 struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -900,6 +911,77 @@ struct Column(Copyable, Movable, Sized):
 
     fn _arith_pow(self, other: Column) raises -> Column:
         return self._arith_op[_ARITH_POW]("pow", other)
+
+    # ------------------------------------------------------------------
+    # Comparison operations
+    # ------------------------------------------------------------------
+
+    fn _cmp_op[op: Int](self, op_name: String, other: Column) raises -> Column:
+        """Core element-wise binary comparison kernel.
+
+        ``op`` is a compile-time constant (``_CMP_*``) that selects the
+        operation; ``@parameter if`` folds the branch at compile time so each
+        specialisation compiles to a tight scalar loop with no runtime dispatch.
+        Null propagation: if either input element is null, the result is null.
+        """
+        if len(self) != len(other):
+            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+        var a = self._to_float64_list()
+        var b = other._to_float64_list()
+        var has_a_mask = len(self._null_mask) > 0
+        var has_b_mask = len(other._null_mask) > 0
+        var result = List[Bool]()
+        var result_mask = List[Bool]()
+        var has_any_null = False
+        for i in range(len(a)):
+            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+            if is_null:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+            else:
+                var v: Bool
+                @parameter
+                if op == _CMP_EQ:
+                    v = a[i] == b[i]
+                elif op == _CMP_NE:
+                    v = a[i] != b[i]
+                elif op == _CMP_LT:
+                    v = a[i] < b[i]
+                elif op == _CMP_LE:
+                    v = a[i] <= b[i]
+                elif op == _CMP_GT:
+                    v = a[i] > b[i]
+                elif op == _CMP_GE:
+                    v = a[i] >= b[i]
+                else:
+                    v = False  # unreachable: compile-time guard
+                result.append(v)
+                result_mask.append(False)
+        var col_data = ColumnData(result^)
+        var dtype = Column._sniff_dtype(col_data)
+        var col = Column(self.name, col_data^, dtype)
+        if has_any_null:
+            col._null_mask = result_mask^
+        return col^
+
+    fn _cmp_eq(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_EQ]("eq", other)
+
+    fn _cmp_ne(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_NE]("ne", other)
+
+    fn _cmp_lt(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_LT]("lt", other)
+
+    fn _cmp_le(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_LE]("le", other)
+
+    fn _cmp_gt(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_GT]("gt", other)
+
+    fn _cmp_ge(self, other: Column) raises -> Column:
+        return self._cmp_op[_CMP_GE]("ge", other)
 
     # ------------------------------------------------------------------
     # Cumulative operations
