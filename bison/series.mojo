@@ -169,28 +169,22 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn eq(self, other: Series) raises -> Series:
-        _not_implemented("Series.eq")
-        return Series()
+        return Series(self._col._cmp_eq(other._col))
 
     fn ne(self, other: Series) raises -> Series:
-        _not_implemented("Series.ne")
-        return Series()
+        return Series(self._col._cmp_ne(other._col))
 
     fn lt(self, other: Series) raises -> Series:
-        _not_implemented("Series.lt")
-        return Series()
+        return Series(self._col._cmp_lt(other._col))
 
     fn le(self, other: Series) raises -> Series:
-        _not_implemented("Series.le")
-        return Series()
+        return Series(self._col._cmp_le(other._col))
 
     fn gt(self, other: Series) raises -> Series:
-        _not_implemented("Series.gt")
-        return Series()
+        return Series(self._col._cmp_gt(other._col))
 
     fn ge(self, other: Series) raises -> Series:
-        _not_implemented("Series.ge")
-        return Series()
+        return Series(self._col._cmp_ge(other._col))
 
     # ------------------------------------------------------------------
     # Aggregation

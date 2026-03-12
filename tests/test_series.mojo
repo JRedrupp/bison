@@ -533,5 +533,75 @@ def test_bfill_no_nulls():
     assert_true(Float64(String(rp.iloc[1])) == 2.0)
 
 
+def test_eq():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1, 0, 3]")))
+    var rp = s1.eq(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == True)
+
+
+def test_ne():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1, 0, 3]")))
+    var rp = s1.ne(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == False)
+
+
+def test_lt():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
+    var rp = s1.lt(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == False)
+
+
+def test_le():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
+    var rp = s1.le(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == False)
+
+
+def test_gt():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
+    var rp = s1.gt(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == True)
+
+
+def test_ge():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
+    var rp = s1.ge(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == True)
+
+
+def test_eq_null_propagation():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var result = s1.eq(s2)
+    assert_true(result.isna().iloc(1)[Bool])
+    assert_false(result.isna().iloc(0)[Bool])
+    assert_false(result.isna().iloc(2)[Bool])
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()
