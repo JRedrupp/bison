@@ -603,5 +603,72 @@ def test_eq_null_propagation():
     assert_false(result.isna().iloc(2)[Bool])
 
 
+# Bool column comparison tests — exercises the direct Bool arm in _cmp_op
+def test_bool_eq():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
+    var rp = s1.eq(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == False)
+    assert_true(Bool(rp.iloc[3]) == True)
+
+
+def test_bool_ne():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
+    var rp = s1.ne(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == True)
+    assert_true(Bool(rp.iloc[3]) == False)
+
+
+def test_bool_lt():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
+    var rp = s1.lt(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == False)
+    assert_true(Bool(rp.iloc[3]) == False)
+
+
+def test_bool_le():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
+    var rp = s1.le(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == False)
+    assert_true(Bool(rp.iloc[3]) == True)
+
+
+def test_bool_gt():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
+    var rp = s1.gt(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == True)
+    assert_true(Bool(rp.iloc[3]) == False)
+
+
+def test_bool_ge():
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
+    var rp = s1.ge(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == True)
+    assert_true(Bool(rp.iloc[3]) == True)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()

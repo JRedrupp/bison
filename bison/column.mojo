@@ -949,36 +949,72 @@ struct Column(Copyable, Movable, Sized):
         operation; ``@parameter if`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         Null propagation: if either input element is null, the result is null.
+
+        When both columns are Bool, comparison is performed directly on Bool
+        values without round-tripping through Float64.
         """
-        var inp = self._binary_op_prepare(op_name, other)
+        if len(self) != len(other):
+            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
-        for i in range(len(inp.a)):
-            var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
-            if is_null:
-                result.append(False)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                var v: Bool
-                @parameter
-                if op == _CMP_EQ:
-                    v = inp.a[i] == inp.b[i]
-                elif op == _CMP_NE:
-                    v = inp.a[i] != inp.b[i]
-                elif op == _CMP_LT:
-                    v = inp.a[i] < inp.b[i]
-                elif op == _CMP_LE:
-                    v = inp.a[i] <= inp.b[i]
-                elif op == _CMP_GT:
-                    v = inp.a[i] > inp.b[i]
-                elif op == _CMP_GE:
-                    v = inp.a[i] >= inp.b[i]
+        var has_a_mask = len(self._null_mask) > 0
+        var has_b_mask = len(other._null_mask) > 0
+        if self._data.isa[List[Bool]]() and other._data.isa[List[Bool]]():
+            ref da = self._data[List[Bool]]
+            ref db = other._data[List[Bool]]
+            for i in range(len(da)):
+                var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+                if is_null:
+                    result.append(False)
+                    result_mask.append(True)
+                    has_any_null = True
                 else:
-                    v = False  # unreachable: compile-time guard
-                result.append(v)
-                result_mask.append(False)
+                    var v: Bool
+                    @parameter
+                    if op == _CMP_EQ:
+                        v = da[i] == db[i]
+                    elif op == _CMP_NE:
+                        v = da[i] != db[i]
+                    elif op == _CMP_LT:
+                        v = (not da[i]) and db[i]  # False < True: False=0, True=1
+                    elif op == _CMP_LE:
+                        v = (not da[i]) or db[i]   # False <= True, False <= False, True <= True
+                    elif op == _CMP_GT:
+                        v = da[i] and (not db[i])  # True > False
+                    elif op == _CMP_GE:
+                        v = da[i] or (not db[i])   # True >= False, False >= False, True >= True
+                    else:
+                        v = False  # unreachable: compile-time guard
+                    result.append(v)
+                    result_mask.append(False)
+        else:
+            var inp = self._binary_op_prepare(op_name, other)
+            for i in range(len(inp.a)):
+                var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
+                if is_null:
+                    result.append(False)
+                    result_mask.append(True)
+                    has_any_null = True
+                else:
+                    var v: Bool
+                    @parameter
+                    if op == _CMP_EQ:
+                        v = inp.a[i] == inp.b[i]
+                    elif op == _CMP_NE:
+                        v = inp.a[i] != inp.b[i]
+                    elif op == _CMP_LT:
+                        v = inp.a[i] < inp.b[i]
+                    elif op == _CMP_LE:
+                        v = inp.a[i] <= inp.b[i]
+                    elif op == _CMP_GT:
+                        v = inp.a[i] > inp.b[i]
+                    elif op == _CMP_GE:
+                        v = inp.a[i] >= inp.b[i]
+                    else:
+                        v = False  # unreachable: compile-time guard
+                    result.append(v)
+                    result_mask.append(False)
         return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
 
     fn _cmp_eq(self, other: Column) raises -> Column:
