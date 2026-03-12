@@ -141,6 +141,26 @@ comptime _CMP_GT = 4
 comptime _CMP_GE = 5
 
 
+# ------------------------------------------------------------------
+# Shared preamble holder for binary element-wise operations.
+# Returned by Column._binary_op_prepare; avoids duplicating the
+# length check, float64 conversion, and null-mask detection across
+# _arith_op and _cmp_op.
+# ------------------------------------------------------------------
+struct _BinOpInputs(Movable):
+    var a: List[Float64]
+    var b: List[Float64]
+    var has_a_mask: Bool
+    var has_b_mask: Bool
+
+    fn __init__(out self, var a: List[Float64], var b: List[Float64],
+                has_a_mask: Bool, has_b_mask: Bool):
+        self.a = a^
+        self.b = b^
+        self.has_a_mask = has_a_mask
+        self.has_b_mask = has_b_mask
+
+
 struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -836,14 +856,25 @@ struct Column(Copyable, Movable, Sized):
             raise Error("arith: non-numeric column type")
         return result^
 
-    fn _arith_build(self, var result: List[Float64], var result_mask: List[Bool], has_any_null: Bool) -> Column:
-        """Wrap a computed Float64 list into a Column, attaching mask only if needed."""
-        var col_data = ColumnData(result^)
+    fn _build_result_col(self, var col_data: ColumnData, var result_mask: List[Bool], has_any_null: Bool) -> Column:
+        """Wrap a computed ColumnData into a Column, attaching mask only if needed."""
         var dtype = Column._sniff_dtype(col_data)
         var col = Column(self.name, col_data^, dtype)
         if has_any_null:
             col._null_mask = result_mask^
         return col^
+
+    fn _binary_op_prepare(self, op_name: String, other: Column) raises -> _BinOpInputs:
+        """Check lengths and build the shared Float64 input arrays and null-mask flags.
+
+        Raises if ``self`` and ``other`` differ in length.  Called at the top
+        of ``_arith_op`` and ``_cmp_op`` to eliminate repeated preamble code.
+        """
+        if len(self) != len(other):
+            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+        var a = self._to_float64_list()
+        var b = other._to_float64_list()
+        return _BinOpInputs(a^, b^, len(self._null_mask) > 0, len(other._null_mask) > 0)
 
     fn _arith_op[op: Int](self, op_name: String, other: Column) raises -> Column:
         """Core element-wise binary arithmetic kernel.
@@ -852,18 +883,13 @@ struct Column(Copyable, Movable, Sized):
         operation; ``@parameter if`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         """
-        if len(self) != len(other):
-            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
+        var inp = self._binary_op_prepare(op_name, other)
         var result = List[Float64]()
         var result_mask = List[Bool]()
         var has_any_null = False
         var nan = Float64(0) / Float64(0)
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+        for i in range(len(inp.a)):
+            var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
             if is_null:
                 result.append(nan)
                 result_mask.append(True)
@@ -872,24 +898,24 @@ struct Column(Copyable, Movable, Sized):
                 var v: Float64
                 @parameter
                 if op == _ARITH_ADD:
-                    v = a[i] + b[i]
+                    v = inp.a[i] + inp.b[i]
                 elif op == _ARITH_SUB:
-                    v = a[i] - b[i]
+                    v = inp.a[i] - inp.b[i]
                 elif op == _ARITH_MUL:
-                    v = a[i] * b[i]
+                    v = inp.a[i] * inp.b[i]
                 elif op == _ARITH_DIV:
-                    v = a[i] / b[i]
+                    v = inp.a[i] / inp.b[i]
                 elif op == _ARITH_FLOORDIV:
-                    v = floor(a[i] / b[i])
+                    v = floor(inp.a[i] / inp.b[i])
                 elif op == _ARITH_MOD:
-                    v = a[i] - floor(a[i] / b[i]) * b[i]
+                    v = inp.a[i] - floor(inp.a[i] / inp.b[i]) * inp.b[i]
                 elif op == _ARITH_POW:
-                    v = a[i] ** b[i]
+                    v = inp.a[i] ** inp.b[i]
                 else:
                     v = Float64(0)  # unreachable: compile-time guard
                 result.append(v)
                 result_mask.append(False)
-        return self._arith_build(result^, result_mask^, has_any_null)
+        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
 
     fn _arith_add(self, other: Column) raises -> Column:
         return self._arith_op[_ARITH_ADD]("add", other)
@@ -924,17 +950,12 @@ struct Column(Copyable, Movable, Sized):
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         Null propagation: if either input element is null, the result is null.
         """
-        if len(self) != len(other):
-            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
-        var a = self._to_float64_list()
-        var b = other._to_float64_list()
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
+        var inp = self._binary_op_prepare(op_name, other)
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
-        for i in range(len(a)):
-            var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+        for i in range(len(inp.a)):
+            var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
             if is_null:
                 result.append(False)
                 result_mask.append(True)
@@ -943,27 +964,22 @@ struct Column(Copyable, Movable, Sized):
                 var v: Bool
                 @parameter
                 if op == _CMP_EQ:
-                    v = a[i] == b[i]
+                    v = inp.a[i] == inp.b[i]
                 elif op == _CMP_NE:
-                    v = a[i] != b[i]
+                    v = inp.a[i] != inp.b[i]
                 elif op == _CMP_LT:
-                    v = a[i] < b[i]
+                    v = inp.a[i] < inp.b[i]
                 elif op == _CMP_LE:
-                    v = a[i] <= b[i]
+                    v = inp.a[i] <= inp.b[i]
                 elif op == _CMP_GT:
-                    v = a[i] > b[i]
+                    v = inp.a[i] > inp.b[i]
                 elif op == _CMP_GE:
-                    v = a[i] >= b[i]
+                    v = inp.a[i] >= inp.b[i]
                 else:
                     v = False  # unreachable: compile-time guard
                 result.append(v)
                 result_mask.append(False)
-        var col_data = ColumnData(result^)
-        var dtype = Column._sniff_dtype(col_data)
-        var col = Column(self.name, col_data^, dtype)
-        if has_any_null:
-            col._null_mask = result_mask^
-        return col^
+        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
 
     fn _cmp_eq(self, other: Column) raises -> Column:
         return self._cmp_op[_CMP_EQ]("eq", other)
