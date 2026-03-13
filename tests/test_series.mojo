@@ -736,6 +736,24 @@ def test_round_null_propagation():
     assert_false(result.isna().iloc(0)[Bool])
 
 
+def test_round_bankers():
+    """Verify banker's rounding (round-half-to-even) at exact half-way points."""
+    var pd = Python.import_module("pandas")
+    # 0.5 → 0 (even), 1.5 → 2 (even), 2.5 → 2 (even), 3.5 → 4 (even)
+    var s = Series(pd.Series(Python.evaluate("[0.5, 1.5, 2.5, 3.5]")))
+    var r = s.round(0)
+    assert_true(r.iloc(0)[Float64] == 0.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == 2.0)
+    assert_true(r.iloc(3)[Float64] == 4.0)
+    # Negative half-way points: -0.5 → 0, -1.5 → -2
+    var s2 = Series(pd.Series(Python.evaluate("[-0.5, -1.5, -2.5]")))
+    var r2 = s2.round(0)
+    assert_true(r2.iloc(0)[Float64] == 0.0)
+    assert_true(r2.iloc(1)[Float64] == -2.0)
+    assert_true(r2.iloc(2)[Float64] == -2.0)
+
+
 def test_clip_float():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 10.0, 15.0]")))

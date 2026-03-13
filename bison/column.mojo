@@ -1086,8 +1086,8 @@ struct Column(Copyable, Movable, Sized):
 
         Int64 and Bool columns are returned unchanged. Raises for
         String/Object columns or negative ``decimals``.
-        Uses round-half-up convention (differs from Python banker's
-        rounding at exact half-way points; see SESSION.md tech debt).
+        Uses banker's rounding (round-half-to-even), matching Python and
+        numpy behaviour at exact half-way points.
         """
         if decimals < 0:
             raise Error("round: negative decimals not supported")
@@ -1107,7 +1107,7 @@ struct Column(Copyable, Movable, Sized):
                     result_mask.append(True)
                     has_any_null = True
                 else:
-                    result.append(floor(d[i] * factor + 0.5) / factor)
+                    result.append(round(d[i] * factor) / factor)
                     result_mask.append(False)
             return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         elif self._data.isa[List[Int64]]() or self._data.isa[List[Bool]]():
