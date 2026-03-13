@@ -9,7 +9,7 @@ from .dtypes import (
     datetime64_ns, timedelta64_ns,
 )
 from .index import Index, RangeIndex
-from .column import Column, ColumnData, DFScalar, SeriesScalar
+from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
 from .series import Series
 from .dataframe import DataFrame
 from .groupby import DataFrameGroupBy, SeriesGroupBy

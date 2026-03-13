@@ -82,7 +82,7 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Category | Stubs | Implemented |
 |----------|-------|-------------|
 | DataFrame | 79 | 38 |
-| Series | 25 | 60 |
+| Series | 11 | 73 |
 | GroupBy (DataFrame) | 16 | 1 |
 | GroupBy (Series) | 15 | 1 |
 | String accessor | 18 | 1 |
@@ -90,8 +90,30 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Index | 0 | 14 |
 | IO | 10 | 2 |
 | Reshape | 1 | 0 |
-| **Total** | **181** | **118** |
+| **Total** | **167** | **131** |
 <!-- COMPAT_TABLE_END -->
+
+## Known limitations
+
+### `apply` and `map` require compile-time functions
+
+`Series.apply` and `Series.map` accept a function parameter at compile time
+only. Runtime closures that capture variables are not supported:
+
+```mojo
+# Works — function is known at compile time
+fn double(v: Float64) -> Float64: return v * 2.0
+var result = s.apply[double]()
+
+# Does not work — threshold is a runtime value
+var threshold = 1.5
+fn clip_fn(v: Float64) -> Float64: return v if v > threshold else 0.0
+var result = s.apply[clip_fn]()  # compile error
+```
+
+This is a current limitation of Mojo's parametric function support
+(tracked in [modularml/mojo#6130](https://github.com/modularml/mojo/issues/6130)).
+Use `clip()` or `where()` for threshold-style operations in the meantime.
 
 ## Contributing
 

@@ -2,7 +2,7 @@ from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_
-from .column import Column, ColumnData, DFScalar, SeriesScalar
+from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -740,61 +740,54 @@ struct Series(Copyable, Movable):
     # Reshaping / transformations
     # ------------------------------------------------------------------
 
-    fn apply(self, func: PythonObject) raises -> Series:
-        _not_implemented("Series.apply")
-        return Series()
+    fn apply[F: FloatTransformFn](self) raises -> Series:
+        """Apply a compile-time function element-wise. Call as ``s.apply[my_fn]()``."""
+        return Series(self._col._apply[F]())
 
-    fn map(self, func: PythonObject) raises -> Series:
-        _not_implemented("Series.map")
-        return Series()
+    fn map[F: FloatTransformFn](self) raises -> Series:
+        """Map a compile-time function element-wise. Call as ``s.map[my_fn]()``."""
+        return Series(self._col._apply[F]())
 
     fn astype(self, dtype: String) raises -> Series:
-        _not_implemented("Series.astype")
-        return Series()
+        return Series(self._col._astype(dtype))
 
-    fn copy(self) raises -> Series:
-        _not_implemented("Series.copy")
-        return Series()
+    fn copy(self) -> Series:
+        return Series(self._col.copy())
 
     fn reset_index(self, drop: Bool = False) raises -> Series:
-        _not_implemented("Series.reset_index")
-        return Series()
+        return Series(self._col._reset_index(drop))
 
     fn rename(self, new_name: String) raises -> Series:
-        _not_implemented("Series.rename")
-        return Series()
+        var c = self._col.copy()
+        c.name = new_name
+        return Series(c^)
 
-    fn clip(self, lower: PythonObject, upper: PythonObject) raises -> Series:
-        _not_implemented("Series.clip")
-        return Series()
+    fn clip(self, lower: Float64, upper: Float64) raises -> Series:
+        return Series(self._col._clip(lower, upper))
 
     fn abs(self) raises -> Series:
-        _not_implemented("Series.abs")
-        return Series()
+        return Series(self._col._abs())
 
     fn round(self, decimals: Int = 0) raises -> Series:
-        _not_implemented("Series.round")
-        return Series()
+        return Series(self._col._round(decimals))
 
     fn unique(self) raises -> Series:
-        _not_implemented("Series.unique")
-        return Series()
+        return Series(self._col._unique())
 
-    fn isin(self, values: PythonObject) raises -> Series:
-        _not_implemented("Series.isin")
-        return Series()
+    fn isin(self, values: List[Int64]) raises -> Series:
+        return Series(self._col._isin_int(values))
 
-    fn between(self, left: PythonObject, right: PythonObject) raises -> Series:
-        _not_implemented("Series.between")
-        return Series()
+    fn isin(self, values: List[Float64]) raises -> Series:
+        return Series(self._col._isin_float(values))
+
+    fn between(self, left: Float64, right: Float64) raises -> Series:
+        return Series(self._col._between(left, right))
 
     fn where(self, cond: Series) raises -> Series:
-        _not_implemented("Series.where")
-        return Series()
+        return Series(self._col._where(cond._col))
 
     fn mask(self, cond: Series) raises -> Series:
-        _not_implemented("Series.mask")
-        return Series()
+        return Series(self._col._mask(cond._col))
 
     # ------------------------------------------------------------------
     # Interop
