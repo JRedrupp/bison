@@ -1107,23 +1107,7 @@ struct Column(Copyable, Movable, Sized):
                     result_mask.append(True)
                     has_any_null = True
                 else:
-                    var shifted = d[i] * factor
-                    var floored = floor(shifted)
-                    var frac = shifted - floored
-                    var rounded: Float64
-                    if frac < 0.5:
-                        rounded = floored
-                    elif frac > 0.5:
-                        rounded = floored + 1.0
-                    else:
-                        # Exactly 0.5: round to nearest even (banker's rounding).
-                        # Use floating-point parity check to avoid Int64 overflow
-                        # for large values: floored is even iff floored mod 2 == 0.
-                        if floored - 2.0 * floor(floored * 0.5) == 0.0:
-                            rounded = floored
-                        else:
-                            rounded = floored + 1.0
-                    result.append(rounded / factor)
+                    result.append(round(d[i] * factor) / factor)
                     result_mask.append(False)
             return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         elif self._data.isa[List[Int64]]() or self._data.isa[List[Bool]]():
