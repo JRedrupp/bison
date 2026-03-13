@@ -70,7 +70,7 @@ jobs:
           steps.readme-diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RENOVATE_TOKEN }}
           commit-message: "chore: update compatibility table in README"
           branch: chore/update-compat-table
           delete-branch: true
