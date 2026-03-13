@@ -905,6 +905,21 @@ def test_astype():
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
+def test_astype_null_propagation():
+    var pd = Python.import_module("pandas")
+    # Float64 → Int64: null at index 1 must propagate
+    var sf = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var ri = sf.astype("int64")
+    assert_false(ri.isna().iloc(0)[Bool])
+    assert_true(ri.isna().iloc(1)[Bool])
+    assert_false(ri.isna().iloc(2)[Bool])
+    # Float64 → Bool: null at index 1 must propagate
+    var rb = sf.astype("bool")
+    assert_false(rb.isna().iloc(0)[Bool])
+    assert_true(rb.isna().iloc(1)[Bool])
+    assert_false(rb.isna().iloc(2)[Bool])
+
+
 def test_reset_index():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), index=Python.evaluate("[5, 6, 7]")))

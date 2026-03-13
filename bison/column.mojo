@@ -1484,10 +1484,13 @@ struct Column(Copyable, Movable, Sized):
           Int64  → Float64, Bool, Int64 (identity)
           Float64 → Int64 (truncation), Bool, Float64 (identity)
           Bool   → Int64, Float64, Bool (identity)
-        The null mask is preserved unchanged across conversions.
+        The null mask is propagated via _build_result_col (same as other kernels).
         Raises for unsupported source/target dtype combinations.
         """
         var has_mask = len(self._null_mask) > 0
+        var result_mask = List[Bool]()
+        var has_any_null = False
+        var nan = Float64(0) / Float64(0)
         # Determine target family from dtype_name prefix
         var to_int = (
             dtype_name == "int8"
@@ -1507,19 +1510,25 @@ struct Column(Copyable, Movable, Sized):
             if to_float:
                 var result = List[Float64]()
                 for i in range(len(d)):
-                    result.append(Float64(d[i]))
-                var col = Column(self.name, ColumnData(result^), float64)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(nan)
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(Float64(d[i]))
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_bool:
                 var result = List[Bool]()
                 for i in range(len(d)):
-                    result.append(d[i] != 0)
-                var col = Column(self.name, ColumnData(result^), bool_)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(False)
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(d[i] != 0)
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_int:
                 return self.copy()
             else:
@@ -1529,19 +1538,25 @@ struct Column(Copyable, Movable, Sized):
             if to_int:
                 var result = List[Int64]()
                 for i in range(len(d)):
-                    result.append(Int64(d[i]))
-                var col = Column(self.name, ColumnData(result^), int64)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(Int64(0))
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(Int64(d[i]))
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_bool:
                 var result = List[Bool]()
                 for i in range(len(d)):
-                    result.append(d[i] != 0.0)
-                var col = Column(self.name, ColumnData(result^), bool_)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(False)
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(d[i] != 0.0)
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_float:
                 return self.copy()
             else:
@@ -1551,19 +1566,25 @@ struct Column(Copyable, Movable, Sized):
             if to_int:
                 var result = List[Int64]()
                 for i in range(len(d)):
-                    result.append(Int64(1) if d[i] else Int64(0))
-                var col = Column(self.name, ColumnData(result^), int64)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(Int64(0))
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(Int64(1) if d[i] else Int64(0))
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_float:
                 var result = List[Float64]()
                 for i in range(len(d)):
-                    result.append(1.0 if d[i] else 0.0)
-                var col = Column(self.name, ColumnData(result^), float64)
-                if has_mask:
-                    col._null_mask = self._null_mask.copy()
-                return col^
+                    if has_mask and self._null_mask[i]:
+                        result.append(nan)
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        result.append(1.0 if d[i] else 0.0)
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
             elif to_bool:
                 return self.copy()
             else:
