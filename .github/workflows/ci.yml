@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     strategy:
       fail-fast: false
@@ -48,16 +49,17 @@ jobs:
           PASSING=$(cat .test-pass-count 2>/dev/null || echo 0)
           python scripts/update_compat.py --passing "$PASSING"
 
-      - name: Commit updated README
+      - name: Open PR for updated README
         if: >
           matrix.max-version == 'locked' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          if ! git diff --cached --quiet; then
-            git commit --amend --no-edit
-            git push --force-with-lease origin HEAD:main
-          fi
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update compatibility table in README"
+          branch: chore/update-compat-table
+          delete-branch: true
+          title: "chore: update compatibility table"
+          body: "Automated update of the compatibility table in README.md by CI."
+          add-paths: README.md
