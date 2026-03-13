@@ -1,7 +1,7 @@
-"""Tests that reshaping stubs raise 'not implemented'."""
+"""Tests for reshaping operations."""
 from python import Python, PythonObject
 from testing import assert_true, TestSuite
-from bison import DataFrame, Series
+from bison import DataFrame, Series, SeriesScalar
 
 
 def test_sort_values_stub():
@@ -59,15 +59,13 @@ def test_drop_duplicates_stub():
     assert_true(raised)
 
 
-def test_series_sort_values_stub():
+def test_series_sort_values():
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
-    var raised = False
-    try:
-        _ = s.sort_values()
-    except:
-        raised = True
-    assert_true(raised)
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[Int64] == 1)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 3)
 
 
 def main():
