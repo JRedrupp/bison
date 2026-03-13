@@ -780,6 +780,12 @@ struct Series(Copyable, Movable):
     fn isin(self, values: List[Float64]) raises -> Series:
         return Series(self._col._isin_float(values))
 
+    fn isin(self, values: List[String]) raises -> Series:
+        return Series(self._col._isin_str(values))
+
+    fn isin(self, values: List[Bool]) raises -> Series:
+        return Series(self._col._isin_bool(values))
+
     fn between(self, left: Float64, right: Float64) raises -> Series:
         return Series(self._col._between(left, right))
 
