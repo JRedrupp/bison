@@ -1,7 +1,7 @@
 from python import Python, PythonObject
 from collections import Optional
 from ._errors import _not_implemented
-from .dtypes import BisonDtype, object_, bool_
+from .dtypes import BisonDtype, object_, bool_, int64, float64
 from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -720,21 +720,335 @@ struct Series(Copyable, Movable):
     # Sorting
     # ------------------------------------------------------------------
 
+    fn _sort_perm(self, ascending: Bool) raises -> List[Int]:
+        """Return an insertion-sort permutation over the column values.
+
+        perm[i] = original index of the i-th element in sorted order.
+        Null elements are placed at the end regardless of direction.
+        """
+        var n = len(self._col)
+        var perm = List[Int]()
+        for i in range(n):
+            perm.append(i)
+        if n <= 1:
+            return perm^
+        var has_mask = len(self._col._null_mask) > 0
+        if self._col._data.isa[List[Int64]]():
+            ref d = self._col._data[List[Int64]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var key_null = has_mask and self._col._null_mask[key]
+                    var prev_null = has_mask and self._col._null_mask[prev]
+                    var do_swap: Bool
+                    if key_null:
+                        do_swap = False
+                    elif prev_null:
+                        do_swap = True
+                    elif ascending:
+                        do_swap = d[key] < d[prev]
+                    else:
+                        do_swap = d[key] > d[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._col._data.isa[List[Float64]]():
+            ref d = self._col._data[List[Float64]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var key_null = has_mask and self._col._null_mask[key]
+                    var prev_null = has_mask and self._col._null_mask[prev]
+                    var do_swap: Bool
+                    if key_null:
+                        do_swap = False
+                    elif prev_null:
+                        do_swap = True
+                    elif ascending:
+                        do_swap = d[key] < d[prev]
+                    else:
+                        do_swap = d[key] > d[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._col._data.isa[List[Bool]]():
+            ref d = self._col._data[List[Bool]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var key_null = has_mask and self._col._null_mask[key]
+                    var prev_null = has_mask and self._col._null_mask[prev]
+                    var do_swap: Bool
+                    if key_null:
+                        do_swap = False
+                    elif prev_null:
+                        do_swap = True
+                    elif ascending:
+                        do_swap = (not d[key]) and d[prev]  # False < True
+                    else:
+                        do_swap = d[key] and (not d[prev])  # True > False
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var key_null = has_mask and self._col._null_mask[key]
+                    var prev_null = has_mask and self._col._null_mask[prev]
+                    var do_swap: Bool
+                    if key_null:
+                        do_swap = False
+                    elif prev_null:
+                        do_swap = True
+                    elif ascending:
+                        do_swap = d[key] < d[prev]
+                    else:
+                        do_swap = d[key] > d[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        else:
+            ref d = self._col._data[List[PythonObject]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var key_null = has_mask and self._col._null_mask[key]
+                    var prev_null = has_mask and self._col._null_mask[prev]
+                    var do_swap: Bool
+                    if key_null:
+                        do_swap = False
+                    elif prev_null:
+                        do_swap = True
+                    elif ascending:
+                        do_swap = Bool(d[key] < d[prev])
+                    else:
+                        do_swap = Bool(d[key] > d[prev])
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        return perm^
+
     fn sort_values(self, ascending: Bool = True) raises -> Series:
-        _not_implemented("Series.sort_values")
-        return Series()
+        """Return a new Series sorted by value.
+
+        Null elements are placed at the end regardless of direction.
+        The original index labels are reordered to follow their data rows.
+        """
+        var n = len(self._col)
+        if n == 0:
+            return Series(self._col.copy())
+        var perm = self._sort_perm(ascending)
+        var sorted_col = self._col.take(perm)
+        if len(self._col._index) > 0:
+            var new_idx = List[PythonObject]()
+            for k in range(n):
+                new_idx.append(self._col._index[perm[k]])
+            sorted_col._index = new_idx^
+        return Series(sorted_col^)
 
     fn sort_index(self, ascending: Bool = True) raises -> Series:
-        _not_implemented("Series.sort_index")
-        return Series()
+        """Return a new Series sorted by index label.
+
+        When the Series has a default RangeIndex the data is already ordered
+        for ``ascending=True``; ``ascending=False`` reverses it.
+        For explicit index labels, Python comparison is used so any
+        comparable index type (int, float, str) works.
+        """
+        var n = len(self._col)
+        if n == 0:
+            return Series(self._col.copy())
+        if len(self._col._index) == 0:
+            # Default RangeIndex [0, 1, ..., n-1].
+            if not ascending:
+                var rev_perm = List[Int]()
+                for i in range(n):
+                    rev_perm.append(n - 1 - i)
+                var sorted_col = self._col.take(rev_perm)
+                var builtins = Python.import_module("builtins")
+                var new_idx = List[PythonObject]()
+                for k in range(n):
+                    new_idx.append(builtins.int(n - 1 - k))
+                sorted_col._index = new_idx^
+                return Series(sorted_col^)
+            return Series(self._col.copy())
+        # Sort permutation by index labels via Python comparison.
+        var perm = List[Int]()
+        for i in range(n):
+            perm.append(i)
+        for i in range(1, n):
+            var key = perm[i]
+            var j = i - 1
+            while j >= 0:
+                var prev = perm[j]
+                var do_swap: Bool
+                if ascending:
+                    do_swap = Bool(self._col._index[key] < self._col._index[prev])
+                else:
+                    do_swap = Bool(self._col._index[key] > self._col._index[prev])
+                if not do_swap:
+                    break
+                perm[j + 1] = prev
+                j -= 1
+            perm[j + 1] = key
+        var sorted_col = self._col.take(perm)
+        var new_idx = List[PythonObject]()
+        for k in range(n):
+            new_idx.append(self._col._index[perm[k]])
+        sorted_col._index = new_idx^
+        return Series(sorted_col^)
 
     fn argsort(self) raises -> Series:
-        _not_implemented("Series.argsort")
-        return Series()
+        """Return the integer indices that would sort the Series values.
+
+        The result is a Series with the same index as the input.
+        For non-null elements, values are the 0-based positions in the
+        original Series that would produce a sorted sequence.
+        Null positions in the sort permutation produce NaN (Float64 dtype);
+        otherwise the result dtype is Int64.
+        """
+        var n = len(self._col)
+        if n == 0:
+            return Series(self._col.copy())
+        var perm = self._sort_perm(True)
+        var has_mask = len(self._col._null_mask) > 0
+        # Determine whether any element is actually null; only then use Float64.
+        var has_any_null = False
+        if has_mask:
+            for i in range(n):
+                if self._col._null_mask[i]:
+                    has_any_null = True
+                    break
+        var idx = self._col._index.copy()
+        if not has_any_null:
+            var result_data = List[Int64]()
+            for i in range(n):
+                result_data.append(Int64(perm[i]))
+            var col = Column(self._col.name, ColumnData(result_data^), int64, idx^)
+            return Series(col^)
+        # Build Float64 result: NaN wherever the sort permutation points to a
+        # null element in the original (those positions are at the tail of perm).
+        var result_data = List[Float64]()
+        var result_mask = List[Bool]()
+        for i in range(n):
+            var orig_pos = perm[i]
+            if self._col._null_mask[orig_pos]:
+                result_data.append(Float64(0))
+                result_mask.append(True)
+            else:
+                result_data.append(Float64(perm[i]))
+                result_mask.append(False)
+        var col = Column(self._col.name, ColumnData(result_data^), float64, idx^)
+        col._null_mask = result_mask^
+        return Series(col^)
 
     fn rank(self) raises -> Series:
-        _not_implemented("Series.rank")
-        return Series()
+        """Return 1-based float ranks (average method for ties, NaN for nulls)."""
+        var n = len(self._col)
+        if n == 0:
+            return Series(self._col.copy())
+        var perm = self._sort_perm(True)
+        var has_mask = len(self._col._null_mask) > 0
+        # Count non-null elements (null elements sit at the tail of perm).
+        var n_non_null = n
+        if has_mask:
+            n_non_null = 0
+            for i in range(n):
+                if not self._col._null_mask[i]:
+                    n_non_null += 1
+        # Prepare Float64 result; null slots are marked in rank_mask.
+        var ranks = List[Float64]()
+        var rank_mask = List[Bool]()
+        for i in range(n):
+            ranks.append(Float64(0))
+            rank_mask.append(False)
+        if has_mask:
+            for i in range(n_non_null, n):
+                rank_mask[perm[i]] = True
+        # Assign average ranks for each tied group (type-dispatch).
+        # avg = ((i+1) + (j+1)) / 2 where i..j is the 0-based sorted range.
+        if self._col._data.isa[List[Int64]]():
+            ref d = self._col._data[List[Int64]]
+            var i = 0
+            while i < n_non_null:
+                var j = i
+                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
+                    j += 1
+                var avg_rank = Float64(i + j + 2) / Float64(2)
+                for k in range(i, j + 1):
+                    ranks[perm[k]] = avg_rank
+                i = j + 1
+        elif self._col._data.isa[List[Float64]]():
+            ref d = self._col._data[List[Float64]]
+            var i = 0
+            while i < n_non_null:
+                var j = i
+                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
+                    j += 1
+                var avg_rank = Float64(i + j + 2) / Float64(2)
+                for k in range(i, j + 1):
+                    ranks[perm[k]] = avg_rank
+                i = j + 1
+        elif self._col._data.isa[List[Bool]]():
+            ref d = self._col._data[List[Bool]]
+            var i = 0
+            while i < n_non_null:
+                var j = i
+                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
+                    j += 1
+                var avg_rank = Float64(i + j + 2) / Float64(2)
+                for k in range(i, j + 1):
+                    ranks[perm[k]] = avg_rank
+                i = j + 1
+        elif self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            var i = 0
+            while i < n_non_null:
+                var j = i
+                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
+                    j += 1
+                var avg_rank = Float64(i + j + 2) / Float64(2)
+                for k in range(i, j + 1):
+                    ranks[perm[k]] = avg_rank
+                i = j + 1
+        else:
+            ref d = self._col._data[List[PythonObject]]
+            var i = 0
+            while i < n_non_null:
+                var j = i
+                while j < n_non_null - 1 and Bool(d[perm[j]] == d[perm[j + 1]]):
+                    j += 1
+                var avg_rank = Float64(i + j + 2) / Float64(2)
+                for k in range(i, j + 1):
+                    ranks[perm[k]] = avg_rank
+                i = j + 1
+        var idx = self._col._index.copy()
+        var col = Column(self._col.name, ColumnData(ranks^), float64, idx^)
+        # n_non_null < n iff there are nulls — no need to re-scan the mask.
+        if n_non_null < n:
+            col._null_mask = rank_mask^
+        return Series(col^)
 
     # ------------------------------------------------------------------
     # Reshaping / transformations

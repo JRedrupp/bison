@@ -971,5 +971,163 @@ def test_reset_index():
     assert_true(r.iloc(2)[Int64] == 30)
 
 
+# ------------------------------------------------------------------
+# Sorting
+# ------------------------------------------------------------------
+
+def test_sort_values_ascending_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[Int64] == 1)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 3)
+
+
+def test_sort_values_descending_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
+    var r = s.sort_values(ascending=False)
+    assert_true(r.iloc(0)[Int64] == 3)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 1)
+
+
+def test_sort_values_float():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+
+
+def test_sort_values_string():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("['c', 'a', 'b']"), dtype="string"))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[String] == "a")
+    assert_true(r.iloc(1)[String] == "b")
+    assert_true(r.iloc(2)[String] == "c")
+
+
+def test_sort_values_null_last():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    assert_true(r.iloc(1)[Float64] == 3.0)
+    assert_true(r.isna().iloc(2)[Bool])
+
+
+def test_sort_values_preserves_index():
+    var pd = Python.import_module("pandas")
+    # s: label 'b'->3, 'a'->1, 'c'->2.  Sorted by value: 1,2,3 → labels a,c,b.
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64", index=Python.evaluate("['b', 'a', 'c']")))
+    var r = s.sort_values()
+    assert_true(r.iloc(0)[Int64] == 1)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 3)
+    # index labels must follow their data row
+    assert_true(r.at("a")[Int64] == 1)
+    assert_true(r.at("c")[Int64] == 2)
+    assert_true(r.at("b")[Int64] == 3)
+
+
+def test_sort_index_ascending_default():
+    var pd = Python.import_module("pandas")
+    # Default RangeIndex — ascending is a no-op.
+    var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64"))
+    var r = s.sort_index()
+    assert_true(r.iloc(0)[Int64] == 30)
+    assert_true(r.iloc(1)[Int64] == 10)
+    assert_true(r.iloc(2)[Int64] == 20)
+
+
+def test_sort_index_descending_default():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64"))
+    var r = s.sort_index(ascending=False)
+    assert_true(r.iloc(0)[Int64] == 20)
+    assert_true(r.iloc(1)[Int64] == 10)
+    assert_true(r.iloc(2)[Int64] == 30)
+
+
+def test_sort_index_custom():
+    var pd = Python.import_module("pandas")
+    # index labels [2, 0, 1] → sorted ascending → [0, 1, 2] → data [10, 20, 30]
+    var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64", index=Python.evaluate("[2, 0, 1]")))
+    var r = s.sort_index()
+    assert_true(r.iloc(0)[Int64] == 10)
+    assert_true(r.iloc(1)[Int64] == 20)
+    assert_true(r.iloc(2)[Int64] == 30)
+
+
+def test_sort_index_custom_descending():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64", index=Python.evaluate("[2, 0, 1]")))
+    var r = s.sort_index(ascending=False)
+    assert_true(r.iloc(0)[Int64] == 30)
+    assert_true(r.iloc(1)[Int64] == 20)
+    assert_true(r.iloc(2)[Int64] == 10)
+
+
+def test_argsort_int():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
+    var r = s.argsort()
+    # perm: smallest=1(pos1), next=2(pos2), largest=3(pos0) → [1, 2, 0]
+    assert_true(r.iloc(0)[Int64] == 1)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 0)
+
+
+def test_argsort_float():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
+    var r = s.argsort()
+    assert_true(r.iloc(0)[Int64] == 1)
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 0)
+
+
+def test_argsort_with_null():
+    var pd = Python.import_module("pandas")
+    # s=[3.0, None, 1.0]: perm=[2,0,1]; perm[2]=1 is null → NaN at result pos 2
+    var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
+    var r = s.argsort()
+    assert_true(r.iloc(0)[Float64] == 2.0)
+    assert_true(r.iloc(1)[Float64] == 0.0)
+    assert_true(r.isna().iloc(2)[Bool])
+
+
+def test_rank_no_ties():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
+    var r = s.rank()
+    assert_true(r.iloc(0)[Float64] == 3.0)
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 2.0)
+
+
+def test_rank_with_ties():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 1.0, 2.0]")))
+    var r = s.rank()
+    # Tied at 1st/2nd → average rank = (1+2)/2 = 1.5; unique 3rd → 3.0
+    assert_true(r.iloc(0)[Float64] == 1.5)
+    assert_true(r.iloc(1)[Float64] == 1.5)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+
+
+def test_rank_with_null():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
+    var r = s.rank()
+    assert_true(r.iloc(0)[Float64] == 2.0)
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.iloc(2)[Float64] == 1.0)
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()
