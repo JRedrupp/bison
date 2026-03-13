@@ -1379,14 +1379,15 @@ struct Column(Copyable, Movable, Sized):
     fn _unique(self) raises -> Column:
         """Return a Column of unique values, preserving first-occurrence order.
 
-        Nulls are included once at the end if present. Uses O(n²) linear scan
-        (see SESSION.md tech debt for Set-based improvement path).
+        Nulls are included once at the end if present. Uses a Set[T] for O(1)
+        membership checks, giving O(n) overall complexity.
         Raises for Object dtype.
         """
         var has_mask = len(self._null_mask) > 0
         if self._data.isa[List[Int64]]():
             ref d = self._data[List[Int64]]
-            var seen = List[Int64]()
+            var seen_set = Set[Int64]()
+            var result = List[Int64]()
             var result_mask = List[Bool]()
             var has_any_null = False
             for i in range(len(d)):
@@ -1394,21 +1395,18 @@ struct Column(Copyable, Movable, Sized):
                     has_any_null = True
                     continue
                 var v = d[i]
-                var found = False
-                for j in range(len(seen)):
-                    if seen[j] == v:
-                        found = True
-                        break
-                if not found:
-                    seen.append(v)
+                if v not in seen_set:
+                    seen_set.add(v)
+                    result.append(v)
                     result_mask.append(False)
             if has_any_null:
-                seen.append(Int64(0))
+                result.append(Int64(0))
                 result_mask.append(True)
-            return self._build_result_col(ColumnData(seen^), result_mask^, has_any_null)
+            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         elif self._data.isa[List[Float64]]():
             ref d = self._data[List[Float64]]
-            var seen = List[Float64]()
+            var seen_set = Set[Float64]()
+            var result = List[Float64]()
             var result_mask = List[Bool]()
             var has_any_null = False
             var nan = Float64(0) / Float64(0)
@@ -1417,18 +1415,14 @@ struct Column(Copyable, Movable, Sized):
                     has_any_null = True
                     continue
                 var v = d[i]
-                var found = False
-                for j in range(len(seen)):
-                    if seen[j] == v:
-                        found = True
-                        break
-                if not found:
-                    seen.append(v)
+                if v not in seen_set:
+                    seen_set.add(v)
+                    result.append(v)
                     result_mask.append(False)
             if has_any_null:
-                seen.append(nan)
+                result.append(nan)
                 result_mask.append(True)
-            return self._build_result_col(ColumnData(seen^), result_mask^, has_any_null)
+            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         elif self._data.isa[List[Bool]]():
             ref d = self._data[List[Bool]]
             var seen_false = False
@@ -1455,25 +1449,23 @@ struct Column(Copyable, Movable, Sized):
             return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         elif self._data.isa[List[String]]():
             ref d = self._data[List[String]]
-            var seen = List[String]()
+            var seen_set = Set[String]()
+            var result = List[String]()
             var result_mask = List[Bool]()
             var has_any_null = False
             for i in range(len(d)):
                 if has_mask and self._null_mask[i]:
                     has_any_null = True
                     continue
-                var found = False
-                for j in range(len(seen)):
-                    if seen[j] == d[i]:
-                        found = True
-                        break
-                if not found:
-                    seen.append(d[i])
+                var v = d[i]
+                if v not in seen_set:
+                    seen_set.add(v)
+                    result.append(v)
                     result_mask.append(False)
             if has_any_null:
-                seen.append(String(""))
+                result.append(String(""))
                 result_mask.append(True)
-            return self._build_result_col(ColumnData(seen^), result_mask^, has_any_null)
+            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
         else:
             raise Error("unique: not supported for object dtype")
 
