@@ -93,6 +93,28 @@ In CI it runs after the test suite and the result is committed back to the branc
 | **Total** | **167** | **131** |
 <!-- COMPAT_TABLE_END -->
 
+## Known limitations
+
+### `apply` and `map` require compile-time functions
+
+`Series.apply` and `Series.map` accept a function parameter at compile time
+only. Runtime closures that capture variables are not supported:
+
+```mojo
+# Works — function is known at compile time
+fn double(v: Float64) -> Float64: return v * 2.0
+var result = s.apply[double]()
+
+# Does not work — threshold is a runtime value
+var threshold = 1.5
+fn clip_fn(v: Float64) -> Float64: return v if v > threshold else 0.0
+var result = s.apply[clip_fn]()  # compile error
+```
+
+This is a current limitation of Mojo's parametric function support
+(tracked in [modularml/mojo#6130](https://github.com/modularml/mojo/issues/6130)).
+Use `clip()` or `where()` for threshold-style operations in the meantime.
+
 ## Contributing
 
 1. Pick a stub method from the table above.
