@@ -824,6 +824,31 @@ def test_isin_float():
     assert_false(r.iloc(3)[Bool])
 
 
+def test_isin_str():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate('["a", "b", "c", "d"]'), dtype="string"))
+    var vals = List[String]()
+    vals.append("a")
+    vals.append("c")
+    var r = s.isin(vals)
+    assert_true(r.iloc(0)[Bool])
+    assert_false(r.iloc(1)[Bool])
+    assert_true(r.iloc(2)[Bool])
+    assert_false(r.iloc(3)[Bool])
+
+
+def test_isin_bool():
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var vals = List[Bool]()
+    vals.append(True)
+    var r = s.isin(vals)
+    assert_true(r.iloc(0)[Bool])
+    assert_false(r.iloc(1)[Bool])
+    assert_true(r.iloc(2)[Bool])
+    assert_false(r.iloc(3)[Bool])
+
+
 def test_between():
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
