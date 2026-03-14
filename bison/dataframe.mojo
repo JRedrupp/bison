@@ -1,5 +1,5 @@
-from python import Python, PythonObject
-from collections import Optional, Dict
+from std.python import Python, PythonObject
+from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
 from .dtypes import float64 as _float64

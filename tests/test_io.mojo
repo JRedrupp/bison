@@ -1,5 +1,5 @@
 """Tests for read_csv and DataFrame.to_csv."""
-from python import Python
+from std.python import Python
 from testing import assert_equal, assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
 

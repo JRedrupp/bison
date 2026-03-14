@@ -1,5 +1,5 @@
 """Tests that missing-data stubs raise 'not implemented'."""
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 from testing import assert_true, TestSuite
 from bison import DataFrame, Series, DFScalar
 

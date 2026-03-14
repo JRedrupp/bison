@@ -1,5 +1,5 @@
 """Tests aggregation methods."""
-from python import Python
+from std.python import Python
 from testing import assert_true, TestSuite
 from math import isnan
 from bison import DataFrame, Series

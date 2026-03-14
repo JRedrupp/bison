@@ -1,6 +1,6 @@
 """Tests for DataFrame construction and basic attributes."""
-from python import Python, PythonObject
-from collections import Dict
+from std.python import Python, PythonObject
+from std.collections import Dict
 from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import DataFrame, ColumnData, Series
 
