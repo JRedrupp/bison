@@ -1142,8 +1142,12 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn str(self) raises -> StringMethods:
-        _not_implemented("Series.str")
-        return StringMethods()
+        if not self._col._data.isa[List[String]]():
+            raise Error("Series.str: accessor requires a string Series")
+        ref d = self._col._data[List[String]]
+        var data = d.copy()
+        var null_mask = self._col._null_mask.copy()
+        return StringMethods(data^, null_mask^, self._col.name)
 
     fn dt(self) raises -> DatetimeMethods:
         _not_implemented("Series.dt")
