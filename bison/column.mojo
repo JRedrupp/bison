@@ -45,9 +45,12 @@ trait ColumnDataVisitor:
 
     Implement one ``on_*`` method per arm.  Use a ``mut self`` field to
     accumulate or return a result.  Pass an instance to
-    ``visit_col_data``, which contains the **only** ``isa`` chain in the
-    codebase; all callers should delegate here instead of writing their
+    ``visit_col_data``, which contains the **only** non-raises ``isa`` chain
+    in the codebase; all callers should delegate here instead of writing their
     own discriminant checks.
+
+    For visitors that need to call Python APIs or otherwise raise, implement
+    ``ColumnDataVisitorRaises`` and use ``visit_col_data_raises`` instead.
     """
 
     fn on_int64(mut self, data: List[Int64]): ...
@@ -58,12 +61,52 @@ trait ColumnDataVisitor:
 
 
 fn visit_col_data[V: ColumnDataVisitor](mut visitor: V, data: ColumnData):
-    """Dispatch *visitor* to the active ``ColumnData`` arm.
+    """Dispatch *visitor* to the active ``ColumnData`` arm (non-raises).
 
-    This is the **only** place in the codebase that reads the ``ColumnData``
-    discriminant via ``isa``.  Add new ``ColumnData`` arms here and in the
-    ``ColumnDataVisitor`` trait — every other dispatch site is then updated
-    automatically because it delegates here.
+    This is the **only** non-raises place in the codebase that reads the
+    ``ColumnData`` discriminant via ``isa``.  Add new ``ColumnData`` arms here,
+    in ``ColumnDataVisitor``, and in ``visit_col_data_raises`` — every other
+    dispatch site is then updated automatically because it delegates here.
+    For visitors that may raise, use ``visit_col_data_raises`` instead.
+    """
+    if data.isa[List[Int64]]():
+        visitor.on_int64(data[List[Int64]])
+    elif data.isa[List[Float64]]():
+        visitor.on_float64(data[List[Float64]])
+    elif data.isa[List[Bool]]():
+        visitor.on_bool(data[List[Bool]])
+    elif data.isa[List[String]]():
+        visitor.on_str(data[List[String]])
+    else:
+        visitor.on_obj(data[List[PythonObject]])
+
+
+# ------------------------------------------------------------------
+# Raises-capable visitor — for operations that perform Python interop
+# or other potentially-failing work (e.g. to_pandas).
+# ------------------------------------------------------------------
+
+trait ColumnDataVisitorRaises:
+    """Raises-capable counterpart to ``ColumnDataVisitor``.
+
+    Use when ``on_*`` methods must call Python APIs or otherwise raise.
+    Implement one ``on_*`` method per ``ColumnData`` arm and pass an
+    instance to ``visit_col_data_raises``.
+    """
+
+    fn on_int64(mut self, data: List[Int64]) raises: ...
+    fn on_float64(mut self, data: List[Float64]) raises: ...
+    fn on_bool(mut self, data: List[Bool]) raises: ...
+    fn on_str(mut self, data: List[String]) raises: ...
+    fn on_obj(mut self, data: List[PythonObject]) raises: ...
+
+
+fn visit_col_data_raises[V: ColumnDataVisitorRaises](mut visitor: V, data: ColumnData) raises:
+    """Raises-capable dispatch for visitors that may raise (e.g. Python interop).
+
+    Mirrors ``visit_col_data`` but each ``on_*`` call site is in a ``raises``
+    context.  Add new ``ColumnData`` arms here, in ``ColumnDataVisitorRaises``,
+    *and* in ``visit_col_data``.
     """
     if data.isa[List[Int64]]():
         visitor.on_int64(data[List[Int64]])
@@ -116,6 +159,62 @@ struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
     fn on_bool(mut self, data: List[Bool]): self.result = ColumnData(data.copy())
     fn on_str(mut self, data: List[String]): self.result = ColumnData(data.copy())
     fn on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
+
+
+struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that appends each element of the active ColumnData arm to a
+    Python list, respecting a parallel null mask.
+
+    ``py_list`` must already be a Python list object; elements are appended
+    in order.  Null entries (``null_mask[i] == True``) are appended as the
+    provided ``py_none`` value.  The ``List[PythonObject]`` arm is assumed
+    to carry its own ``None`` representations and is appended unconditionally.
+    """
+    var py_list: PythonObject
+    var py_none: PythonObject
+    var null_mask: List[Bool]
+
+    fn __init__(out self, py_list: PythonObject, py_none: PythonObject,
+                null_mask: List[Bool]):
+        self.py_list = py_list
+        self.py_none = py_none
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                _ = self.py_list.append(self.py_none)
+            else:
+                _ = self.py_list.append(data[i])
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                _ = self.py_list.append(self.py_none)
+            else:
+                _ = self.py_list.append(data[i])
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                _ = self.py_list.append(self.py_none)
+            else:
+                _ = self.py_list.append(data[i])
+
+    fn on_str(mut self, data: List[String]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                _ = self.py_list.append(self.py_none)
+            else:
+                _ = self.py_list.append(data[i])
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        for i in range(len(data)):
+            _ = self.py_list.append(data[i])
 
 
 # ------------------------------------------------------------------
@@ -2087,39 +2186,8 @@ struct Column(Copyable, Movable, Sized):
         var pd = Python.import_module("pandas")
         var py_list = Python.evaluate("[]")
         var py_none = Python.evaluate("None")
-        var has_mask = len(self._null_mask) > 0
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    _ = py_list.append(py_none)
-                else:
-                    _ = py_list.append(d[i])
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    _ = py_list.append(py_none)
-                else:
-                    _ = py_list.append(d[i])
-        elif self._data.isa[List[Bool]]():
-            ref d = self._data[List[Bool]]
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    _ = py_list.append(py_none)
-                else:
-                    _ = py_list.append(d[i])
-        elif self._data.isa[List[String]]():
-            ref d = self._data[List[String]]
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    _ = py_list.append(py_none)
-                else:
-                    _ = py_list.append(d[i])
-        else:
-            ref d = self._data[List[PythonObject]]
-            for i in range(len(d)):
-                _ = py_list.append(d[i])
+        var visitor = _ToPandasVisitor(py_list, py_none, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
         if len(self._index) > 0:
             var idx_py = Python.evaluate("[]")
             for i in range(len(self._index)):
