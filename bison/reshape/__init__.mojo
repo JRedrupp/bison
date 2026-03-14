@@ -1,1 +1,1 @@
-from .concat import concat
+from ._concat import concat
