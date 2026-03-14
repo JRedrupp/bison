@@ -7,6 +7,7 @@ from .dtypes import (
     float32, float64,
     bool_, object_,
     datetime64_ns, timedelta64_ns,
+    dtype_from_string,
 )
 from .index import Index, RangeIndex
 from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn

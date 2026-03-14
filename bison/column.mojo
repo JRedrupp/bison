@@ -10,6 +10,7 @@ from .dtypes import (
     float32, float64,
     bool_, object_,
     datetime64_ns, timedelta64_ns,
+    dtype_from_string,
 )
 
 # One active arm per Column instance, selected by dtype:
@@ -1622,7 +1623,7 @@ struct Column(Copyable, Movable, Sized):
         else:
             raise Error("unique: not supported for object dtype")
 
-    fn _astype(self, dtype_name: String) raises -> Column:
+    fn _astype(self, target_dtype: BisonDtype) raises -> Column:
         """Convert Column to a different dtype.
 
         Supported conversions:
@@ -1636,19 +1637,9 @@ struct Column(Copyable, Movable, Sized):
         var result_mask = List[Bool]()
         var has_any_null = False
         var nan = Float64(0) / Float64(0)
-        # Determine target family from dtype_name prefix
-        var to_int = (
-            dtype_name == "int8"
-            or dtype_name == "int16"
-            or dtype_name == "int32"
-            or dtype_name == "int64"
-            or dtype_name == "uint8"
-            or dtype_name == "uint16"
-            or dtype_name == "uint32"
-            or dtype_name == "uint64"
-        )
-        var to_float = dtype_name == "float32" or dtype_name == "float64"
-        var to_bool = dtype_name == "bool"
+        var to_int = target_dtype.is_integer()
+        var to_float = target_dtype.is_float()
+        var to_bool = target_dtype == bool_
 
         if self._data.isa[List[Int64]]():
             ref d = self._data[List[Int64]]
@@ -1677,7 +1668,7 @@ struct Column(Copyable, Movable, Sized):
             elif to_int:
                 return self.copy()
             else:
-                raise Error("astype: unsupported target dtype '" + dtype_name + "' for Int64 source")
+                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Int64 source")
         elif self._data.isa[List[Float64]]():
             ref d = self._data[List[Float64]]
             if to_int:
@@ -1705,7 +1696,7 @@ struct Column(Copyable, Movable, Sized):
             elif to_float:
                 return self.copy()
             else:
-                raise Error("astype: unsupported target dtype '" + dtype_name + "' for Float64 source")
+                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Float64 source")
         elif self._data.isa[List[Bool]]():
             ref d = self._data[List[Bool]]
             if to_int:
@@ -1733,7 +1724,7 @@ struct Column(Copyable, Movable, Sized):
             elif to_bool:
                 return self.copy()
             else:
-                raise Error("astype: unsupported target dtype '" + dtype_name + "' for Bool source")
+                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Bool source")
         else:
             raise Error("astype: not supported for source dtype '" + String(self.dtype.name) + "'")
 

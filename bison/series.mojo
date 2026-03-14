@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ._errors import _not_implemented
-from .dtypes import BisonDtype, object_, bool_, int64, float64
+from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
 from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -1063,7 +1063,7 @@ struct Series(Copyable, Movable):
         return Series(self._col._apply[F]())
 
     fn astype(self, dtype: String) raises -> Series:
-        return Series(self._col._astype(dtype))
+        return Series(self._col._astype(dtype_from_string(dtype)))
 
     fn copy(self) -> Series:
         return Series(self._col.copy())
