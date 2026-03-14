@@ -1,5 +1,5 @@
 # bison
-[![Nightly](https://github.com/JRedrupp/bison/actions/workflows/nightly.yml/badge.svg)](https://github.com/JRedrupp/bison/actions/workflows/nightly.yml)
+[![Nightly](https://github.com/JRedrupp/bison/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/JRedrupp/bison/actions/workflows/nightly.yml)
 
 A Mojo DataFrame library with a pandas-compatible API.
 
