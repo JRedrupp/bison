@@ -4,7 +4,7 @@ from testing import assert_true, TestSuite
 from bison import DataFrame, Series, DFScalar
 
 
-def test_df_isna_stub():
+fn test_df_isna_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var raised = False
@@ -15,7 +15,7 @@ def test_df_isna_stub():
     assert_true(raised)
 
 
-def test_df_fillna_stub():
+fn test_df_fillna_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
     var raised = False
@@ -26,7 +26,7 @@ def test_df_fillna_stub():
     assert_true(raised)
 
 
-def test_df_dropna_stub():
+fn test_df_dropna_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
     var raised = False
@@ -37,7 +37,7 @@ def test_df_dropna_stub():
     assert_true(raised)
 
 
-def test_df_ffill_stub():
+fn test_df_ffill_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
     var raised = False
@@ -48,12 +48,12 @@ def test_df_ffill_stub():
     assert_true(raised)
 
 
-def test_series_fillna_works():
+fn test_series_fillna_works() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 2.0]")))
     var filled = s.fillna(DFScalar(Float64(0.0)))
     assert_true(filled.size() == 3)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

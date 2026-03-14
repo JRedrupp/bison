@@ -73,11 +73,11 @@ struct DataFrame(Copyable, Movable):
             var col_name = String(pd_cols[i])
             self._cols.append(Column.from_pandas(pd_df[pd_cols[i]], col_name))
 
-    fn __copyinit__(out self, existing: Self):
-        self._cols = existing._cols.copy()
+    fn __copyinit__(out self, copy: Self):
+        self._cols = copy._cols.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self._cols = existing._cols^
+    fn __moveinit__(out self, deinit take: Self):
+        self._cols = take._cols^
 
     @staticmethod
     fn from_pandas(pd_df: PythonObject) raises -> DataFrame:
@@ -173,7 +173,9 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             if self._cols[i].name == key:
                 return Series(self._cols[i].copy())
-        return default
+        if default:
+            return Optional[Series](default.value().copy())
+        return None
 
     fn head(self, n: Int = 5) -> DataFrame:
         var nrows = self.shape()[0]

@@ -4,7 +4,7 @@ from testing import assert_true, TestSuite
 from bison import DataFrame, Series, SeriesScalar
 
 
-def test_sort_values_stub():
+fn test_sort_values_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var raised = False
@@ -15,7 +15,7 @@ def test_sort_values_stub():
     assert_true(raised)
 
 
-def test_pivot_stub():
+fn test_pivot_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var raised = False
@@ -26,7 +26,7 @@ def test_pivot_stub():
     assert_true(raised)
 
 
-def test_melt_stub():
+fn test_melt_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'id': [1], 'val': [10]}")))
     var raised = False
@@ -37,7 +37,7 @@ def test_melt_stub():
     assert_true(raised)
 
 
-def test_transpose_stub():
+fn test_transpose_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var raised = False
@@ -48,7 +48,7 @@ def test_transpose_stub():
     assert_true(raised)
 
 
-def test_drop_duplicates_stub():
+fn test_drop_duplicates_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var raised = False
@@ -59,7 +59,7 @@ def test_drop_duplicates_stub():
     assert_true(raised)
 
 
-def test_series_sort_values():
+fn test_series_sort_values() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
     var r = s.sort_values()
@@ -68,5 +68,5 @@ def test_series_sort_values():
     assert_true(r.iloc(2)[Int64] == 3)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

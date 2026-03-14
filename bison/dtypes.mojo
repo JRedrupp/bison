@@ -6,13 +6,13 @@ struct BisonDtype(ImplicitlyCopyable, Movable):
         self.name = name
         self.itemsize = itemsize
 
-    fn __copyinit__(out self, existing: Self):
-        self.name = existing.name
-        self.itemsize = existing.itemsize
+    fn __copyinit__(out self, copy: Self):
+        self.name = copy.name
+        self.itemsize = copy.itemsize
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.name = existing.name^
-        self.itemsize = existing.itemsize
+    fn __moveinit__(out self, deinit take: Self):
+        self.name = take.name^
+        self.itemsize = take.itemsize
 
     fn __str__(self) -> String:
         return self.name

@@ -219,20 +219,20 @@ struct Column(Copyable, Movable, Sized):
     # them explicitly in __copyinit__ as well.
     # ------------------------------------------------------------------
 
-    fn __copyinit__(out self, existing: Self):
-        self.name  = existing.name
-        self.dtype = existing.dtype
-        self._data = existing._data
+    fn __copyinit__(out self, copy: Self):
+        self.name  = copy.name
+        self.dtype = copy.dtype
+        self._data = copy._data
         # PythonObject is not ImplicitlyCopyable — explicit .copy() required.
-        self._index = existing._index.copy()
-        self._null_mask = existing._null_mask.copy()
+        self._index = copy._index.copy()
+        self._null_mask = copy._null_mask.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.name  = existing.name^
-        self.dtype = existing.dtype^
-        self._data = existing._data^
-        self._index = existing._index^
-        self._null_mask = existing._null_mask^
+    fn __moveinit__(out self, deinit take: Self):
+        self.name  = take.name^
+        self.dtype = take.dtype^
+        self._data = take._data^
+        self._index = take._index^
+        self._null_mask = take._null_mask^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
