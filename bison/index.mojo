@@ -1,4 +1,4 @@
-from collections import Set
+from std.collections import Set
 from builtin.sort import sort
 
 

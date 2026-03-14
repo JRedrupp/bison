@@ -1,7 +1,7 @@
-from python import Python, PythonObject
-from utils import Variant
-from memory import bitcast
-from collections import Dict, Set
+from std.python import Python, PythonObject
+from std.utils import Variant
+from std.memory import bitcast
+from std.collections import Dict, Set
 from math import sqrt, floor
 from .dtypes import (
     BisonDtype,
@@ -883,7 +883,7 @@ struct Column(Copyable, Movable, Sized):
         """Core element-wise binary arithmetic kernel.
 
         ``op`` is a compile-time constant (``_ARITH_*``) that selects the
-        operation; ``@parameter if`` folds the branch at compile time so each
+        operation; ``@parameter`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         """
         var inp = self._binary_op_prepare(op_name, other)
@@ -949,7 +949,7 @@ struct Column(Copyable, Movable, Sized):
         """Core element-wise binary comparison kernel.
 
         ``op`` is a compile-time constant (``_CMP_*``) that selects the
-        operation; ``@parameter if`` folds the branch at compile time so each
+        operation; ``@parameter`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         Null propagation: if either input element is null, the result is null.
 

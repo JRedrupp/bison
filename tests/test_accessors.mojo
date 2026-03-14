@@ -1,5 +1,5 @@
 """Tests that .str and .dt accessor stubs raise 'not implemented'."""
-from python import Python
+from std.python import Python
 from testing import assert_true, TestSuite
 from bison import Series
 
