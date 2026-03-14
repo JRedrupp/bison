@@ -86,12 +86,12 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Series | 7 | 80 |
 | GroupBy (DataFrame) | 16 | 1 |
 | GroupBy (Series) | 15 | 1 |
-| String accessor | 18 | 1 |
+| String accessor | 0 | 21 |
 | Datetime accessor | 17 | 1 |
 | Index | 0 | 14 |
 | IO | 10 | 2 |
 | Reshape | 1 | 0 |
-| **Total** | **163** | **138** |
+| **Total** | **145** | **158** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations

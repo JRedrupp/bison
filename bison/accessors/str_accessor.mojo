@@ -1,77 +1,329 @@
-from std.python import PythonObject
+from std.python import Python, PythonObject
 from .._errors import _not_implemented
+from ..column import Column, ColumnData
+from ..dtypes import BisonDtype, object_, bool_, int64
 
 
 struct StringMethods:
     """Vectorized string operations on a Series (.str accessor)."""
 
+    var _data: List[String]
+    var _null_mask: List[Bool]
+    var _name: String
+
     fn __init__(out self):
-        pass
+        self._data = List[String]()
+        self._null_mask = List[Bool]()
+        self._name = ""
 
-    fn contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> PythonObject:
-        _not_implemented("Series.str.contains")
-        return PythonObject(None)
+    fn __init__(out self, var data: List[String], var null_mask: List[Bool], name: String):
+        self._data = data^
+        self._null_mask = null_mask^
+        self._name = name
 
-    fn startswith(self, pat: String) raises -> PythonObject:
-        _not_implemented("Series.str.startswith")
-        return PythonObject(None)
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
 
-    fn endswith(self, pat: String) raises -> PythonObject:
-        _not_implemented("Series.str.endswith")
-        return PythonObject(None)
+    fn _is_null(self, i: Int) -> Bool:
+        return len(self._null_mask) > i and self._null_mask[i]
 
-    fn replace(self, pat: String, repl: String, regex: Bool = True) raises -> PythonObject:
-        _not_implemented("Series.str.replace")
-        return PythonObject(None)
+    # ------------------------------------------------------------------
+    # Case / transform
+    # ------------------------------------------------------------------
+
+    fn upper(self) raises -> Column:
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            else:
+                result.append(self._data[i].upper())
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
+
+    fn lower(self) raises -> Column:
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            else:
+                result.append(self._data[i].lower())
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
+
+    # ------------------------------------------------------------------
+    # Stripping
+    # ------------------------------------------------------------------
+
+    fn strip(self, to_strip: String = "") raises -> Column:
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            elif to_strip == "":
+                result.append(String(self._data[i].strip()))
+            else:
+                result.append(String(self._data[i].strip(to_strip)))
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
+
+    fn lstrip(self, to_strip: String = "") raises -> Column:
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            elif to_strip == "":
+                result.append(String(self._data[i].lstrip()))
+            else:
+                result.append(String(self._data[i].lstrip(to_strip)))
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
+
+    fn rstrip(self, to_strip: String = "") raises -> Column:
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            elif to_strip == "":
+                result.append(String(self._data[i].rstrip()))
+            else:
+                result.append(String(self._data[i].rstrip(to_strip)))
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
+
+    # ------------------------------------------------------------------
+    # Predicates
+    # ------------------------------------------------------------------
+
+    fn contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> Column:
+        var result = List[Bool]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(na)
+                new_mask.append(False)
+            else:
+                if `case`:
+                    result.append(self._data[i].find(pat) != -1)
+                else:
+                    result.append(self._data[i].lower().find(pat.lower()) != -1)
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), bool_)
+        col._null_mask = new_mask^
+        return col^
+
+    fn startswith(self, pat: String) raises -> Column:
+        var result = List[Bool]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(False)
+                new_mask.append(True)
+            else:
+                result.append(self._data[i].startswith(pat))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), bool_)
+        col._null_mask = new_mask^
+        return col^
+
+    fn endswith(self, pat: String) raises -> Column:
+        var result = List[Bool]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(False)
+                new_mask.append(True)
+            else:
+                result.append(self._data[i].endswith(pat))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), bool_)
+        col._null_mask = new_mask^
+        return col^
+
+    # ------------------------------------------------------------------
+    # Replace / split
+    # ------------------------------------------------------------------
+
+    fn replace(self, pat: String, repl: String, regex: Bool = True) raises -> Column:
+        var result = List[String]()
+        var re_mod = Python.import_module("re")
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            elif regex:
+                var py_s = PythonObject(self._data[i])
+                var sub_result = re_mod.sub(pat, repl, py_s)
+                result.append(String(sub_result))
+            else:
+                result.append(self._data[i].replace(pat, repl))
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = self._null_mask.copy()
+        return col^
 
     fn split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> PythonObject:
-        _not_implemented("Series.str.split")
-        return PythonObject(None)
+        """Split strings around given separator/delimiter.
 
-    fn strip(self, to_strip: String = "") raises -> PythonObject:
-        _not_implemented("Series.str.strip")
-        return PythonObject(None)
+        Returns a PythonObject (pandas Series of lists) to match the pandas API,
+        since the result is a ragged structure that cannot be represented as a
+        flat native Mojo List.
+        """
+        var pd = Python.import_module("pandas")
+        var py_list = Python.evaluate("[]")
+        var py_none = Python.evaluate("None")
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                _ = py_list.append(py_none)
+            else:
+                var parts_raw = self._data[i].split(pat, n) if n != -1 else self._data[i].split(pat)
+                var py_parts = Python.evaluate("[]")
+                for j in range(len(parts_raw)):
+                    _ = py_parts.append(String(parts_raw[j]))
+                _ = py_list.append(py_parts)
+        return pd.Series(py_list, name=self._name)
 
-    fn lstrip(self, to_strip: String = "") raises -> PythonObject:
-        _not_implemented("Series.str.lstrip")
-        return PythonObject(None)
+    # ------------------------------------------------------------------
+    # Numeric operations
+    # ------------------------------------------------------------------
 
-    fn rstrip(self, to_strip: String = "") raises -> PythonObject:
-        _not_implemented("Series.str.rstrip")
-        return PythonObject(None)
+    fn len(self) raises -> Column:
+        var result = List[Int64]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(Int64(0))
+                new_mask.append(True)
+            else:
+                result.append(Int64(len(self._data[i])))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), int64)
+        col._null_mask = new_mask^
+        return col^
 
-    fn upper(self) raises -> PythonObject:
-        _not_implemented("Series.str.upper")
-        return PythonObject(None)
+    fn find(self, sub: String, start: Int = 0, end: Int = -1) raises -> Column:
+        var result = List[Int64]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(Int64(-1))
+                new_mask.append(True)
+            else:
+                var s = self._data[i]
+                var search_in: String
+                if end != -1 and end < len(s):
+                    search_in = String(s[0:end])
+                else:
+                    search_in = s
+                result.append(Int64(search_in.find(sub, start)))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), int64)
+        col._null_mask = new_mask^
+        return col^
 
-    fn lower(self) raises -> PythonObject:
-        _not_implemented("Series.str.lower")
-        return PythonObject(None)
+    fn count(self, pat: String) raises -> Column:
+        var result = List[Int64]()
+        var new_mask = List[Bool]()
+        var re_mod = Python.import_module("re")
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(Int64(0))
+                new_mask.append(True)
+            else:
+                var py_s = PythonObject(self._data[i])
+                var matches = re_mod.findall(pat, py_s)
+                result.append(Int64(Int(py=matches.__len__())))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), int64)
+        col._null_mask = new_mask^
+        return col^
 
-    fn len(self) raises -> PythonObject:
-        _not_implemented("Series.str.len")
-        return PythonObject(None)
+    # ------------------------------------------------------------------
+    # Indexing / slicing
+    # ------------------------------------------------------------------
 
-    fn get(self, i: Int) raises -> PythonObject:
-        _not_implemented("Series.str.get")
-        return PythonObject(None)
+    fn get(self, i: Int) raises -> Column:
+        var result = List[String]()
+        var new_mask = List[Bool]()
+        for idx in range(len(self._data)):
+            if self._is_null(idx):
+                result.append(String(""))
+                new_mask.append(True)
+            else:
+                var s = self._data[idx]
+                if i < 0 or i >= len(s):
+                    result.append(String(""))
+                    new_mask.append(True)
+                else:
+                    result.append(String(s[i:i+1]))
+                    new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = new_mask^
+        return col^
 
-    fn slice(self, start: Int = 0, stop: Int = -1, step: Int = 1) raises -> PythonObject:
-        _not_implemented("Series.str.slice")
-        return PythonObject(None)
+    fn slice(self, start: Int = 0, stop: Int = -1, step: Int = 1) raises -> Column:
+        var result = List[String]()
+        var new_mask = List[Bool]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+                new_mask.append(True)
+            else:
+                var s = self._data[i]
+                var slen = len(s)
+                var actual_stop = slen if stop == -1 or stop > slen else stop
+                var sub = String("")
+                if step == 1:
+                    if start < slen and actual_stop > start:
+                        sub = String(s[start:actual_stop])
+                else:
+                    var pos = start
+                    while pos < actual_stop and pos < slen:
+                        sub += String(s[pos:pos+1])
+                        pos += step
+                result.append(sub)
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), object_)
+        col._null_mask = new_mask^
+        return col^
+
+    # ------------------------------------------------------------------
+    # Concatenation
+    # ------------------------------------------------------------------
 
     fn cat(self, sep: String = "") raises -> String:
-        _not_implemented("Series.str.cat")
-        return ""
+        var result = String("")
+        var first = True
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                continue
+            if not first:
+                result += sep
+            result += self._data[i]
+            first = False
+        return result
 
-    fn find(self, sub: String, start: Int = 0, end: Int = -1) raises -> PythonObject:
-        _not_implemented("Series.str.find")
-        return PythonObject(None)
+    # ------------------------------------------------------------------
+    # Regex operations
+    # ------------------------------------------------------------------
 
-    fn count(self, pat: String) raises -> PythonObject:
-        _not_implemented("Series.str.count")
-        return PythonObject(None)
-
-    fn match(self, pat: String) raises -> PythonObject:
-        _not_implemented("Series.str.match")
-        return PythonObject(None)
+    fn match(self, pat: String) raises -> Column:
+        var result = List[Bool]()
+        var new_mask = List[Bool]()
+        var re_mod = Python.import_module("re")
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(False)
+                new_mask.append(True)
+            else:
+                var py_s = PythonObject(self._data[i])
+                var m = re_mod.match(pat, py_s)
+                result.append(Bool(m.__bool__()))
+                new_mask.append(False)
+        var col = Column(self._name, ColumnData(result^), bool_)
+        col._null_mask = new_mask^
+        return col^
