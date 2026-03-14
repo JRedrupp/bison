@@ -3,7 +3,7 @@ from testing import assert_equal, assert_true, TestSuite
 from bison import Index
 
 
-def _make_index(a: String, b: String, c: String) -> Index:
+fn _make_index(a: String, b: String, c: String) -> Index:
     var data = List[String]()
     data.append(a)
     data.append(b)
@@ -11,7 +11,7 @@ def _make_index(a: String, b: String, c: String) -> Index:
     return Index(data^)
 
 
-def _make_index_named(a: String, b: String, c: String, name: String) -> Index:
+fn _make_index_named(a: String, b: String, c: String, name: String) -> Index:
     var data = List[String]()
     data.append(a)
     data.append(b)
