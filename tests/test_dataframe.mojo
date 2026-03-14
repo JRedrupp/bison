@@ -5,7 +5,7 @@ from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import DataFrame, ColumnData, Series
 
 
-def test_shape_from_pandas():
+fn test_shape_from_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
@@ -14,28 +14,28 @@ def test_shape_from_pandas():
     assert_equal(s[1], 2)
 
 
-def test_len():
+fn test_len() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'x': [10, 20]}"))
     var df = DataFrame(pd_df)
     assert_equal(df.__len__(), 2)
 
 
-def test_empty_false():
+fn test_empty_false() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1]}"))
     var df = DataFrame(pd_df)
     assert_false(df.empty())
 
 
-def test_empty_true():
+fn test_empty_true() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame()
     var df = DataFrame(pd_df)
     assert_true(df.empty())
 
 
-def test_columns():
+fn test_columns() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'col1': [1], 'col2': [2]}"))
     var df = DataFrame(pd_df)
@@ -45,26 +45,26 @@ def test_columns():
     assert_equal(cols[1], "col2")
 
 
-def test_ndim():
+fn test_ndim() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     assert_equal(df.ndim(), 2)
 
 
-def test_size():
+fn test_size() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     assert_equal(df.size(), 4)
 
 
-def test_contains():
+fn test_contains() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     assert_true(df.__contains__("a"))
     assert_false(df.__contains__("z"))
 
 
-def test_to_pandas_roundtrip():
+fn test_to_pandas_roundtrip() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
     var df = DataFrame.from_pandas(pd_df)
@@ -73,7 +73,7 @@ def test_to_pandas_roundtrip():
     assert_equal(back.__len__(), 3)
 
 
-def test_from_dict():
+fn test_from_dict() raises:
     var d = Dict[String, ColumnData]()
     var col_a = List[Int64]()
     col_a.append(1)
@@ -95,14 +95,14 @@ def test_from_dict():
 # ------------------------------------------------------------------
 
 
-def test_getitem_column():
+fn test_getitem_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
     var s = df["a"]
     assert_equal(s.size(), 3)
 
 
-def test_getitem_missing_raises():
+fn test_getitem_missing_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var raised = False
@@ -113,7 +113,7 @@ def test_getitem_missing_raises():
     assert_true(raised)
 
 
-def test_setitem_new_column():
+fn test_setitem_new_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_series = Series(pd.Series(Python.evaluate("[10, 20]"), name="b"))
@@ -122,7 +122,7 @@ def test_setitem_new_column():
     assert_true(df.__contains__("b"))
 
 
-def test_setitem_replace_column():
+fn test_setitem_replace_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_series = Series(pd.Series(Python.evaluate("[99, 98]"), name="a"))
@@ -132,7 +132,7 @@ def test_setitem_replace_column():
     assert_equal(s.size(), 2)
 
 
-def test_get_existing_key():
+fn test_get_existing_key() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var result = df.get("a")
@@ -140,14 +140,14 @@ def test_get_existing_key():
     assert_equal(result.value().size(), 3)
 
 
-def test_get_missing_key_default_none():
+fn test_get_missing_key_default_none() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var result = df.get("z")
     assert_false(result.__bool__())
 
 
-def test_head_basic():
+fn test_head_basic() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var h = df.head(3)
@@ -155,14 +155,14 @@ def test_head_basic():
     assert_equal(h.shape()[1], 1)
 
 
-def test_head_larger_than_rows():
+fn test_head_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var h = df.head(10)
     assert_equal(h.shape()[0], 2)
 
 
-def test_tail_basic():
+fn test_tail_basic() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var t = df.tail(2)
@@ -170,14 +170,14 @@ def test_tail_basic():
     assert_equal(t.shape()[1], 1)
 
 
-def test_tail_larger_than_rows():
+fn test_tail_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var t = df.tail(10)
     assert_equal(t.shape()[0], 2)
 
 
-def test_head_tail_values():
+fn test_head_tail_values() raises:
     """Verify head/tail return the correct rows using native sum aggregation."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30, 40, 50]}")))
@@ -189,7 +189,7 @@ def test_head_tail_values():
     assert_true(t.sum().sum() == 90.0)
 
 
-def test_sample_n():
+fn test_sample_n() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var s = df.sample(3, random_state=42)
@@ -197,14 +197,14 @@ def test_sample_n():
     assert_equal(s.shape()[1], 1)
 
 
-def test_sample_n_larger_than_rows():
+fn test_sample_n_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var s = df.sample(10, random_state=0)
     assert_equal(s.shape()[0], 2)
 
 
-def test_filter_items():
+fn test_filter_items() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var items = List[String]()
@@ -217,7 +217,7 @@ def test_filter_items():
     assert_false(result.__contains__("b"))
 
 
-def test_filter_like():
+fn test_filter_like() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'foo_1': [1], 'foo_2': [2], 'bar': [3]}")))
     var result = df.filter(like="foo")
@@ -227,7 +227,7 @@ def test_filter_like():
     assert_false(result.__contains__("bar"))
 
 
-def test_filter_regex():
+fn test_filter_regex() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a1': [1], 'b2': [2], 'c1': [3]}")))
     var result = df.filter(regex=".*1$")
@@ -237,14 +237,14 @@ def test_filter_regex():
     assert_false(result.__contains__("b2"))
 
 
-def test_filter_no_args_keeps_all():
+fn test_filter_no_args_keeps_all() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var result = df.filter()
     assert_equal(result.shape()[1], 2)
 
 
-def test_select_dtypes_include():
+fn test_select_dtypes_include() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var inc = List[String]()
@@ -255,7 +255,7 @@ def test_select_dtypes_include():
     assert_false(result.__contains__("b"))
 
 
-def test_select_dtypes_exclude():
+fn test_select_dtypes_exclude() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var exc = List[String]()
@@ -266,5 +266,5 @@ def test_select_dtypes_exclude():
     assert_false(result.__contains__("b"))
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

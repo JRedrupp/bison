@@ -36,13 +36,13 @@ struct Series(Copyable, Movable):
         self._col = Column.from_pandas(pd_s, col_name)
         self.name = self._col.name
 
-    fn __copyinit__(out self, existing: Self):
-        self._col = existing._col.copy()
-        self.name = existing.name
+    fn __copyinit__(out self, copy: Self):
+        self._col = copy._col.copy()
+        self.name = copy.name
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self._col = existing._col^
-        self.name = existing.name^
+    fn __moveinit__(out self, deinit take: Self):
+        self._col = take._col^
+        self.name = take.name^
 
     @staticmethod
     fn from_pandas(pd_s: PythonObject) raises -> Series:

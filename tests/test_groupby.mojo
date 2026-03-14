@@ -4,7 +4,7 @@ from testing import assert_true, TestSuite
 from bison import DataFrame
 
 
-def test_groupby_stub():
+fn test_groupby_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'grp': ['a', 'a', 'b'], 'val': [1, 2, 3]}")))
     var raised = False
@@ -15,7 +15,7 @@ def test_groupby_stub():
     assert_true(raised)
 
 
-def test_groupby_sum_stub():
+fn test_groupby_sum_stub() raises:
     """DataFrameGroupBy.sum is also a stub."""
     from bison import DataFrameGroupBy
     var pd = Python.import_module("pandas")
@@ -29,5 +29,5 @@ def test_groupby_sum_stub():
     assert_true(raised)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

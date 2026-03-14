@@ -4,7 +4,7 @@ from testing import assert_equal, assert_true, TestSuite
 from bison import DataFrame, Series, Column
 
 
-def test_df_from_pandas_preserves_shape():
+fn test_df_from_pandas_preserves_shape() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6], 'c': [7, 8, 9]}"))
     var df = DataFrame.from_pandas(pd_df)
@@ -12,7 +12,7 @@ def test_df_from_pandas_preserves_shape():
     assert_equal(df.shape()[1], 3)
 
 
-def test_df_to_pandas_identity():
+fn test_df_to_pandas_identity() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'x': [10, 20]}"))
     var df = DataFrame.from_pandas(pd_df)
@@ -21,7 +21,7 @@ def test_df_to_pandas_identity():
     testing.assert_frame_equal(pd_df, back)
 
 
-def test_series_from_pandas_preserves_name():
+fn test_series_from_pandas_preserves_name() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"), name="score")
     var s = Series.from_pandas(pd_s)
@@ -29,7 +29,7 @@ def test_series_from_pandas_preserves_name():
     assert_equal(s.__len__(), 3)
 
 
-def test_series_to_pandas_identity():
+fn test_series_to_pandas_identity() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[5, 6, 7]"), name="v")
     var s = Series.from_pandas(pd_s)
@@ -38,7 +38,7 @@ def test_series_to_pandas_identity():
     testing.assert_series_equal(pd_s, back)
 
 
-def test_df_columns_match():
+fn test_df_columns_match() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'alpha': [1], 'beta': [2], 'gamma': [3]}"))
     var df = DataFrame.from_pandas(pd_df)
@@ -48,7 +48,7 @@ def test_df_columns_match():
     assert_equal(cols[2], "gamma")
 
 
-def test_quickstart_example():
+fn test_quickstart_example() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
 
@@ -65,7 +65,7 @@ def test_quickstart_example():
     testing.assert_frame_equal(pd_df, original)
 
 
-def test_column_typed_storage():
+fn test_column_typed_storage() raises:
     """Verify from_pandas routes values into the correct Variant arm."""
     var pd = Python.import_module("pandas")
 
@@ -94,7 +94,7 @@ def test_column_typed_storage():
     assert_equal(col_obj.__len__(), 2)
 
 
-def test_series_index_roundtrip():
+fn test_series_index_roundtrip() raises:
     """Custom string index must survive from_pandas → to_pandas."""
     var pd = Python.import_module("pandas")
     var testing = Python.import_module("pandas.testing")
@@ -108,7 +108,7 @@ def test_series_index_roundtrip():
     testing.assert_series_equal(pd_s, back)
 
 
-def test_df_index_roundtrip():
+fn test_df_index_roundtrip() raises:
     """Custom string index on a DataFrame must survive from_pandas → to_pandas."""
     var pd = Python.import_module("pandas")
     var testing = Python.import_module("pandas.testing")
@@ -121,7 +121,7 @@ def test_df_index_roundtrip():
     testing.assert_frame_equal(pd_df, back)
 
 
-def test_float64_bitcast_roundtrip():
+fn test_float64_bitcast_roundtrip() raises:
     """Float64 values must survive from_pandas with exact bit-for-bit fidelity.
 
     Uses Python struct to verify that the bits stored in the Column exactly
@@ -147,5 +147,5 @@ def test_float64_bitcast_roundtrip():
         assert_equal(got_bits, expected_bits)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

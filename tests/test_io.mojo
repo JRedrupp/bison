@@ -4,7 +4,7 @@ from testing import assert_equal, assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
 
 
-def test_read_csv_basic():
+fn test_read_csv_basic() raises:
     """Read a CSV file with int, float, and string columns."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -21,7 +21,7 @@ def test_read_csv_basic():
     assert_equal(cols[2], "c")
 
 
-def test_read_csv_sep():
+fn test_read_csv_sep() raises:
     """Custom separator (tab-separated values)."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".tsv"))
@@ -35,7 +35,7 @@ def test_read_csv_sep():
     assert_equal(df.columns()[1], "y")
 
 
-def test_read_csv_nrows():
+fn test_read_csv_nrows() raises:
     """Nrows parameter limits the number of data rows read."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -47,7 +47,7 @@ def test_read_csv_nrows():
     assert_equal(df.shape()[1], 2)
 
 
-def test_read_csv_no_header():
+fn test_read_csv_no_header() raises:
     """With header=-1 there is no header row; columns are auto-numbered as strings."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -63,7 +63,7 @@ def test_read_csv_no_header():
     assert_equal(cols[2], "2")
 
 
-def test_to_csv_returns_string():
+fn test_to_csv_returns_string() raises:
     """Calling to_csv() with no path returns a non-empty CSV string."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
@@ -73,7 +73,7 @@ def test_to_csv_returns_string():
     assert_true(csv_str.find("b") >= 0)
 
 
-def test_to_csv_no_index():
+fn test_to_csv_no_index() raises:
     """Passing index=False omits the row-number column (no leading comma in header)."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
@@ -85,7 +85,7 @@ def test_to_csv_no_index():
     assert_true(csv_str.find("20") >= 0)
 
 
-def test_csv_roundtrip():
+fn test_csv_roundtrip() raises:
     """Write a DataFrame to CSV with index=False, read it back, check shape."""
     var pd = Python.import_module("pandas")
     var tempfile = Python.import_module("tempfile")
@@ -102,7 +102,7 @@ def test_csv_roundtrip():
     assert_equal(df2.columns()[1], "b")
 
 
-def test_read_parquet_stub():
+fn test_read_parquet_stub() raises:
     var raised = False
     try:
         _ = read_parquet("/tmp/nonexistent.parquet")
@@ -111,7 +111,7 @@ def test_read_parquet_stub():
     assert_true(raised)
 
 
-def test_read_json_stub():
+fn test_read_json_stub() raises:
     var raised = False
     try:
         _ = read_json("/tmp/nonexistent.json")
@@ -120,7 +120,7 @@ def test_read_json_stub():
     assert_true(raised)
 
 
-def test_read_excel_stub():
+fn test_read_excel_stub() raises:
     var raised = False
     try:
         _ = read_excel("/tmp/nonexistent.xlsx")
@@ -129,5 +129,5 @@ def test_read_excel_stub():
     assert_true(raised)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

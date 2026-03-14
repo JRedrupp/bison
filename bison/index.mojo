@@ -10,13 +10,13 @@ struct Index(Copyable, Movable):
         self._data = data^
         self.name = name
 
-    fn __copyinit__(out self, existing: Self):
-        self._data = existing._data.copy()
-        self.name = existing.name
+    fn __copyinit__(out self, copy: Self):
+        self._data = copy._data.copy()
+        self.name = copy.name
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self._data = existing._data^
-        self.name = existing.name^
+    fn __moveinit__(out self, deinit take: Self):
+        self._data = take._data^
+        self.name = take.name^
 
     fn __len__(self) -> Int:
         return len(self._data)

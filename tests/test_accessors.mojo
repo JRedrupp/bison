@@ -4,7 +4,7 @@ from testing import assert_true, TestSuite
 from bison import Series
 
 
-def test_str_upper_stub():
+fn test_str_upper_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['foo', 'bar']")))
     var raised = False
@@ -16,7 +16,7 @@ def test_str_upper_stub():
     assert_true(raised)
 
 
-def test_str_contains_stub():
+fn test_str_contains_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world']")))
     var raised = False
@@ -28,7 +28,7 @@ def test_str_contains_stub():
     assert_true(raised)
 
 
-def test_dt_year_stub():
+fn test_dt_year_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01', '2021-06-15']"))))
     var raised = False
@@ -40,7 +40,7 @@ def test_dt_year_stub():
     assert_true(raised)
 
 
-def test_dt_month_stub():
+fn test_dt_month_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01']"))))
     var raised = False
@@ -52,5 +52,5 @@ def test_dt_month_stub():
     assert_true(raised)
 
 
-def main():
+fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
