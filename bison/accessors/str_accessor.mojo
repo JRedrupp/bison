@@ -214,12 +214,10 @@ struct StringMethods:
                 new_mask.append(True)
             else:
                 var s = self._data[i]
-                var search_in: String
-                if end != -1 and end < len(s):
-                    search_in = String(s[0:end])
-                else:
-                    search_in = s
-                result.append(Int64(search_in.find(sub, start)))
+                var pos = s.find(sub, start)
+                if end != -1 and pos >= end:
+                    pos = -1
+                result.append(Int64(pos))
                 new_mask.append(False)
         var col = Column(self._name, ColumnData(result^), int64)
         col._null_mask = new_mask^
@@ -259,7 +257,14 @@ struct StringMethods:
                     result.append(String(""))
                     new_mask.append(True)
                 else:
-                    result.append(String(s[i:i+1]))
+                    var j = 0
+                    var char_val = String("")
+                    for ch in s.codepoint_slices():
+                        if j == i:
+                            char_val = String(ch)
+                            break
+                        j += 1
+                    result.append(char_val)
                     new_mask.append(False)
         var col = Column(self._name, ColumnData(result^), object_)
         col._null_mask = new_mask^
@@ -277,14 +282,13 @@ struct StringMethods:
                 var slen = len(s)
                 var actual_stop = slen if stop == -1 or stop > slen else stop
                 var sub = String("")
-                if step == 1:
-                    if start < slen and actual_stop > start:
-                        sub = String(s[start:actual_stop])
-                else:
-                    var pos = start
-                    while pos < actual_stop and pos < slen:
-                        sub += String(s[pos:pos+1])
-                        pos += step
+                var j = 0
+                for ch in s.codepoint_slices():
+                    if j >= actual_stop:
+                        break
+                    if j >= start and (j - start) % step == 0:
+                        sub += String(ch)
+                    j += 1
                 result.append(sub)
                 new_mask.append(False)
         var col = Column(self._name, ColumnData(result^), object_)
