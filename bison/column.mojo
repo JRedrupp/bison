@@ -1165,6 +1165,35 @@ struct _ValueCountsIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("value_counts: unsupported column type")
 
 
+struct _ToFloat64Visitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Converts a numeric ColumnData arm to a List[Float64].
+
+    Raises for String and PythonObject arms (non-numeric).
+    """
+    var result: List[Float64]
+
+    fn __init__(out self):
+        self.result = List[Float64]()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        for i in range(len(data)):
+            self.result.append(Float64(data[i]))
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        for i in range(len(data)):
+            self.result.append(data[i])
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        for i in range(len(data)):
+            self.result.append(1.0 if data[i] else 0.0)
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("arith: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("arith: non-numeric column type")
+
+
 # ------------------------------------------------------------------
 # Compile-time operation selectors for Column._arith_op
 # ------------------------------------------------------------------
@@ -1608,22 +1637,9 @@ struct Column(Copyable, Movable, Sized):
 
         Raises for non-numeric (String, PythonObject) column types.
         """
-        var result = List[Float64]()
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            for i in range(len(d)):
-                result.append(Float64(d[i]))
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            for i in range(len(d)):
-                result.append(d[i])
-        elif self._data.isa[List[Bool]]():
-            ref d = self._data[List[Bool]]
-            for i in range(len(d)):
-                result.append(1.0 if d[i] else 0.0)
-        else:
-            raise Error("arith: non-numeric column type")
-        return result^
+        var visitor = _ToFloat64Visitor()
+        visit_col_data_raises(visitor, self._data)
+        return visitor.result.copy()
 
     fn _build_result_col(self, var col_data: ColumnData, var result_mask: List[Bool], has_any_null: Bool) -> Column:
         """Wrap a computed ColumnData into a Column, attaching mask only if needed."""
