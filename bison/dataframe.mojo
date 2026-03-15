@@ -1,5 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
+from std.memory import bitcast
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
 from .dtypes import float64 as _float64
@@ -509,40 +510,223 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn isna(self) raises -> DataFrame:
-        _not_implemented("DataFrame.isna")
-        return DataFrame()
+        """Return a boolean DataFrame that is True where values are null/NaN."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var bool_s = s.isna()
+            result_cols.append(bool_s._col.copy())
+        return DataFrame(result_cols^)
 
     fn isnull(self) raises -> DataFrame:
-        _not_implemented("DataFrame.isnull")
-        return DataFrame()
+        """Alias for isna()."""
+        return self.isna()
 
     fn notna(self) raises -> DataFrame:
-        _not_implemented("DataFrame.notna")
-        return DataFrame()
+        """Return a boolean DataFrame that is True where values are not null/NaN."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var bool_s = s.notna()
+            result_cols.append(bool_s._col.copy())
+        return DataFrame(result_cols^)
 
     fn notnull(self) raises -> DataFrame:
-        _not_implemented("DataFrame.notnull")
-        return DataFrame()
+        """Alias for notna()."""
+        return self.notna()
 
     fn fillna(self, value: PythonObject, method: String = "", axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.fillna")
-        return DataFrame()
+        """Return a copy of the DataFrame with null/NaN values replaced by *value*.
+
+        *value* must be a scalar (int, float, bool, or str).
+        *method* and *axis* are accepted for API compatibility but ignored.
+        """
+        # Convert PythonObject scalar to DFScalar.
+        var fill: DFScalar
+        var py_type = value.__class__.__name__
+        var type_str = String(py_type)
+        if type_str == "int":
+            fill = DFScalar(Int64(Int(value)))
+        elif type_str == "float":
+            fill = DFScalar(Float64(value.__float__()))
+        elif type_str == "bool":
+            fill = DFScalar(Bool(value.__bool__()))
+        else:
+            fill = DFScalar(String(value))
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.fillna(fill)
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
 
     fn dropna(self, axis: Int = 0, how: String = "any", thresh: Optional[PythonObject] = None, subset: Optional[PythonObject] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.dropna")
-        return DataFrame()
+        """Remove rows (axis=0) or columns (axis=1) with null/NaN values.
+
+        *how*: "any" drops a row/column if ANY value is null;
+               "all" drops a row/column only if ALL values are null.
+        *thresh*: keep rows with at least *thresh* non-null values (overrides *how*).
+        *subset*: for axis=0, consider only these column names when checking nulls.
+        """
+        if axis == 1:
+            # Drop columns that contain nulls.
+            var result_cols = List[Column]()
+            for i in range(len(self._cols)):
+                var has_null = False
+                var col = self._cols[i]
+                var mask_len = len(col._null_mask)
+                if mask_len > 0:
+                    for j in range(mask_len):
+                        if col._null_mask[j]:
+                            has_null = True
+                            break
+                if how == "all" and mask_len > 0:
+                    # Only drop if ALL values are null.
+                    var all_null = True
+                    for j in range(mask_len):
+                        if not col._null_mask[j]:
+                            all_null = False
+                            break
+                    has_null = all_null
+                if not has_null:
+                    result_cols.append(col.copy())
+            return DataFrame(result_cols^)
+
+        # axis == 0: drop rows.
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return DataFrame()
+        var nrows = len(self._cols[0])
+
+        # Determine which column indices to check (subset parameter).
+        var check_indices = List[Int]()
+        if subset:
+            var sub = subset.value()
+            var sub_len = Int(sub.__len__())
+            for si in range(sub_len):
+                var sub_col = String(sub[si])
+                for ci in range(ncols):
+                    if self._cols[ci].name == sub_col:
+                        check_indices.append(ci)
+                        break
+        else:
+            for ci in range(ncols):
+                check_indices.append(ci)
+
+        # Determine which rows to keep.
+        var keep_rows = List[Int]()
+        for r in range(nrows):
+            var null_count = 0
+            var check_count = len(check_indices)
+            for ki in range(check_count):
+                var ci = check_indices[ki]
+                var col = self._cols[ci]
+                var mask_len = len(col._null_mask)
+                if mask_len > r and col._null_mask[r]:
+                    null_count += 1
+
+            var keep: Bool
+            if thresh:
+                # Keep if non-null count >= thresh.
+                var thresh_val = Int(thresh.value())
+                keep = (check_count - null_count) >= thresh_val
+            elif how == "all":
+                # Drop only if all checked values are null.
+                keep = null_count < check_count
+            else:
+                # "any": drop if any checked value is null.
+                keep = null_count == 0
+            if keep:
+                keep_rows.append(r)
+
+        var result_cols = List[Column]()
+        for i in range(ncols):
+            var new_col = self._cols[i].take(keep_rows)
+            new_col._null_mask = List[Bool]()
+            result_cols.append(new_col^)
+        return DataFrame(result_cols^)
 
     fn ffill(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.ffill")
-        return DataFrame()
+        """Forward-fill null values along *axis* (default: axis=0, along rows)."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.ffill()
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
 
     fn bfill(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.bfill")
-        return DataFrame()
+        """Backward-fill null values along *axis* (default: axis=0, along rows)."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.bfill()
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
 
     fn interpolate(self, method: String = "linear", axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.interpolate")
-        return DataFrame()
+        """Fill null values using linear interpolation (numeric columns only).
+
+        Non-numeric columns are returned unchanged.
+        Only method="linear" is supported natively.
+        """
+        if method != "linear":
+            raise Error("DataFrame.interpolate: only method='linear' is supported")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var col = self._cols[i]
+            var has_mask = len(col._null_mask) > 0
+            if not has_mask or not col.dtype.is_float():
+                result_cols.append(col.copy())
+                continue
+            # Linear interpolation for Float64 columns.
+            var n = len(col)
+            ref d = col._data[List[Float64]]
+            var data = List[Float64]()
+            var new_mask = List[Bool]()
+            for j in range(n):
+                data.append(d[j])
+                new_mask.append(col._null_mask[j])
+            # Fill leading nulls with the first non-null value.
+            var first_valid = -1
+            for j in range(n):
+                if not new_mask[j]:
+                    first_valid = j
+                    break
+            if first_valid == -1:
+                # All null — leave as-is.
+                result_cols.append(col.copy())
+                continue
+            for j in range(first_valid):
+                data[j] = data[first_valid]
+                new_mask[j] = False
+            # Fill trailing nulls with the last non-null value.
+            var last_valid = -1
+            for j in range(n):
+                if not new_mask[n - 1 - j]:
+                    last_valid = n - 1 - j
+                    break
+            for j in range(last_valid + 1, n):
+                data[j] = data[last_valid]
+                new_mask[j] = False
+            # Interpolate interior nulls between two valid values.
+            var seg_start = -1
+            for j in range(n):
+                if not new_mask[j]:
+                    if seg_start >= 0:
+                        # Fill the gap between seg_start and j.
+                        var v0 = data[seg_start]
+                        var v1 = data[j]
+                        var gap = j - seg_start
+                        for k in range(seg_start + 1, j):
+                            var t = Float64(k - seg_start) / Float64(gap)
+                            data[k] = v0 + t * (v1 - v0)
+                            new_mask[k] = False
+                    seg_start = j
+            var col_data = ColumnData(data^)
+            var new_col = Column(col.name, col_data^, col.dtype, col._index.copy())
+            result_cols.append(new_col^)
+        return DataFrame(result_cols^)
 
     # ------------------------------------------------------------------
     # Reshaping / sorting
