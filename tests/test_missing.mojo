@@ -9,7 +9,7 @@ from bison import DataFrame, Series, DFScalar
 # ------------------------------------------------------------------
 
 fn test_df_isna_no_nulls() raises:
-    """isna() on a DataFrame without nulls returns all-False boolean columns."""
+    """Isna on a DataFrame without nulls returns all-False boolean columns."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var result = df.isna()
@@ -21,7 +21,7 @@ fn test_df_isna_no_nulls() raises:
 
 
 fn test_df_isna_with_nulls() raises:
-    """isna() correctly marks NaN rows as True."""
+    """Isna correctly marks NaN rows as True."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var result = df.isna()
@@ -32,7 +32,7 @@ fn test_df_isna_with_nulls() raises:
 
 
 fn test_df_isnull_alias() raises:
-    """isnull() is an alias for isna()."""
+    """Isnull is an alias for isna."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.0, None]}")))
     var r1 = df.isna()
@@ -48,7 +48,7 @@ fn test_df_isnull_alias() raises:
 # ------------------------------------------------------------------
 
 fn test_df_notna_with_nulls() raises:
-    """notna() returns True for non-null entries."""
+    """Notna returns True for non-null entries."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var result = df.notna()
@@ -59,7 +59,7 @@ fn test_df_notna_with_nulls() raises:
 
 
 fn test_df_notnull_alias() raises:
-    """notnull() is an alias for notna()."""
+    """Notnull is an alias for notna."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [None, 2.0]}")))
     var r1 = df.notna()
@@ -75,22 +75,30 @@ fn test_df_notnull_alias() raises:
 # ------------------------------------------------------------------
 
 fn test_df_fillna_float() raises:
-    """fillna(0) replaces NaN in a float column."""
+    """Fillna with 0.0 replaces NaN in a float column."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
-    var result = df.fillna(PythonObject(0))
+    var result = df.fillna(DFScalar(Float64(0.0)))
     assert_equal(result.shape()[0], 3)
     var col_a = result["a"]
     assert_equal(col_a._col._data[List[Float64]][1], Float64(0.0))
 
 
 fn test_df_fillna_no_nulls() raises:
-    """fillna on a DataFrame without nulls returns identical shape."""
+    """Fillna on a DataFrame without nulls returns identical shape."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
-    var result = df.fillna(PythonObject(99))
+    var result = df.fillna(DFScalar(Float64(99.0)))
     assert_equal(result.shape()[0], 3)
     assert_equal(result.shape()[1], 1)
+
+
+fn test_df_fillna_int() raises:
+    """Fillna with an integer value fills Int64 columns."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, None, 3]}")))
+    var result = df.fillna(DFScalar(Int64(0)))
+    assert_equal(result.shape()[0], 3)
 
 
 # ------------------------------------------------------------------
@@ -98,7 +106,7 @@ fn test_df_fillna_no_nulls() raises:
 # ------------------------------------------------------------------
 
 fn test_df_dropna_any() raises:
-    """dropna(how='any') removes rows that have at least one null."""
+    """Dropna with how=any removes rows that have at least one null."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var result = df.dropna()
@@ -106,22 +114,46 @@ fn test_df_dropna_any() raises:
 
 
 fn test_df_dropna_all() raises:
-    """dropna(how='all') keeps rows that have at least one non-null value."""
+    """Dropna with how=all keeps rows that have at least one non-null value."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0], 'b': [None, None, 6.0]}")))
     var result = df.dropna(how="all")
-    # Row 1: a=1.0, b=None  -> not ALL null  -> kept
-    # Row 2: a=None, b=None -> ALL null       -> dropped
-    # Row 3: a=3.0, b=6.0  -> not ALL null  -> kept
+    # Row 0: a=1.0, b=None  -> not ALL null -> kept
+    # Row 1: a=None, b=None -> ALL null      -> dropped
+    # Row 2: a=3.0, b=6.0  -> not ALL null -> kept
     assert_equal(result.shape()[0], 2)
 
 
 fn test_df_dropna_no_nulls() raises:
-    """dropna on a DataFrame without nulls returns all rows."""
+    """Dropna on a DataFrame without nulls returns all rows."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var result = df.dropna()
     assert_equal(result.shape()[0], 3)
+
+
+fn test_df_dropna_thresh() raises:
+    """Dropna with thresh keeps rows with enough non-null values."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0], 'b': [None, None, 6.0]}")))
+    # thresh=2: keep rows with at least 2 non-null values
+    var result = df.dropna(thresh=2)
+    # Row 0: a=1.0, b=None  -> 1 non-null -> dropped
+    # Row 1: a=None, b=None -> 0 non-null -> dropped
+    # Row 2: a=3.0, b=6.0  -> 2 non-null -> kept
+    assert_equal(result.shape()[0], 1)
+
+
+fn test_df_dropna_subset() raises:
+    """Dropna with subset checks only specified columns."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0], 'b': [None, None, 6.0]}")))
+    # Only check column 'a' for nulls
+    var cols = List[String]()
+    cols.append("a")
+    var result = df.dropna(subset=cols^)
+    # Row 1 has a=None -> dropped; rows 0 and 2 have a non-null -> kept
+    assert_equal(result.shape()[0], 2)
 
 
 # ------------------------------------------------------------------
@@ -129,7 +161,7 @@ fn test_df_dropna_no_nulls() raises:
 # ------------------------------------------------------------------
 
 fn test_df_ffill() raises:
-    """ffill() propagates the last non-null value forward."""
+    """Ffill propagates the last non-null value forward."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, None, 4.0]}")))
     var result = df.ffill()
@@ -140,7 +172,7 @@ fn test_df_ffill() raises:
 
 
 fn test_df_ffill_no_nulls() raises:
-    """ffill() on a DataFrame without nulls returns identical values."""
+    """Ffill on a DataFrame without nulls returns identical values."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var result = df.ffill()
@@ -152,7 +184,7 @@ fn test_df_ffill_no_nulls() raises:
 # ------------------------------------------------------------------
 
 fn test_df_bfill() raises:
-    """bfill() propagates the next non-null value backward."""
+    """Bfill propagates the next non-null value backward."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [None, None, 3.0, 4.0]}")))
     var result = df.bfill()
@@ -162,7 +194,7 @@ fn test_df_bfill() raises:
 
 
 fn test_df_bfill_no_nulls() raises:
-    """bfill() on a DataFrame without nulls returns identical values."""
+    """Bfill on a DataFrame without nulls returns identical values."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var result = df.bfill()
@@ -174,7 +206,7 @@ fn test_df_bfill_no_nulls() raises:
 # ------------------------------------------------------------------
 
 fn test_df_interpolate_linear() raises:
-    """interpolate(method='linear') fills interior nulls by linear interpolation."""
+    """Interpolate with method=linear fills interior nulls by linear interpolation."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [0.0, None, 4.0]}")))
     var result = df.interpolate()
@@ -183,7 +215,7 @@ fn test_df_interpolate_linear() raises:
 
 
 fn test_df_interpolate_no_nulls() raises:
-    """interpolate() on a DataFrame without nulls returns identical values."""
+    """Interpolate on a DataFrame without nulls returns identical values."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var result = df.interpolate()
@@ -191,7 +223,7 @@ fn test_df_interpolate_no_nulls() raises:
 
 
 fn test_df_interpolate_unsupported_method() raises:
-    """interpolate() raises for unsupported methods."""
+    """Interpolate raises for unsupported methods."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var raised = False
@@ -203,7 +235,7 @@ fn test_df_interpolate_unsupported_method() raises:
 
 
 # ------------------------------------------------------------------
-# Series fillna (previously tested as a stub)
+# Series fillna (kept from original test suite)
 # ------------------------------------------------------------------
 
 fn test_series_fillna_works() raises:
