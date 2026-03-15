@@ -421,7 +421,7 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", col_data^, dtype)
         return Series(result_col^)
 
-    fn describe(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
+    fn describe(self, include: Optional[List[String]] = None, exclude: Optional[List[String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
         return DataFrame()
 
@@ -472,23 +472,23 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i].cummax(skipna))
         return DataFrame(result_cols^)
 
-    fn agg(self, func: PythonObject, axis: Int = 0) raises -> Series:
+    fn agg(self, func: String, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
         return Series()
 
-    fn aggregate(self, func: PythonObject, axis: Int = 0) raises -> Series:
+    fn aggregate(self, func: String, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.aggregate")
         return Series()
 
-    fn apply(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
+    fn apply(self, func: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.apply")
         return DataFrame()
 
-    fn applymap(self, func: PythonObject) raises -> DataFrame:
+    fn applymap(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.applymap")
         return DataFrame()
 
-    fn transform(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
+    fn transform(self, func: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.transform")
         return DataFrame()
 
@@ -500,7 +500,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.query")
         return DataFrame()
 
-    fn pipe(self, func: PythonObject) raises -> DataFrame:
+    fn pipe(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
         return DataFrame()
 
@@ -509,46 +509,219 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn isna(self) raises -> DataFrame:
-        _not_implemented("DataFrame.isna")
-        return DataFrame()
+        """Return a boolean DataFrame that is True where values are null/NaN."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var bool_s = s.isna()
+            result_cols.append(bool_s._col.copy())
+        return DataFrame(result_cols^)
 
     fn isnull(self) raises -> DataFrame:
-        _not_implemented("DataFrame.isnull")
-        return DataFrame()
+        """Alias for isna()."""
+        return self.isna()
 
     fn notna(self) raises -> DataFrame:
-        _not_implemented("DataFrame.notna")
-        return DataFrame()
+        """Return a boolean DataFrame that is True where values are not null/NaN."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var bool_s = s.notna()
+            result_cols.append(bool_s._col.copy())
+        return DataFrame(result_cols^)
 
     fn notnull(self) raises -> DataFrame:
-        _not_implemented("DataFrame.notnull")
-        return DataFrame()
+        """Alias for notna()."""
+        return self.notna()
 
-    fn fillna(self, value: PythonObject, method: String = "", axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.fillna")
-        return DataFrame()
+    fn fillna(self, value: DFScalar, axis: Int = 0) raises -> DataFrame:
+        """Return a copy of the DataFrame with null/NaN values replaced by *value*.
 
-    fn dropna(self, axis: Int = 0, how: String = "any", thresh: Optional[PythonObject] = None, subset: Optional[PythonObject] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.dropna")
-        return DataFrame()
+        *axis* is accepted for API compatibility (only axis=0 is supported).
+        """
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.fillna(value)
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
+
+    fn dropna(
+        self,
+        axis: Int = 0,
+        how: String = "any",
+        thresh: Optional[Int] = None,
+        subset: Optional[List[String]] = None,
+    ) raises -> DataFrame:
+        """Remove rows (axis=0) or columns (axis=1) with null/NaN values.
+
+        *how*:    "any" drops a row/column if ANY value is null;
+                  "all" drops a row/column only if ALL values are null.
+        *thresh*: keep rows that have at least *thresh* non-null values
+                  (overrides *how*).
+        *subset*: column names to consider when checking for nulls (axis=0 only).
+        """
+        if axis == 1:
+            # Drop columns that contain nulls.
+            var result_cols = List[Column]()
+            for i in range(len(self._cols)):
+                var col = self._cols[i].copy()
+                var mask_len = len(col._null_mask)
+                var has_null = False
+                if mask_len > 0:
+                    if how == "all":
+                        # Drop only when every value is null.
+                        var all_null = True
+                        for j in range(mask_len):
+                            if not col._null_mask[j]:
+                                all_null = False
+                                break
+                        has_null = all_null
+                    else:
+                        for j in range(mask_len):
+                            if col._null_mask[j]:
+                                has_null = True
+                                break
+                if not has_null:
+                    result_cols.append(col^)
+            return DataFrame(result_cols^)
+
+        # axis == 0: drop rows.
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return DataFrame()
+        var nrows = len(self._cols[0])
+
+        # Determine which column indices to check (subset parameter).
+        var check_indices = List[Int]()
+        if subset:
+            var sub = subset.value().copy()
+            for si in range(len(sub)):
+                for ci in range(ncols):
+                    if self._cols[ci].name == sub[si]:
+                        check_indices.append(ci)
+                        break
+        else:
+            for ci in range(ncols):
+                check_indices.append(ci)
+
+        # Determine which rows to keep.
+        var keep_rows = List[Int]()
+        for r in range(nrows):
+            var null_count = 0
+            var check_count = len(check_indices)
+            for ki in range(check_count):
+                var ci = check_indices[ki]
+                var mask_len = len(self._cols[ci]._null_mask)
+                if mask_len > r and self._cols[ci]._null_mask[r]:
+                    null_count += 1
+
+            var keep: Bool
+            if thresh:
+                # Keep if non-null count >= thresh.
+                keep = (check_count - null_count) >= thresh.value()
+            elif how == "all":
+                # Drop only if every checked value is null.
+                keep = null_count < check_count
+            else:
+                # "any": drop if any checked value is null.
+                keep = null_count == 0
+            if keep:
+                keep_rows.append(r)
+
+        var result_cols = List[Column]()
+        for i in range(ncols):
+            result_cols.append(self._cols[i].take(keep_rows))
+        return DataFrame(result_cols^)
 
     fn ffill(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.ffill")
-        return DataFrame()
+        """Forward-fill null values column-wise (axis=0)."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.ffill()
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
 
     fn bfill(self, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.bfill")
-        return DataFrame()
+        """Backward-fill null values column-wise (axis=0)."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var s = Series(self._cols[i].copy())
+            var filled = s.bfill()
+            result_cols.append(filled._col.copy())
+        return DataFrame(result_cols^)
 
     fn interpolate(self, method: String = "linear", axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.interpolate")
-        return DataFrame()
+        """Fill null values using linear interpolation (Float64 columns only).
+
+        Non-numeric columns are returned unchanged.
+        Only method="linear" is supported natively.
+        """
+        if method != "linear":
+            raise Error(
+                "DataFrame.interpolate: method='" + method + "' is not supported; only 'linear' is supported"
+            )
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var col = self._cols[i].copy()
+            var has_mask = len(col._null_mask) > 0
+            if not has_mask or not col.dtype.is_float():
+                result_cols.append(col^)
+                continue
+            # Linear interpolation for Float64 columns.
+            var n = len(col)
+            ref d = col._data[List[Float64]]
+            var data = List[Float64]()
+            var new_mask = List[Bool]()
+            for j in range(n):
+                data.append(d[j])
+                new_mask.append(col._null_mask[j])
+            # Fill leading nulls with the first non-null value.
+            var first_valid = -1
+            for j in range(n):
+                if not new_mask[j]:
+                    first_valid = j
+                    break
+            if first_valid == -1:
+                # All null — leave unchanged.
+                result_cols.append(col^)
+                continue
+            for j in range(first_valid):
+                data[j] = data[first_valid]
+                new_mask[j] = False
+            # Fill trailing nulls with the last non-null value.
+            var last_valid = -1
+            for j in range(n):
+                if not new_mask[n - 1 - j]:
+                    last_valid = n - 1 - j
+                    break
+            for j in range(last_valid + 1, n):
+                data[j] = data[last_valid]
+                new_mask[j] = False
+            # Interpolate interior nulls between two known values.
+            var seg_start = -1
+            for j in range(n):
+                if not new_mask[j]:
+                    if seg_start >= 0:
+                        var v0 = data[seg_start]
+                        var v1 = data[j]
+                        var gap = j - seg_start
+                        for k in range(seg_start + 1, j):
+                            var t = Float64(k - seg_start) / Float64(gap)
+                            data[k] = v0 + t * (v1 - v0)
+                            new_mask[k] = False
+                    seg_start = j
+            var col_data = ColumnData(data^)
+            var new_col = Column(col.name, col_data^, col.dtype, col._index.copy())
+            result_cols.append(new_col^)
+        return DataFrame(result_cols^)
 
     # ------------------------------------------------------------------
     # Reshaping / sorting
     # ------------------------------------------------------------------
 
-    fn sort_values(self, by: PythonObject, ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
+    fn sort_values(self, by: List[String], ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
         _not_implemented("DataFrame.sort_values")
         return DataFrame()
 
@@ -560,31 +733,31 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.reset_index")
         return DataFrame()
 
-    fn set_index(self, keys: PythonObject, drop: Bool = True) raises -> DataFrame:
+    fn set_index(self, keys: List[String], drop: Bool = True) raises -> DataFrame:
         _not_implemented("DataFrame.set_index")
         return DataFrame()
 
-    fn rename(self, columns: Optional[PythonObject] = None, index: Optional[PythonObject] = None) raises -> DataFrame:
+    fn rename(self, columns: Optional[Dict[String, String]] = None, index: Optional[Dict[String, String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.rename")
         return DataFrame()
 
-    fn rename_axis(self, mapper: Optional[PythonObject] = None, axis: Int = 0) raises -> DataFrame:
+    fn rename_axis(self, mapper: Optional[String] = None, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.rename_axis")
         return DataFrame()
 
-    fn reindex(self, labels: Optional[PythonObject] = None, axis: Int = 0, fill_value: Optional[PythonObject] = None) raises -> DataFrame:
+    fn reindex(self, labels: Optional[List[String]] = None, axis: Int = 0, fill_value: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.reindex")
         return DataFrame()
 
-    fn drop(self, labels: Optional[PythonObject] = None, axis: Int = 0, columns: Optional[PythonObject] = None) raises -> DataFrame:
+    fn drop(self, labels: Optional[List[String]] = None, axis: Int = 0, columns: Optional[List[String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.drop")
         return DataFrame()
 
-    fn drop_duplicates(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> DataFrame:
+    fn drop_duplicates(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> DataFrame:
         _not_implemented("DataFrame.drop_duplicates")
         return DataFrame()
 
-    fn duplicated(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> Series:
+    fn duplicated(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> Series:
         _not_implemented("DataFrame.duplicated")
         return Series()
 
@@ -592,11 +765,11 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.pivot")
         return DataFrame()
 
-    fn pivot_table(self, values: Optional[PythonObject] = None, index: Optional[PythonObject] = None, columns: Optional[PythonObject] = None, aggfunc: String = "mean") raises -> DataFrame:
+    fn pivot_table(self, values: Optional[List[String]] = None, index: Optional[List[String]] = None, columns: Optional[List[String]] = None, aggfunc: String = "mean") raises -> DataFrame:
         _not_implemented("DataFrame.pivot_table")
         return DataFrame()
 
-    fn melt(self, id_vars: Optional[PythonObject] = None, value_vars: Optional[PythonObject] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
+    fn melt(self, id_vars: Optional[List[String]] = None, value_vars: Optional[List[String]] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
         _not_implemented("DataFrame.melt")
         return DataFrame()
 
@@ -624,7 +797,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.explode")
         return DataFrame()
 
-    fn clip(self, lower: Optional[PythonObject] = None, upper: Optional[PythonObject] = None) raises -> DataFrame:
+    fn clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> DataFrame:
         _not_implemented("DataFrame.clip")
         return DataFrame()
 
@@ -632,7 +805,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.round")
         return DataFrame()
 
-    fn astype(self, dtype: PythonObject) raises -> DataFrame:
+    fn astype(self, dtype: String) raises -> DataFrame:
         _not_implemented("DataFrame.astype")
         return DataFrame()
 
@@ -640,26 +813,26 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.copy")
         return DataFrame()
 
-    fn assign(self, **kwargs: PythonObject) raises -> DataFrame:
+    fn assign(self, cols: Dict[String, Series]) raises -> DataFrame:
         _not_implemented("DataFrame.assign")
         return DataFrame()
 
-    fn insert(inout self, loc: Int, column: String, value: PythonObject) raises:
+    fn insert(inout self, loc: Int, column: String, value: DFScalar) raises:
         _not_implemented("DataFrame.insert")
 
     fn pop(inout self, item: String) raises -> Series:
         _not_implemented("DataFrame.pop")
         return Series()
 
-    fn where(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
+    fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.where")
         return DataFrame()
 
-    fn mask(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
+    fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.mask")
         return DataFrame()
 
-    fn isin(self, values: PythonObject) raises -> DataFrame:
+    fn isin(self, values: Dict[String, List[DFScalar]]) raises -> DataFrame:
         _not_implemented("DataFrame.isin")
         return DataFrame()
 
@@ -678,12 +851,12 @@ struct DataFrame(Copyable, Movable):
         self,
         right: DataFrame,
         how: String = "inner",
-        on: Optional[PythonObject] = None,
-        left_on: Optional[PythonObject] = None,
-        right_on: Optional[PythonObject] = None,
+        on: Optional[List[String]] = None,
+        left_on: Optional[List[String]] = None,
+        right_on: Optional[List[String]] = None,
         left_index: Bool = False,
         right_index: Bool = False,
-        suffixes: Optional[PythonObject] = None,
+        suffixes: Optional[List[String]] = None,
     ) raises -> DataFrame:
         _not_implemented("DataFrame.merge")
         return DataFrame()
@@ -691,7 +864,7 @@ struct DataFrame(Copyable, Movable):
     fn join(
         self,
         other: DataFrame,
-        on: Optional[PythonObject] = None,
+        on: Optional[List[String]] = None,
         how: String = "left",
         lsuffix: String = "",
         rsuffix: String = "",
@@ -710,30 +883,30 @@ struct DataFrame(Copyable, Movable):
 
     fn groupby(
         self,
-        by: PythonObject,
+        by: List[String],
         axis: Int = 0,
         as_index: Bool = True,
         sort: Bool = True,
         dropna: Bool = True,
     ) raises -> DataFrameGroupBy:
         _not_implemented("DataFrame.groupby")
-        return DataFrameGroupBy(PythonObject(None))
+        return DataFrameGroupBy()
 
-    fn resample(self, rule: String, axis: Int = 0) raises -> PythonObject:
+    fn resample(self, rule: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.resample")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn rolling(self, window: Int, min_periods: Optional[PythonObject] = None) raises -> PythonObject:
+    fn rolling(self, window: Int, min_periods: Optional[Int] = None) raises -> DataFrame:
         _not_implemented("DataFrame.rolling")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn expanding(self, min_periods: Int = 1) raises -> PythonObject:
+    fn expanding(self, min_periods: Int = 1) raises -> DataFrame:
         _not_implemented("DataFrame.expanding")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn ewm(self, com: Optional[PythonObject] = None, span: Optional[PythonObject] = None) raises -> PythonObject:
+    fn ewm(self, com: Optional[Float64] = None, span: Optional[Float64] = None) raises -> DataFrame:
         _not_implemented("DataFrame.ewm")
-        return PythonObject(None)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # IO
@@ -794,17 +967,17 @@ struct DataFrame(Copyable, Movable):
     fn to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
         _not_implemented("DataFrame.to_excel")
 
-    fn to_dict(self, orient: String = "dict") raises -> PythonObject:
+    fn to_dict(self, orient: String = "dict") raises -> Dict[String, List[DFScalar]]:
         _not_implemented("DataFrame.to_dict")
-        return PythonObject(None)
+        return Dict[String, List[DFScalar]]()
 
-    fn to_records(self, index: Bool = True) raises -> PythonObject:
+    fn to_records(self, index: Bool = True) raises -> List[Dict[String, DFScalar]]:
         _not_implemented("DataFrame.to_records")
-        return PythonObject(None)
+        return List[Dict[String, DFScalar]]()
 
-    fn to_numpy(self) raises -> PythonObject:
+    fn to_numpy(self) raises -> List[List[Float64]]:
         _not_implemented("DataFrame.to_numpy")
-        return PythonObject(None)
+        return List[List[Float64]]()
 
     fn to_string(self) raises -> String:
         _not_implemented("DataFrame.to_string")
@@ -836,14 +1009,14 @@ struct DataFrame(Copyable, Movable):
                 return True
         return False
 
-    fn items(self) raises -> PythonObject:
+    fn items(self) raises -> List[Series]:
         _not_implemented("DataFrame.items")
-        return PythonObject(None)
+        return List[Series]()
 
-    fn iterrows(self) raises -> PythonObject:
+    fn iterrows(self) raises -> List[Series]:
         _not_implemented("DataFrame.iterrows")
-        return PythonObject(None)
+        return List[Series]()
 
-    fn itertuples(self, index: Bool = True, name: String = "Pandas") raises -> PythonObject:
+    fn itertuples(self, index: Bool = True, name: String = "Pandas") raises -> List[Series]:
         _not_implemented("DataFrame.itertuples")
-        return PythonObject(None)
+        return List[Series]()

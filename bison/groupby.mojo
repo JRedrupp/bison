@@ -1,145 +1,148 @@
-from std.python import PythonObject
 from ._errors import _not_implemented
 from .series import Series
 
 
 struct DataFrameGroupBy:
-    """GroupBy object returned by DataFrame.groupby()."""
+    """GroupBy object returned by DataFrame.groupby().
 
-    var _pd_gb: PythonObject   # backing pandas GroupBy — stub stage only
+    Stub-only type — all methods raise 'not implemented' until a native
+    implementation is added.  No backing state is held at this stage.
+    """
 
-    fn __init__(out self, pd_gb: PythonObject):
-        self._pd_gb = pd_gb
+    fn __init__(out self):
+        pass
 
-    fn agg(self, func: PythonObject) raises -> PythonObject:
+    fn agg(self, func: String) raises -> Series:
         _not_implemented("DataFrameGroupBy.agg")
-        return PythonObject(None)
+        return Series()
 
-    fn aggregate(self, func: PythonObject) raises -> PythonObject:
+    fn aggregate(self, func: String) raises -> Series:
         _not_implemented("DataFrameGroupBy.aggregate")
-        return PythonObject(None)
+        return Series()
 
-    fn transform(self, func: PythonObject) raises -> PythonObject:
+    fn transform(self, func: String) raises -> Series:
         _not_implemented("DataFrameGroupBy.transform")
-        return PythonObject(None)
+        return Series()
 
-    fn apply(self, func: PythonObject) raises -> PythonObject:
+    fn apply(self, func: String) raises -> Series:
         _not_implemented("DataFrameGroupBy.apply")
-        return PythonObject(None)
+        return Series()
 
-    fn sum(self) raises -> PythonObject:
+    fn sum(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.sum")
-        return PythonObject(None)
+        return Series()
 
-    fn mean(self) raises -> PythonObject:
+    fn mean(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.mean")
-        return PythonObject(None)
+        return Series()
 
-    fn min(self) raises -> PythonObject:
+    fn min(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.min")
-        return PythonObject(None)
+        return Series()
 
-    fn max(self) raises -> PythonObject:
+    fn max(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.max")
-        return PythonObject(None)
+        return Series()
 
-    fn count(self) raises -> PythonObject:
+    fn count(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.count")
-        return PythonObject(None)
+        return Series()
 
-    fn nunique(self) raises -> PythonObject:
+    fn nunique(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.nunique")
-        return PythonObject(None)
+        return Series()
 
-    fn first(self) raises -> PythonObject:
+    fn first(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.first")
-        return PythonObject(None)
+        return Series()
 
-    fn last(self) raises -> PythonObject:
+    fn last(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.last")
-        return PythonObject(None)
+        return Series()
 
-    fn size(self) raises -> PythonObject:
+    fn size(self) raises -> Series:
         _not_implemented("DataFrameGroupBy.size")
-        return PythonObject(None)
+        return Series()
 
-    fn std(self, ddof: Int = 1) raises -> PythonObject:
+    fn std(self, ddof: Int = 1) raises -> Series:
         _not_implemented("DataFrameGroupBy.std")
-        return PythonObject(None)
+        return Series()
 
-    fn var(self, ddof: Int = 1) raises -> PythonObject:
+    fn var(self, ddof: Int = 1) raises -> Series:
         _not_implemented("DataFrameGroupBy.var")
-        return PythonObject(None)
+        return Series()
 
-    fn filter(self, func: PythonObject) raises -> PythonObject:
+    fn filter(self, func: String) raises -> Series:
         _not_implemented("DataFrameGroupBy.filter")
-        return PythonObject(None)
+        return Series()
 
 
 struct SeriesGroupBy:
-    """GroupBy object returned by Series.groupby()."""
+    """GroupBy object returned by Series.groupby().
 
-    var _pd_gb: PythonObject
+    Stub-only type — all methods raise 'not implemented' until a native
+    implementation is added.  No backing state is held at this stage.
+    """
 
-    fn __init__(out self, pd_gb: PythonObject):
-        self._pd_gb = pd_gb
+    fn __init__(out self):
+        pass
 
-    fn agg(self, func: PythonObject) raises -> Series:
+    fn agg(self, func: String) raises -> Series:
         _not_implemented("SeriesGroupBy.agg")
-        return Series(PythonObject(None))
+        return Series()
 
-    fn aggregate(self, func: PythonObject) raises -> Series:
+    fn aggregate(self, func: String) raises -> Series:
         _not_implemented("SeriesGroupBy.aggregate")
-        return Series(PythonObject(None))
+        return Series()
 
-    fn transform(self, func: PythonObject) raises -> Series:
+    fn transform(self, func: String) raises -> Series:
         _not_implemented("SeriesGroupBy.transform")
-        return Series(PythonObject(None))
+        return Series()
 
-    fn apply(self, func: PythonObject) raises -> Series:
+    fn apply(self, func: String) raises -> Series:
         _not_implemented("SeriesGroupBy.apply")
-        return Series(PythonObject(None))
+        return Series()
 
     fn sum(self) raises -> Series:
         _not_implemented("SeriesGroupBy.sum")
-        return Series(PythonObject(None))
+        return Series()
 
     fn mean(self) raises -> Series:
         _not_implemented("SeriesGroupBy.mean")
-        return Series(PythonObject(None))
+        return Series()
 
     fn min(self) raises -> Series:
         _not_implemented("SeriesGroupBy.min")
-        return Series(PythonObject(None))
+        return Series()
 
     fn max(self) raises -> Series:
         _not_implemented("SeriesGroupBy.max")
-        return Series(PythonObject(None))
+        return Series()
 
     fn count(self) raises -> Series:
         _not_implemented("SeriesGroupBy.count")
-        return Series(PythonObject(None))
+        return Series()
 
     fn nunique(self) raises -> Series:
         _not_implemented("SeriesGroupBy.nunique")
-        return Series(PythonObject(None))
+        return Series()
 
     fn first(self) raises -> Series:
         _not_implemented("SeriesGroupBy.first")
-        return Series(PythonObject(None))
+        return Series()
 
     fn last(self) raises -> Series:
         _not_implemented("SeriesGroupBy.last")
-        return Series(PythonObject(None))
+        return Series()
 
     fn size(self) raises -> Series:
         _not_implemented("SeriesGroupBy.size")
-        return Series(PythonObject(None))
+        return Series()
 
     fn std(self, ddof: Int = 1) raises -> Series:
         _not_implemented("SeriesGroupBy.std")
-        return Series(PythonObject(None))
+        return Series()
 
     fn var(self, ddof: Int = 1) raises -> Series:
         _not_implemented("SeriesGroupBy.var")
-        return Series(PythonObject(None))
+        return Series()

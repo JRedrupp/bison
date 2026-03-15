@@ -1,5 +1,5 @@
 """Tests for reshaping operations."""
-from std.python import Python, PythonObject
+from std.python import Python
 from testing import assert_true, TestSuite
 from bison import DataFrame, Series, SeriesScalar
 
@@ -9,7 +9,9 @@ fn test_sort_values_stub() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var raised = False
     try:
-        _ = df.sort_values(PythonObject("a"))
+        var by = List[String]()
+        by.append("a")
+        _ = df.sort_values(by)
     except:
         raised = True
     assert_true(raised)

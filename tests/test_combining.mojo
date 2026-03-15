@@ -1,5 +1,5 @@
 """Tests that combining stubs raise 'not implemented'."""
-from std.python import Python, PythonObject
+from std.python import Python
 from testing import assert_true, TestSuite
 from bison import DataFrame
 
@@ -10,7 +10,9 @@ fn test_merge_stub() raises:
     var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'b': [30, 40]}")))
     var raised = False
     try:
-        _ = left.merge(right, on=PythonObject("key"))
+        var on = List[String]()
+        on.append("key")
+        _ = left.merge(right, on=on^)
     except:
         raised = True
     assert_true(raised)

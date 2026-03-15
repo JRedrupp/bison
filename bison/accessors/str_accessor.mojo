@@ -166,26 +166,28 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    fn split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> PythonObject:
+    fn split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> List[List[String]]:
         """Split strings around given separator/delimiter.
 
-        Returns a PythonObject (pandas Series of lists) to match the pandas API,
-        since the result is a ragged structure that cannot be represented as a
-        flat native Mojo List.
+        Returns a List[List[String]] where each inner list contains the split
+        parts. Null entries produce an empty inner list; callers can use the
+        Series null mask to distinguish empty-from-null vs. empty-from-split.
         """
-        var pd = Python.import_module("pandas")
-        var py_list = Python.evaluate("[]")
-        var py_none = Python.evaluate("None")
+        var result = List[List[String]]()
         for i in range(len(self._data)):
             if self._is_null(i):
-                _ = py_list.append(py_none)
+                result.append(List[String]())
             else:
-                var parts_raw = self._data[i].split(pat, n) if n != -1 else self._data[i].split(pat)
-                var py_parts = Python.evaluate("[]")
+                var parts_raw = (
+                    self._data[i].split(pat, n)
+                    if n != -1
+                    else self._data[i].split(pat)
+                )
+                var parts = List[String]()
                 for j in range(len(parts_raw)):
-                    _ = py_parts.append(String(parts_raw[j]))
-                _ = py_list.append(py_parts)
-        return pd.Series(py_list, name=self._name)
+                    parts.append(String(parts_raw[j]))
+                result.append(parts^)
+        return result^
 
     # ------------------------------------------------------------------
     # Numeric operations
