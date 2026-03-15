@@ -219,6 +219,768 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 # ------------------------------------------------------------------
+# Aggregation visitors (issue #81)
+# ------------------------------------------------------------------
+
+struct _SumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Accumulates element-wise sum into Float64, skipping masked nulls."""
+    var result: Float64
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.result = Float64(0)
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            self.result += Float64(data[i])
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            self.result += data[i]
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            if data[i]:
+                self.result += 1.0
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("sum: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("sum: non-numeric column type")
+
+
+struct _MinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Finds the minimum value as Float64, skipping masked nulls."""
+    var result: Float64
+    var found: Bool
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.result = Float64(0)
+        self.found = False
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(data[i])
+            if not self.found or v < self.result:
+                self.result = v
+                self.found = True
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = data[i]
+            if not self.found or v < self.result:
+                self.result = v
+                self.found = True
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            if not self.found or v < self.result:
+                self.result = v
+                self.found = True
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("min: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("min: non-numeric column type")
+
+
+struct _MaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Finds the maximum value as Float64, skipping masked nulls."""
+    var result: Float64
+    var found: Bool
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.result = Float64(0)
+        self.found = False
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(data[i])
+            if not self.found or v > self.result:
+                self.result = v
+                self.found = True
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = data[i]
+            if not self.found or v > self.result:
+                self.result = v
+                self.found = True
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            if not self.found or v > self.result:
+                self.result = v
+                self.found = True
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("max: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("max: non-numeric column type")
+
+
+struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Accumulates squared deviations from the mean for variance computation."""
+    var total: Float64
+    var mean: Float64
+    var null_mask: List[Bool]
+
+    fn __init__(out self, mean: Float64, null_mask: List[Bool]):
+        self.total = Float64(0)
+        self.mean = mean
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var diff = Float64(data[i]) - self.mean
+            self.total += diff * diff
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var diff = data[i] - self.mean
+            self.total += diff * diff
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            var diff = v - self.mean
+            self.total += diff * diff
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("var: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("var: non-numeric column type")
+
+
+struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Counts unique non-null values across all supported column types."""
+    var result: Int
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.result = 0
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen = Set[Int64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            seen.add(data[i])
+        self.result = len(seen)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen = Set[Float64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            seen.add(data[i])
+        self.result = len(seen)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen = Set[Bool]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            seen.add(data[i])
+        self.result = len(seen)
+
+    fn on_str(mut self, data: List[String]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen = Set[String]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            seen.add(data[i])
+        self.result = len(seen)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("nunique: unsupported column type")
+
+
+struct _QuantileCollectVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Collects non-null numeric values into a Float64 list for quantile computation."""
+    var vals: List[Float64]
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.vals = List[Float64]()
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            self.vals.append(Float64(data[i]))
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            self.vals.append(data[i])
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            self.vals.append(Float64(1.0) if data[i] else Float64(0.0))
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("quantile: non-numeric column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("quantile: non-numeric column type")
+
+
+# ------------------------------------------------------------------
+# Transformation visitors (issue #127)
+#
+# Each visitor accumulates col_data + result_mask + has_any_null.
+# The Column method calls self._build_result_col(...) on these fields,
+# so no visitor references Column directly (avoiding a forward reference).
+# When is_identity is True the method returns self.copy() instead.
+# ------------------------------------------------------------------
+
+struct _AbsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Element-wise absolute value; Bool arm is identity."""
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+    var is_identity: Bool
+    var dtype_name: String
+
+    fn __init__(out self, null_mask: List[Bool], dtype_name: String):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+        self.is_identity = False
+        self.dtype_name = dtype_name
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var result = List[Int64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i] if data[i] >= 0 else -data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i] if data[i] >= 0.0 else -data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        self.is_identity = True
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("abs: not supported for dtype " + self.dtype_name)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("abs: not supported for dtype " + self.dtype_name)
+
+
+struct _RoundVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Rounds Float64 values; Int64 and Bool arms are identity."""
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+    var decimals: Int
+    var is_identity: Bool
+    var dtype_name: String
+
+    fn __init__(out self, null_mask: List[Bool], decimals: Int, dtype_name: String):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+        self.decimals = decimals
+        self.is_identity = False
+        self.dtype_name = dtype_name
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        self.is_identity = True
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
+        var factor = Float64(1)
+        for _ in range(self.decimals):
+            factor *= 10.0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(round(data[i] * factor) / factor)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        self.is_identity = True
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("round: not supported for dtype " + self.dtype_name)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("round: not supported for dtype " + self.dtype_name)
+
+
+struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Clamps values to [lower, upper]; supports Int64 and Float64 only."""
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+    var lower: Float64
+    var upper: Float64
+    var dtype_name: String
+
+    fn __init__(out self, null_mask: List[Bool], lower: Float64, upper: Float64,
+                dtype_name: String):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+        self.lower = lower
+        self.upper = upper
+        self.dtype_name = dtype_name
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var result = List[Int64]()
+        var lo = Int64(self.lower)
+        var hi = Int64(self.upper)
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if v < lo:
+                    v = lo
+                elif v > hi:
+                    v = hi
+                result.append(v)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if v < self.lower:
+                    v = self.lower
+                elif v > self.upper:
+                    v = self.upper
+                result.append(v)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        raise Error("clip: not supported for dtype " + self.dtype_name)
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("clip: not supported for dtype " + self.dtype_name)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("clip: not supported for dtype " + self.dtype_name)
+
+
+struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Applies where/mask logic: keep or null each element based on a Bool condition.
+
+    keep_on_true=True  → where semantics: keep value when condition is True.
+    keep_on_true=False → mask semantics: null value when condition is True.
+    """
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var self_null_mask: List[Bool]
+    var cond_data: List[Bool]
+    var cond_null_mask: List[Bool]
+    var keep_on_true: Bool
+
+    fn __init__(out self, self_null_mask: List[Bool], cond_data: List[Bool],
+                cond_null_mask: List[Bool], keep_on_true: Bool):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.self_null_mask = self_null_mask.copy()
+        self.cond_data = cond_data.copy()
+        self.cond_null_mask = cond_null_mask.copy()
+        self.keep_on_true = keep_on_true
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_cond_mask = len(self.cond_null_mask) > 0
+        var result = List[Int64]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var keep = cond_true if self.keep_on_true else not cond_true
+            if self_null or not keep:
+                result.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_cond_mask = len(self.cond_null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var keep = cond_true if self.keep_on_true else not cond_true
+            if self_null or not keep:
+                result.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_cond_mask = len(self.cond_null_mask) > 0
+        var result = List[Bool]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var keep = cond_true if self.keep_on_true else not cond_true
+            if self_null or not keep:
+                result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]) raises:
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_cond_mask = len(self.cond_null_mask) > 0
+        var result = List[String]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var keep = cond_true if self.keep_on_true else not cond_true
+            if self_null or not keep:
+                result.append(String(""))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("where/mask: not supported for object dtype")
+
+
+struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Returns unique values in first-occurrence order; nulls appended once at end."""
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+
+    fn __init__(out self, null_mask: List[Bool]):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen_set = Set[Int64]()
+        var result = List[Int64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                self.has_any_null = True
+                continue
+            var v = data[i]
+            if v not in seen_set:
+                seen_set.add(v)
+                result.append(v)
+                self.result_mask.append(False)
+        if self.has_any_null:
+            result.append(Int64(0))
+            self.result_mask.append(True)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var seen_set = Set[Float64]()
+        var result = List[Float64]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                self.has_any_null = True
+                continue
+            var v = data[i]
+            if v not in seen_set:
+                seen_set.add(v)
+                result.append(v)
+                self.result_mask.append(False)
+        if self.has_any_null:
+            result.append(nan)
+            self.result_mask.append(True)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen_false = False
+        var seen_true = False
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                self.has_any_null = True
+            elif data[i]:
+                seen_true = True
+            else:
+                seen_false = True
+        var result = List[Bool]()
+        if seen_false:
+            result.append(False)
+            self.result_mask.append(False)
+        if seen_true:
+            result.append(True)
+            self.result_mask.append(False)
+        if self.has_any_null:
+            result.append(False)
+            self.result_mask.append(True)
+        self.col_data = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var seen_set = Set[String]()
+        var result = List[String]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                self.has_any_null = True
+                continue
+            var v = data[i]
+            if v not in seen_set:
+                seen_set.add(v)
+                result.append(v)
+                self.result_mask.append(False)
+        if self.has_any_null:
+            result.append(String(""))
+            self.result_mask.append(True)
+        self.col_data = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("unique: not supported for object dtype")
+
+
+struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Converts the active ColumnData arm to a target dtype."""
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+    var is_identity: Bool
+    var to_int: Bool
+    var to_float: Bool
+    var to_bool: Bool
+    var target_dtype_name: String
+    var source_dtype_name: String
+
+    fn __init__(out self, null_mask: List[Bool], to_int: Bool, to_float: Bool,
+                to_bool: Bool, target_dtype_name: String, source_dtype_name: String):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+        self.is_identity = False
+        self.to_int = to_int
+        self.to_float = to_float
+        self.to_bool = to_bool
+        self.target_dtype_name = target_dtype_name
+        self.source_dtype_name = source_dtype_name
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        if self.to_float:
+            var nan = Float64(0) / Float64(0)
+            var result = List[Float64]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(nan)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(Float64(data[i]))
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_bool:
+            var result = List[Bool]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(data[i] != 0)
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_int:
+            self.is_identity = True
+        else:
+            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Int64 source")
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        if self.to_int:
+            var result = List[Int64]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(Int64(0))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(Int64(data[i]))
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_bool:
+            var result = List[Bool]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(data[i] != 0.0)
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_float:
+            self.is_identity = True
+        else:
+            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Float64 source")
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        if self.to_int:
+            var result = List[Int64]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(Int64(0))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(Int64(1) if data[i] else Int64(0))
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_float:
+            var nan = Float64(0) / Float64(0)
+            var result = List[Float64]()
+            for i in range(len(data)):
+                if has_mask and self.null_mask[i]:
+                    result.append(nan)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(1.0 if data[i] else 0.0)
+                    self.result_mask.append(False)
+            self.col_data = ColumnData(result^)
+        elif self.to_bool:
+            self.is_identity = True
+        else:
+            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Bool source")
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("astype: not supported for source dtype '" + self.source_dtype_name + "'")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("astype: not supported for source dtype '" + self.source_dtype_name + "'")
+
+
+# ------------------------------------------------------------------
 # Compile-time operation selectors for Column._arith_op
 # ------------------------------------------------------------------
 comptime _ARITH_ADD      = 0
@@ -549,31 +1311,9 @@ struct Column(Copyable, Movable, Sized):
             # Return NaN (IEEE 754: 0/0 → quiet NaN).
             var zero = Float64(0)
             return zero / zero
-        var has_mask = len(self._null_mask) > 0
-        if self._data.isa[List[Int64]]():
-            var total = Float64(0)
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                total += Float64(self._data[List[Int64]][i])
-            return total
-        elif self._data.isa[List[Float64]]():
-            var total = Float64(0)
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                total += self._data[List[Float64]][i]
-            return total
-        elif self._data.isa[List[Bool]]():
-            var total = Float64(0)
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                if self._data[List[Bool]][i]:
-                    total += 1.0
-            return total
-        else:
-            raise Error("sum: non-numeric column type")
+        var visitor = _SumVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return visitor.result
 
     fn count(self) -> Int:
         """Return the number of non-null elements."""
@@ -607,39 +1347,12 @@ struct Column(Copyable, Movable, Sized):
         if not skipna and self.has_nulls():
             var zero = Float64(0)
             return zero / zero
-        var has_mask = len(self._null_mask) > 0
-        var found = False
-        var result = Float64(0)
-        if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = Float64(self._data[List[Int64]][i])
-                if not found or v < result:
-                    result = v
-                    found = True
-        elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = self._data[List[Float64]][i]
-                if not found or v < result:
-                    result = v
-                    found = True
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                if not found or v < result:
-                    result = v
-                    found = True
-        else:
-            raise Error("min: non-numeric column type")
-        if not found:
+        var visitor = _MinVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        if not visitor.found:
             var zero = Float64(0)
             return zero / zero
-        return result
+        return visitor.result
 
     fn max(self, skipna: Bool = True) raises -> Float64:
         """Return the maximum value as Float64.
@@ -650,39 +1363,12 @@ struct Column(Copyable, Movable, Sized):
         if not skipna and self.has_nulls():
             var zero = Float64(0)
             return zero / zero
-        var has_mask = len(self._null_mask) > 0
-        var found = False
-        var result = Float64(0)
-        if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = Float64(self._data[List[Int64]][i])
-                if not found or v > result:
-                    result = v
-                    found = True
-        elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = self._data[List[Float64]][i]
-                if not found or v > result:
-                    result = v
-                    found = True
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                if not found or v > result:
-                    result = v
-                    found = True
-        else:
-            raise Error("max: non-numeric column type")
-        if not found:
+        var visitor = _MaxVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        if not visitor.found:
             var zero = Float64(0)
             return zero / zero
-        return result
+        return visitor.result
 
     fn var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         """Return the variance with Bessel correction (ddof=1 by default).
@@ -695,30 +1381,9 @@ struct Column(Copyable, Movable, Sized):
             var zero = Float64(0)
             return zero / zero
         var m = self.mean(skipna)
-        var has_mask = len(self._null_mask) > 0
-        var total = Float64(0)
-        if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var diff = Float64(self._data[List[Int64]][i]) - m
-                total += diff * diff
-        elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var diff = self._data[List[Float64]][i] - m
-                total += diff * diff
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                var diff = v - m
-                total += diff * diff
-        else:
-            raise Error("var: non-numeric column type")
-        return total / Float64(n - ddof)
+        var visitor = _VarVisitor(m, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return visitor.total / Float64(n - ddof)
 
     fn std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         """Return the standard deviation (square root of variance)."""
@@ -729,37 +1394,9 @@ struct Column(Copyable, Movable, Sized):
 
         Raises for non-numeric and non-string column types.
         """
-        var has_mask = len(self._null_mask) > 0
-        if self._data.isa[List[Int64]]():
-            var seen = Set[Int64]()
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                seen.add(self._data[List[Int64]][i])
-            return len(seen)
-        elif self._data.isa[List[Float64]]():
-            var seen = Set[Float64]()
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                seen.add(self._data[List[Float64]][i])
-            return len(seen)
-        elif self._data.isa[List[Bool]]():
-            var seen = Set[Bool]()
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                seen.add(self._data[List[Bool]][i])
-            return len(seen)
-        elif self._data.isa[List[String]]():
-            var seen = Set[String]()
-            for i in range(len(self._data[List[String]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                seen.add(self._data[List[String]][i])
-            return len(seen)
-        else:
-            raise Error("nunique: unsupported column type")
+        var visitor = _NuniqueVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return visitor.result
 
     fn quantile(self, q: Float64 = 0.5) raises -> Float64:
         """Return the q-th quantile using linear interpolation.
@@ -767,25 +1404,9 @@ struct Column(Copyable, Movable, Sized):
         Always skips null elements (matches pandas default behaviour).
         Raises for non-numeric column types.
         """
-        var vals = List[Float64]()
-        var has_mask = len(self._null_mask) > 0
-        if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                vals.append(Float64(self._data[List[Int64]][i]))
-        elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                vals.append(self._data[List[Float64]][i])
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                vals.append(Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0))
-        else:
-            raise Error("quantile: non-numeric column type")
+        var visitor = _QuantileCollectVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        var vals = visitor.vals.copy()
         if len(vals) == 0:
             var zero = Float64(0)
             return zero / zero
@@ -1148,38 +1769,11 @@ struct Column(Copyable, Movable, Sized):
         Int64 and Float64 arms are supported; Bool is identity.
         Nulls propagate. Raises for String/Object columns.
         """
-        var has_mask = len(self._null_mask) > 0
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            var result = List[Int64]()
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    result.append(Int64(0))
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i] if d[i] >= 0 else -d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            var result = List[Float64]()
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    result.append(nan)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i] if d[i] >= 0.0 else -d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Bool]]():
+        var visitor = _AbsVisitor(self._null_mask, self.dtype.name)
+        visit_col_data_raises(visitor, self._data)
+        if visitor.is_identity:
             return self.copy()
-        else:
-            raise Error("abs: not supported for dtype " + String(self.dtype.name))
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _round(self, decimals: Int = 0) raises -> Column:
         """Round Float64 values to ``decimals`` decimal places.
@@ -1191,29 +1785,11 @@ struct Column(Copyable, Movable, Sized):
         """
         if decimals < 0:
             raise Error("round: negative decimals not supported")
-        var has_mask = len(self._null_mask) > 0
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        if self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            var result = List[Float64]()
-            var factor = Float64(1)
-            for _ in range(decimals):
-                factor *= 10.0
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    result.append(nan)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(round(d[i] * factor) / factor)
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Int64]]() or self._data.isa[List[Bool]]():
+        var visitor = _RoundVisitor(self._null_mask, decimals, self.dtype.name)
+        visit_col_data_raises(visitor, self._data)
+        if visitor.is_identity:
             return self.copy()
-        else:
-            raise Error("round: not supported for dtype " + String(self.dtype.name))
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _clip(self, lower: Float64, upper: Float64) raises -> Column:
         """Clamp values to [``lower``, ``upper``].
@@ -1221,48 +1797,9 @@ struct Column(Copyable, Movable, Sized):
         Supports Int64 and Float64 arms. Nulls propagate.
         Raises for String/Object columns.
         """
-        var has_mask = len(self._null_mask) > 0
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            var result = List[Int64]()
-            var lo = Int64(lower)
-            var hi = Int64(upper)
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    result.append(Int64(0))
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    var v = d[i]
-                    if v < lo:
-                        v = lo
-                    elif v > hi:
-                        v = hi
-                    result.append(v)
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            var result = List[Float64]()
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    result.append(nan)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    var v = d[i]
-                    if v < lower:
-                        v = lower
-                    elif v > upper:
-                        v = upper
-                    result.append(v)
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        else:
-            raise Error("clip: not supported for dtype " + String(self.dtype.name))
+        var visitor = _ClipVisitor(self._null_mask, lower, upper, self.dtype.name)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _apply[F: FloatTransformFn](self) raises -> Column:
         """Apply a compile-time function element-wise over Float64 values.
@@ -1433,94 +1970,12 @@ struct Column(Copyable, Movable, Sized):
                 + String(len(cond))
                 + ")"
             )
-        ref cd = cond._data[List[Bool]]
-        var has_cond_mask = len(cond._null_mask) > 0
-        var has_self_mask = len(self._null_mask) > 0
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            var result = List[Int64]()
-            for i in range(len(d)):
-                var self_null = has_self_mask and self._null_mask[i]
-                var cond_true = (not has_cond_mask or not cond._null_mask[i]) and cd[i]
-                var keep: Bool
-                @parameter
-                if mode == 1:
-                    keep = cond_true
-                else:
-                    keep = not cond_true
-                if self_null or not keep:
-                    result.append(Int64(0))
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            var result = List[Float64]()
-            for i in range(len(d)):
-                var self_null = has_self_mask and self._null_mask[i]
-                var cond_true = (not has_cond_mask or not cond._null_mask[i]) and cd[i]
-                var keep: Bool
-                @parameter
-                if mode == 1:
-                    keep = cond_true
-                else:
-                    keep = not cond_true
-                if self_null or not keep:
-                    result.append(nan)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Bool]]():
-            ref d = self._data[List[Bool]]
-            var result = List[Bool]()
-            for i in range(len(d)):
-                var self_null = has_self_mask and self._null_mask[i]
-                var cond_true = (not has_cond_mask or not cond._null_mask[i]) and cd[i]
-                var keep: Bool
-                @parameter
-                if mode == 1:
-                    keep = cond_true
-                else:
-                    keep = not cond_true
-                if self_null or not keep:
-                    result.append(False)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[String]]():
-            ref d = self._data[List[String]]
-            var result = List[String]()
-            for i in range(len(d)):
-                var self_null = has_self_mask and self._null_mask[i]
-                var cond_true = (not has_cond_mask or not cond._null_mask[i]) and cd[i]
-                var keep: Bool
-                @parameter
-                if mode == 1:
-                    keep = cond_true
-                else:
-                    keep = not cond_true
-                if self_null or not keep:
-                    result.append(String(""))
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    result.append(d[i])
-                    result_mask.append(False)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        else:
-            raise Error("where/mask: not supported for object dtype")
+        var keep_on_true = (mode == 1)
+        var visitor = _WhereMaskVisitor(
+            self._null_mask, cond._data[List[Bool]].copy(), cond._null_mask, keep_on_true
+        )
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _where(self, cond: Column) raises -> Column:
         """Keep value where ``cond`` is True; null otherwise."""
@@ -1537,91 +1992,9 @@ struct Column(Copyable, Movable, Sized):
         membership checks, giving O(n) overall complexity.
         Raises for Object dtype.
         """
-        var has_mask = len(self._null_mask) > 0
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            var seen_set = Set[Int64]()
-            var result = List[Int64]()
-            var result_mask = List[Bool]()
-            var has_any_null = False
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    has_any_null = True
-                    continue
-                var v = d[i]
-                if v not in seen_set:
-                    seen_set.add(v)
-                    result.append(v)
-                    result_mask.append(False)
-            if has_any_null:
-                result.append(Int64(0))
-                result_mask.append(True)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            var seen_set = Set[Float64]()
-            var result = List[Float64]()
-            var result_mask = List[Bool]()
-            var has_any_null = False
-            var nan = Float64(0) / Float64(0)
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    has_any_null = True
-                    continue
-                var v = d[i]
-                if v not in seen_set:
-                    seen_set.add(v)
-                    result.append(v)
-                    result_mask.append(False)
-            if has_any_null:
-                result.append(nan)
-                result_mask.append(True)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[Bool]]():
-            ref d = self._data[List[Bool]]
-            var seen_false = False
-            var seen_true = False
-            var has_any_null = False
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    has_any_null = True
-                elif d[i]:
-                    seen_true = True
-                else:
-                    seen_false = True
-            var result = List[Bool]()
-            var result_mask = List[Bool]()
-            if seen_false:
-                result.append(False)
-                result_mask.append(False)
-            if seen_true:
-                result.append(True)
-                result_mask.append(False)
-            if has_any_null:
-                result.append(False)
-                result_mask.append(True)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        elif self._data.isa[List[String]]():
-            ref d = self._data[List[String]]
-            var seen_set = Set[String]()
-            var result = List[String]()
-            var result_mask = List[Bool]()
-            var has_any_null = False
-            for i in range(len(d)):
-                if has_mask and self._null_mask[i]:
-                    has_any_null = True
-                    continue
-                var v = d[i]
-                if v not in seen_set:
-                    seen_set.add(v)
-                    result.append(v)
-                    result_mask.append(False)
-            if has_any_null:
-                result.append(String(""))
-                result_mask.append(True)
-            return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-        else:
-            raise Error("unique: not supported for object dtype")
+        var visitor = _UniqueVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _astype(self, target_dtype: BisonDtype) raises -> Column:
         """Convert Column to a different dtype.
@@ -1633,100 +2006,18 @@ struct Column(Copyable, Movable, Sized):
         The null mask is propagated via _build_result_col (same as other kernels).
         Raises for unsupported source/target dtype combinations.
         """
-        var has_mask = len(self._null_mask) > 0
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var nan = Float64(0) / Float64(0)
-        var to_int = target_dtype.is_integer()
-        var to_float = target_dtype.is_float()
-        var to_bool = target_dtype == bool_
-
-        if self._data.isa[List[Int64]]():
-            ref d = self._data[List[Int64]]
-            if to_float:
-                var result = List[Float64]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(nan)
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(Float64(d[i]))
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_bool:
-                var result = List[Bool]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(False)
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(d[i] != 0)
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_int:
-                return self.copy()
-            else:
-                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Int64 source")
-        elif self._data.isa[List[Float64]]():
-            ref d = self._data[List[Float64]]
-            if to_int:
-                var result = List[Int64]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(Int64(0))
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(Int64(d[i]))
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_bool:
-                var result = List[Bool]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(False)
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(d[i] != 0.0)
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_float:
-                return self.copy()
-            else:
-                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Float64 source")
-        elif self._data.isa[List[Bool]]():
-            ref d = self._data[List[Bool]]
-            if to_int:
-                var result = List[Int64]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(Int64(0))
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(Int64(1) if d[i] else Int64(0))
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_float:
-                var result = List[Float64]()
-                for i in range(len(d)):
-                    if has_mask and self._null_mask[i]:
-                        result.append(nan)
-                        result_mask.append(True)
-                        has_any_null = True
-                    else:
-                        result.append(1.0 if d[i] else 0.0)
-                        result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
-            elif to_bool:
-                return self.copy()
-            else:
-                raise Error("astype: unsupported target dtype '" + target_dtype.name + "' for Bool source")
-        else:
-            raise Error("astype: not supported for source dtype '" + String(self.dtype.name) + "'")
+        var visitor = _AstypeVisitor(
+            self._null_mask,
+            target_dtype.is_integer(),
+            target_dtype.is_float(),
+            target_dtype == bool_,
+            target_dtype.name,
+            self.dtype.name,
+        )
+        visit_col_data_raises(visitor, self._data)
+        if visitor.is_identity:
+            return self.copy()
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _reset_index(self, drop: Bool = False) raises -> Column:
         """Return a copy of the Column with its index cleared.
