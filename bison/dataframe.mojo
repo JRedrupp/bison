@@ -421,7 +421,7 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", col_data^, dtype)
         return Series(result_col^)
 
-    fn describe(self, include: Optional[PythonObject] = None, exclude: Optional[PythonObject] = None) raises -> DataFrame:
+    fn describe(self, include: Optional[List[String]] = None, exclude: Optional[List[String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
         return DataFrame()
 
@@ -472,23 +472,23 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i].cummax(skipna))
         return DataFrame(result_cols^)
 
-    fn agg(self, func: PythonObject, axis: Int = 0) raises -> Series:
+    fn agg(self, func: String, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
         return Series()
 
-    fn aggregate(self, func: PythonObject, axis: Int = 0) raises -> Series:
+    fn aggregate(self, func: String, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.aggregate")
         return Series()
 
-    fn apply(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
+    fn apply(self, func: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.apply")
         return DataFrame()
 
-    fn applymap(self, func: PythonObject) raises -> DataFrame:
+    fn applymap(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.applymap")
         return DataFrame()
 
-    fn transform(self, func: PythonObject, axis: Int = 0) raises -> DataFrame:
+    fn transform(self, func: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.transform")
         return DataFrame()
 
@@ -500,7 +500,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.query")
         return DataFrame()
 
-    fn pipe(self, func: PythonObject) raises -> DataFrame:
+    fn pipe(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
         return DataFrame()
 
@@ -721,7 +721,7 @@ struct DataFrame(Copyable, Movable):
     # Reshaping / sorting
     # ------------------------------------------------------------------
 
-    fn sort_values(self, by: PythonObject, ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
+    fn sort_values(self, by: List[String], ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
         _not_implemented("DataFrame.sort_values")
         return DataFrame()
 
@@ -733,31 +733,31 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.reset_index")
         return DataFrame()
 
-    fn set_index(self, keys: PythonObject, drop: Bool = True) raises -> DataFrame:
+    fn set_index(self, keys: List[String], drop: Bool = True) raises -> DataFrame:
         _not_implemented("DataFrame.set_index")
         return DataFrame()
 
-    fn rename(self, columns: Optional[PythonObject] = None, index: Optional[PythonObject] = None) raises -> DataFrame:
+    fn rename(self, columns: Optional[Dict[String, String]] = None, index: Optional[Dict[String, String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.rename")
         return DataFrame()
 
-    fn rename_axis(self, mapper: Optional[PythonObject] = None, axis: Int = 0) raises -> DataFrame:
+    fn rename_axis(self, mapper: Optional[String] = None, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.rename_axis")
         return DataFrame()
 
-    fn reindex(self, labels: Optional[PythonObject] = None, axis: Int = 0, fill_value: Optional[PythonObject] = None) raises -> DataFrame:
+    fn reindex(self, labels: Optional[List[String]] = None, axis: Int = 0, fill_value: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.reindex")
         return DataFrame()
 
-    fn drop(self, labels: Optional[PythonObject] = None, axis: Int = 0, columns: Optional[PythonObject] = None) raises -> DataFrame:
+    fn drop(self, labels: Optional[List[String]] = None, axis: Int = 0, columns: Optional[List[String]] = None) raises -> DataFrame:
         _not_implemented("DataFrame.drop")
         return DataFrame()
 
-    fn drop_duplicates(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> DataFrame:
+    fn drop_duplicates(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> DataFrame:
         _not_implemented("DataFrame.drop_duplicates")
         return DataFrame()
 
-    fn duplicated(self, subset: Optional[PythonObject] = None, keep: String = "first") raises -> Series:
+    fn duplicated(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> Series:
         _not_implemented("DataFrame.duplicated")
         return Series()
 
@@ -765,11 +765,11 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.pivot")
         return DataFrame()
 
-    fn pivot_table(self, values: Optional[PythonObject] = None, index: Optional[PythonObject] = None, columns: Optional[PythonObject] = None, aggfunc: String = "mean") raises -> DataFrame:
+    fn pivot_table(self, values: Optional[List[String]] = None, index: Optional[List[String]] = None, columns: Optional[List[String]] = None, aggfunc: String = "mean") raises -> DataFrame:
         _not_implemented("DataFrame.pivot_table")
         return DataFrame()
 
-    fn melt(self, id_vars: Optional[PythonObject] = None, value_vars: Optional[PythonObject] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
+    fn melt(self, id_vars: Optional[List[String]] = None, value_vars: Optional[List[String]] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
         _not_implemented("DataFrame.melt")
         return DataFrame()
 
@@ -797,7 +797,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.explode")
         return DataFrame()
 
-    fn clip(self, lower: Optional[PythonObject] = None, upper: Optional[PythonObject] = None) raises -> DataFrame:
+    fn clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> DataFrame:
         _not_implemented("DataFrame.clip")
         return DataFrame()
 
@@ -805,7 +805,7 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.round")
         return DataFrame()
 
-    fn astype(self, dtype: PythonObject) raises -> DataFrame:
+    fn astype(self, dtype: String) raises -> DataFrame:
         _not_implemented("DataFrame.astype")
         return DataFrame()
 
@@ -813,26 +813,26 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.copy")
         return DataFrame()
 
-    fn assign(self, **kwargs: PythonObject) raises -> DataFrame:
+    fn assign(self, cols: Dict[String, Series]) raises -> DataFrame:
         _not_implemented("DataFrame.assign")
         return DataFrame()
 
-    fn insert(inout self, loc: Int, column: String, value: PythonObject) raises:
+    fn insert(inout self, loc: Int, column: String, value: DFScalar) raises:
         _not_implemented("DataFrame.insert")
 
     fn pop(inout self, item: String) raises -> Series:
         _not_implemented("DataFrame.pop")
         return Series()
 
-    fn where(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
+    fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.where")
         return DataFrame()
 
-    fn mask(self, cond: PythonObject, other: Optional[PythonObject] = None) raises -> DataFrame:
+    fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
         _not_implemented("DataFrame.mask")
         return DataFrame()
 
-    fn isin(self, values: PythonObject) raises -> DataFrame:
+    fn isin(self, values: Dict[String, List[DFScalar]]) raises -> DataFrame:
         _not_implemented("DataFrame.isin")
         return DataFrame()
 
@@ -851,12 +851,12 @@ struct DataFrame(Copyable, Movable):
         self,
         right: DataFrame,
         how: String = "inner",
-        on: Optional[PythonObject] = None,
-        left_on: Optional[PythonObject] = None,
-        right_on: Optional[PythonObject] = None,
+        on: Optional[List[String]] = None,
+        left_on: Optional[List[String]] = None,
+        right_on: Optional[List[String]] = None,
         left_index: Bool = False,
         right_index: Bool = False,
-        suffixes: Optional[PythonObject] = None,
+        suffixes: Optional[List[String]] = None,
     ) raises -> DataFrame:
         _not_implemented("DataFrame.merge")
         return DataFrame()
@@ -864,7 +864,7 @@ struct DataFrame(Copyable, Movable):
     fn join(
         self,
         other: DataFrame,
-        on: Optional[PythonObject] = None,
+        on: Optional[List[String]] = None,
         how: String = "left",
         lsuffix: String = "",
         rsuffix: String = "",
@@ -883,30 +883,30 @@ struct DataFrame(Copyable, Movable):
 
     fn groupby(
         self,
-        by: PythonObject,
+        by: List[String],
         axis: Int = 0,
         as_index: Bool = True,
         sort: Bool = True,
         dropna: Bool = True,
     ) raises -> DataFrameGroupBy:
         _not_implemented("DataFrame.groupby")
-        return DataFrameGroupBy(PythonObject(None))
+        return DataFrameGroupBy()
 
-    fn resample(self, rule: String, axis: Int = 0) raises -> PythonObject:
+    fn resample(self, rule: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.resample")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn rolling(self, window: Int, min_periods: Optional[PythonObject] = None) raises -> PythonObject:
+    fn rolling(self, window: Int, min_periods: Optional[Int] = None) raises -> DataFrame:
         _not_implemented("DataFrame.rolling")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn expanding(self, min_periods: Int = 1) raises -> PythonObject:
+    fn expanding(self, min_periods: Int = 1) raises -> DataFrame:
         _not_implemented("DataFrame.expanding")
-        return PythonObject(None)
+        return DataFrame()
 
-    fn ewm(self, com: Optional[PythonObject] = None, span: Optional[PythonObject] = None) raises -> PythonObject:
+    fn ewm(self, com: Optional[Float64] = None, span: Optional[Float64] = None) raises -> DataFrame:
         _not_implemented("DataFrame.ewm")
-        return PythonObject(None)
+        return DataFrame()
 
     # ------------------------------------------------------------------
     # IO
@@ -967,17 +967,17 @@ struct DataFrame(Copyable, Movable):
     fn to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
         _not_implemented("DataFrame.to_excel")
 
-    fn to_dict(self, orient: String = "dict") raises -> PythonObject:
+    fn to_dict(self, orient: String = "dict") raises -> Dict[String, List[DFScalar]]:
         _not_implemented("DataFrame.to_dict")
-        return PythonObject(None)
+        return Dict[String, List[DFScalar]]()
 
-    fn to_records(self, index: Bool = True) raises -> PythonObject:
+    fn to_records(self, index: Bool = True) raises -> List[Dict[String, DFScalar]]:
         _not_implemented("DataFrame.to_records")
-        return PythonObject(None)
+        return List[Dict[String, DFScalar]]()
 
-    fn to_numpy(self) raises -> PythonObject:
+    fn to_numpy(self) raises -> List[List[Float64]]:
         _not_implemented("DataFrame.to_numpy")
-        return PythonObject(None)
+        return List[List[Float64]]()
 
     fn to_string(self) raises -> String:
         _not_implemented("DataFrame.to_string")
@@ -1009,14 +1009,14 @@ struct DataFrame(Copyable, Movable):
                 return True
         return False
 
-    fn items(self) raises -> PythonObject:
+    fn items(self) raises -> List[Series]:
         _not_implemented("DataFrame.items")
-        return PythonObject(None)
+        return List[Series]()
 
-    fn iterrows(self) raises -> PythonObject:
+    fn iterrows(self) raises -> List[Series]:
         _not_implemented("DataFrame.iterrows")
-        return PythonObject(None)
+        return List[Series]()
 
-    fn itertuples(self, index: Bool = True, name: String = "Pandas") raises -> PythonObject:
+    fn itertuples(self, index: Bool = True, name: String = "Pandas") raises -> List[Series]:
         _not_implemented("DataFrame.itertuples")
-        return PythonObject(None)
+        return List[Series]()

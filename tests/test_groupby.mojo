@@ -1,7 +1,7 @@
 """Tests that groupby stubs raise 'not implemented'."""
-from std.python import Python, PythonObject
+from std.python import Python
 from testing import assert_true, TestSuite
-from bison import DataFrame
+from bison import DataFrame, DataFrameGroupBy
 
 
 fn test_groupby_stub() raises:
@@ -9,7 +9,9 @@ fn test_groupby_stub() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'grp': ['a', 'a', 'b'], 'val': [1, 2, 3]}")))
     var raised = False
     try:
-        _ = df.groupby(PythonObject("grp"))
+        var by = List[String]()
+        by.append("grp")
+        _ = df.groupby(by^)
     except:
         raised = True
     assert_true(raised)
@@ -17,10 +19,7 @@ fn test_groupby_stub() raises:
 
 fn test_groupby_sum_stub() raises:
     """DataFrameGroupBy.sum is also a stub."""
-    from bison import DataFrameGroupBy
-    var pd = Python.import_module("pandas")
-    var pd_gb = pd.DataFrame(Python.evaluate("{'a': [1]}")).groupby("a")
-    var gb = DataFrameGroupBy(pd_gb)
+    var gb = DataFrameGroupBy()
     var raised = False
     try:
         _ = gb.sum()

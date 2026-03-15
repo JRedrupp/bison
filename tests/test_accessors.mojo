@@ -1,5 +1,5 @@
 """Tests for .str string accessor methods and .dt accessor stubs."""
-from std.python import Python, PythonObject
+from std.python import Python
 from testing import assert_true, assert_false, assert_equal, TestSuite
 from bison import Series
 
@@ -175,9 +175,9 @@ fn test_str_split() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['a,b,c', 'x,y']"), dtype="string"))
     var result = s.str().split(",")
-    # result is a PythonObject (pandas Series of lists)
-    assert_true(Bool(result[0].__len__().__eq__(3)))
-    assert_true(Bool(result[1].__len__().__eq__(2)))
+    # result is a List[List[String]]
+    assert_equal(len(result[0]), 3)
+    assert_equal(len(result[1]), 2)
 
 
 fn test_dt_year_stub() raises:

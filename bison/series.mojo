@@ -1,5 +1,5 @@
 from std.python import Python, PythonObject
-from std.collections import Optional
+from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
 from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
@@ -1113,21 +1113,21 @@ struct Series(Copyable, Movable):
     # Interop
     # ------------------------------------------------------------------
 
-    fn to_list(self) raises -> PythonObject:
+    fn to_list(self) raises -> List[DFScalar]:
         _not_implemented("Series.to_list")
-        return PythonObject(None)
+        return List[DFScalar]()
 
-    fn to_numpy(self) raises -> PythonObject:
+    fn to_numpy(self) raises -> List[Float64]:
         _not_implemented("Series.to_numpy")
-        return PythonObject(None)
+        return List[Float64]()
 
-    fn to_frame(self, name: String = "") raises -> PythonObject:
+    fn to_frame(self, name: String = "") raises -> Series:
         _not_implemented("Series.to_frame")
-        return PythonObject(None)
+        return Series()
 
-    fn to_dict(self) raises -> PythonObject:
+    fn to_dict(self) raises -> Dict[String, DFScalar]:
         _not_implemented("Series.to_dict")
-        return PythonObject(None)
+        return Dict[String, DFScalar]()
 
     fn to_csv(self, path: String = "") raises -> String:
         _not_implemented("Series.to_csv")
