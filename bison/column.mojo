@@ -981,6 +981,191 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 # ------------------------------------------------------------------
+# Row-selection visitors (issue #161)
+# ------------------------------------------------------------------
+
+struct _SliceVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Extracts the subarray [start, end) from the active ColumnData arm."""
+    var start: Int
+    var end: Int
+    var result: ColumnData
+
+    fn __init__(out self, start: Int, end: Int):
+        self.start = start
+        self.end = end
+        self.result = ColumnData(List[PythonObject]())
+
+    fn on_int64(mut self, data: List[Int64]):
+        var result = List[Int64]()
+        for i in range(self.start, self.end):
+            result.append(data[i])
+        self.result = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]):
+        var result = List[Float64]()
+        for i in range(self.start, self.end):
+            result.append(data[i])
+        self.result = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]):
+        var result = List[Bool]()
+        for i in range(self.start, self.end):
+            result.append(data[i])
+        self.result = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]):
+        var result = List[String]()
+        for i in range(self.start, self.end):
+            result.append(data[i])
+        self.result = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]):
+        var result = List[PythonObject]()
+        for i in range(self.start, self.end):
+            result.append(data[i])
+        self.result = ColumnData(result^)
+
+
+struct _TakeVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Selects rows by arbitrary *indices* from the active ColumnData arm."""
+    var indices: List[Int]
+    var result: ColumnData
+
+    fn __init__(out self, indices: List[Int]):
+        self.indices = indices.copy()
+        self.result = ColumnData(List[PythonObject]())
+
+    fn on_int64(mut self, data: List[Int64]):
+        var result = List[Int64]()
+        for k in range(len(self.indices)):
+            result.append(data[self.indices[k]])
+        self.result = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]):
+        var result = List[Float64]()
+        for k in range(len(self.indices)):
+            result.append(data[self.indices[k]])
+        self.result = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]):
+        var result = List[Bool]()
+        for k in range(len(self.indices)):
+            result.append(data[self.indices[k]])
+        self.result = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]):
+        var result = List[String]()
+        for k in range(len(self.indices)):
+            result.append(data[self.indices[k]])
+        self.result = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]):
+        var result = List[PythonObject]()
+        for k in range(len(self.indices)):
+            result.append(data[self.indices[k]])
+        self.result = ColumnData(result^)
+
+
+struct _ValueCountsCountVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Phase 1 of value_counts: counts unique values via stringified keys.
+
+    Builds ``unique_keys`` (insertion-order list of string representations)
+    and ``counts_dict`` (key → count).  Raises for String/PythonObject arms.
+    """
+    var has_mask: Bool
+    var null_mask: List[Bool]
+    var unique_keys: List[String]
+    var counts_dict: Dict[String, Int]
+
+    fn __init__(out self, has_mask: Bool, null_mask: List[Bool]):
+        self.has_mask = has_mask
+        self.null_mask = null_mask.copy()
+        self.unique_keys = List[String]()
+        self.counts_dict = Dict[String, Int]()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        for i in range(len(data)):
+            if self.has_mask and self.null_mask[i]:
+                continue
+            var k = String(data[i])
+            if k not in self.counts_dict:
+                self.unique_keys.append(k)
+            self.counts_dict[k] = self.counts_dict.get(k, 0) + 1
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        for i in range(len(data)):
+            if self.has_mask and self.null_mask[i]:
+                continue
+            var k = String(data[i])
+            if k not in self.counts_dict:
+                self.unique_keys.append(k)
+            self.counts_dict[k] = self.counts_dict.get(k, 0) + 1
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        for i in range(len(data)):
+            if self.has_mask and self.null_mask[i]:
+                continue
+            var k = String(data[i])
+            if k not in self.counts_dict:
+                self.unique_keys.append(k)
+            self.counts_dict[k] = self.counts_dict.get(k, 0) + 1
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("value_counts: unsupported column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("value_counts: unsupported column type")
+
+
+struct _ValueCountsIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Phase 2 of value_counts: builds the typed Python index.
+
+    Given ``sorted_order``, ``unique_keys``, and ``count_vals`` from phase 1,
+    converts string keys back to typed ``PythonObject`` values and accumulates
+    ``result_counts``.  Raises for String/PythonObject arms.
+    """
+    var sorted_order: List[Int]
+    var unique_keys: List[String]
+    var count_vals: List[Int]
+    var result_idx: List[PythonObject]
+    var result_counts: List[Int64]
+
+    fn __init__(out self, sorted_order: List[Int], unique_keys: List[String],
+                count_vals: List[Int]):
+        self.sorted_order = sorted_order.copy()
+        self.unique_keys = unique_keys.copy()
+        self.count_vals = count_vals.copy()
+        self.result_idx = List[PythonObject]()
+        self.result_counts = List[Int64]()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var builtins = Python.import_module("builtins")
+        for i in range(len(self.sorted_order)):
+            var si = self.sorted_order[i]
+            self.result_counts.append(Int64(self.count_vals[si]))
+            self.result_idx.append(builtins.int(self.unique_keys[si]))
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var builtins = Python.import_module("builtins")
+        for i in range(len(self.sorted_order)):
+            var si = self.sorted_order[i]
+            self.result_counts.append(Int64(self.count_vals[si]))
+            self.result_idx.append(builtins.float(self.unique_keys[si]))
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        for i in range(len(self.sorted_order)):
+            var si = self.sorted_order[i]
+            self.result_counts.append(Int64(self.count_vals[si]))
+            self.result_idx.append(PythonObject(self.unique_keys[si] == "True"))
+
+    fn on_str(mut self, data: List[String]) raises:
+        raise Error("value_counts: unsupported column type")
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("value_counts: unsupported column type")
+
+
+# ------------------------------------------------------------------
 # Compile-time operation selectors for Column._arith_op
 # ------------------------------------------------------------------
 comptime _ARITH_ADD      = 0
@@ -1159,131 +1344,30 @@ struct Column(Copyable, Movable, Sized):
             e = 0
         if e > n:
             e = n
-        var has_mask = len(self._null_mask) > 0
         var new_mask = List[Bool]()
-        if has_mask:
+        if len(self._null_mask) > 0:
             for i in range(s, e):
                 new_mask.append(self._null_mask[i])
-        if self._data.isa[List[Int64]]():
-            var result = List[Int64]()
-            ref d = self._data[List[Int64]]
-            for i in range(s, e):
-                result.append(d[i])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[Float64]]():
-            var result = List[Float64]()
-            ref d = self._data[List[Float64]]
-            for i in range(s, e):
-                result.append(d[i])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[Bool]]():
-            var result = List[Bool]()
-            ref d = self._data[List[Bool]]
-            for i in range(s, e):
-                result.append(d[i])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[String]]():
-            var result = List[String]()
-            ref d = self._data[List[String]]
-            for i in range(s, e):
-                result.append(d[i])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        else:
-            var result = List[PythonObject]()
-            ref d = self._data[List[PythonObject]]
-            for i in range(s, e):
-                result.append(d[i])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
+        var visitor = _SliceVisitor(s, e)
+        visit_col_data(visitor, self._data)
+        var col = Column(self.name, visitor^.result, self.dtype)
+        if len(new_mask) > 0:
+            col._null_mask = new_mask^
+        return col^
 
     fn take(self, indices: List[Int]) -> Column:
         """Return a new Column with rows selected by *indices* (arbitrary order)."""
         var has_mask = len(self._null_mask) > 0
         var new_mask = List[Bool]()
-        if self._data.isa[List[Int64]]():
-            var result = List[Int64]()
-            ref d = self._data[List[Int64]]
+        if has_mask:
             for k in range(len(indices)):
-                var idx = indices[k]
-                result.append(d[idx])
-                if has_mask:
-                    new_mask.append(self._null_mask[idx])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[Float64]]():
-            var result = List[Float64]()
-            ref d = self._data[List[Float64]]
-            for k in range(len(indices)):
-                var idx = indices[k]
-                result.append(d[idx])
-                if has_mask:
-                    new_mask.append(self._null_mask[idx])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[Bool]]():
-            var result = List[Bool]()
-            ref d = self._data[List[Bool]]
-            for k in range(len(indices)):
-                var idx = indices[k]
-                result.append(d[idx])
-                if has_mask:
-                    new_mask.append(self._null_mask[idx])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        elif self._data.isa[List[String]]():
-            var result = List[String]()
-            ref d = self._data[List[String]]
-            for k in range(len(indices)):
-                var idx = indices[k]
-                result.append(d[idx])
-                if has_mask:
-                    new_mask.append(self._null_mask[idx])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
-        else:
-            var result = List[PythonObject]()
-            ref d = self._data[List[PythonObject]]
-            for k in range(len(indices)):
-                var idx = indices[k]
-                result.append(d[idx])
-                if has_mask:
-                    new_mask.append(self._null_mask[idx])
-            var col_data = ColumnData(result^)
-            var col = Column(self.name, col_data^, self.dtype)
-            if len(new_mask) > 0:
-                col._null_mask = new_mask^
-            return col^
+                new_mask.append(self._null_mask[indices[k]])
+        var visitor = _TakeVisitor(indices)
+        visit_col_data(visitor, self._data)
+        var col = Column(self.name, visitor^.result, self.dtype)
+        if len(new_mask) > 0:
+            col._null_mask = new_mask^
+        return col^
 
     # ------------------------------------------------------------------
     # Null tracking
@@ -1473,42 +1557,16 @@ struct Column(Copyable, Movable, Sized):
         Raises for object/datetime column types.
         """
         var has_mask = len(self._null_mask) > 0
-        var unique_keys = List[String]()
-        var counts_dict = Dict[String, Int]()
 
-        if self._data.isa[List[Int64]]():
-            for i in range(len(self._data[List[Int64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var k = String(self._data[List[Int64]][i])
-                if k not in counts_dict:
-                    unique_keys.append(k)
-                counts_dict[k] = counts_dict.get(k, 0) + 1
-        elif self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var k = String(self._data[List[Float64]][i])
-                if k not in counts_dict:
-                    unique_keys.append(k)
-                counts_dict[k] = counts_dict.get(k, 0) + 1
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                if has_mask and self._null_mask[i]:
-                    continue
-                var k = String(self._data[List[Bool]][i])
-                if k not in counts_dict:
-                    unique_keys.append(k)
-                counts_dict[k] = counts_dict.get(k, 0) + 1
-        else:
-            raise Error("value_counts: unsupported column type")
-
-        var n = len(unique_keys)
+        # Phase 1: count unique values (raises for unsupported arms).
+        var count_visitor = _ValueCountsCountVisitor(has_mask, self._null_mask)
+        visit_col_data_raises(count_visitor, self._data)
+        var n = len(count_visitor.unique_keys)
 
         # Materialise per-key counts in insertion order.
         var count_vals = List[Int]()
         for i in range(n):
-            count_vals.append(counts_dict[unique_keys[i]])
+            count_vals.append(count_visitor.counts_dict[count_visitor.unique_keys[i]])
 
         # Compute a sorted permutation (insertion sort, stable, count desc).
         var sorted_order = List[Int]()
@@ -1524,26 +1582,13 @@ struct Column(Copyable, Movable, Sized):
                     j -= 1
                 sorted_order[j + 1] = key_idx
 
-        # Build result index (original values) and counts.
-        var builtins = Python.import_module("builtins")
-        var result_counts = List[Int64]()
-        var result_idx = List[PythonObject]()
-
-        if self._data.isa[List[Int64]]():
-            for i in range(n):
-                var si = sorted_order[i]
-                result_counts.append(Int64(count_vals[si]))
-                result_idx.append(builtins.int(unique_keys[si]))
-        elif self._data.isa[List[Float64]]():
-            for i in range(n):
-                var si = sorted_order[i]
-                result_counts.append(Int64(count_vals[si]))
-                result_idx.append(builtins.float(unique_keys[si]))
-        else:  # Bool — only remaining arm after the raise above
-            for i in range(n):
-                var si = sorted_order[i]
-                result_counts.append(Int64(count_vals[si]))
-                result_idx.append(PythonObject(unique_keys[si] == "True"))
+        # Phase 2: build typed index (raises for unsupported arms).
+        var index_visitor = _ValueCountsIndexVisitor(
+            sorted_order, count_visitor.unique_keys, count_vals
+        )
+        visit_col_data_raises(index_visitor, self._data)
+        var result_counts = index_visitor.result_counts.copy()
+        var result_idx = index_visitor.result_idx.copy()
 
         if normalize:
             var total = Float64(self.count())
