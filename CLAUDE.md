@@ -70,7 +70,7 @@ Every stub category has a corresponding issue on GitHub. When implementing a gro
 
 ## Session notes
 
-At the start of every session create `SESSION.md` at the project root if it does not already exist. While reading files and doing work, append an entry for every tech debt item, bug, or refactoring opportunity noticed. Do not wait until the end — add entries as they are found.
+At the start of every session create `SESSION.md` at the project root if it does not already exist. While reading files and doing work, append an entry for every tech debt item, bug, or refactoring opportunity noticed. **Do not wait until the end — add entries immediately as they are found.** This includes incidental observations made while navigating code for unrelated reasons (e.g. spotting a raw `isa` chain while reading a file to implement something else).
 
 ### Entry format
 
