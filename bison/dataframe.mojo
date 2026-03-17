@@ -722,12 +722,111 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     fn sort_values(self, by: List[String], ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
-        _not_implemented("DataFrame.sort_values")
-        return DataFrame()
+        """Return a new DataFrame sorted by one or more columns.
+
+        Rows are reordered so that the values in the first ``by`` column are
+        sorted (ascending or descending).  Ties in the primary key are broken
+        by subsequent keys using a stable insertion sort applied in reverse
+        key order.  Null elements are always placed at the end regardless of
+        direction (``na_position`` is accepted but only ``"last"`` is
+        currently implemented).
+        """
+        var n_rows = self.shape()[0]
+        if n_rows == 0 or len(by) == 0:
+            return DataFrame(self._cols.copy())
+
+        # Build the sort permutation using a stable multi-key approach:
+        # process keys in reverse order (last key first) so that when a
+        # higher-priority key is applied next it dominates via the stable
+        # insertion sort.  Each step reorders the key column by the current
+        # permutation, sorts the reordered values to produce a sub-perm, then
+        # composes: new_perm[j] = perm[sub_perm[j]].
+        var perm = List[Int]()
+        for i in range(n_rows):
+            perm.append(i)
+        var k = len(by) - 1
+        while k >= 0:
+            var key_col = self[by[k]]
+            var sub_perm = Series(key_col._col.take(perm))._sort_perm(ascending)
+            var new_perm = List[Int]()
+            for j in range(n_rows):
+                new_perm.append(perm[sub_perm[j]])
+            perm = new_perm^
+            k -= 1
+
+        # Reorder index labels (parallel to the data).
+        var has_index = len(self._cols[0]._index) > 0
+        var new_idx = List[PythonObject]()
+        if has_index:
+            for k in range(n_rows):
+                new_idx.append(self._cols[0]._index[perm[k]])
+
+        # Apply permutation to every column.
+        var new_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var taken = self._cols[i].take(perm)
+            if has_index:
+                taken._index = new_idx.copy()
+            new_cols.append(taken^)
+        return DataFrame(new_cols^)
 
     fn sort_index(self, axis: Int = 0, ascending: Bool = True) raises -> DataFrame:
-        _not_implemented("DataFrame.sort_index")
-        return DataFrame()
+        """Return a new DataFrame sorted by its row index labels.
+
+        When the DataFrame has a default RangeIndex (no explicit index stored),
+        ascending order is already the natural order and is returned as-is;
+        descending reverses the rows.  For an explicit index, an insertion sort
+        using Python comparison orders the rows.  Only ``axis=0`` (row sort) is
+        supported.
+        """
+        if axis != 0:
+            _not_implemented("DataFrame.sort_index(axis=1)")
+            return DataFrame(self._cols.copy())
+
+        var n_rows = self.shape()[0]
+        if n_rows == 0 or len(self._cols) == 0:
+            return DataFrame(self._cols.copy())
+
+        var perm = List[Int]()
+        if len(self._cols[0]._index) == 0:
+            # Default RangeIndex — ascending is already sorted.
+            if ascending:
+                return DataFrame(self._cols.copy())
+            for i in range(n_rows):
+                perm.append(n_rows - 1 - i)
+        else:
+            # Explicit index: insertion sort by Python comparison.
+            for i in range(n_rows):
+                perm.append(i)
+            for i in range(1, n_rows):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap: Bool
+                    if ascending:
+                        do_swap = Bool(self._cols[0]._index[key] < self._cols[0]._index[prev])
+                    else:
+                        do_swap = Bool(self._cols[0]._index[key] > self._cols[0]._index[prev])
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+
+        # Reorder index labels and apply permutation to every column.
+        var has_index = len(self._cols[0]._index) > 0
+        var new_idx = List[PythonObject]()
+        if has_index:
+            for k in range(n_rows):
+                new_idx.append(self._cols[0]._index[perm[k]])
+        var new_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var taken = self._cols[i].take(perm)
+            if has_index:
+                taken._index = new_idx.copy()
+            new_cols.append(taken^)
+        return DataFrame(new_cols^)
 
     fn reset_index(self, drop: Bool = False) raises -> DataFrame:
         _not_implemented("DataFrame.reset_index")

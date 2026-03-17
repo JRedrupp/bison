@@ -4,17 +4,91 @@ from testing import assert_true, TestSuite
 from bison import DataFrame, Series, SeriesScalar
 
 
-fn test_sort_values_stub() raises:
+fn test_sort_values_ascending_int() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
-    var raised = False
-    try:
-        var by = List[String]()
-        by.append("a")
-        _ = df.sort_values(by)
-    except:
-        raised = True
-    assert_true(raised)
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
+    assert_true(r["a"].iloc(2)[Int64] == 3)
+
+
+fn test_sort_values_descending_int() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by, ascending=False)
+    assert_true(r["a"].iloc(0)[Int64] == 3)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
+    assert_true(r["a"].iloc(2)[Int64] == 1)
+
+
+fn test_sort_values_multi_col() raises:
+    # Sort by ['a', 'b']: primary key 'a', secondary key 'b'.
+    # Input:  a=[1,1,2], b=[3,1,2]
+    # Expected order: (1,1), (1,3), (2,2) → rows 1, 0, 2
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2], 'b': [3, 1, 2]}")))
+    var by = List[String]()
+    by.append("a")
+    by.append("b")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["b"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["b"].iloc(1)[Int64] == 3)
+    assert_true(r["a"].iloc(2)[Int64] == 2)
+    assert_true(r["b"].iloc(2)[Int64] == 2)
+
+
+fn test_sort_values_null_last() raises:
+    # Null should always appear at the end regardless of direction.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, None, 1]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Float64] == 1.0)
+    assert_true(r["a"].iloc(1)[Float64] == 3.0)
+    assert_true(r["a"].isnull().iloc(2)[Bool] == True)
+
+
+fn test_sort_values_preserves_columns() raises:
+    # All columns must be reordered together, not just the sort key.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2], 'b': [30, 10, 20]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["b"].iloc(0)[Int64] == 10)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
+    assert_true(r["b"].iloc(1)[Int64] == 20)
+    assert_true(r["a"].iloc(2)[Int64] == 3)
+    assert_true(r["b"].iloc(2)[Int64] == 30)
+
+
+fn test_sort_index_ascending_default() raises:
+    # Ascending sort on a default integer index is a no-op.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
+    var r = df.sort_index()
+    assert_true(r["a"].iloc(0)[Int64] == 3)
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["a"].iloc(2)[Int64] == 2)
+
+
+fn test_sort_index_descending_default() raises:
+    # Descending sort on a default integer index reverses the rows.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
+    var r = df.sort_index(ascending=False)
+    assert_true(r["a"].iloc(0)[Int64] == 2)
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["a"].iloc(2)[Int64] == 3)
 
 
 fn test_pivot_stub() raises:
