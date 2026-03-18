@@ -771,17 +771,46 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(new_cols^)
 
     fn sort_index(self, axis: Int = 0, ascending: Bool = True) raises -> DataFrame:
-        """Return a new DataFrame sorted by its row index labels.
+        """Return a new DataFrame sorted by its index labels.
 
-        When the DataFrame has a default RangeIndex (no explicit index stored),
-        ascending order is already the natural order and is returned as-is;
-        descending reverses the rows.  For an explicit index, an insertion sort
-        using Python comparison orders the rows.  Only ``axis=0`` (row sort) is
-        supported.
+        ``axis=0`` (default) sorts by row index labels.  When the DataFrame has
+        a default RangeIndex (no explicit index stored), ascending order is
+        already the natural order and is returned as-is; descending reverses the
+        rows.  For an explicit index, an insertion sort using Python comparison
+        orders the rows.
+
+        ``axis=1`` sorts the column labels lexicographically and reorders the
+        columns accordingly.
         """
-        if axis != 0:
-            _not_implemented("DataFrame.sort_index(axis=1)")
-            return DataFrame(self._cols.copy())
+        if axis == 1:
+            # Sort column labels lexicographically.
+            var n_cols = len(self._cols)
+            if n_cols == 0:
+                return DataFrame(self._cols.copy())
+            # Build a permutation over column positions using insertion sort.
+            var perm = List[Int]()
+            for i in range(n_cols):
+                perm.append(i)
+            for i in range(1, n_cols):
+                var key = perm[i]
+                var key_name = self._cols[key].name
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap: Bool
+                    if ascending:
+                        do_swap = self._cols[prev].name > key_name
+                    else:
+                        do_swap = self._cols[prev].name < key_name
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+            var new_cols = List[Column]()
+            for i in range(n_cols):
+                new_cols.append(self._cols[perm[i]].copy())
+            return DataFrame(new_cols^)
 
         var n_rows = self.shape()[0]
         if n_rows == 0 or len(self._cols) == 0:
@@ -1067,19 +1096,12 @@ struct DataFrame(Copyable, Movable):
 
         Either bound may be ``None`` (no clipping on that side).  Non-numeric
         columns (Bool, String, Object) raise from the underlying ``Column._clip``.
-        Uses sentinel values ±1e308 when a bound is ``None``.
         """
         if not lower and not upper:
             return self._deep_copy()
-        var lo = Float64(-1e308)
-        if lower:
-            lo = lower.value()
-        var hi = Float64(1e308)
-        if upper:
-            hi = upper.value()
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._clip(lo, hi))
+            result_cols.append(self._cols[i]._clip(lower, upper))
         return DataFrame(result_cols^)
 
     fn round(self, decimals: Int = 0) raises -> DataFrame:

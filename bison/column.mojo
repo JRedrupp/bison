@@ -598,17 +598,21 @@ struct _RoundVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Clamps values to [lower, upper]; supports Int64 and Float64 only."""
+    """Clamps values to [lower, upper]; supports Int64 and Float64 only.
+
+    Either bound may be ``None``, in which case no clipping is applied on
+    that side.  This avoids the need for sentinel magic values such as ±1e308.
+    """
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
     var null_mask: List[Bool]
-    var lower: Float64
-    var upper: Float64
+    var lower: Optional[Float64]
+    var upper: Optional[Float64]
     var dtype_name: String
 
-    fn __init__(out self, null_mask: List[Bool], lower: Float64, upper: Float64,
-                dtype_name: String):
+    fn __init__(out self, null_mask: List[Bool], lower: Optional[Float64],
+                upper: Optional[Float64], dtype_name: String):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -619,9 +623,15 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     fn on_int64(mut self, data: List[Int64]) raises:
         var has_mask = len(self.null_mask) > 0
+        var has_lo = self.lower.__bool__()
+        var has_hi = self.upper.__bool__()
+        var lo = Int64(0)
+        var hi = Int64(0)
+        if has_lo:
+            lo = Int64(self.lower.value())
+        if has_hi:
+            hi = Int64(self.upper.value())
         var result = List[Int64]()
-        var lo = Int64(self.lower)
-        var hi = Int64(self.upper)
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 result.append(Int64(0))
@@ -629,9 +639,9 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.has_any_null = True
             else:
                 var v = data[i]
-                if v < lo:
+                if has_lo and v < lo:
                     v = lo
-                elif v > hi:
+                elif has_hi and v > hi:
                     v = hi
                 result.append(v)
                 self.result_mask.append(False)
@@ -639,6 +649,14 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     fn on_float64(mut self, data: List[Float64]) raises:
         var has_mask = len(self.null_mask) > 0
+        var has_lo = self.lower.__bool__()
+        var has_hi = self.upper.__bool__()
+        var lo = Float64(0)
+        var hi = Float64(0)
+        if has_lo:
+            lo = self.lower.value()
+        if has_hi:
+            hi = self.upper.value()
         var nan = Float64(0) / Float64(0)
         var result = List[Float64]()
         for i in range(len(data)):
@@ -648,10 +666,10 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.has_any_null = True
             else:
                 var v = data[i]
-                if v < self.lower:
-                    v = self.lower
-                elif v > self.upper:
-                    v = self.upper
+                if has_lo and v < lo:
+                    v = lo
+                elif has_hi and v > hi:
+                    v = hi
                 result.append(v)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
@@ -1975,11 +1993,12 @@ struct Column(Copyable, Movable, Sized):
             return self.copy()
         return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
-    fn _clip(self, lower: Float64, upper: Float64) raises -> Column:
+    fn _clip(self, lower: Optional[Float64], upper: Optional[Float64]) raises -> Column:
         """Clamp values to [``lower``, ``upper``].
 
-        Supports Int64 and Float64 arms. Nulls propagate.
-        Raises for String/Object columns.
+        Either bound may be ``None`` (no clipping on that side).  Supports
+        Int64 and Float64 arms. Nulls propagate. Raises for String/Object
+        columns.
         """
         var visitor = _ClipVisitor(self._null_mask, lower, upper, self.dtype.name)
         visit_col_data_raises(visitor, self._data)
