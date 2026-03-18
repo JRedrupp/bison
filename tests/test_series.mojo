@@ -781,6 +781,28 @@ fn test_clip_null_propagation() raises:
     assert_false(result.isna().iloc(0)[Bool])
 
 
+fn test_clip_lower_only() raises:
+    # When only a lower bound is provided the upper side must not be clipped.
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 1000.0]")))
+    var r = s.clip(lower=Float64(3.0))
+    assert_true(r.iloc(0)[Float64] == 3.0)
+    assert_true(r.iloc(1)[Float64] == 5.0)
+    # 1000.0 must remain unchanged — sentinel ±1e308 would wrongly clip this.
+    assert_true(r.iloc(2)[Float64] == 1000.0)
+
+
+fn test_clip_upper_only() raises:
+    # When only an upper bound is provided the lower side must not be clipped.
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 10.0]")))
+    var r = s.clip(upper=Float64(7.0))
+    # 0.0 must remain unchanged.
+    assert_true(r.iloc(0)[Float64] == 0.0)
+    assert_true(r.iloc(1)[Float64] == 5.0)
+    assert_true(r.iloc(2)[Float64] == 7.0)
+
+
 fn _double(v: Float64) -> Float64:
     return v * 2.0
 

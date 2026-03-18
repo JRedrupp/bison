@@ -1096,19 +1096,12 @@ struct DataFrame(Copyable, Movable):
 
         Either bound may be ``None`` (no clipping on that side).  Non-numeric
         columns (Bool, String, Object) raise from the underlying ``Column._clip``.
-        Uses sentinel values ±1e308 when a bound is ``None``.
         """
         if not lower and not upper:
             return self._deep_copy()
-        var lo = Float64(-1e308)
-        if lower:
-            lo = lower.value()
-        var hi = Float64(1e308)
-        if upper:
-            hi = upper.value()
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._clip(lo, hi))
+            result_cols.append(self._cols[i]._clip(lower, upper))
         return DataFrame(result_cols^)
 
     fn round(self, decimals: Int = 0) raises -> DataFrame:
