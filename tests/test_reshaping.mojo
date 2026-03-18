@@ -303,6 +303,23 @@ fn test_set_index_multi_raises() raises:
     assert_true(raised)
 
 
+fn test_set_index_null_key() raises:
+    """Null entries in the key column must become NaN/None in the resulting index."""
+    var pd = Python.import_module("pandas")
+    # "a" is a float column with a null at position 1.
+    var py_df = pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0], 'b': [10, 20, 30]}"))
+    var df = DataFrame(py_df)
+    var keys = List[String]()
+    keys.append("a")
+    var r = df.set_index(keys)
+    # Row 1 index entry must be None/NaN, not the typed placeholder 0.0.
+    var pd_series = r["b"].to_pandas()
+    assert_true(Bool(pd.isna(pd_series.index[1])))
+    # Non-null rows must retain their original values.
+    assert_true(Bool(pd_series.index[0] == 1.0))
+    assert_true(Bool(pd_series.index[2] == 3.0))
+
+
 # ------------------------------------------------------------------
 # rename_axis
 # ------------------------------------------------------------------
