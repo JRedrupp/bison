@@ -266,5 +266,49 @@ fn test_select_dtypes_exclude() raises:
     assert_false(result.__contains__("b"))
 
 
+fn test_sort_values_basic() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
+    assert_true(r["a"].iloc(2)[Int64] == 3)
+
+
+fn test_sort_values_na_last_default() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Float64] == 1.0)
+    assert_true(r["a"].iloc(1)[Float64] == 3.0)
+    assert_true(r["a"].isna().iloc(2)[Bool])
+
+
+fn test_sort_values_na_first() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by, na_position="first")
+    assert_true(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].iloc(1)[Float64] == 1.0)
+    assert_true(r["a"].iloc(2)[Float64] == 3.0)
+
+
+fn test_sort_values_na_first_descending() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by, ascending=False, na_position="first")
+    assert_true(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].iloc(1)[Float64] == 3.0)
+    assert_true(r["a"].iloc(2)[Float64] == 1.0)
+
+
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

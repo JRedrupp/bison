@@ -720,11 +720,12 @@ struct Series(Copyable, Movable):
     # Sorting
     # ------------------------------------------------------------------
 
-    fn _sort_perm(self, ascending: Bool) raises -> List[Int]:
+    fn _sort_perm(self, ascending: Bool, na_last: Bool = True) raises -> List[Int]:
         """Return an insertion-sort permutation over the column values.
 
         perm[i] = original index of the i-th element in sorted order.
-        Null elements are placed at the end regardless of direction.
+        When na_last is True (default), null elements are placed at the end.
+        When na_last is False, null elements are placed at the beginning.
         """
         var n = len(self._col)
         var perm = List[Int]()
@@ -743,10 +744,12 @@ struct Series(Copyable, Movable):
                     var key_null = has_mask and self._col._null_mask[key]
                     var prev_null = has_mask and self._col._null_mask[prev]
                     var do_swap: Bool
-                    if key_null:
+                    if key_null and prev_null:
                         do_swap = False
+                    elif key_null:
+                        do_swap = not na_last
                     elif prev_null:
-                        do_swap = True
+                        do_swap = na_last
                     elif ascending:
                         do_swap = d[key] < d[prev]
                     else:
@@ -766,10 +769,12 @@ struct Series(Copyable, Movable):
                     var key_null = has_mask and self._col._null_mask[key]
                     var prev_null = has_mask and self._col._null_mask[prev]
                     var do_swap: Bool
-                    if key_null:
+                    if key_null and prev_null:
                         do_swap = False
+                    elif key_null:
+                        do_swap = not na_last
                     elif prev_null:
-                        do_swap = True
+                        do_swap = na_last
                     elif ascending:
                         do_swap = d[key] < d[prev]
                     else:
@@ -789,10 +794,12 @@ struct Series(Copyable, Movable):
                     var key_null = has_mask and self._col._null_mask[key]
                     var prev_null = has_mask and self._col._null_mask[prev]
                     var do_swap: Bool
-                    if key_null:
+                    if key_null and prev_null:
                         do_swap = False
+                    elif key_null:
+                        do_swap = not na_last
                     elif prev_null:
-                        do_swap = True
+                        do_swap = na_last
                     elif ascending:
                         do_swap = (not d[key]) and d[prev]  # False < True
                     else:
@@ -812,10 +819,12 @@ struct Series(Copyable, Movable):
                     var key_null = has_mask and self._col._null_mask[key]
                     var prev_null = has_mask and self._col._null_mask[prev]
                     var do_swap: Bool
-                    if key_null:
+                    if key_null and prev_null:
                         do_swap = False
+                    elif key_null:
+                        do_swap = not na_last
                     elif prev_null:
-                        do_swap = True
+                        do_swap = na_last
                     elif ascending:
                         do_swap = d[key] < d[prev]
                     else:
@@ -835,10 +844,12 @@ struct Series(Copyable, Movable):
                     var key_null = has_mask and self._col._null_mask[key]
                     var prev_null = has_mask and self._col._null_mask[prev]
                     var do_swap: Bool
-                    if key_null:
+                    if key_null and prev_null:
                         do_swap = False
+                    elif key_null:
+                        do_swap = not na_last
                     elif prev_null:
-                        do_swap = True
+                        do_swap = na_last
                     elif ascending:
                         do_swap = Bool(d[key] < d[prev])
                     else:
@@ -850,16 +861,17 @@ struct Series(Copyable, Movable):
                 perm[j + 1] = key
         return perm^
 
-    fn sort_values(self, ascending: Bool = True) raises -> Series:
+    fn sort_values(self, ascending: Bool = True, na_position: String = "last") raises -> Series:
         """Return a new Series sorted by value.
 
-        Null elements are placed at the end regardless of direction.
+        Null elements are placed at the end when na_position is ``"last"``
+        (default) or at the beginning when na_position is ``"first"``.
         The original index labels are reordered to follow their data rows.
         """
         var n = len(self._col)
         if n == 0:
             return Series(self._col.copy())
-        var perm = self._sort_perm(ascending)
+        var perm = self._sort_perm(ascending, na_position == "last")
         var sorted_col = self._col.take(perm)
         if len(self._col._index) > 0:
             var new_idx = List[PythonObject]()

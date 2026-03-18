@@ -727,9 +727,9 @@ struct DataFrame(Copyable, Movable):
         Rows are reordered so that the values in the first ``by`` column are
         sorted (ascending or descending).  Ties in the primary key are broken
         by subsequent keys using a stable insertion sort applied in reverse
-        key order.  Null elements are always placed at the end regardless of
-        direction (``na_position`` is accepted but only ``"last"`` is
-        currently implemented).
+        key order.  Null elements are placed at the end when na_position is
+        ``"last"`` (default) or at the beginning when na_position is
+        ``"first"``.
         """
         var n_rows = self.shape()[0]
         if n_rows == 0 or len(by) == 0:
@@ -747,7 +747,7 @@ struct DataFrame(Copyable, Movable):
         var k = len(by) - 1
         while k >= 0:
             var key_col = self[by[k]]
-            var sub_perm = Series(key_col._col.take(perm))._sort_perm(ascending)
+            var sub_perm = Series(key_col._col.take(perm))._sort_perm(ascending, na_position == "last")
             var new_perm = List[Int]()
             for j in range(n_rows):
                 new_perm.append(perm[sub_perm[j]])
