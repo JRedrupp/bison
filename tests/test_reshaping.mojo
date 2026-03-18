@@ -1,7 +1,8 @@
 """Tests for reshaping operations."""
 from std.python import Python
+from std.collections import Dict, Optional
 from testing import assert_true, assert_equal, TestSuite
-from bison import DataFrame, Series, SeriesScalar
+from bison import DataFrame, Series, SeriesScalar, DFScalar
 
 
 fn test_sort_values_ascending_int() raises:
@@ -187,6 +188,202 @@ fn test_series_sort_values() raises:
     assert_true(r.iloc(0)[Int64] == 1)
     assert_true(r.iloc(1)[Int64] == 2)
     assert_true(r.iloc(2)[Int64] == 3)
+
+
+# ------------------------------------------------------------------
+# rename
+# ------------------------------------------------------------------
+
+fn test_rename_columns() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var cols_map = Dict[String, String]()
+    cols_map["a"] = "x"
+    var r = df.rename(columns=Optional[Dict[String, String]](cols_map^))
+    assert_equal(r.shape()[1], 1)
+    assert_true(r["x"].iloc(0)[Int64] == 1)
+    assert_true(r["x"].iloc(1)[Int64] == 2)
+
+
+fn test_rename_columns_partial() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
+    var cols_map = Dict[String, String]()
+    cols_map["a"] = "x"
+    var r = df.rename(columns=Optional[Dict[String, String]](cols_map^))
+    assert_equal(r.shape()[1], 2)
+    assert_true(r["x"].iloc(0)[Int64] == 1)
+    assert_true(r["b"].iloc(0)[Int64] == 2)
+
+
+fn test_rename_index() raises:
+    # Rename index label 'i' → 'z'; sort_index ascending gives j, k, z.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}"), index=Python.evaluate("['i', 'j', 'k']")))
+    var idx_map = Dict[String, String]()
+    idx_map["i"] = "z"
+    var r = df.rename(index=Optional[Dict[String, String]](idx_map^))
+    assert_equal(r.shape()[0], 3)
+    var s = r.sort_index()
+    # Sorted order: 'j'=20, 'k'=30, 'z'=10 (formerly 'i')
+    assert_true(s["a"].iloc(0)[Int64] == 20)
+    assert_true(s["a"].iloc(2)[Int64] == 10)
+
+
+# ------------------------------------------------------------------
+# reset_index
+# ------------------------------------------------------------------
+
+fn test_reset_index_drop_true() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}"), index=Python.evaluate("['x', 'y']")))
+    var r = df.reset_index(drop=True)
+    assert_equal(r.shape()[0], 2)
+    assert_equal(r.shape()[1], 1)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
+
+
+fn test_reset_index_drop_false() raises:
+    # Index promoted to a new "index" column prepended to the result.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}"), index=Python.evaluate("['x', 'y']")))
+    var r = df.reset_index()  # drop=False by default
+    assert_equal(r.shape()[0], 2)
+    assert_equal(r.shape()[1], 2)  # "index" column + "a" column
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+
+
+fn test_reset_index_range_index() raises:
+    # On a default RangeIndex, reset_index is a copy.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var r = df.reset_index(drop=True)
+    assert_equal(r.shape()[0], 3)
+    assert_equal(r.shape()[1], 1)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+
+
+# ------------------------------------------------------------------
+# set_index
+# ------------------------------------------------------------------
+
+fn test_set_index_single_drop_true() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': ['x', 'y'], 'b': [10, 20]}")))
+    var keys = List[String]()
+    keys.append("a")
+    var r = df.set_index(keys)  # drop=True by default
+    assert_equal(r.shape()[1], 1)  # "a" removed, only "b" remains
+    assert_true(r["b"].iloc(0)[Int64] == 10)
+    assert_true(r["b"].iloc(1)[Int64] == 20)
+
+
+fn test_set_index_single_drop_false() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': ['x', 'y'], 'b': [10, 20]}")))
+    var keys = List[String]()
+    keys.append("a")
+    var r = df.set_index(keys, drop=False)
+    assert_equal(r.shape()[1], 2)  # "a" kept as column and as index
+    assert_true(r["b"].iloc(0)[Int64] == 10)
+
+
+fn test_set_index_multi_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var keys = List[String]()
+    keys.append("a")
+    keys.append("b")
+    var raised = False
+    try:
+        _ = df.set_index(keys)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+# ------------------------------------------------------------------
+# rename_axis
+# ------------------------------------------------------------------
+
+fn test_rename_axis_is_copy() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r = df.rename_axis(mapper=Optional[String]("rows"))
+    assert_equal(r.shape()[0], 2)
+    assert_equal(r.shape()[1], 2)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+
+
+# ------------------------------------------------------------------
+# reindex
+# ------------------------------------------------------------------
+
+fn test_reindex_axis1_reorder() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
+    var lbls = List[String]()
+    lbls.append("c")
+    lbls.append("a")
+    lbls.append("b")
+    var r = df.reindex(labels=Optional[List[String]](lbls^), axis=1)
+    assert_equal(r.shape()[1], 3)
+    assert_true(r["c"].iloc(0)[Int64] == 3)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["b"].iloc(0)[Int64] == 2)
+
+
+fn test_reindex_axis1_fill() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var lbls = List[String]()
+    lbls.append("a")
+    lbls.append("x")
+    var fv = Optional[DFScalar](DFScalar(Int64(99)))
+    var r = df.reindex(labels=Optional[List[String]](lbls^), axis=1, fill_value=fv)
+    assert_equal(r.shape()[1], 2)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["x"].iloc(0)[Int64] == 99)
+
+
+fn test_reindex_axis1_null_fill() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var lbls = List[String]()
+    lbls.append("a")
+    lbls.append("x")
+    var r = df.reindex(labels=Optional[List[String]](lbls^), axis=1)
+    assert_equal(r.shape()[1], 2)
+    assert_equal(r.shape()[0], 2)
+
+
+fn test_reindex_axis0_reorder() raises:
+    # index=['c', 'a', 'b'], values=[10, 20, 30]. Reindex to ['a', 'b', 'c'].
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}"), index=Python.evaluate("['c', 'a', 'b']")))
+    var lbls = List[String]()
+    lbls.append("a")
+    lbls.append("b")
+    lbls.append("c")
+    var r = df.reindex(labels=Optional[List[String]](lbls^))  # axis=0 default
+    assert_equal(r.shape()[0], 3)
+    assert_true(r["a"].iloc(0)[Int64] == 20)  # row 'a' had value 20
+    assert_true(r["a"].iloc(1)[Int64] == 30)  # row 'b' had value 30
+    assert_true(r["a"].iloc(2)[Int64] == 10)  # row 'c' had value 10
+
+
+fn test_reindex_axis0_fill() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10]}"), index=Python.evaluate("['x']")))
+    var lbls = List[String]()
+    lbls.append("x")
+    lbls.append("z")
+    var fv = Optional[DFScalar](DFScalar(Int64(0)))
+    var r = df.reindex(labels=Optional[List[String]](lbls^), fill_value=fv)
+    assert_equal(r.shape()[0], 2)
+    assert_true(r["a"].iloc(0)[Int64] == 10)
+    assert_true(r["a"].iloc(1)[Int64] == 0)
 
 
 fn main() raises:

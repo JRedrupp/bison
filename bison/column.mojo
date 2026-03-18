@@ -1381,6 +1381,153 @@ struct _BinOpInputs(Movable):
         self.has_b_mask = has_b_mask
 
 
+struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Select/insert rows by a pre-built index list.
+
+    ``indices[i] >= 0``  → take that row from the source data.
+    ``indices[i] == -1`` → insert a null row, or a fill row if *fill_value* is set.
+
+    The parallel ``src_null_mask`` carries the source column's null mask so that
+    nulls from existing rows are propagated correctly.
+    """
+
+    var indices: List[Int]
+    var fill_value: Optional[DFScalar]
+    var src_null_mask: List[Bool]
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    fn __init__(out self, indices: List[Int], fill_value: Optional[DFScalar],
+                src_null_mask: List[Bool]):
+        self.indices = indices.copy()
+        self.fill_value = fill_value
+        self.src_null_mask = src_null_mask.copy()
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var fill: Int64 = 0
+        var is_null_fill: Bool = True
+        if self.fill_value:
+            var fv = self.fill_value.value()
+            if fv.isa[Int64]():
+                fill = fv[Int64]; is_null_fill = False
+            elif fv.isa[Float64]():
+                fill = Int64(Int(fv[Float64])); is_null_fill = False
+            elif fv.isa[Bool]():
+                fill = Int64(1) if fv[Bool] else Int64(0); is_null_fill = False
+        var has_src_mask = len(self.src_null_mask) > 0
+        var result = List[Int64]()
+        for i in range(len(self.indices)):
+            var idx = self.indices[i]
+            if idx >= 0:
+                result.append(data[idx])
+                var is_null = has_src_mask and self.src_null_mask[idx]
+                self.result_mask.append(is_null)
+                if is_null:
+                    self.has_any_null = True
+            else:
+                result.append(fill)
+                self.result_mask.append(is_null_fill)
+                if is_null_fill:
+                    self.has_any_null = True
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var fill: Float64 = Float64(0) / Float64(0)  # NaN
+        var is_null_fill: Bool = True
+        if self.fill_value:
+            var fv = self.fill_value.value()
+            if fv.isa[Float64]():
+                fill = fv[Float64]; is_null_fill = False
+            elif fv.isa[Int64]():
+                fill = Float64(fv[Int64]); is_null_fill = False
+            elif fv.isa[Bool]():
+                fill = 1.0 if fv[Bool] else 0.0; is_null_fill = False
+        var has_src_mask = len(self.src_null_mask) > 0
+        var result = List[Float64]()
+        for i in range(len(self.indices)):
+            var idx = self.indices[i]
+            if idx >= 0:
+                result.append(data[idx])
+                var is_null = has_src_mask and self.src_null_mask[idx]
+                self.result_mask.append(is_null)
+                if is_null:
+                    self.has_any_null = True
+            else:
+                result.append(fill)
+                self.result_mask.append(is_null_fill)
+                if is_null_fill:
+                    self.has_any_null = True
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var fill: Bool = False
+        var is_null_fill: Bool = True
+        if self.fill_value:
+            var fv = self.fill_value.value()
+            if fv.isa[Bool]():
+                fill = fv[Bool]; is_null_fill = False
+            elif fv.isa[Int64]():
+                fill = fv[Int64] != 0; is_null_fill = False
+        var has_src_mask = len(self.src_null_mask) > 0
+        var result = List[Bool]()
+        for i in range(len(self.indices)):
+            var idx = self.indices[i]
+            if idx >= 0:
+                result.append(data[idx])
+                var is_null = has_src_mask and self.src_null_mask[idx]
+                self.result_mask.append(is_null)
+                if is_null:
+                    self.has_any_null = True
+            else:
+                result.append(fill)
+                self.result_mask.append(is_null_fill)
+                if is_null_fill:
+                    self.has_any_null = True
+        self.col_data = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]) raises:
+        var fill: String = ""
+        var is_null_fill: Bool = True
+        if self.fill_value:
+            var fv = self.fill_value.value()
+            if fv.isa[String]():
+                fill = fv[String]; is_null_fill = False
+        var has_src_mask = len(self.src_null_mask) > 0
+        var result = List[String]()
+        for i in range(len(self.indices)):
+            var idx = self.indices[i]
+            if idx >= 0:
+                result.append(data[idx])
+                var is_null = has_src_mask and self.src_null_mask[idx]
+                self.result_mask.append(is_null)
+                if is_null:
+                    self.has_any_null = True
+            else:
+                result.append(fill)
+                self.result_mask.append(is_null_fill)
+                if is_null_fill:
+                    self.has_any_null = True
+        self.col_data = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        var py_none = Python.evaluate("None")
+        var result = List[PythonObject]()
+        for i in range(len(self.indices)):
+            var idx = self.indices[i]
+            if idx >= 0:
+                result.append(data[idx])
+                self.result_mask.append(False)
+            else:
+                result.append(py_none)
+                self.result_mask.append(True)
+                self.has_any_null = True
+        self.col_data = ColumnData(result^)
+
+
 struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -2255,6 +2402,37 @@ struct Column(Copyable, Movable, Sized):
         var c = self.copy()
         c._index = List[PythonObject]()
         return c^
+
+    fn _to_pyobj_index(self) raises -> List[PythonObject]:
+        """Extract column values as a List[PythonObject] for use as a row index.
+
+        Converts each typed value to its Python equivalent using the
+        ``_ToPandasVisitor`` pattern so that the result can be stored in
+        ``Column._index`` of other columns.
+        """
+        var py_list = Python.evaluate("[]")
+        var py_none = Python.evaluate("None")
+        var empty_mask = List[Bool]()
+        var visitor = _ToPandasVisitor(py_list, py_none, empty_mask)
+        visit_col_data_raises(visitor, self._data)
+        var n = Int(py_list.__len__())
+        var result = List[PythonObject]()
+        for i in range(n):
+            result.append(py_list[i])
+        return result^
+
+    fn _reindex_rows(self, indices: List[Int],
+                     fill_value: Optional[DFScalar]) raises -> Column:
+        """Return a new Column with rows selected or inserted according to *indices*.
+
+        ``indices[i] >= 0``  → take that row from self.
+        ``indices[i] == -1`` → insert a null row, or a fill row when *fill_value*
+                                is provided.
+        Existing null mask entries are propagated for taken rows.
+        """
+        var visitor = _ReindexRowsVisitor(indices, fill_value, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     # ------------------------------------------------------------------
     # Cumulative operations
