@@ -1,5 +1,5 @@
 """Tests for reshaping operations."""
-from std.python import Python
+from std.python import Python, PythonObject
 from std.collections import Dict, Optional
 from testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, Series, SeriesScalar, DFScalar
@@ -384,6 +384,38 @@ fn test_reindex_axis0_fill() raises:
     assert_equal(r.shape()[0], 2)
     assert_true(r["a"].iloc(0)[Int64] == 10)
     assert_true(r["a"].iloc(1)[Int64] == 0)
+
+
+fn test_reindex_axis0_obj_fill_value() raises:
+    # Object-dtype column with axis=0 reindex and fill_value: bug fix for
+    # _ReindexRowsVisitor.on_obj ignoring fill_value.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': ['x', 'y']}"), index=Python.evaluate("['r0', 'r1']")))
+    var lbls = List[String]()
+    lbls.append("r0")
+    lbls.append("r2")  # new row — should get fill_value
+    var fv = Optional[DFScalar](DFScalar(String("FILL")))
+    var r = df.reindex(labels=Optional[List[String]](lbls^), fill_value=fv)
+    assert_equal(r.shape()[0], 2)
+    # existing row preserved
+    assert_true(String(r["a"].iloc(0)[PythonObject]) == "x")
+    # missing row gets fill_value, not None
+    assert_true(String(r["a"].iloc(1)[PythonObject]) == "FILL")
+
+
+fn test_reindex_axis0_obj_null_propagation() raises:
+    # Object-dtype column: existing null rows should propagate through reindex.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [None, 'y']}"), index=Python.evaluate("['r0', 'r1']")))
+    var lbls = List[String]()
+    lbls.append("r1")
+    lbls.append("r0")  # was null in source
+    var r = df.reindex(labels=Optional[List[String]](lbls^))
+    assert_equal(r.shape()[0], 2)
+    # non-null row
+    assert_true(String(r["a"].iloc(0)[PythonObject]) == "y")
+    # row that was null in the source should still be null
+    assert_true(r["a"].isna().iloc(1)[Bool] == True)
 
 
 fn main() raises:
