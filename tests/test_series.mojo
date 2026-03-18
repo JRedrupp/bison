@@ -1020,6 +1020,24 @@ fn test_sort_values_null_last() raises:
     assert_true(r.isna().iloc(2)[Bool])
 
 
+fn test_sort_values_null_first() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
+    var r = s.sort_values(na_position="first")
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+
+
+fn test_sort_values_null_first_descending() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
+    var r = s.sort_values(ascending=False, na_position="first")
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 3.0)
+    assert_true(r.iloc(2)[Float64] == 1.0)
+
+
 fn test_sort_values_preserves_index() raises:
     var pd = Python.import_module("pandas")
     # s: label 'b'->3, 'a'->1, 'c'->2.  Sorted by value: 1,2,3 → labels a,c,b.
