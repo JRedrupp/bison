@@ -2429,8 +2429,7 @@ struct Column(Copyable, Movable, Sized):
         """
         var py_list = Python.evaluate("[]")
         var py_none = Python.evaluate("None")
-        var empty_mask = List[Bool]()
-        var visitor = _ToPandasVisitor(py_list, py_none, empty_mask)
+        var visitor = _ToPandasVisitor(py_list, py_none, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         var n = Int(py_list.__len__())
         var result = List[PythonObject]()
