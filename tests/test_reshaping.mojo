@@ -1,6 +1,6 @@
 """Tests for reshaping operations."""
 from std.python import Python
-from testing import assert_true, TestSuite
+from testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, Series, SeriesScalar
 
 
@@ -89,6 +89,53 @@ fn test_sort_index_descending_default() raises:
     assert_true(r["a"].iloc(0)[Int64] == 2)
     assert_true(r["a"].iloc(1)[Int64] == 1)
     assert_true(r["a"].iloc(2)[Int64] == 3)
+
+
+fn test_sort_index_axis1_ascending() raises:
+    # axis=1 sorts column labels lexicographically (ascending).
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'c': [1, 2], 'a': [3, 4], 'b': [5, 6]}")))
+    var r = df.sort_index(axis=1)
+    var cols = r.columns()
+    assert_equal(cols[0], "a")
+    assert_equal(cols[1], "b")
+    assert_equal(cols[2], "c")
+    # Data must follow the reordered columns.
+    assert_true(r["a"].iloc(0)[Int64] == 3)
+    assert_true(r["b"].iloc(0)[Int64] == 5)
+    assert_true(r["c"].iloc(0)[Int64] == 1)
+
+
+fn test_sort_index_axis1_descending() raises:
+    # axis=1 sorts column labels lexicographically (descending).
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'c': [2], 'b': [3]}")))
+    var r = df.sort_index(axis=1, ascending=False)
+    var cols = r.columns()
+    assert_equal(cols[0], "c")
+    assert_equal(cols[1], "b")
+    assert_equal(cols[2], "a")
+
+
+fn test_sort_index_axis1_already_sorted() raises:
+    # No-op when columns are already in ascending order.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
+    var r = df.sort_index(axis=1)
+    var cols = r.columns()
+    assert_equal(cols[0], "a")
+    assert_equal(cols[1], "b")
+    assert_equal(cols[2], "c")
+
+
+fn test_sort_index_axis1_single_column() raises:
+    # Single-column DataFrame is unchanged.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'z': [10, 20]}")))
+    var r = df.sort_index(axis=1)
+    var cols = r.columns()
+    assert_equal(cols[0], "z")
+    assert_true(r["z"].iloc(0)[Int64] == 10)
 
 
 fn test_pivot_stub() raises:
