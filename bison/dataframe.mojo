@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
-from .dtypes import float64 as _float64
+from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -849,16 +849,182 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     fn drop(self, labels: Optional[List[String]] = None, axis: Int = 0, columns: Optional[List[String]] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.drop")
-        return DataFrame()
+        """Drop columns (axis=1 / columns kwarg) or rows (axis=0) by label.
+
+        Column drop: pass ``columns=[...]`` or ``axis=1`` with ``labels=[...]``.
+        Row drop: pass ``axis=0`` with ``labels=[...]`` matching index labels or
+        (for default RangeIndex) integer row positions as strings.
+        Raises if a requested label is not found.
+        """
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return DataFrame()
+
+        # Determine drop mode: column axis if ``columns`` kwarg is set, or axis==1.
+        var drop_cols: Bool
+        var drop_labels: List[String]
+        if columns:
+            drop_cols = True
+            drop_labels = columns.value().copy()
+        elif axis == 1:
+            drop_cols = True
+            if labels:
+                drop_labels = labels.value().copy()
+            else:
+                drop_labels = List[String]()
+        else:
+            drop_cols = False
+            if labels:
+                drop_labels = labels.value().copy()
+            else:
+                drop_labels = List[String]()
+
+        if drop_cols:
+            # Build a set of column names to remove.
+            var drop_set = Dict[String, Bool]()
+            for i in range(len(drop_labels)):
+                drop_set[drop_labels[i]] = True
+            # Verify all requested labels exist.
+            for i in range(len(drop_labels)):
+                var found = False
+                for j in range(ncols):
+                    if self._cols[j].name == drop_labels[i]:
+                        found = True
+                        break
+                if not found:
+                    raise Error("DataFrame.drop: column not found: " + drop_labels[i])
+            # Collect surviving columns.
+            var result_cols = List[Column]()
+            for i in range(ncols):
+                if self._cols[i].name not in drop_set:
+                    result_cols.append(self._cols[i].copy())
+            return DataFrame(result_cols^)
+        else:
+            # Row drop: match drop_labels against the index.
+            var nrows = self.shape()[0]
+            var has_index = ncols > 0 and len(self._cols[0]._index) > 0
+            var drop_set = Dict[String, Bool]()
+            for i in range(len(drop_labels)):
+                drop_set[drop_labels[i]] = True
+            var keep_indices = List[Int]()
+            for i in range(nrows):
+                var key: String
+                if has_index:
+                    key = String(self._cols[0]._index[i])
+                else:
+                    key = String(i)
+                if key not in drop_set:
+                    keep_indices.append(i)
+            # Verify all requested labels were found.
+            var found_set = Dict[String, Bool]()
+            for i in range(nrows):
+                var key: String
+                if has_index:
+                    key = String(self._cols[0]._index[i])
+                else:
+                    key = String(i)
+                if key in drop_set:
+                    found_set[key] = True
+            for i in range(len(drop_labels)):
+                if drop_labels[i] not in found_set:
+                    raise Error("DataFrame.drop: index label not found: " + drop_labels[i])
+            var result_cols = List[Column]()
+            for i in range(ncols):
+                result_cols.append(self._cols[i].take(keep_indices))
+            return DataFrame(result_cols^)
 
     fn drop_duplicates(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> DataFrame:
-        _not_implemented("DataFrame.drop_duplicates")
-        return DataFrame()
+        """Return a DataFrame with duplicate rows removed.
+
+        Delegates to ``duplicated`` to identify duplicates, then retains rows
+        where the duplicate flag is False.  See ``duplicated`` for ``subset``
+        and ``keep`` semantics.
+        """
+        var dup = self.duplicated(subset, keep)
+        ref dup_data = dup._col._data[List[Bool]]
+        var keep_indices = List[Int]()
+        for i in range(len(dup_data)):
+            if not dup_data[i]:
+                keep_indices.append(i)
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].take(keep_indices))
+        return DataFrame(result_cols^)
 
     fn duplicated(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> Series:
-        _not_implemented("DataFrame.duplicated")
-        return Series()
+        """Return a boolean Series indicating duplicate rows.
+
+        Each row is fingerprinted by concatenating per-column string
+        representations separated by ``\\x00``.
+
+        - ``keep="first"``  — False for the first occurrence, True for subsequent.
+        - ``keep="last"``   — False for the last occurrence, True for earlier ones.
+        - ``keep=False``    — True for every occurrence of a repeated row.
+
+        ``subset`` restricts the columns used to build the fingerprint.
+        Raises if any name in ``subset`` is not a column in this DataFrame.
+        """
+        var nrows = self.shape()[0]
+        var ncols = len(self._cols)
+
+        # Build list of working column indices (subset or all).
+        var work_indices = List[Int]()
+        if subset:
+            var sub = subset.value().copy()
+            for s in range(len(sub)):
+                var name = sub[s]
+                var found = False
+                for j in range(ncols):
+                    if self._cols[j].name == name:
+                        work_indices.append(j)
+                        found = True
+                        break
+                if not found:
+                    raise Error("DataFrame.duplicated: column not found in subset: " + name)
+        else:
+            for j in range(ncols):
+                work_indices.append(j)
+
+        # Build a row-key string for each row.
+        var keys = List[String]()
+        for i in range(nrows):
+            var key = String("")
+            for k in range(len(work_indices)):
+                if k > 0:
+                    key = key + "\x00"
+                key = key + _col_cell_str(self._cols[work_indices[k]], i)
+            keys.append(key)
+
+        var result = List[Bool]()
+
+        if keep == "first":
+            var seen = Dict[String, Bool]()
+            for i in range(nrows):
+                if keys[i] in seen:
+                    result.append(True)
+                else:
+                    seen[keys[i]] = True
+                    result.append(False)
+        elif keep == "last":
+            # Pass 1: find last occurrence index of each key.
+            var last_idx = Dict[String, Int]()
+            for i in range(nrows):
+                last_idx[keys[i]] = i
+            # Pass 2: mark True for all rows that are NOT the last occurrence.
+            for i in range(nrows):
+                result.append(last_idx[keys[i]] != i)
+        elif keep == "False":
+            # Count all occurrences.
+            var counts = Dict[String, Int]()
+            for i in range(nrows):
+                counts[keys[i]] = counts.get(keys[i], 0) + 1
+            for i in range(nrows):
+                result.append(counts[keys[i]] > 1)
+        else:
+            raise Error("DataFrame.duplicated: keep must be 'first', 'last', or 'False'")
+
+        var col = Column("", ColumnData(result^), _bool_)
+        return Series(col^)
 
     fn pivot(self, index: String = "", columns: String = "", values: String = "") raises -> DataFrame:
         _not_implemented("DataFrame.pivot")
@@ -897,50 +1063,248 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     fn clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.clip")
-        return DataFrame()
+        """Clamp numeric column values to [lower, upper].
+
+        Either bound may be ``None`` (no clipping on that side).  Non-numeric
+        columns (Bool, String, Object) raise from the underlying ``Column._clip``.
+        Uses sentinel values ±1e308 when a bound is ``None``.
+        """
+        if not lower and not upper:
+            return self._deep_copy()
+        var lo = Float64(-1e308)
+        if lower:
+            lo = lower.value()
+        var hi = Float64(1e308)
+        if upper:
+            hi = upper.value()
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._clip(lo, hi))
+        return DataFrame(result_cols^)
 
     fn round(self, decimals: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.round")
-        return DataFrame()
+        """Round numeric column values to *decimals* decimal places."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._round(decimals))
+        return DataFrame(result_cols^)
 
     fn astype(self, dtype: String) raises -> DataFrame:
-        _not_implemented("DataFrame.astype")
-        return DataFrame()
+        """Cast every column to *dtype*.
 
-    fn copy(self, deep: Bool = True) raises -> DataFrame:
-        _not_implemented("DataFrame.copy")
-        return DataFrame()
+        Supported target dtypes: any value accepted by ``dtype_from_string``
+        (e.g. ``"float64"``, ``"int64"``, ``"bool"``).
+        """
+        var target = dtype_from_string(dtype)
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._astype(target))
+        return DataFrame(result_cols^)
+
+    fn _deep_copy(self) -> DataFrame:
+        """Return an independent column-wise copy of this DataFrame (internal helper)."""
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].copy())
+        return DataFrame(result_cols^)
+
+    fn copy(self, deep: Bool) raises -> DataFrame:
+        """Return an independent copy of this DataFrame.
+
+        ``deep=False`` is accepted but behaves identically to ``deep=True``
+        because ``Column.copy()`` always performs a deep copy.
+        Calling ``df.copy()`` (no args) uses the Copyable-trait copy, which
+        is also a deep copy via ``__copyinit__``.
+        """
+        return self._deep_copy()
 
     fn assign(self, cols: Dict[String, Series]) raises -> DataFrame:
-        _not_implemented("DataFrame.assign")
-        return DataFrame()
+        """Return a new DataFrame with additional or replaced columns.
 
-    fn insert(inout self, loc: Int, column: String, value: DFScalar) raises:
-        _not_implemented("DataFrame.insert")
+        Each key in *cols* is a column name; the value is the new Series.
+        Existing columns are replaced in-place; new columns are appended.
+        """
+        var df = self._deep_copy()
+        for entry in cols.items():
+            df[entry.key] = entry.value
+        return df^
 
-    fn pop(inout self, item: String) raises -> Series:
-        _not_implemented("DataFrame.pop")
-        return Series()
+    fn insert(mut self, loc: Int, column: String, value: DFScalar) raises:
+        """Insert a constant-valued column at position *loc*.
+
+        *loc* is clamped to ``[0, ncols]``.  Raises if *column* already exists.
+        """
+        for i in range(len(self._cols)):
+            if self._cols[i].name == column:
+                raise Error("DataFrame.insert: column already exists: " + column)
+        var nrows = self.shape()[0]
+        var idx = List[PythonObject]()
+        if len(self._cols) > 0:
+            idx = self._cols[0]._index.copy()
+        var new_col = Column._fill_scalar(column, value, nrows, idx)
+        var insert_at = loc
+        if insert_at < 0:
+            insert_at = 0
+        if insert_at > len(self._cols):
+            insert_at = len(self._cols)
+        var new_cols = List[Column]()
+        for i in range(insert_at):
+            new_cols.append(self._cols[i].copy())
+        new_cols.append(new_col^)
+        for i in range(insert_at, len(self._cols)):
+            new_cols.append(self._cols[i].copy())
+        self._cols = new_cols^
+
+    fn pop(mut self, item: String) raises -> Series:
+        """Remove column *item* and return it as a Series.
+
+        Raises if *item* is not a column in this DataFrame.
+        """
+        var idx = -1
+        for i in range(len(self._cols)):
+            if self._cols[i].name == item:
+                idx = i
+                break
+        if idx == -1:
+            raise Error("DataFrame.pop: column not found: " + item)
+        var result = Series(self._cols[idx].copy())
+        var new_cols = List[Column]()
+        for i in range(len(self._cols)):
+            if i != idx:
+                new_cols.append(self._cols[i].copy())
+        self._cols = new_cols^
+        return result^
 
     fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.where")
-        return DataFrame()
+        """Keep each element where *cond* is True; replace with null otherwise.
+
+        ``other`` (replacement value for False positions) is not yet supported;
+        pass ``other=None`` (the default).
+        """
+        if other:
+            raise Error("DataFrame.where: other= parameter is not yet implemented; pass other=None")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._where(cond._col))
+        return DataFrame(result_cols^)
 
     fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.mask")
-        return DataFrame()
+        """Replace each element with null where *cond* is True; keep otherwise.
+
+        ``other`` (replacement value for True positions) is not yet supported;
+        pass ``other=None`` (the default).
+        """
+        if other:
+            raise Error("DataFrame.mask: other= parameter is not yet implemented; pass other=None")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._mask(cond._col))
+        return DataFrame(result_cols^)
 
     fn isin(self, values: Dict[String, List[DFScalar]]) raises -> DataFrame:
-        _not_implemented("DataFrame.isin")
-        return DataFrame()
+        """Return a boolean DataFrame: True where each element is in the corresponding list.
+
+        *values* maps column names to lists of scalars.  Columns not present in
+        *values* produce an all-False Bool column.  Scalar types are coerced to
+        match the column arm (e.g. Int64 scalars against a Float64 column).
+        """
+        var nrows = self.shape()[0]
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var col_name = self._cols[i].name
+            if col_name not in values:
+                # All-False Bool column for columns not in the dict.
+                var false_data = List[Bool]()
+                for j in range(nrows):
+                    false_data.append(False)
+                result_cols.append(Column(col_name, ColumnData(false_data^), _bool_))
+            else:
+                # Dispatch based on column arm type; coerce scalar types as needed.
+                var result_col: Column
+                if self._cols[i]._data.isa[List[Int64]]():
+                    var int_vals = List[Int64]()
+                    var n_vals = len(values[col_name])
+                    for k in range(n_vals):
+                        if values[col_name][k].isa[Int64]():
+                            int_vals.append(values[col_name][k][Int64])
+                        elif values[col_name][k].isa[Float64]():
+                            int_vals.append(Int64(Int(values[col_name][k][Float64])))
+                        elif values[col_name][k].isa[Bool]():
+                            int_vals.append(Int64(1) if values[col_name][k][Bool] else Int64(0))
+                    result_col = self._cols[i]._isin_int(int_vals)
+                elif self._cols[i]._data.isa[List[Float64]]():
+                    var float_vals = List[Float64]()
+                    var n_vals = len(values[col_name])
+                    for k in range(n_vals):
+                        if values[col_name][k].isa[Float64]():
+                            float_vals.append(values[col_name][k][Float64])
+                        elif values[col_name][k].isa[Int64]():
+                            float_vals.append(Float64(values[col_name][k][Int64]))
+                        elif values[col_name][k].isa[Bool]():
+                            float_vals.append(Float64(1.0) if values[col_name][k][Bool] else Float64(0.0))
+                    result_col = self._cols[i]._isin_float(float_vals)
+                elif self._cols[i]._data.isa[List[Bool]]():
+                    var bool_vals = List[Bool]()
+                    var n_vals = len(values[col_name])
+                    for k in range(n_vals):
+                        if values[col_name][k].isa[Bool]():
+                            bool_vals.append(values[col_name][k][Bool])
+                    result_col = self._cols[i]._isin_bool(bool_vals)
+                elif self._cols[i]._data.isa[List[String]]():
+                    var str_vals = List[String]()
+                    var n_vals = len(values[col_name])
+                    for k in range(n_vals):
+                        if values[col_name][k].isa[String]():
+                            str_vals.append(values[col_name][k][String])
+                    result_col = self._cols[i]._isin_str(str_vals)
+                else:
+                    raise Error("DataFrame.isin: unsupported column dtype for column: " + col_name)
+                result_col.name = col_name
+                result_cols.append(result_col^)
+        return DataFrame(result_cols^)
 
     fn combine_first(self, other: DataFrame) raises -> DataFrame:
-        _not_implemented("DataFrame.combine_first")
-        return DataFrame()
+        """Fill null positions in self with corresponding values from other.
 
-    fn update(inout self, other: DataFrame) raises:
-        _not_implemented("DataFrame.update")
+        For each column present in both DataFrames: keep self's value where
+        non-null; take other's value otherwise.  Columns present only in
+        ``other`` are appended as-is.  Same-named columns must have the same
+        dtype; raises on dtype mismatch.
+        """
+        var result_cols = List[Column]()
+        # Phase 1: iterate self columns, fill from other where available.
+        for i in range(len(self._cols)):
+            var found = False
+            for j in range(len(other._cols)):
+                if other._cols[j].name == self._cols[i].name:
+                    result_cols.append(self._cols[i]._combine_first_col(other._cols[j]))
+                    found = True
+                    break
+            if not found:
+                result_cols.append(self._cols[i].copy())
+        # Phase 2: append columns that exist only in other.
+        for j in range(len(other._cols)):
+            var in_self = False
+            for i in range(len(self._cols)):
+                if self._cols[i].name == other._cols[j].name:
+                    in_self = True
+                    break
+            if not in_self:
+                result_cols.append(other._cols[j].copy())
+        return DataFrame(result_cols^)
+
+    fn update(mut self, other: DataFrame) raises:
+        """Update in-place with non-null values from other.
+
+        For each column present in both DataFrames: overwrite self's null
+        positions with other's non-null values (other wins where non-null).
+        Columns in other that are absent from self are ignored.
+        """
+        for j in range(len(other._cols)):
+            for i in range(len(self._cols)):
+                if self._cols[i].name == other._cols[j].name:
+                    self._cols[i] = other._cols[j]._combine_first_col(self._cols[i])
+                    break
 
     # ------------------------------------------------------------------
     # Combining

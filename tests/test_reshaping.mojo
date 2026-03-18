@@ -124,15 +124,13 @@ fn test_transpose_stub() raises:
     assert_true(raised)
 
 
-fn test_drop_duplicates_stub() raises:
+fn test_drop_duplicates_removes_duplicates() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
-    var raised = False
-    try:
-        _ = df.drop_duplicates()
-    except:
-        raised = True
-    assert_true(raised)
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2], 'b': [10, 10, 20]}")))
+    var r = df.drop_duplicates()
+    assert_true(r.shape()[0] == 2)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 2)
 
 
 fn test_series_sort_values() raises:
