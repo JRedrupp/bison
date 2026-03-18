@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
-from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64
+from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64, object_ as _object_
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -858,24 +858,187 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(new_cols^)
 
     fn reset_index(self, drop: Bool = False) raises -> DataFrame:
-        _not_implemented("DataFrame.reset_index")
-        return DataFrame()
+        """Replace the row index with a default RangeIndex.
+
+        When ``drop=True`` the existing index labels are discarded.
+        When ``drop=False`` (default) the existing index is promoted to a new
+        column named ``"index"`` prepended to the result, and the row index is
+        then cleared to a default RangeIndex.  On a DataFrame that already has
+        a default RangeIndex, both modes simply return an identical copy.
+        """
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return DataFrame()
+        var has_index = len(self._cols[0]._index) > 0
+        var new_cols = List[Column]()
+        if not drop and has_index:
+            # Promote the index to a PythonObject column called "index".
+            var idx_data = List[PythonObject]()
+            for i in range(len(self._cols[0]._index)):
+                idx_data.append(self._cols[0]._index[i])
+            var empty_idx = List[PythonObject]()
+            new_cols.append(Column("index", ColumnData(idx_data^), _object_, empty_idx^))
+        for i in range(ncols):
+            var c = self._cols[i].copy()
+            c._index = List[PythonObject]()
+            new_cols.append(c^)
+        return DataFrame(new_cols^)
 
     fn set_index(self, keys: List[String], drop: Bool = True) raises -> DataFrame:
-        _not_implemented("DataFrame.set_index")
-        return DataFrame()
+        """Promote one column to the row index.
+
+        ``keys`` must contain exactly one column name; multi-key (MultiIndex)
+        is not yet supported and raises.  When ``drop=True`` (default) the key
+        column is removed from the result columns.
+        """
+        if len(keys) == 0:
+            raise Error("DataFrame.set_index: keys must not be empty")
+        if len(keys) > 1:
+            raise Error(
+                "DataFrame.set_index: MultiIndex not yet supported; "
+                + "pass a single key"
+            )
+        var key = keys[0]
+        # Find the key column.
+        var key_col_idx: Int = -1
+        for i in range(len(self._cols)):
+            if self._cols[i].name == key:
+                key_col_idx = i
+                break
+        if key_col_idx == -1:
+            raise Error("DataFrame.set_index: column not found: " + key)
+        # Extract the key column's values as the new index.
+        var new_idx = self._cols[key_col_idx]._to_pyobj_index()
+        # Build result columns (skip key column when drop=True).
+        var new_cols = List[Column]()
+        for i in range(len(self._cols)):
+            if drop and i == key_col_idx:
+                continue
+            var c = self._cols[i].copy()
+            c._index = new_idx.copy()
+            new_cols.append(c^)
+        return DataFrame(new_cols^)
 
     fn rename(self, columns: Optional[Dict[String, String]] = None, index: Optional[Dict[String, String]] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.rename")
-        return DataFrame()
+        """Rename column labels and/or row index labels.
+
+        ``columns`` maps old column names to new ones; missing keys are left
+        unchanged.  ``index`` maps old index label strings to new ones; missing
+        keys are left unchanged.  Both can be applied in the same call.
+        """
+        var new_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var c = self._cols[i].copy()
+            if columns:
+                ref col_map = columns.value()
+                if c.name in col_map:
+                    c.name = col_map[c.name]
+            if index and len(c._index) > 0:
+                ref idx_map = index.value()
+                var builtins = Python.import_module("builtins")
+                for k in range(len(c._index)):
+                    var lbl = String(c._index[k])
+                    if lbl in idx_map:
+                        c._index[k] = builtins.str(idx_map[lbl])
+            new_cols.append(c^)
+        return DataFrame(new_cols^)
 
     fn rename_axis(self, mapper: Optional[String] = None, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.rename_axis")
-        return DataFrame()
+        """Return a copy with the axis name set to *mapper*.
+
+        Note: bison does not currently store axis names (the ``Index.name``
+        field is not wired into ``Column._index`` storage).  This method
+        returns a deep copy and silently ignores *mapper*.  The limitation is
+        tracked in SESSION.md as a tech-debt item.
+        """
+        return self._deep_copy()
 
     fn reindex(self, labels: Optional[List[String]] = None, axis: Int = 0, fill_value: Optional[DFScalar] = None) raises -> DataFrame:
-        _not_implemented("DataFrame.reindex")
-        return DataFrame()
+        """Conform the DataFrame to a new set of labels along an axis.
+
+        ``axis=1`` reorders/selects columns; missing columns are filled with
+        *fill_value* (null when *fill_value* is not provided).
+        ``axis=0`` reorders/selects rows by index label; missing labels produce
+        null rows (or rows filled with *fill_value*).
+
+        Returns an identical copy when ``labels`` is not provided.
+        """
+        if not labels:
+            return self._deep_copy()
+        ref new_labels = labels.value()
+        var ncols = len(self._cols)
+        if axis == 1:
+            # Column reindex: reorder and/or fill new columns.
+            var nrows = self.shape()[0]
+            # Build a name→col_index lookup.
+            var col_map = Dict[String, Int]()
+            for i in range(ncols):
+                col_map[self._cols[i].name] = i
+            # Determine the shared index for the result.
+            var shared_idx = List[PythonObject]()
+            if ncols > 0:
+                shared_idx = self._cols[0]._index.copy()
+            var new_cols = List[Column]()
+            for k in range(len(new_labels)):
+                var lbl = new_labels[k]
+                if lbl in col_map:
+                    var c = self._cols[col_map[lbl]].copy()
+                    new_cols.append(c^)
+                else:
+                    # Insert a fill/null column.
+                    if fill_value:
+                        var c = Column._fill_scalar(lbl, fill_value.value(), nrows, shared_idx.copy())
+                        new_cols.append(c^)
+                    else:
+                        # Null Float64 column: all-null mask.
+                        var null_data = List[Float64]()
+                        for r in range(nrows):
+                            null_data.append(Float64(0) / Float64(0))
+                        var null_mask = List[Bool]()
+                        for r in range(nrows):
+                            null_mask.append(True)
+                        var c = Column(lbl, ColumnData(null_data^), _float64, shared_idx.copy())
+                        c._null_mask = null_mask^
+                        new_cols.append(c^)
+            return DataFrame(new_cols^)
+        else:
+            # Row reindex: reorder and/or fill new rows.
+            if ncols == 0:
+                return DataFrame()
+            var nrows = self.shape()[0]
+            var has_index = len(self._cols[0]._index) > 0
+            # Build label → row-position map.
+            var label_to_row = Dict[String, Int]()
+            for i in range(nrows):
+                var key: String
+                if has_index:
+                    key = String(self._cols[0]._index[i])
+                else:
+                    key = String(i)
+                label_to_row[key] = i
+            # Build the per-output-row index list (row_indices) and new _index.
+            var row_indices = List[Int]()
+            var new_pyidx = List[PythonObject]()
+            var builtins = Python.import_module("builtins")
+            for k in range(len(new_labels)):
+                var lbl = new_labels[k]
+                if lbl in label_to_row:
+                    var src_row = label_to_row[lbl]
+                    row_indices.append(src_row)
+                    if has_index:
+                        new_pyidx.append(self._cols[0]._index[src_row])
+                    else:
+                        new_pyidx.append(builtins.int(src_row))
+                else:
+                    row_indices.append(-1)
+                    new_pyidx.append(builtins.str(lbl))
+            # Reindex each column.
+            var new_cols = List[Column]()
+            for i in range(ncols):
+                var c = self._cols[i]._reindex_rows(row_indices, fill_value)
+                c._index = new_pyidx.copy()
+                new_cols.append(c^)
+            return DataFrame(new_cols^)
 
     fn drop(self, labels: Optional[List[String]] = None, axis: Int = 0, columns: Optional[List[String]] = None) raises -> DataFrame:
         """Drop columns (axis=1 / columns kwarg) or rows (axis=0) by label.
