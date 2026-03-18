@@ -1076,7 +1076,7 @@ struct Series(Copyable, Movable):
         c.name = new_name
         return Series(c^)
 
-    fn clip(self, lower: Float64, upper: Float64) raises -> Series:
+    fn clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> Series:
         return Series(self._col._clip(lower, upper))
 
     fn abs(self) raises -> Series:
