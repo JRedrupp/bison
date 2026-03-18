@@ -763,6 +763,129 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("where/mask: not supported for object dtype")
 
 
+struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Row-wise null-coalesce: keeps self's value where non-null, takes other's otherwise.
+
+    Used by ``_combine_first_col`` (backing ``DataFrame.combine_first`` and
+    ``DataFrame.update``).  For each row i: if self is non-null keep self;
+    else take other (which may itself be null).
+    Raises if the two ColumnData arms have different types.
+    """
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var self_null_mask: List[Bool]
+    var other_data: ColumnData
+    var other_null_mask: List[Bool]
+
+    fn __init__(out self, self_null_mask: List[Bool], other_data: ColumnData,
+                other_null_mask: List[Bool]):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.self_null_mask = self_null_mask.copy()
+        var v = _CopyDataVisitor()
+        visit_col_data(v, other_data)
+        self.other_data = v^.result
+        self.other_null_mask = other_null_mask.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        if not self.other_data.isa[List[Int64]]():
+            raise Error("combine_first: dtype mismatch between columns")
+        ref od = self.other_data[List[Int64]]
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_other_mask = len(self.other_null_mask) > 0
+        var result = List[Int64]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            if not self_null:
+                result.append(data[i])
+                self.result_mask.append(False)
+            else:
+                var other_null = has_other_mask and self.other_null_mask[i]
+                if other_null:
+                    result.append(Int64(0))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(od[i])
+                    self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        if not self.other_data.isa[List[Float64]]():
+            raise Error("combine_first: dtype mismatch between columns")
+        ref od = self.other_data[List[Float64]]
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_other_mask = len(self.other_null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            if not self_null:
+                result.append(data[i])
+                self.result_mask.append(False)
+            else:
+                var other_null = has_other_mask and self.other_null_mask[i]
+                if other_null:
+                    result.append(nan)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(od[i])
+                    self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        if not self.other_data.isa[List[Bool]]():
+            raise Error("combine_first: dtype mismatch between columns")
+        ref od = self.other_data[List[Bool]]
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_other_mask = len(self.other_null_mask) > 0
+        var result = List[Bool]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            if not self_null:
+                result.append(data[i])
+                self.result_mask.append(False)
+            else:
+                var other_null = has_other_mask and self.other_null_mask[i]
+                if other_null:
+                    result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(od[i])
+                    self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]) raises:
+        if not self.other_data.isa[List[String]]():
+            raise Error("combine_first: dtype mismatch between columns")
+        ref od = self.other_data[List[String]]
+        var has_self_mask = len(self.self_null_mask) > 0
+        var has_other_mask = len(self.other_null_mask) > 0
+        var result = List[String]()
+        for i in range(len(data)):
+            var self_null = has_self_mask and self.self_null_mask[i]
+            if not self_null:
+                result.append(data[i])
+                self.result_mask.append(False)
+            else:
+                var other_null = has_other_mask and self.other_null_mask[i]
+                if other_null:
+                    result.append(String(""))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    result.append(od[i])
+                    self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("combine_first: not supported for object dtype")
+
+
 struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Returns unique values in first-occurrence order; nulls appended once at end."""
     var col_data: ColumnData
@@ -2046,6 +2169,24 @@ struct Column(Copyable, Movable, Sized):
         """Null value where ``cond`` is True; keep otherwise."""
         return self._where_mask[0](cond)
 
+    fn _combine_first_col(self, other: Column) raises -> Column:
+        """Return a Column whose values come from self where non-null, otherwise from other.
+
+        Both columns must have the same length and the same ColumnData arm type.
+        Raises on length mismatch or dtype mismatch.
+        """
+        if len(self) != len(other):
+            raise Error(
+                "combine_first: length mismatch ("
+                + String(len(self))
+                + " vs "
+                + String(len(other))
+                + ")"
+            )
+        var visitor = _CombineFirstVisitor(self._null_mask, other._data, other._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+
     fn _unique(self) raises -> Column:
         """Return a Column of unique values, preserving first-occurrence order.
 
@@ -2523,6 +2664,38 @@ struct Column(Copyable, Movable, Sized):
         var visitor = _DtypeSniffVisitor()
         visit_col_data(visitor, data)
         return visitor.result
+
+    @staticmethod
+    fn _fill_scalar(name: String, value: DFScalar, n: Int, index: List[PythonObject]) -> Column:
+        """Create a Column of length *n* with every element equal to *value*.
+
+        The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
+        Bool → bool, String → object (matching pandas string storage).
+        """
+        if value.isa[Int64]():
+            var v = value[Int64]
+            var data = List[Int64]()
+            for i in range(n):
+                data.append(v)
+            return Column(name, ColumnData(data^), int64, index.copy())
+        elif value.isa[Float64]():
+            var v = value[Float64]
+            var data = List[Float64]()
+            for i in range(n):
+                data.append(v)
+            return Column(name, ColumnData(data^), float64, index.copy())
+        elif value.isa[Bool]():
+            var v = value[Bool]
+            var data = List[Bool]()
+            for i in range(n):
+                data.append(v)
+            return Column(name, ColumnData(data^), bool_, index.copy())
+        else:
+            var v = value[String]
+            var data = List[String]()
+            for i in range(n):
+                data.append(v)
+            return Column(name, ColumnData(data^), object_, index.copy())
 
     fn to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
