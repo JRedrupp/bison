@@ -927,6 +927,7 @@ struct DataFrame(Copyable, Movable):
         keys are left unchanged.  Both can be applied in the same call.
         """
         var new_cols = List[Column]()
+        var builtins = Python.import_module("builtins")
         for i in range(len(self._cols)):
             var c = self._cols[i].copy()
             if columns:
@@ -935,7 +936,6 @@ struct DataFrame(Copyable, Movable):
                     c.name = col_map[c.name]
             if index and len(c._index) > 0:
                 ref idx_map = index.value()
-                var builtins = Python.import_module("builtins")
                 for k in range(len(c._index)):
                     var lbl = String(c._index[k])
                     if lbl in idx_map:
