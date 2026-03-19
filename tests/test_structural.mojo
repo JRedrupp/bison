@@ -315,17 +315,28 @@ fn test_mask_nulls_true_positions() raises:
     assert_true(r["a"].isna().iloc(2)[Bool])
 
 
-fn test_where_other_raises() raises:
+fn test_where_other_fills() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
-    var cond = Series(pd.Series(Python.evaluate("[True, False]")))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
+    var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
     var other = Optional[DFScalar](DFScalar(Float64(0.0)))
-    var raised = False
-    try:
-        _ = df.where(cond, other)
-    except:
-        raised = True
-    assert_true(raised)
+    var r = df.where(cond, other)
+    assert_true(r["a"].iloc(0)[Float64] == 1.0)
+    assert_true(r["a"].iloc(1)[Float64] == 0.0)
+    assert_false(r["a"].isna().iloc(1)[Bool])
+    assert_true(r["a"].iloc(2)[Float64] == 3.0)
+
+
+fn test_mask_other_fills() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
+    var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
+    var other = Optional[DFScalar](DFScalar(Float64(-1.0)))
+    var r = df.mask(cond, other)
+    assert_true(r["a"].iloc(0)[Float64] == -1.0)
+    assert_false(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].iloc(1)[Float64] == 2.0)
+    assert_true(r["a"].iloc(2)[Float64] == -1.0)
 
 
 # ------------------------------------------------------------------
