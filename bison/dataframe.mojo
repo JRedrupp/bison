@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .column import Column, ColumnData, DFScalar
-from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64, object_ as _object_
+from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64, object_ as _object_, int64 as _int64
 from .series import Series
 from .groupby import DataFrameGroupBy
 
@@ -978,6 +978,16 @@ struct DataFrame(Copyable, Movable):
             var shared_idx = List[PythonObject]()
             if ncols > 0:
                 shared_idx = self._cols[0]._index.copy()
+            # Infer a common dtype from existing columns for null-fill.
+            # If all columns share the same dtype, use it; otherwise fall back
+            # to float64 (the widest numeric type).
+            var inferred_dtype = _float64
+            if ncols > 0:
+                inferred_dtype = self._cols[0].dtype
+                for j in range(1, ncols):
+                    if self._cols[j].dtype != inferred_dtype:
+                        inferred_dtype = _float64
+                        break
             var new_cols = List[Column]()
             for k in range(len(new_labels)):
                 var lbl = new_labels[k]
@@ -990,15 +1000,10 @@ struct DataFrame(Copyable, Movable):
                         var c = Column._fill_scalar(lbl, fill_value.value(), nrows, shared_idx.copy())
                         new_cols.append(c^)
                     else:
-                        # Null Float64 column: all-null mask.
-                        var null_data = List[Float64]()
-                        for r in range(nrows):
-                            null_data.append(Float64(0) / Float64(0))
-                        var null_mask = List[Bool]()
-                        for r in range(nrows):
-                            null_mask.append(True)
-                        var c = Column(lbl, ColumnData(null_data^), _float64, shared_idx.copy())
-                        c._null_mask = null_mask^
+                        # Null column: infer dtype from existing columns so
+                        # that a frame of all-int64 columns produces an int64
+                        # null column rather than float64.
+                        var c = Column._null_column(lbl, inferred_dtype, nrows, shared_idx.copy())
                         new_cols.append(c^)
             return DataFrame(new_cols^)
         else:
