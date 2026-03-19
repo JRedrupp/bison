@@ -689,6 +689,8 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     keep_on_true=True  → where semantics: keep value when condition is True.
     keep_on_true=False → mask semantics: null value when condition is True.
+    When ``other`` is provided, non-kept cells are filled with that scalar
+    instead of null.
     """
     var col_data: ColumnData
     var result_mask: List[Bool]
@@ -697,9 +699,11 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var cond_data: List[Bool]
     var cond_null_mask: List[Bool]
     var keep_on_true: Bool
+    var other: Optional[DFScalar]
 
     fn __init__(out self, self_null_mask: List[Bool], cond_data: List[Bool],
-                cond_null_mask: List[Bool], keep_on_true: Bool):
+                cond_null_mask: List[Bool], keep_on_true: Bool,
+                other: Optional[DFScalar] = None):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -707,21 +711,38 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.cond_data = cond_data.copy()
         self.cond_null_mask = cond_null_mask.copy()
         self.keep_on_true = keep_on_true
+        self.other = other
 
     fn on_int64(mut self, data: List[Int64]) raises:
         var has_self_mask = len(self.self_null_mask) > 0
         var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_other = self.other.__bool__()
+        var other_val: Int64 = 0
+        var other_is_null = True
+        if has_other:
+            var fv = self.other.value()
+            if fv.isa[Int64]():
+                other_val = fv[Int64]; other_is_null = False
+            elif fv.isa[Float64]():
+                other_val = Int64(Int(fv[Float64])); other_is_null = False
+            elif fv.isa[Bool]():
+                other_val = Int64(1) if fv[Bool] else Int64(0); other_is_null = False
         var result = List[Int64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
             var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
-            if self_null or not keep:
+            if keep:
+                result.append(data[i])
+                self.result_mask.append(self_null)
+                if self_null:
+                    self.has_any_null = True
+            elif other_is_null:
                 result.append(Int64(0))
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                result.append(data[i])
+                result.append(other_val)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
@@ -729,51 +750,93 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         var has_self_mask = len(self.self_null_mask) > 0
         var has_cond_mask = len(self.cond_null_mask) > 0
         var nan = Float64(0) / Float64(0)
+        var has_other = self.other.__bool__()
+        var other_val: Float64 = nan
+        var other_is_null = True
+        if has_other:
+            var fv = self.other.value()
+            if fv.isa[Float64]():
+                other_val = fv[Float64]; other_is_null = False
+            elif fv.isa[Int64]():
+                other_val = Float64(fv[Int64]); other_is_null = False
+            elif fv.isa[Bool]():
+                other_val = 1.0 if fv[Bool] else 0.0; other_is_null = False
         var result = List[Float64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
             var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
-            if self_null or not keep:
+            if keep:
+                result.append(data[i])
+                self.result_mask.append(self_null)
+                if self_null:
+                    self.has_any_null = True
+            elif other_is_null:
                 result.append(nan)
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                result.append(data[i])
+                result.append(other_val)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
     fn on_bool(mut self, data: List[Bool]) raises:
         var has_self_mask = len(self.self_null_mask) > 0
         var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_other = self.other.__bool__()
+        var other_val: Bool = False
+        var other_is_null = True
+        if has_other:
+            var fv = self.other.value()
+            if fv.isa[Bool]():
+                other_val = fv[Bool]; other_is_null = False
+            elif fv.isa[Int64]():
+                other_val = fv[Int64] != 0; other_is_null = False
         var result = List[Bool]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
             var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
-            if self_null or not keep:
+            if keep:
+                result.append(data[i])
+                self.result_mask.append(self_null)
+                if self_null:
+                    self.has_any_null = True
+            elif other_is_null:
                 result.append(False)
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                result.append(data[i])
+                result.append(other_val)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
     fn on_str(mut self, data: List[String]) raises:
         var has_self_mask = len(self.self_null_mask) > 0
         var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_other = self.other.__bool__()
+        var other_val: String = ""
+        var other_is_null = True
+        if has_other:
+            var fv = self.other.value()
+            if fv.isa[String]():
+                other_val = fv[String]; other_is_null = False
         var result = List[String]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
             var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
-            if self_null or not keep:
+            if keep:
+                result.append(data[i])
+                self.result_mask.append(self_null)
+                if self_null:
+                    self.has_any_null = True
+            elif other_is_null:
                 result.append(String(""))
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                result.append(data[i])
+                result.append(other_val)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
@@ -2275,11 +2338,13 @@ struct Column(Copyable, Movable, Sized):
                 result_mask.append(False)
         return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
 
-    fn _where_mask[mode: Int](self, cond: Column) raises -> Column:
+    fn _where_mask[mode: Int](self, cond: Column,
+                              other: Optional[DFScalar] = None) raises -> Column:
         """Shared kernel for ``_where`` (mode=1) and ``_mask`` (mode=0).
 
-        mode=1: keep value where cond is True, null otherwise.
-        mode=0: null value where cond is True, keep otherwise.
+        mode=1: keep value where cond is True, replace otherwise.
+        mode=0: replace value where cond is True, keep otherwise.
+        When ``other`` is None, replaced cells become null.
         Supports Int64, Float64, Bool, String arms. Raises for Object dtype.
         """
         if not cond._data.isa[List[Bool]]():
@@ -2294,18 +2359,19 @@ struct Column(Copyable, Movable, Sized):
             )
         var keep_on_true = (mode == 1)
         var visitor = _WhereMaskVisitor(
-            self._null_mask, cond._data[List[Bool]].copy(), cond._null_mask, keep_on_true
+            self._null_mask, cond._data[List[Bool]].copy(), cond._null_mask,
+            keep_on_true, other
         )
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
-    fn _where(self, cond: Column) raises -> Column:
-        """Keep value where ``cond`` is True; null otherwise."""
-        return self._where_mask[1](cond)
+    fn _where(self, cond: Column, other: Optional[DFScalar] = None) raises -> Column:
+        """Keep value where ``cond`` is True; replace with ``other`` (or null) otherwise."""
+        return self._where_mask[1](cond, other)
 
-    fn _mask(self, cond: Column) raises -> Column:
-        """Null value where ``cond`` is True; keep otherwise."""
-        return self._where_mask[0](cond)
+    fn _mask(self, cond: Column, other: Optional[DFScalar] = None) raises -> Column:
+        """Replace with ``other`` (or null) where ``cond`` is True; keep otherwise."""
+        return self._where_mask[0](cond, other)
 
     fn _combine_first_col(self, other: Column) raises -> Column:
         """Return a Column whose values come from self where non-null, otherwise from other.
