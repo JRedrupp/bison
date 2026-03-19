@@ -1115,11 +1115,11 @@ struct Series(Copyable, Movable):
     fn between(self, left: Float64, right: Float64) raises -> Series:
         return Series(self._col._between(left, right))
 
-    fn where(self, cond: Series) raises -> Series:
-        return Series(self._col._where(cond._col))
+    fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+        return Series(self._col._where(cond._col, other))
 
-    fn mask(self, cond: Series) raises -> Series:
-        return Series(self._col._mask(cond._col))
+    fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+        return Series(self._col._mask(cond._col, other))
 
     # ------------------------------------------------------------------
     # Interop

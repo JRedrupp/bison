@@ -1377,29 +1377,23 @@ struct DataFrame(Copyable, Movable):
         return result^
 
     fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        """Keep each element where *cond* is True; replace with null otherwise.
+        """Keep each element where *cond* is True; replace with *other* otherwise.
 
-        ``other`` (replacement value for False positions) is not yet supported;
-        pass ``other=None`` (the default).
+        When *other* is ``None`` (the default), non-matching cells become null.
         """
-        if other:
-            raise Error("DataFrame.where: other= parameter is not yet implemented; pass other=None")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._where(cond._col))
+            result_cols.append(self._cols[i]._where(cond._col, other))
         return DataFrame(result_cols^)
 
     fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        """Replace each element with null where *cond* is True; keep otherwise.
+        """Replace each element with *other* where *cond* is True; keep otherwise.
 
-        ``other`` (replacement value for True positions) is not yet supported;
-        pass ``other=None`` (the default).
+        When *other* is ``None`` (the default), matching cells become null.
         """
-        if other:
-            raise Error("DataFrame.mask: other= parameter is not yet implemented; pass other=None")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._mask(cond._col))
+            result_cols.append(self._cols[i]._mask(cond._col, other))
         return DataFrame(result_cols^)
 
     fn isin(self, values: Dict[String, List[DFScalar]]) raises -> DataFrame:
