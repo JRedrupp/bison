@@ -375,6 +375,23 @@ fn test_reindex_axis1_null_fill() raises:
     assert_equal(r.shape()[0], 2)
 
 
+fn test_reindex_axis1_null_fill_dtype_inferred() raises:
+    # Missing columns should get the same dtype as existing columns,
+    # not unconditionally float64 (tech debt fix).
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var lbls = List[String]()
+    lbls.append("a")
+    lbls.append("x")  # missing — should be int64, not float64
+    var r = df.reindex(labels=Optional[List[String]](lbls^), axis=1)
+    assert_equal(r.shape()[1], 2)
+    # All source columns are int64, so the null column should also be int64.
+    assert_equal(r["x"]._col.dtype.name, "int64")
+    # The null column must be entirely null.
+    assert_true(r["x"].isna().iloc(0)[Bool] == True)
+    assert_true(r["x"].isna().iloc(1)[Bool] == True)
+
+
 fn test_reindex_axis0_reorder() raises:
     # index=['c', 'a', 'b'], values=[10, 20, 30]. Reindex to ['a', 'b', 'c'].
     var pd = Python.import_module("pandas")

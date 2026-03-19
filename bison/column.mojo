@@ -3033,6 +3033,43 @@ struct Column(Copyable, Movable, Sized):
         return visitor.result
 
     @staticmethod
+    fn _null_column(name: String, dtype: BisonDtype, n: Int, var index: List[PythonObject]) raises -> Column:
+        """Create an all-null Column of length *n* with the given *dtype*.
+
+        The underlying storage uses the canonical Mojo type for *dtype*
+        (Int64 for integer families, Float64 for float families, Bool for
+        bool, PythonObject for everything else).  Every element is marked
+        null via ``_null_mask``.
+        """
+        var null_mask = List[Bool]()
+        for _ in range(n):
+            null_mask.append(True)
+        var c: Column
+        if dtype.is_integer():
+            var data = List[Int64]()
+            for _ in range(n):
+                data.append(Int64(0))
+            c = Column(name, ColumnData(data^), dtype, index^)
+        elif dtype.is_float():
+            var data = List[Float64]()
+            for _ in range(n):
+                data.append(Float64(0) / Float64(0))
+            c = Column(name, ColumnData(data^), dtype, index^)
+        elif dtype == bool_:
+            var data = List[Bool]()
+            for _ in range(n):
+                data.append(False)
+            c = Column(name, ColumnData(data^), bool_, index^)
+        else:
+            var data = List[PythonObject]()
+            var py_none = Python.evaluate("None")
+            for _ in range(n):
+                data.append(py_none)
+            c = Column(name, ColumnData(data^), dtype, index^)
+        c._null_mask = null_mask^
+        return c^
+
+    @staticmethod
     fn _fill_scalar(name: String, value: DFScalar, n: Int, index: List[PythonObject]) -> Column:
         """Create a Column of length *n* with every element equal to *value*.
 
