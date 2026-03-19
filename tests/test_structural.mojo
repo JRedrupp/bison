@@ -39,6 +39,18 @@ fn test_copy_is_independent() raises:
     assert_true(df["a"].iloc(0)[Int64] == 1)
 
 
+fn test_copy_shallow_raises() raises:
+    # copy(deep=False) must raise because shallow copy is not yet supported.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var raised = False
+    try:
+        _ = df.copy(False)
+    except:
+        raised = True
+    assert_true(raised)
+
+
 # ------------------------------------------------------------------
 # round
 # ------------------------------------------------------------------
