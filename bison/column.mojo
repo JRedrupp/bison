@@ -2191,14 +2191,14 @@ struct Column(Copyable, Movable, Sized):
                 result_mask.append(False)
         return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
 
-    fn _isin_int(self, values: List[Int64]) raises -> Column:
-        """Bool Column: True where element is in ``values`` (Int64 columns only).
+    fn _isin_kernel[T: Comparable & Copyable & Movable](
+        self, d: List[T], values: List[T]
+    ) -> Column:
+        """Shared kernel for all _isin_* methods.
 
+        Builds a Bool Column: True where element is in ``values``.
         Nulls propagate as null.
         """
-        if not self._data.isa[List[Int64]]():
-            raise Error("isin: column must be Int64 to match against List[Int64]")
-        ref d = self._data[List[Int64]]
         var has_mask = len(self._null_mask) > 0
         var result = List[Bool]()
         var result_mask = List[Bool]()
@@ -2217,6 +2217,15 @@ struct Column(Copyable, Movable, Sized):
                 result.append(found)
                 result_mask.append(False)
         return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+
+    fn _isin_int(self, values: List[Int64]) raises -> Column:
+        """Bool Column: True where element is in ``values`` (Int64 columns only).
+
+        Nulls propagate as null.
+        """
+        if not self._data.isa[List[Int64]]():
+            raise Error("isin: column must be Int64 to match against List[Int64]")
+        return self._isin_kernel(self._data[List[Int64]], values)
 
     fn _isin_float(self, values: List[Float64]) raises -> Column:
         """Bool Column: True where element is in ``values`` (Float64 columns only).
@@ -2225,25 +2234,7 @@ struct Column(Copyable, Movable, Sized):
         """
         if not self._data.isa[List[Float64]]():
             raise Error("isin: column must be Float64 to match against List[Float64]")
-        ref d = self._data[List[Float64]]
-        var has_mask = len(self._null_mask) > 0
-        var result = List[Bool]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        for i in range(len(d)):
-            if has_mask and self._null_mask[i]:
-                result.append(False)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                var found = False
-                for j in range(len(values)):
-                    if d[i] == values[j]:
-                        found = True
-                        break
-                result.append(found)
-                result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._isin_kernel(self._data[List[Float64]], values)
 
     fn _isin_str(self, values: List[String]) raises -> Column:
         """Bool Column: True where element is in ``values`` (String columns only).
@@ -2252,25 +2243,7 @@ struct Column(Copyable, Movable, Sized):
         """
         if not self._data.isa[List[String]]():
             raise Error("isin: column must be String to match against List[String]")
-        ref d = self._data[List[String]]
-        var has_mask = len(self._null_mask) > 0
-        var result = List[Bool]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        for i in range(len(d)):
-            if has_mask and self._null_mask[i]:
-                result.append(False)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                var found = False
-                for j in range(len(values)):
-                    if d[i] == values[j]:
-                        found = True
-                        break
-                result.append(found)
-                result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._isin_kernel(self._data[List[String]], values)
 
     fn _isin_bool(self, values: List[Bool]) raises -> Column:
         """Bool Column: True where element is in ``values`` (Bool columns only).
@@ -2279,25 +2252,7 @@ struct Column(Copyable, Movable, Sized):
         """
         if not self._data.isa[List[Bool]]():
             raise Error("isin: column must be Bool to match against List[Bool]")
-        ref d = self._data[List[Bool]]
-        var has_mask = len(self._null_mask) > 0
-        var result = List[Bool]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        for i in range(len(d)):
-            if has_mask and self._null_mask[i]:
-                result.append(False)
-                result_mask.append(True)
-                has_any_null = True
-            else:
-                var found = False
-                for j in range(len(values)):
-                    if d[i] == values[j]:
-                        found = True
-                        break
-                result.append(found)
-                result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._isin_kernel(self._data[List[Bool]], values)
 
     fn _between(self, left: Float64, right: Float64) raises -> Column:
         """Bool Column: True where left <= element <= right.
