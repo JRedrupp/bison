@@ -1303,11 +1303,20 @@ struct DataFrame(Copyable, Movable):
     fn copy(self, deep: Bool) raises -> DataFrame:
         """Return an independent copy of this DataFrame.
 
-        ``deep=False`` is accepted but behaves identically to ``deep=True``
-        because ``Column.copy()`` always performs a deep copy.
-        Calling ``df.copy()`` (no args) uses the Copyable-trait copy, which
-        is also a deep copy via ``__copyinit__``.
+        When ``deep=True`` (the default in pandas), a full independent copy of
+        all columns is returned.
+
+        ``deep=False`` raises ``Error`` because shallow-copy semantics require
+        reference-counted storage, which Mojo's ownership model does not yet
+        support.  Pass ``deep=True`` (or call ``df.copy(True)``) to obtain a
+        deep copy.
         """
+        if not deep:
+            raise Error(
+                "DataFrame.copy: deep=False is not yet supported; Mojo's"
+                " ownership model requires reference-counted storage for"
+                " shallow copies"
+            )
         return self._deep_copy()
 
     fn assign(self, cols: Dict[String, Series]) raises -> DataFrame:
