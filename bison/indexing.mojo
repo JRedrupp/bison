@@ -1,47 +1,394 @@
-from ._errors import _not_implemented
-from .column import DFScalar
+from std.python import PythonObject
+from std.memory import UnsafePointer
+from .column import Column, ColumnData, DFScalar, SeriesScalar
+from .dtypes import object_
 from .series import Series
+from .dataframe import DataFrame
 
 
-struct LocIndexer:
-    """Label-based indexer (.loc)."""
+# ------------------------------------------------------------------
+# Private helpers
+# ------------------------------------------------------------------
+
+fn _df_col_index(df: DataFrame, name: String) raises -> Int:
+    """Return the integer position of column *name* in *df*."""
+    for i in range(len(df._cols)):
+        if df._cols[i].name == name:
+            return i
+    raise Error("column '" + name + "' not found")
+
+
+fn _parse_int_label(label: String) raises -> Int:
+    """Parse a decimal integer string into an ``Int``.
+
+    Supports an optional leading ``'-'`` sign.  Raises when the string
+    contains non-digit characters.
+    """
+    var n = len(label)
+    if n == 0:
+        raise Error("loc: empty row label")
+    var bytes = label.as_bytes()
+    var start = 0
+    var negative = False
+    if bytes[0] == ord('-'):
+        negative = True
+        start = 1
+    elif bytes[0] == ord('+'):
+        start = 1
+    if start >= n:
+        raise Error("loc: invalid row label: " + label)
+    var result = 0
+    for i in range(start, n):
+        var digit = Int(bytes[i]) - ord('0')
+        if digit < 0 or digit > 9:
+            raise Error("loc: not an integer label: " + label)
+        result = result * 10 + digit
+    return -result if negative else result
+
+
+fn _df_row_index(df: DataFrame, label: String) raises -> Int:
+    """Return the integer row position for the given row *label*.
+
+    If the first column has a non-empty ``_index`` list the label is
+    matched via ``String()`` conversion.  When the index list is empty
+    the default integer range index (0, 1, …) is assumed and the label
+    must be a decimal integer string.
+    """
+    var nrows = df.shape()[0]
+    if nrows == 0:
+        raise Error("loc: DataFrame is empty")
+    if len(df._cols) == 0:
+        raise Error("loc: DataFrame has no columns")
+    ref idx = df._cols[0]._index
+    if len(idx) > 0:
+        for i in range(len(idx)):
+            if String(idx[i]) == label:
+                return i
+        raise Error("loc: label '" + label + "' not found in index")
+    # Default RangeIndex: parse the label as an integer.
+    var row = _parse_int_label(label)
+    if row < 0:
+        row = nrows + row
+    if row < 0 or row >= nrows:
+        raise Error("loc: label '" + label + "' out of range")
+    return row
+
+
+fn _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
+    """Extract cell (*row*) from *col* as a ``DFScalar``.
+
+    Raises for ``List[PythonObject]`` columns (object / datetime) since
+    ``DFScalar`` has no ``PythonObject`` arm.
+    """
+    if col._data.isa[List[Int64]]():
+        return DFScalar(col._data[List[Int64]][row])
+    elif col._data.isa[List[Float64]]():
+        return DFScalar(col._data[List[Float64]][row])
+    elif col._data.isa[List[Bool]]():
+        return DFScalar(col._data[List[Bool]][row])
+    elif col._data.isa[List[String]]():
+        return DFScalar(col._data[List[String]][row])
+    else:
+        raise Error("scalar access not supported for object/datetime columns")
+
+
+fn _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
+    """Write *value* into *col* at integer position *row*.
+
+    Type coercion mirrors pandas ``at`` / ``iat`` behaviour:
+    * Int64 value → Int64 or Float64 or Bool column (cast).
+    * Float64 value → Float64 column; truncated to Int64 when the
+      target is an integer column (fractional part is discarded,
+      matching pandas ``iat`` behaviour).
+    * Bool value → Bool or Int64 or Float64 column (0/1).
+    * String value → String column only.
+    Raises when the types are incompatible.
+    """
+    if col._data.isa[List[Int64]]():
+        if value.isa[Int64]():
+            col._data[List[Int64]][row] = value[Int64]
+        elif value.isa[Float64]():
+            col._data[List[Int64]][row] = Int64(Int(value[Float64]))
+        elif value.isa[Bool]():
+            col._data[List[Int64]][row] = Int64(1) if value[Bool] else Int64(0)
+        else:
+            raise Error("iat/at: cannot assign String to int column")
+    elif col._data.isa[List[Float64]]():
+        if value.isa[Float64]():
+            col._data[List[Float64]][row] = value[Float64]
+        elif value.isa[Int64]():
+            col._data[List[Float64]][row] = Float64(Int(value[Int64]))
+        elif value.isa[Bool]():
+            col._data[List[Float64]][row] = Float64(1) if value[Bool] else Float64(0)
+        else:
+            raise Error("iat/at: cannot assign String to float column")
+    elif col._data.isa[List[Bool]]():
+        if value.isa[Bool]():
+            col._data[List[Bool]][row] = value[Bool]
+        elif value.isa[Int64]():
+            col._data[List[Bool]][row] = value[Int64] != 0
+        elif value.isa[Float64]():
+            col._data[List[Bool]][row] = value[Float64] != 0.0
+        else:
+            raise Error("iat/at: cannot assign String to bool column")
+    elif col._data.isa[List[String]]():
+        if value.isa[String]():
+            col._data[List[String]][row] = value[String]
+        else:
+            raise Error("iat/at: cannot assign non-String to string column")
+    else:
+        raise Error("iat/at: scalar write not supported for object/datetime columns")
+
+
+fn _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
+    """Write a ``SeriesScalar`` cell into *col* at position *row*.
+
+    Behaves like ``_set_scalar_in_col`` but also handles the
+    ``PythonObject`` arm of ``SeriesScalar``.
+    """
+    if value.isa[PythonObject]():
+        # Only object columns accept PythonObject values.
+        if col._data.isa[List[PythonObject]]():
+            col._data[List[PythonObject]][row] = value[PythonObject]
+        else:
+            raise Error("iloc: cannot assign PythonObject to typed column")
+        return
+    # Use the DFScalar path for the four typed arms.
+    var ds: DFScalar
+    if value.isa[Int64]():
+        ds = DFScalar(value[Int64])
+    elif value.isa[Float64]():
+        ds = DFScalar(value[Float64])
+    elif value.isa[Bool]():
+        ds = DFScalar(value[Bool])
+    else:
+        ds = DFScalar(value[String])
+    _set_scalar_in_col(col, row, ds)
+
+
+fn _row_as_series(df: DataFrame, row: Int) raises -> Series:
+    """Build a ``Series`` representing row *row* of *df*.
+
+    The returned Series has ``object_`` dtype; each element is a
+    ``PythonObject`` wrapping the cell value.  The ``_index`` of the
+    returned column holds the column names as ``PythonObject`` strings,
+    matching the pandas ``df.iloc[i]`` behaviour.
+    """
+    var ncols = df.shape()[1]
+    var data = List[PythonObject]()
+    var index = List[PythonObject]()
+    for ci in range(ncols):
+        index.append(PythonObject(df._cols[ci].name))
+        ref col = df._cols[ci]
+        if col._data.isa[List[Int64]]():
+            data.append(PythonObject(col._data[List[Int64]][row]))
+        elif col._data.isa[List[Float64]]():
+            data.append(PythonObject(col._data[List[Float64]][row]))
+        elif col._data.isa[List[Bool]]():
+            data.append(PythonObject(col._data[List[Bool]][row]))
+        elif col._data.isa[List[String]]():
+            data.append(PythonObject(col._data[List[String]][row]))
+        else:
+            data.append(col._data[List[PythonObject]][row])
+    var result_col = Column("", ColumnData(data^), object_, index^)
+    return Series(result_col^)
+
+
+# ------------------------------------------------------------------
+# Public indexer structs
+# ------------------------------------------------------------------
+
+struct LocIndexer[O: MutOrigin]:
+    """Label-based row indexer (.loc).
+
+    Construct via ``LocIndexer(UnsafePointer(to=df))`` where *df* is a
+    mutable ``DataFrame``.  The pointer must remain valid for the
+    lifetime of the indexer.
+    """
+
+    var _df: UnsafePointer[DataFrame, Self.O]
+
+    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+        self._df = ptr
 
     fn __getitem__(self, key: String) raises -> Series:
-        _not_implemented("DataFrame.loc.__getitem__")
-        return Series()
+        """Return row *key* as a Series (index = column names)."""
+        ref df = self._df[]
+        var row = _df_row_index(df, key)
+        var nrows = df.shape()[0]
+        if row < 0 or row >= nrows:
+            raise Error("loc: row index out of bounds")
+        return _row_as_series(df, row)
 
     fn __setitem__(self, key: String, value: Series) raises:
-        _not_implemented("DataFrame.loc.__setitem__")
+        """Assign Series *value* to row *key*.
+
+        *value* must have exactly as many elements as there are columns.
+        Each element is written into the corresponding column at the
+        row position identified by *key*.
+        """
+        ref df = self._df[]
+        var row = _df_row_index(df, key)
+        var ncols = df.shape()[1]
+        var nrows = df.shape()[0]
+        if row < 0 or row >= nrows:
+            raise Error("loc: row index out of bounds")
+        if value.size() != ncols:
+            raise Error(
+                "loc: Series length "
+                + String(value.size())
+                + " != number of columns "
+                + String(ncols)
+            )
+        for ci in range(ncols):
+            var cell = value.iloc(ci)
+            _set_series_scalar_in_col(df._cols[ci], row, cell)
 
 
-struct ILocIndexer:
-    """Integer-position-based indexer (.iloc)."""
+struct ILocIndexer[O: MutOrigin]:
+    """Integer-position-based row indexer (.iloc).
+
+    Construct via ``ILocIndexer(UnsafePointer(to=df))``.
+    """
+
+    var _df: UnsafePointer[DataFrame, Self.O]
+
+    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+        self._df = ptr
 
     fn __getitem__(self, key: Int) raises -> Series:
-        _not_implemented("DataFrame.iloc.__getitem__")
-        return Series()
+        """Return row *key* (integer position) as a Series."""
+        ref df = self._df[]
+        var nrows = df.shape()[0]
+        var row = key
+        if row < 0:
+            row = nrows + row
+        if row < 0 or row >= nrows:
+            raise Error(
+                "iloc: row index "
+                + String(key)
+                + " out of bounds for DataFrame with "
+                + String(nrows)
+                + " rows"
+            )
+        return _row_as_series(df, row)
 
     fn __setitem__(self, key: Int, value: Series) raises:
-        _not_implemented("DataFrame.iloc.__setitem__")
+        """Assign Series *value* to row *key* (integer position).
+
+        *value* must have exactly as many elements as there are columns.
+        """
+        ref df = self._df[]
+        var nrows = df.shape()[0]
+        var row = key
+        if row < 0:
+            row = nrows + row
+        if row < 0 or row >= nrows:
+            raise Error(
+                "iloc: row index "
+                + String(key)
+                + " out of bounds for DataFrame with "
+                + String(nrows)
+                + " rows"
+            )
+        var ncols = df.shape()[1]
+        if value.size() != ncols:
+            raise Error(
+                "iloc: Series length "
+                + String(value.size())
+                + " != number of columns "
+                + String(ncols)
+            )
+        for ci in range(ncols):
+            var cell = value.iloc(ci)
+            _set_series_scalar_in_col(df._cols[ci], row, cell)
 
 
-struct AtIndexer:
-    """Label-based scalar accessor (.at)."""
+struct AtIndexer[O: MutOrigin]:
+    """Label-based scalar accessor (.at).
+
+    Construct via ``AtIndexer(UnsafePointer(to=df))``.
+    """
+
+    var _df: UnsafePointer[DataFrame, Self.O]
+
+    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+        self._df = ptr
 
     fn __getitem__(self, row: String, col: String) raises -> DFScalar:
-        _not_implemented("DataFrame.at.__getitem__")
-        return DFScalar(Int64(0))
+        """Return the scalar at row label *row*, column name *col*."""
+        ref df = self._df[]
+        var row_idx = _df_row_index(df, row)
+        var col_idx = _df_col_index(df, col)
+        return _scalar_from_col(df._cols[col_idx], row_idx)
 
     fn __setitem__(self, row: String, col: String, value: DFScalar) raises:
-        _not_implemented("DataFrame.at.__setitem__")
+        """Set the scalar at row label *row*, column name *col* to *value*."""
+        ref df = self._df[]
+        var row_idx = _df_row_index(df, row)
+        var col_idx = _df_col_index(df, col)
+        _set_scalar_in_col(df._cols[col_idx], row_idx, value)
 
 
-struct IAtIndexer:
-    """Integer-based scalar accessor (.iat)."""
+struct IAtIndexer[O: MutOrigin]:
+    """Integer-based scalar accessor (.iat).
+
+    Construct via ``IAtIndexer(UnsafePointer(to=df))``.
+    """
+
+    var _df: UnsafePointer[DataFrame, Self.O]
+
+    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+        self._df = ptr
 
     fn __getitem__(self, row: Int, col: Int) raises -> DFScalar:
-        _not_implemented("DataFrame.iat.__getitem__")
-        return DFScalar(Int64(0))
+        """Return the scalar at integer row *row*, column position *col*."""
+        ref df = self._df[]
+        var nrows = df.shape()[0]
+        var ncols = df.shape()[1]
+        var r = row
+        if r < 0:
+            r = nrows + r
+        if r < 0 or r >= nrows:
+            raise Error(
+                "iat: row index "
+                + String(row)
+                + " out of bounds for DataFrame with "
+                + String(nrows)
+                + " rows"
+            )
+        if col < 0 or col >= ncols:
+            raise Error(
+                "iat: column index "
+                + String(col)
+                + " out of bounds for DataFrame with "
+                + String(ncols)
+                + " columns"
+            )
+        return _scalar_from_col(df._cols[col], r)
 
     fn __setitem__(self, row: Int, col: Int, value: DFScalar) raises:
-        _not_implemented("DataFrame.iat.__setitem__")
+        """Set the scalar at integer row *row*, column position *col*."""
+        ref df = self._df[]
+        var nrows = df.shape()[0]
+        var ncols = df.shape()[1]
+        var r = row
+        if r < 0:
+            r = nrows + r
+        if r < 0 or r >= nrows:
+            raise Error(
+                "iat: row index "
+                + String(row)
+                + " out of bounds for DataFrame with "
+                + String(nrows)
+                + " rows"
+            )
+        if col < 0 or col >= ncols:
+            raise Error(
+                "iat: column index "
+                + String(col)
+                + " out of bounds for DataFrame with "
+                + String(ncols)
+                + " columns"
+            )
+        _set_scalar_in_col(df._cols[col], r, value)
