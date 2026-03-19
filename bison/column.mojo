@@ -967,6 +967,128 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("combine_first: not supported for object dtype")
 
 
+struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Bool Column: True where each element appears in a list of DFScalar values.
+
+    Dispatches on the active ``ColumnData`` arm and performs scalar-type
+    coercion internally, so no ``isa`` chain is needed outside the visitor
+    framework.  Used by ``Column._isin_scalars``.
+    """
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+    var scalars: List[DFScalar]
+
+    fn __init__(out self, null_mask: List[Bool], scalars: List[DFScalar]):
+        # Initialised with the fallback arm (List[PythonObject]) so that the
+        # field is always valid.  on_* immediately replaces it with the Bool result.
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+        self.scalars = scalars.copy()
+
+    fn on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var typed_vals = List[Int64]()
+        for k in range(len(self.scalars)):
+            if self.scalars[k].isa[Int64]():
+                typed_vals.append(self.scalars[k][Int64])
+            elif self.scalars[k].isa[Float64]():
+                typed_vals.append(Int64(Int(self.scalars[k][Float64])))
+            elif self.scalars[k].isa[Bool]():
+                typed_vals.append(Int64(1) if self.scalars[k][Bool] else Int64(0))
+        var result = List[Bool]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var found = False
+                for j in range(len(typed_vals)):
+                    if data[i] == typed_vals[j]:
+                        found = True
+                        break
+                result.append(found)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var typed_vals = List[Float64]()
+        for k in range(len(self.scalars)):
+            if self.scalars[k].isa[Float64]():
+                typed_vals.append(self.scalars[k][Float64])
+            elif self.scalars[k].isa[Int64]():
+                typed_vals.append(Float64(self.scalars[k][Int64]))
+            elif self.scalars[k].isa[Bool]():
+                typed_vals.append(Float64(1.0) if self.scalars[k][Bool] else Float64(0.0))
+        var result = List[Bool]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var found = False
+                for j in range(len(typed_vals)):
+                    if data[i] == typed_vals[j]:
+                        found = True
+                        break
+                result.append(found)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var typed_vals = List[Bool]()
+        for k in range(len(self.scalars)):
+            if self.scalars[k].isa[Bool]():
+                typed_vals.append(self.scalars[k][Bool])
+        var result = List[Bool]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var found = False
+                for j in range(len(typed_vals)):
+                    if data[i] == typed_vals[j]:
+                        found = True
+                        break
+                result.append(found)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_str(mut self, data: List[String]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var typed_vals = List[String]()
+        for k in range(len(self.scalars)):
+            if self.scalars[k].isa[String]():
+                typed_vals.append(self.scalars[k][String])
+        var result = List[Bool]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var found = False
+                for j in range(len(typed_vals)):
+                    if data[i] == typed_vals[j]:
+                        found = True
+                        break
+                result.append(found)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    fn on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("isin: not supported for object dtype")
+
+
 struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Returns unique values in first-occurrence order; nulls appended once at end."""
     var col_data: ColumnData
@@ -2316,6 +2438,17 @@ struct Column(Copyable, Movable, Sized):
         if not self._data.isa[List[Bool]]():
             raise Error("isin: column must be Bool to match against List[Bool]")
         return self._isin_kernel(self._data[List[Bool]], values)
+
+    fn _isin_scalars(self, scalars: List[DFScalar]) raises -> Column:
+        """Bool Column: True where each element appears in ``scalars``.
+
+        Dispatches on the active ``ColumnData`` arm via ``_IsInVisitor``,
+        which performs scalar-type coercion internally.  Raises for object
+        dtype columns.  Nulls propagate as null.
+        """
+        var visitor = _IsInVisitor(self._null_mask, scalars)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     fn _between(self, left: Float64, right: Float64) raises -> Column:
         """Bool Column: True where left <= element <= right.
