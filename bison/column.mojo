@@ -1515,16 +1515,33 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     fn on_obj(mut self, data: List[PythonObject]) raises:
         var py_none = Python.evaluate("None")
+        var fill: PythonObject = py_none
+        var is_null_fill: Bool = True
+        if self.fill_value:
+            var fv = self.fill_value.value()
+            if fv.isa[String]():
+                fill = PythonObject(fv[String]); is_null_fill = False
+            elif fv.isa[Int64]():
+                fill = PythonObject(Int(fv[Int64])); is_null_fill = False
+            elif fv.isa[Float64]():
+                fill = PythonObject(fv[Float64]); is_null_fill = False
+            elif fv.isa[Bool]():
+                fill = PythonObject(fv[Bool]); is_null_fill = False
+        var has_src_mask = len(self.src_null_mask) > 0
         var result = List[PythonObject]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
             if idx >= 0:
                 result.append(data[idx])
-                self.result_mask.append(False)
+                var is_null = has_src_mask and self.src_null_mask[idx]
+                self.result_mask.append(is_null)
+                if is_null:
+                    self.has_any_null = True
             else:
-                result.append(py_none)
-                self.result_mask.append(True)
-                self.has_any_null = True
+                result.append(fill)
+                self.result_mask.append(is_null_fill)
+                if is_null_fill:
+                    self.has_any_null = True
         self.col_data = ColumnData(result^)
 
 

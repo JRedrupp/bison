@@ -358,6 +358,24 @@ fn test_duplicated_subset() raises:
     assert_true(d.iloc(1)[Bool])
 
 
+fn test_duplicated_nul_byte_no_false_positive() raises:
+    # Regression test for the "\x00"-separator bug.
+    # Row 0: a="a\x00b", b="c"      → old key "a\x00b\x00c"
+    # Row 1: a="a",      b="b\x00c" → old key "a\x00b\x00c"  (COLLISION!)
+    # With the length-prefix scheme the keys are distinct:
+    # Row 0 new key: "3:a\x00b1:c"
+    # Row 1 new key: "1:a3:b\x00c"
+    # so neither row should be marked as a duplicate of the other.
+    var pd = Python.import_module("pandas")
+    var py_data = Python.evaluate(
+        "{'a': ['a' + chr(0) + 'b', 'a'], 'b': ['c', 'b' + chr(0) + 'c']}"
+    )
+    var df = DataFrame(pd.DataFrame(py_data))
+    var d = df.duplicated()
+    assert_false(d.iloc(0)[Bool])
+    assert_false(d.iloc(1)[Bool])
+
+
 # ------------------------------------------------------------------
 # drop_duplicates
 # ------------------------------------------------------------------
