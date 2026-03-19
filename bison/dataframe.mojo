@@ -1146,8 +1146,12 @@ struct DataFrame(Copyable, Movable):
     fn duplicated(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> Series:
         """Return a boolean Series indicating duplicate rows.
 
-        Each row is fingerprinted by concatenating per-column string
-        representations separated by ``\\x00``.
+        Each row is fingerprinted by concatenating per-column cell values
+        using a length-prefixed encoding: each cell ``v`` is encoded as
+        ``"<len(v)>:<v>"`` and the per-cell tokens are concatenated without
+        any separator.  For example, a cell with value ``"abc"`` contributes
+        ``"3:abc"`` to the key.  This scheme is safe for cells containing any
+        byte value, including NUL.
 
         - ``keep="first"``  — False for the first occurrence, True for subsequent.
         - ``keep="last"``   — False for the last occurrence, True for earlier ones.
@@ -1177,14 +1181,17 @@ struct DataFrame(Copyable, Movable):
             for j in range(ncols):
                 work_indices.append(j)
 
-        # Build a row-key string for each row.
+        # Build a row-key string for each row using a length-prefixed encoding.
+        # Each cell is encoded as "<decimal_length>:<value>" and concatenated
+        # without any separator.  This is unambiguous regardless of the cell
+        # content (e.g. cells that contain NUL bytes or digit/colon sequences
+        # will never produce the same key as a row with different cell values).
         var keys = List[String]()
         for i in range(nrows):
             var key = String("")
             for k in range(len(work_indices)):
-                if k > 0:
-                    key = key + "\x00"
-                key = key + _col_cell_str(self._cols[work_indices[k]], i)
+                var cell = _col_cell_str(self._cols[work_indices[k]], i)
+                key = key + String(len(cell)) + ":" + cell
             keys.append(key)
 
         var result = List[Bool]()
