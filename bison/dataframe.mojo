@@ -1382,29 +1382,23 @@ struct DataFrame(Copyable, Movable):
         return result^
 
     fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        """Keep each element where *cond* is True; replace with null otherwise.
+        """Keep each element where *cond* is True; replace with *other* otherwise.
 
-        ``other`` (replacement value for False positions) is not yet supported;
-        pass ``other=None`` (the default).
+        When *other* is ``None`` (the default), non-matching cells become null.
         """
-        if other:
-            raise Error("DataFrame.where: other= parameter is not yet implemented; pass other=None")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._where(cond._col))
+            result_cols.append(self._cols[i]._where(cond._col, other))
         return DataFrame(result_cols^)
 
     fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
-        """Replace each element with null where *cond* is True; keep otherwise.
+        """Replace each element with *other* where *cond* is True; keep otherwise.
 
-        ``other`` (replacement value for True positions) is not yet supported;
-        pass ``other=None`` (the default).
+        When *other* is ``None`` (the default), matching cells become null.
         """
-        if other:
-            raise Error("DataFrame.mask: other= parameter is not yet implemented; pass other=None")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._mask(cond._col))
+            result_cols.append(self._cols[i]._mask(cond._col, other))
         return DataFrame(result_cols^)
 
     fn isin(self, values: Dict[String, List[DFScalar]]) raises -> DataFrame:
@@ -1425,46 +1419,7 @@ struct DataFrame(Copyable, Movable):
                     false_data.append(False)
                 result_cols.append(Column(col_name, ColumnData(false_data^), _bool_))
             else:
-                # Dispatch based on column arm type; coerce scalar types as needed.
-                var result_col: Column
-                if self._cols[i]._data.isa[List[Int64]]():
-                    var int_vals = List[Int64]()
-                    var n_vals = len(values[col_name])
-                    for k in range(n_vals):
-                        if values[col_name][k].isa[Int64]():
-                            int_vals.append(values[col_name][k][Int64])
-                        elif values[col_name][k].isa[Float64]():
-                            int_vals.append(Int64(Int(values[col_name][k][Float64])))
-                        elif values[col_name][k].isa[Bool]():
-                            int_vals.append(Int64(1) if values[col_name][k][Bool] else Int64(0))
-                    result_col = self._cols[i]._isin_int(int_vals)
-                elif self._cols[i]._data.isa[List[Float64]]():
-                    var float_vals = List[Float64]()
-                    var n_vals = len(values[col_name])
-                    for k in range(n_vals):
-                        if values[col_name][k].isa[Float64]():
-                            float_vals.append(values[col_name][k][Float64])
-                        elif values[col_name][k].isa[Int64]():
-                            float_vals.append(Float64(values[col_name][k][Int64]))
-                        elif values[col_name][k].isa[Bool]():
-                            float_vals.append(Float64(1.0) if values[col_name][k][Bool] else Float64(0.0))
-                    result_col = self._cols[i]._isin_float(float_vals)
-                elif self._cols[i]._data.isa[List[Bool]]():
-                    var bool_vals = List[Bool]()
-                    var n_vals = len(values[col_name])
-                    for k in range(n_vals):
-                        if values[col_name][k].isa[Bool]():
-                            bool_vals.append(values[col_name][k][Bool])
-                    result_col = self._cols[i]._isin_bool(bool_vals)
-                elif self._cols[i]._data.isa[List[String]]():
-                    var str_vals = List[String]()
-                    var n_vals = len(values[col_name])
-                    for k in range(n_vals):
-                        if values[col_name][k].isa[String]():
-                            str_vals.append(values[col_name][k][String])
-                    result_col = self._cols[i]._isin_str(str_vals)
-                else:
-                    raise Error("DataFrame.isin: unsupported column dtype for column: " + col_name)
+                var result_col = self._cols[i]._isin_scalars(values[col_name])
                 result_col.name = col_name
                 result_cols.append(result_col^)
         return DataFrame(result_cols^)
