@@ -126,10 +126,121 @@ struct DataFrame(Copyable, Movable):
         records: List[Dict[String, DFScalar]],
         columns: Optional[List[String]] = None,
     ) raises -> DataFrame:
-        """Create DataFrame from a list of row dicts."""
-        # TODO(#47): row-to-column transposition is non-trivial; implement natively.
-        _not_implemented("DataFrame.from_records")
-        return DataFrame()
+        """Create DataFrame from a list of row dicts (row-to-column transposition)."""
+        if len(records) == 0:
+            return DataFrame()
+
+        # Determine column names
+        var col_names = List[String]()
+        if columns:
+            col_names = columns.value().copy()
+        else:
+            for entry in records[0].items():
+                col_names.append(entry.key)
+
+        var cols = List[Column]()
+
+        for ci in range(len(col_names)):
+            var col_name = col_names[ci]
+            var null_mask = List[Bool]()
+
+            # Infer dtype from first record that has this key
+            var first_int = False
+            var first_float = False
+            var first_bool = False
+            var found = False
+            for ri in range(len(records)):
+                try:
+                    var v = records[ri][col_name]
+                    if v.isa[Int64]():
+                        first_int = True
+                    elif v.isa[Float64]():
+                        first_float = True
+                    elif v.isa[Bool]():
+                        first_bool = True
+                    # else String
+                    found = True
+                    break
+                except:
+                    pass
+
+            if not found:
+                # All rows missing this key — object column, all null
+                var data = List[PythonObject]()
+                var py_none = Python.evaluate("None")
+                for _ in range(len(records)):
+                    data.append(py_none)
+                    null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), object_)
+                col._null_mask = null_mask^
+                cols.append(col^)
+                continue
+
+            if first_int:
+                var data = List[Int64]()
+                var has_nulls = False
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        data.append(v[Int64])
+                        null_mask.append(False)
+                    except:
+                        data.append(Int64(0))
+                        null_mask.append(True)
+                        has_nulls = True
+                if has_nulls:
+                    # Promote to float64 so NaN can be represented (mirrors pandas behavior)
+                    var fdata = List[Float64]()
+                    for i in range(len(data)):
+                        fdata.append(Float64(data[i]))
+                    var col = Column(col_name, ColumnData(fdata^), float64)
+                    col._null_mask = null_mask^
+                    cols.append(col^)
+                    continue
+                var col = Column(col_name, ColumnData(data^), int64)
+                col._null_mask = null_mask^
+                cols.append(col^)
+            elif first_float:
+                var data = List[Float64]()
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        data.append(v[Float64])
+                        null_mask.append(False)
+                    except:
+                        data.append(Float64(0.0))
+                        null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), float64)
+                col._null_mask = null_mask^
+                cols.append(col^)
+            elif first_bool:
+                var data = List[Bool]()
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        data.append(v[Bool])
+                        null_mask.append(False)
+                    except:
+                        data.append(False)
+                        null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), bool_)
+                col._null_mask = null_mask^
+                cols.append(col^)
+            else:  # String
+                var data = List[String]()
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        data.append(v[String])
+                        null_mask.append(False)
+                    except:
+                        data.append(String(""))
+                        null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), object_)
+                col._null_mask = null_mask^
+                cols.append(col^)
+
+        return DataFrame(cols^)
 
     # ------------------------------------------------------------------
     # Attributes
