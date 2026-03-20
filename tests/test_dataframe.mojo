@@ -461,6 +461,40 @@ fn test_from_records_mixed_types() raises:
     assert_equal(df.shape()[1], 2)
 
 
+fn test_from_records_int_float_mixed() raises:
+    # First row has Int64, second row has Float64 — column should be promoted to float64
+    var row0: Dict[String, DFScalar] = {"x": DFScalar(Int64(1))}
+    var row1: Dict[String, DFScalar] = {"x": DFScalar(Float64(2.5))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 1)
+    # Verify the column is promoted to float64
+    assert_equal(df.dtypes().iloc(0)[String], "float64")
+    var pd_df = df.to_pandas()
+    assert_true(Bool(pd_df["x"][0] == 1.0))
+    assert_true(Bool(pd_df["x"][1] == 2.5))
+
+
+fn test_from_records_bool_int_mixed() raises:
+    # First row has Bool, second row has Int64 — column should be promoted to int64
+    var row0: Dict[String, DFScalar] = {"y": DFScalar(True)}
+    var row1: Dict[String, DFScalar] = {"y": DFScalar(Int64(42))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 1)
+    # Verify the column is promoted to int64
+    assert_equal(df.dtypes().iloc(0)[String], "int64")
+    var pd_df = df.to_pandas()
+    assert_true(Bool(pd_df["y"][0] == 1))
+    assert_true(Bool(pd_df["y"][1] == 42))
+
+
 fn test_from_records_missing_key() raises:
     var row0: Dict[String, DFScalar] = {"a": DFScalar(Int64(1)), "b": DFScalar(Int64(10))}
     var row1: Dict[String, DFScalar] = {"a": DFScalar(Int64(2))}
