@@ -1,6 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
-from ..dataframe import DataFrame
+from ..dataframe import DataFrame, _sort_col_names
 from ..column import Column, ColumnData
 from ..dtypes import BisonDtype, int64, float64, bool_, object_
 
@@ -201,26 +201,6 @@ fn _vstack(pieces: List[Column]) raises -> Column:
             col._null_mask = mask^
         return col^
 
-
-fn _sort_col_names(names: List[String]) -> List[String]:
-    """Return a copy of *names* sorted in ascending order (selection sort)."""
-    var n = len(names)
-    var order = List[Int]()
-    for i in range(n):
-        order.append(i)
-    for i in range(n):
-        var min_idx = i
-        for j in range(i + 1, n):
-            if names[order[j]] < names[order[min_idx]]:
-                min_idx = j
-        if min_idx != i:
-            var tmp = order[i]
-            order[i] = order[min_idx]
-            order[min_idx] = tmp
-    var result = List[String]()
-    for i in range(n):
-        result.append(names[order[i]])
-    return result^
 
 
 fn _sort_result_cols(cols: List[Column]) raises -> List[Column]:

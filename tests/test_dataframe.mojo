@@ -476,5 +476,18 @@ fn test_from_records_missing_key() raises:
     assert_true(Bool(pd_df["b"].isna()[1]))
 
 
+fn test_from_records_column_order_deterministic() raises:
+    # Column names should be sorted alphabetically when `columns` is not provided,
+    # so the result is deterministic regardless of Dict iteration order.
+    var row0: Dict[String, DFScalar] = {"z": DFScalar(Int64(3)), "a": DFScalar(Int64(1)), "m": DFScalar(Int64(2))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[1], 3)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "m")
+    assert_equal(df.columns()[2], "z")
+
+
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
