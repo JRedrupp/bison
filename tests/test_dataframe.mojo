@@ -2,7 +2,7 @@
 from std.python import Python, PythonObject
 from std.collections import Dict
 from testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import DataFrame, ColumnData, Series
+from bison import DataFrame, ColumnData, DFScalar, Series
 
 
 fn test_shape_from_pandas() raises:
@@ -415,6 +415,65 @@ fn test_itertuples_name() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var tuples = df.itertuples(index=True, name="Row")
     assert_equal(tuples[0].name, "Row")
+
+
+fn test_from_records_basic() raises:
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(Int64(1)), "b": DFScalar(Int64(10))}
+    var row1: Dict[String, DFScalar] = {"a": DFScalar(Int64(2)), "b": DFScalar(Int64(20))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "b")
+
+
+fn test_from_records_empty() raises:
+    var records = List[Dict[String, DFScalar]]()
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 0)
+    assert_equal(df.shape()[1], 0)
+
+
+fn test_from_records_columns_param() raises:
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(Int64(1)), "b": DFScalar(Int64(2)), "c": DFScalar(Int64(3))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    var cols = List[String]()
+    cols.append("a")
+    cols.append("c")
+    var df = DataFrame.from_records(records, cols^)
+    assert_equal(df.shape()[1], 2)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "c")
+
+
+fn test_from_records_mixed_types() raises:
+    var row0: Dict[String, DFScalar] = {"i": DFScalar(Int64(42)), "s": DFScalar(String("hello"))}
+    var row1: Dict[String, DFScalar] = {"i": DFScalar(Int64(7)), "s": DFScalar(String("world"))}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+
+
+fn test_from_records_missing_key() raises:
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(Int64(1)), "b": DFScalar(Int64(10))}
+    var row1: Dict[String, DFScalar] = {"a": DFScalar(Int64(2))}
+    # "b" is missing in row1
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+    # verify via pandas that the missing value is NaN
+    var pd_df = df.to_pandas()
+    assert_true(Bool(pd_df["b"].isna()[1]))
 
 
 fn main() raises:
