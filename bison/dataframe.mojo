@@ -175,23 +175,28 @@ struct DataFrame(Copyable, Movable):
             var col_name = col_names[ci]
             var null_mask = List[Bool]()
 
-            # Infer dtype from first record that has this key
-            var first_int = False
-            var first_float = False
-            var first_bool = False
+            # Scan ALL rows to determine dominant column dtype.
+            # Promotion order matches pandas/NumPy type coercion rules:
+            # String > Float64 > Int64 > Bool.
+            # This prevents a panic when the same column has mixed DFScalar arms
+            # across rows (e.g. first row Int64, second row Float64).
+            var has_int = False
+            var has_float = False
+            var has_bool = False
+            var has_string = False
             var found = False
             for ri in range(len(records)):
                 try:
                     var v = records[ri][col_name]
                     if v.isa[Int64]():
-                        first_int = True
+                        has_int = True
                     elif v.isa[Float64]():
-                        first_float = True
+                        has_float = True
                     elif v.isa[Bool]():
-                        first_bool = True
-                    # else String
+                        has_bool = True
+                    else:  # String
+                        has_string = True
                     found = True
-                    break
                 except:
                     pass
 
@@ -207,13 +212,63 @@ struct DataFrame(Copyable, Movable):
                 cols.append(col^)
                 continue
 
-            if first_int:
+            if has_string:
+                # String dominates: convert all non-null values to String
+                var data = List[String]()
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        var val: String
+                        if v.isa[String]():
+                            val = v[String]
+                        elif v.isa[Int64]():
+                            val = String(Int(v[Int64]))
+                        elif v.isa[Float64]():
+                            val = String(v[Float64])
+                        else:  # Bool
+                            val = String("True") if v[Bool] else String("False")
+                        data.append(val)
+                        null_mask.append(False)
+                    except:
+                        data.append(String(""))
+                        null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), object_)
+                col._null_mask = null_mask^
+                cols.append(col^)
+            elif has_float:
+                # Float64 dominates Int64 and Bool
+                var data = List[Float64]()
+                for ri in range(len(records)):
+                    try:
+                        var v = records[ri][col_name]
+                        var val: Float64
+                        if v.isa[Float64]():
+                            val = v[Float64]
+                        elif v.isa[Int64]():
+                            val = Float64(v[Int64])
+                        else:  # Bool
+                            val = Float64(1) if v[Bool] else Float64(0)
+                        data.append(val)
+                        null_mask.append(False)
+                    except:
+                        data.append(Float64(0.0))
+                        null_mask.append(True)
+                var col = Column(col_name, ColumnData(data^), float64)
+                col._null_mask = null_mask^
+                cols.append(col^)
+            elif has_int:
+                # Int64 (Bool values are promoted to Int64)
                 var data = List[Int64]()
                 var has_nulls = False
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
-                        data.append(v[Int64])
+                        var val: Int64
+                        if v.isa[Int64]():
+                            val = v[Int64]
+                        else:  # Bool
+                            val = Int64(1) if v[Bool] else Int64(0)
+                        data.append(val)
                         null_mask.append(False)
                     except:
                         data.append(Int64(0))
@@ -231,20 +286,7 @@ struct DataFrame(Copyable, Movable):
                 var col = Column(col_name, ColumnData(data^), int64)
                 col._null_mask = null_mask^
                 cols.append(col^)
-            elif first_float:
-                var data = List[Float64]()
-                for ri in range(len(records)):
-                    try:
-                        var v = records[ri][col_name]
-                        data.append(v[Float64])
-                        null_mask.append(False)
-                    except:
-                        data.append(Float64(0.0))
-                        null_mask.append(True)
-                var col = Column(col_name, ColumnData(data^), float64)
-                col._null_mask = null_mask^
-                cols.append(col^)
-            elif first_bool:
+            else:  # Bool only
                 var data = List[Bool]()
                 var has_nulls = False
                 for ri in range(len(records)):
@@ -270,19 +312,6 @@ struct DataFrame(Copyable, Movable):
                     cols.append(col^)
                     continue
                 var col = Column(col_name, ColumnData(data^), bool_)
-                col._null_mask = null_mask^
-                cols.append(col^)
-            else:  # String
-                var data = List[String]()
-                for ri in range(len(records)):
-                    try:
-                        var v = records[ri][col_name]
-                        data.append(v[String])
-                        null_mask.append(False)
-                    except:
-                        data.append(String(""))
-                        null_mask.append(True)
-                var col = Column(col_name, ColumnData(data^), object_)
                 col._null_mask = null_mask^
                 cols.append(col^)
 
