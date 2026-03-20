@@ -1856,8 +1856,87 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.to_parquet")
 
     fn to_json(self, path_or_buf: String = "", orient: String = "") raises -> String:
-        _not_implemented("DataFrame.to_json")
-        return String("")
+        """Serialize the DataFrame to a JSON-formatted string or file.
+
+        Parameters
+        ----------
+        path_or_buf : File path to write. If empty (default) the JSON text is
+                      returned as a ``String`` instead of being written.
+        orient      : JSON format. Supported values: ``"records"``
+                      (list of dicts), ``"split"`` (split format),
+                      ``"columns"`` (dict of dicts keyed by column name,
+                      default when orient is ``""``), ``"index"`` (dict of
+                      dicts keyed by row index), ``"values"`` (list of lists).
+        """
+        var json_mod = Python.import_module("json")
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var eff_orient = orient if len(orient) > 0 else "columns"
+
+        var py_obj: PythonObject
+
+        if eff_orient == "records":
+            # [{"col1": val1, "col2": val2}, ...]
+            py_obj = Python.evaluate("[]")
+            for ri in range(nrows):
+                var row = Python.evaluate("{}")
+                for ci in range(ncols):
+                    row[self._cols[ci].name] = _col_cell_pyobj(self._cols[ci], ri)
+                py_obj.append(row)
+
+        elif eff_orient == "split":
+            # {"columns": [...], "index": [...], "data": [[...], ...]}
+            py_obj = Python.evaluate("{}")
+            var cols_list = Python.evaluate("[]")
+            for ci in range(ncols):
+                cols_list.append(self._cols[ci].name)
+            py_obj["columns"] = cols_list
+            var idx_list = Python.evaluate("[]")
+            for ri in range(nrows):
+                idx_list.append(ri)
+            py_obj["index"] = idx_list
+            var data_list = Python.evaluate("[]")
+            for ri in range(nrows):
+                var row = Python.evaluate("[]")
+                for ci in range(ncols):
+                    row.append(_col_cell_pyobj(self._cols[ci], ri))
+                data_list.append(row)
+            py_obj["data"] = data_list
+
+        elif eff_orient == "index":
+            # {"0": {"col1": val1, ...}, ...}
+            py_obj = Python.evaluate("{}")
+            for ri in range(nrows):
+                var row = Python.evaluate("{}")
+                for ci in range(ncols):
+                    row[self._cols[ci].name] = _col_cell_pyobj(self._cols[ci], ri)
+                py_obj[String(ri)] = row
+
+        elif eff_orient == "values":
+            # [[val1, val2], ...]
+            py_obj = Python.evaluate("[]")
+            for ri in range(nrows):
+                var row = Python.evaluate("[]")
+                for ci in range(ncols):
+                    row.append(_col_cell_pyobj(self._cols[ci], ri))
+                py_obj.append(row)
+
+        else:  # "columns" (default pandas behavior)
+            # {"col1": {"0": val1, "1": val2, ...}, ...}
+            py_obj = Python.evaluate("{}")
+            for ci in range(ncols):
+                var col_dict = Python.evaluate("{}")
+                for ri in range(nrows):
+                    col_dict[String(ri)] = _col_cell_pyobj(self._cols[ci], ri)
+                py_obj[self._cols[ci].name] = col_dict
+
+        var result = String(json_mod.dumps(py_obj))
+
+        if len(path_or_buf) > 0:
+            with open(path_or_buf, "w") as f:
+                f.write(result)
+            return String("")
+        return result^
 
     fn to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
         _not_implemented("DataFrame.to_excel")

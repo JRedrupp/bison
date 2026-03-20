@@ -111,13 +111,84 @@ fn test_read_parquet_stub() raises:
     assert_true(raised)
 
 
-fn test_read_json_stub() raises:
-    var raised = False
-    try:
-        _ = read_json("/tmp/nonexistent.json")
-    except:
-        raised = True
-    assert_true(raised)
+fn test_read_json_records() raises:
+    """Read a JSON file in records format (list of dicts)."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".json"))
+    with open(path, "w") as f:
+        f.write('[{"a": 1, "b": 2.5, "c": "hello"}, {"a": 3, "b": 4.5, "c": "world"}]')
+
+    var df = read_json(path)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 3)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "b")
+    assert_equal(df.columns()[2], "c")
+
+
+fn test_read_json_lines() raises:
+    """Read a JSON Lines (NDJSON) file with lines=True."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".jsonl"))
+    with open(path, "w") as f:
+        f.write('{"x": 1, "y": "foo"}\n{"x": 2, "y": "bar"}\n')
+
+    var df = read_json(path, lines=True)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+    assert_equal(df.columns()[0], "x")
+    assert_equal(df.columns()[1], "y")
+
+
+fn test_read_json_split() raises:
+    """Read a JSON file in split format."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".json"))
+    with open(path, "w") as f:
+        f.write('{"columns": ["a", "b"], "index": [0, 1], "data": [[1, 2], [3, 4]]}')
+
+    var df = read_json(path, orient="split")
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 2)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "b")
+
+
+fn test_to_json_records() raises:
+    """Serialize a DataFrame to JSON records format."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var json_str = df.to_json(orient="records")
+    assert_true(len(json_str) > 0)
+    assert_true(json_str.find('"a"') >= 0)
+    assert_true(json_str.find('"b"') >= 0)
+
+
+fn test_to_json_split() raises:
+    """Serialize a DataFrame to JSON split format."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
+    var json_str = df.to_json(orient="split")
+    assert_true(json_str.find('"columns"') >= 0)
+    assert_true(json_str.find('"data"') >= 0)
+    assert_true(json_str.find('"index"') >= 0)
+
+
+fn test_json_roundtrip() raises:
+    """Write a DataFrame to JSON (records orient), read it back, check shape/columns."""
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".json"))
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
+    )
+    _ = df.to_json(path, orient="records")
+
+    var df2 = read_json(path, orient="records")
+    assert_equal(df2.shape()[0], 3)
+    assert_equal(df2.shape()[1], 2)
+    assert_equal(df2.columns()[0], "a")
+    assert_equal(df2.columns()[1], "b")
 
 
 fn test_read_excel_stub() raises:

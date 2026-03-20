@@ -89,9 +89,9 @@ In CI it runs after the test suite and the result is committed back to the branc
 | String accessor | 0 | 21 |
 | Datetime accessor | 17 | 1 |
 | Index | 0 | 14 |
-| IO | 10 | 2 |
+| IO | 7 | 4 |
 | Reshape | 0 | 1 |
-| **Total** | **98** | **210** |
+| **Total** | **95** | **212** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations
