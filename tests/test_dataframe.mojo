@@ -489,5 +489,25 @@ fn test_from_records_column_order_deterministic() raises:
     assert_equal(df.columns()[2], "z")
 
 
+fn test_from_records_bool_with_nulls() raises:
+    # Bool column containing a null should round-trip through to_pandas() without error.
+    # Pandas cannot represent NaN in a bool dtype column, so bison must promote to object.
+    var row0: Dict[String, DFScalar] = {"flag": DFScalar(True)}
+    var row1: Dict[String, DFScalar] = {}  # "flag" is missing → null
+    var row2: Dict[String, DFScalar] = {"flag": DFScalar(False)}
+    var records = List[Dict[String, DFScalar]]()
+    records.append(row0^)
+    records.append(row1^)
+    records.append(row2^)
+    var df = DataFrame.from_records(records)
+    assert_equal(df.shape()[0], 3)
+    assert_equal(df.shape()[1], 1)
+    # to_pandas() must succeed (previously raised with bool dtype + NaN)
+    var pd_df = df.to_pandas()
+    assert_true(Bool(pd_df["flag"].isna()[1]))
+    assert_true(Bool(pd_df["flag"][0] == True))
+    assert_true(Bool(pd_df["flag"][2] == False))
+
+
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
