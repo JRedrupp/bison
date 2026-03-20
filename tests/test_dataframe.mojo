@@ -310,5 +310,112 @@ fn test_sort_values_na_first_descending() raises:
     assert_true(r["a"].iloc(2)[Float64] == 1.0)
 
 
+fn test_dtypes_names() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
+    var dt = df.dtypes()
+    assert_equal(dt.size(), 2)
+
+
+fn test_dtypes_values() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
+    var dt = df.dtypes()
+    assert_equal(dt.iloc(0)[String], "int64")
+    assert_equal(dt.iloc(1)[String], "float64")
+
+
+fn test_memory_usage_length() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}")))
+    var mu = df.memory_usage()
+    assert_equal(mu.size(), 2)
+
+
+fn test_memory_usage_int64_bytes() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var mu = df.memory_usage()
+    # 3 rows * 8 bytes per int64 = 24
+    assert_equal(mu.iloc(0)[Int64], Int64(24))
+
+
+fn test_memory_usage_float64_bytes() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [1.0, 2.0]}")))
+    var mu = df.memory_usage()
+    # 2 rows * 8 bytes per float64 = 16
+    assert_equal(mu.iloc(0)[Int64], Int64(16))
+
+
+fn test_info_no_raise() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3.0, 4.0]}")))
+    df.info()
+
+
+fn test_items_count() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var cols = df.items()
+    assert_equal(len(cols), 2)
+
+
+fn test_items_names() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1], 'y': [2]}")))
+    var cols = df.items()
+    assert_equal(cols[0].name, "x")
+    assert_equal(cols[1].name, "y")
+
+
+fn test_items_values() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20]}")))
+    var cols = df.items()
+    assert_equal(cols[0].iloc(0)[Int64], Int64(10))
+    assert_equal(cols[0].iloc(1)[Int64], Int64(20))
+
+
+fn test_iterrows_count() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var rows = df.iterrows()
+    assert_equal(len(rows), 3)
+
+
+fn test_iterrows_values() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
+    var rows = df.iterrows()
+    # Row 0: a=10, b=30
+    assert_equal(rows[0].size(), 2)
+    assert_equal(rows[1].size(), 2)
+
+
+fn test_itertuples_with_index() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var tuples = df.itertuples()
+    # With index=True (default): each row has index value + column values
+    assert_equal(len(tuples), 2)
+    assert_equal(tuples[0].size(), 2)  # Index + a
+
+
+fn test_itertuples_without_index() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var tuples = df.itertuples(index=False)
+    assert_equal(len(tuples), 2)
+    assert_equal(tuples[0].size(), 2)  # a + b only (no index)
+
+
+fn test_itertuples_name() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
+    var tuples = df.itertuples(index=True, name="Row")
+    assert_equal(tuples[0].name, "Row")
+
+
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
