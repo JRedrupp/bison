@@ -8,6 +8,31 @@ from .groupby import DataFrameGroupBy
 
 
 # ------------------------------------------------------------------
+# Shared string-list utilities
+# ------------------------------------------------------------------
+
+fn _sort_col_names(names: List[String]) -> List[String]:
+    """Return a copy of *names* sorted in ascending order (selection sort)."""
+    var n = len(names)
+    var order = List[Int]()
+    for i in range(n):
+        order.append(i)
+    for i in range(n):
+        var min_idx = i
+        for j in range(i + 1, n):
+            if names[order[j]] < names[order[min_idx]]:
+                min_idx = j
+        if min_idx != i:
+            var tmp = order[i]
+            order[i] = order[min_idx]
+            order[min_idx] = tmp
+    var result = List[String]()
+    for i in range(n):
+        result.append(names[order[i]])
+    return result^
+
+
+# ------------------------------------------------------------------
 # CSV serialisation helpers (used by DataFrame.to_csv)
 # ------------------------------------------------------------------
 
@@ -135,8 +160,14 @@ struct DataFrame(Copyable, Movable):
         if columns:
             col_names = columns.value().copy()
         else:
+            # Collect keys from the first record, then sort them alphabetically.
+            # Mojo's Dict does not guarantee insertion-order iteration, so sorting
+            # ensures the resulting column order is deterministic regardless of how
+            # the caller constructed each row dict.
+            var unsorted = List[String]()
             for entry in records[0].items():
-                col_names.append(entry.key)
+                unsorted.append(entry.key)
+            col_names = _sort_col_names(unsorted)
 
         var cols = List[Column]()
 
