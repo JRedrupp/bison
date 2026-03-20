@@ -215,6 +215,7 @@ struct DataFrame(Copyable, Movable):
                 cols.append(col^)
             elif first_bool:
                 var data = List[Bool]()
+                var has_nulls = False
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
@@ -223,6 +224,20 @@ struct DataFrame(Copyable, Movable):
                     except:
                         data.append(False)
                         null_mask.append(True)
+                        has_nulls = True
+                if has_nulls:
+                    # Promote to object so None can be represented (mirrors pandas behavior)
+                    var py_none = Python.evaluate("None")
+                    var odata = List[PythonObject]()
+                    for i in range(len(data)):
+                        if null_mask[i]:
+                            odata.append(py_none)
+                        else:
+                            odata.append(PythonObject(data[i]))
+                    var col = Column(col_name, ColumnData(odata^), object_)
+                    col._null_mask = null_mask^
+                    cols.append(col^)
+                    continue
                 var col = Column(col_name, ColumnData(data^), bool_)
                 col._null_mask = null_mask^
                 cols.append(col^)
