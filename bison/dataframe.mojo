@@ -26,6 +26,26 @@ fn _csv_quote_field(field: String, sep: String) -> String:
     return '"' + field.replace('"', '""') + '"'
 
 
+fn _col_cell_pyobj(col: Column, row: Int) raises -> PythonObject:
+    """Return a PythonObject representation of cell *row* in *col*.
+
+    Null cells (masked entries) are returned as Python None.
+    """
+    var has_mask = len(col._null_mask) > 0
+    if has_mask and row < len(col._null_mask) and col._null_mask[row]:
+        return Python.evaluate("None")
+    if col._data.isa[List[Int64]]():
+        return PythonObject(Int(col._data[List[Int64]][row]))
+    elif col._data.isa[List[Float64]]():
+        return PythonObject(col._data[List[Float64]][row])
+    elif col._data.isa[List[Bool]]():
+        return PythonObject(col._data[List[Bool]][row])
+    elif col._data.isa[List[String]]():
+        return PythonObject(col._data[List[String]][row])
+    else:
+        return col._data[List[PythonObject]][row]
+
+
 fn _col_cell_str(col: Column, row: Int) raises -> String:
     """Return the string representation of cell *row* in *col*.
 
@@ -140,15 +160,80 @@ struct DataFrame(Copyable, Movable):
         return 2
 
     fn dtypes(self) raises -> Series:
-        _not_implemented("DataFrame.dtypes")
-        return Series()
+        """Return a Series with the dtype of each column, indexed by column name."""
+        var n = len(self._cols)
+        var dtype_names = List[String]()
+        var idx = List[PythonObject]()
+        for i in range(n):
+            dtype_names.append(self._cols[i].dtype.name)
+            idx.append(PythonObject(self._cols[i].name))
+        var col_data = ColumnData(dtype_names^)
+        var result_col = Column("", col_data^, _object_, idx^)
+        return Series(result_col^)
 
     fn info(self) raises:
-        _not_implemented("DataFrame.info")
+        """Print a concise summary of the DataFrame to stdout."""
+        var s = self.shape()
+        var nrows = s[0]
+        var ncols = s[1]
+        print("<class 'bison.DataFrame'>")
+        if nrows > 0:
+            print(
+                "RangeIndex: "
+                + String(nrows)
+                + " entries, 0 to "
+                + String(nrows - 1)
+            )
+        else:
+            print("RangeIndex: 0 entries")
+        print("Data columns (total " + String(ncols) + " columns):")
+        for i in range(ncols):
+            var non_null = self._cols[i].count()
+            print(
+                " "
+                + String(i)
+                + "   "
+                + self._cols[i].name
+                + "   "
+                + String(non_null)
+                + " non-null   "
+                + self._cols[i].dtype.name
+            )
+        var dtype_counts = Dict[String, Int]()
+        for i in range(ncols):
+            var dn = self._cols[i].dtype.name
+            if dn in dtype_counts:
+                dtype_counts[dn] = dtype_counts[dn] + 1
+            else:
+                dtype_counts[dn] = 1
+        var dtype_summary = String("")
+        var first = True
+        for entry in dtype_counts.items():
+            if not first:
+                dtype_summary += ", "
+            dtype_summary += entry.key + "(" + String(entry.value) + ")"
+            first = False
+        print("dtypes: " + dtype_summary)
+        var total_bytes = Int64(0)
+        for i in range(ncols):
+            total_bytes += Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize)
+        print("memory usage: " + String(total_bytes) + " bytes")
 
     fn memory_usage(self, deep: Bool = False) raises -> Series:
-        _not_implemented("DataFrame.memory_usage")
-        return Series()
+        """Return a Series with memory usage in bytes for each column.
+
+        *deep* is accepted for API compatibility but ignored — object columns
+        are always estimated at ``itemsize`` bytes per element.
+        """
+        var n = len(self._cols)
+        var values = List[Int64]()
+        var idx = List[PythonObject]()
+        for i in range(n):
+            values.append(Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize))
+            idx.append(PythonObject(self._cols[i].name))
+        var col_data = ColumnData(values^)
+        var result_col = Column("", col_data^, _int64, idx^)
+        return Series(result_col^)
 
     # ------------------------------------------------------------------
     # Selection / indexing
@@ -1634,13 +1719,64 @@ struct DataFrame(Copyable, Movable):
         return False
 
     fn items(self) raises -> List[Series]:
-        _not_implemented("DataFrame.items")
-        return List[Series]()
+        """Return a list of (column_name, Series) pairs as Series objects.
+
+        Each returned Series corresponds to one column; the column name is
+        available via ``series.name``.
+        """
+        var result = List[Series]()
+        for i in range(len(self._cols)):
+            result.append(Series(self._cols[i].copy()))
+        return result^
 
     fn iterrows(self) raises -> List[Series]:
-        _not_implemented("DataFrame.iterrows")
-        return List[Series]()
+        """Return a list of row Series, one per row.
+
+        Each Series holds all column values for that row as object dtype
+        (``List[PythonObject]``), with column names as the Series index.
+        The Series name is the string representation of the row position.
+        """
+        var nrows = self.shape()[0]
+        var ncols = len(self._cols)
+        var result = List[Series]()
+        var col_idx = List[PythonObject]()
+        for j in range(ncols):
+            col_idx.append(PythonObject(self._cols[j].name))
+        for i in range(nrows):
+            var row_data = List[PythonObject]()
+            for j in range(ncols):
+                row_data.append(_col_cell_pyobj(self._cols[j], i))
+            var idx_copy = col_idx.copy()
+            var row_col = Column(
+                String(i), ColumnData(row_data^), _object_, idx_copy^
+            )
+            result.append(Series(row_col^))
+        return result^
 
     fn itertuples(self, index: Bool = True, name: String = "Pandas") raises -> List[Series]:
-        _not_implemented("DataFrame.itertuples")
-        return List[Series]()
+        """Return a list of row Series, one per row, optionally with the row index prepended.
+
+        When *index* is ``True`` (default) the first element of each Series is
+        the integer row position and the corresponding index label is
+        ``"Index"``.  *name* is stored as the Series name for each row.
+        """
+        var nrows = self.shape()[0]
+        var ncols = len(self._cols)
+        var result = List[Series]()
+        var col_idx = List[PythonObject]()
+        if index:
+            col_idx.append(PythonObject("Index"))
+        for j in range(ncols):
+            col_idx.append(PythonObject(self._cols[j].name))
+        for i in range(nrows):
+            var row_data = List[PythonObject]()
+            if index:
+                row_data.append(PythonObject(i))
+            for j in range(ncols):
+                row_data.append(_col_cell_pyobj(self._cols[j], i))
+            var idx_copy = col_idx.copy()
+            var row_col = Column(
+                name, ColumnData(row_data^), _object_, idx_copy^
+            )
+            result.append(Series(row_col^))
+        return result^
