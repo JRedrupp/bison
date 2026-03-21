@@ -1839,6 +1839,9 @@ struct Column(Copyable, Movable, Sized):
     var _data: ColumnData
     var _index: ColumnIndex
     var _null_mask: List[Bool]
+    # Level names for a multi-key index set via DataFrame.set_index.
+    # Empty when the index is a single-key or default RangeIndex.
+    var _index_names: List[String]
 
     # ------------------------------------------------------------------
     # Constructors
@@ -1851,6 +1854,7 @@ struct Column(Copyable, Movable, Sized):
         self._data = ColumnData(List[PythonObject]())
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
+        self._index_names = List[String]()
 
     def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype):
         self.name  = name
@@ -1858,6 +1862,7 @@ struct Column(Copyable, Movable, Sized):
         self._data = data^
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
+        self._index_names = List[String]()
 
     def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: ColumnIndex):
         self.name  = name
@@ -1865,6 +1870,7 @@ struct Column(Copyable, Movable, Sized):
         self._data = data^
         self._index = index^
         self._null_mask = List[Bool]()
+        self._index_names = List[String]()
 
     # ------------------------------------------------------------------
     # Traits
@@ -1879,6 +1885,7 @@ struct Column(Copyable, Movable, Sized):
         self._data = copy._data
         self._index = copy._index
         self._null_mask = copy._null_mask.copy()
+        self._index_names = copy._index_names.copy()
 
     def __init__(out self, *, deinit take: Self):
         self.name  = take.name^
@@ -1886,6 +1893,7 @@ struct Column(Copyable, Movable, Sized):
         self._data = take._data^
         self._index = take._index^
         self._null_mask = take._null_mask^
+        self._index_names = take._index_names^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
@@ -1919,6 +1927,7 @@ struct Column(Copyable, Movable, Sized):
         var mask = self._null_mask.copy()
         var col = Column(self.name, visitor^.result, self.dtype, idx^)
         col._null_mask = mask^
+        col._index_names = self._index_names.copy()
         return col^
 
     # ------------------------------------------------------------------

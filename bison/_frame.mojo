@@ -2381,10 +2381,15 @@ struct DataFrame(Copyable, Movable):
         """Replace the row index with a default RangeIndex.
 
         When ``drop=True`` the existing index labels are discarded.
-        When ``drop=False`` (default) the existing index is promoted to a new
-        column named ``"index"`` prepended to the result, and the row index is
-        then cleared to a default RangeIndex.  On a DataFrame that already has
-        a default RangeIndex, both modes simply return an identical copy.
+        When ``drop=False`` (default) the existing index is promoted to new
+        column(s) prepended to the result, and the row index is then cleared to
+        a default RangeIndex.  On a DataFrame that already has a default
+        RangeIndex, both modes simply return an identical copy.
+
+        For a scalar index (single-key ``set_index``), a single column named
+        ``"index"`` is prepended.  For a MultiIndex created by a multi-key
+        ``set_index``, one column per level is prepended using the original key
+        column names stored in ``Column._index_names``.
         """
         var ncols = len(self._cols)
         if ncols == 0:
@@ -2393,7 +2398,6 @@ struct DataFrame(Copyable, Movable):
         var has_index = n_idx > 0
         var new_cols = List[Column]()
         if not drop and has_index:
-            # Promote the index to a typed column called "index".
             var empty_col_idx = ColumnIndex(List[PythonObject]())
             if self._cols[0]._index.isa[Index]():
                 ref str_idx = self._cols[0]._index[Index]
@@ -2409,49 +2413,109 @@ struct DataFrame(Copyable, Movable):
                 new_cols.append(Column("index", ColumnData(int_data^), int64, empty_col_idx^))
             else:
                 ref obj_idx = self._cols[0]._index[List[PythonObject]]
-                var obj_data = List[PythonObject]()
-                for i in range(n_idx):
-                    obj_data.append(obj_idx[i])
-                var empty2 = ColumnIndex(List[PythonObject]())
-                new_cols.append(Column("index", ColumnData(obj_data^), object_, empty2^))
+                ref idx_names = self._cols[0]._index_names
+                var n_levels = len(idx_names)
+                if n_levels > 1:
+                    # MultiIndex: expand each tuple level to its own column.
+                    for k in range(n_levels):
+                        var level_data = List[PythonObject]()
+                        for i in range(n_idx):
+                            level_data.append(obj_idx[i].__getitem__(k))
+                        var empty2 = ColumnIndex(List[PythonObject]())
+                        new_cols.append(Column(idx_names[k], ColumnData(level_data^), object_, empty2^))
+                else:
+                    # Single PythonObject index (e.g. float, datetime).
+                    var obj_data = List[PythonObject]()
+                    for i in range(n_idx):
+                        obj_data.append(obj_idx[i])
+                    var empty2 = ColumnIndex(List[PythonObject]())
+                    new_cols.append(Column("index", ColumnData(obj_data^), object_, empty2^))
         for i in range(ncols):
             var c = self._cols[i].copy()
             c._index = ColumnIndex(List[PythonObject]())
+            c._index_names = List[String]()
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
     def set_index(self, keys: List[String], drop: Bool = True) raises -> DataFrame:
-        """Promote one column to the row index.
+        """Promote one or more columns to the row index.
 
-        ``keys`` must contain exactly one column name; multi-key (MultiIndex)
-        is not yet supported and raises.  When ``drop=True`` (default) the key
-        column is removed from the result columns.
+        When ``keys`` contains a single column name the index is stored as a
+        typed ``ColumnIndex`` (``Index`` for strings, ``List[Int64]`` for
+        integers, ``List[PythonObject]`` for other types).
+
+        When ``keys`` contains more than one column name a MultiIndex is created:
+        each row's index label is a Python tuple ``(key0_val, key1_val, ...)``,
+        stored as a ``List[PythonObject]`` ``ColumnIndex``.  The level names are
+        stored in ``Column._index_names`` so that ``reset_index`` can expand
+        them back to individual columns.
+
+        When ``drop=True`` (default) the key column(s) are removed from the
+        result columns.
         """
         if len(keys) == 0:
             raise Error("DataFrame.set_index: keys must not be empty")
-        if len(keys) > 1:
-            raise Error(
-                "DataFrame.set_index: MultiIndex not yet supported; "
-                + "pass a single key"
-            )
-        var key = keys[0]
-        # Find the key column.
-        var key_col_idx: Int = -1
-        for i in range(len(self._cols)):
-            if self._cols[i].name == key:
-                key_col_idx = i
-                break
-        if key_col_idx == -1:
-            raise Error("DataFrame.set_index: column not found: " + key)
-        # Extract the key column's values as the new index.
-        var new_idx = self._cols[key_col_idx]._to_column_index()
-        # Build result columns (skip key column when drop=True).
+        if len(keys) == 1:
+            var key = keys[0]
+            # Find the key column.
+            var key_col_idx: Int = -1
+            for i in range(len(self._cols)):
+                if self._cols[i].name == key:
+                    key_col_idx = i
+                    break
+            if key_col_idx == -1:
+                raise Error("DataFrame.set_index: column not found: " + key)
+            # Extract the key column's values as the new index.
+            var new_idx = self._cols[key_col_idx]._to_column_index()
+            # Build result columns (skip key column when drop=True).
+            var new_cols = List[Column]()
+            for i in range(len(self._cols)):
+                if drop and i == key_col_idx:
+                    continue
+                var c = self._cols[i].copy()
+                c._index = new_idx
+                c._index_names = List[String]()
+                new_cols.append(c^)
+            return DataFrame(new_cols^)
+        # --- MultiIndex: len(keys) > 1 ---
+        # Validate all keys exist.
+        var key_col_indices = List[Int]()
+        for k in range(len(keys)):
+            var found: Int = -1
+            for i in range(len(self._cols)):
+                if self._cols[i].name == keys[k]:
+                    found = i
+                    break
+            if found == -1:
+                raise Error("DataFrame.set_index: column not found: " + keys[k])
+            key_col_indices.append(found)
+        # For each key column, extract values as a List[PythonObject].
+        var n_rows = self.shape()[0]
+        var key_pyobj_lists = List[List[PythonObject]]()
+        for k in range(len(keys)):
+            var pyobj_list = self._cols[key_col_indices[k]]._to_pyobj_index()
+            key_pyobj_lists.append(pyobj_list^)
+        # Build a List[PythonObject] index where each entry is a Python tuple.
+        var builtins = Python.import_module("builtins")
+        var multi_idx = List[PythonObject]()
+        for i in range(n_rows):
+            var items = builtins.list()
+            for k in range(len(keys)):
+                _ = items.append(key_pyobj_lists[k][i])
+            multi_idx.append(builtins.tuple(items))
+        var new_idx = ColumnIndex(multi_idx^)
+        # Build result columns, storing level names in _index_names.
+        # key_col_set acts as a membership set (value is unused).
+        var key_col_set = Dict[Int, Bool]()
+        for k in range(len(key_col_indices)):
+            key_col_set[key_col_indices[k]] = True
         var new_cols = List[Column]()
         for i in range(len(self._cols)):
-            if drop and i == key_col_idx:
+            if drop and i in key_col_set:
                 continue
             var c = self._cols[i].copy()
             c._index = new_idx
+            c._index_names = keys.copy()
             new_cols.append(c^)
         return DataFrame(new_cols^)
 

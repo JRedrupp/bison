@@ -289,18 +289,86 @@ def test_set_index_single_drop_false() raises:
     assert_true(r["b"].iloc(0)[Int64] == 10)
 
 
-def test_set_index_multi_raises() raises:
+def test_set_index_multi_drop_true() raises:
+    """Multi-key set_index creates a tuple-valued MultiIndex (drop=True)."""
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': ['x', 'y', 'z'], 'c': [10, 20, 30]}")))
     var keys = List[String]()
     keys.append("a")
     keys.append("b")
-    var raised = False
-    try:
-        _ = df.set_index(keys)
-    except:
-        raised = True
-    assert_true(raised)
+    var r = df.set_index(keys)
+    # 'a' and 'b' are dropped; only 'c' remains.
+    assert_equal(r.shape()[1], 1)
+    assert_true(r["c"].iloc(0)[Int64] == 10)
+    assert_true(r["c"].iloc(1)[Int64] == 20)
+    assert_true(r["c"].iloc(2)[Int64] == 30)
+    # Index entries must be Python tuples (1, 'x'), (2, 'y'), (3, 'z').
+    var pd_series = r["c"].to_pandas()
+    assert_true(Bool(pd_series.index[0] == pd.Index(Python.evaluate("[(1, 'x')]"))[0]))
+    assert_true(Bool(pd_series.index[1] == pd.Index(Python.evaluate("[(2, 'y')]"))[0]))
+    assert_true(Bool(pd_series.index[2] == pd.Index(Python.evaluate("[(3, 'z')]"))[0]))
+
+
+def test_set_index_multi_drop_false() raises:
+    """Multi-key set_index with drop=False keeps key columns in result."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': ['x', 'y'], 'c': [10, 20]}")))
+    var keys = List[String]()
+    keys.append("a")
+    keys.append("b")
+    var r = df.set_index(keys, drop=False)
+    # 'a', 'b', and 'c' all remain.
+    assert_equal(r.shape()[1], 3)
+    assert_true(r["c"].iloc(0)[Int64] == 10)
+
+
+def test_set_index_multi_sort_index() raises:
+    """Sort_index on a MultiIndex DataFrame sorts rows by tuple comparison."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2, 1, 1], 'b': [3, 4, 2], 'c': [100, 200, 300]}")))
+    var keys = List[String]()
+    keys.append("a")
+    keys.append("b")
+    var indexed = df.set_index(keys)
+    var r = indexed.sort_index()
+    # Sorted order by tuple: (1,2), (1,4), (2,3) → rows 2, 1, 0.
+    assert_true(r["c"].iloc(0)[Int64] == 300)
+    assert_true(r["c"].iloc(1)[Int64] == 200)
+    assert_true(r["c"].iloc(2)[Int64] == 100)
+
+
+def test_set_index_multi_reset_index_drop_true() raises:
+    """Reset_index(drop=True) on a MultiIndex clears the index."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': ['x', 'y'], 'c': [10, 20]}")))
+    var keys = List[String]()
+    keys.append("a")
+    keys.append("b")
+    var indexed = df.set_index(keys)
+    var r = indexed.reset_index(drop=True)
+    # Only 'c' column, default RangeIndex.
+    assert_equal(r.shape()[1], 1)
+    assert_true(r["c"].iloc(0)[Int64] == 10)
+
+
+def test_set_index_multi_reset_index_drop_false() raises:
+    """Reset_index(drop=False) on a MultiIndex expands tuples back to columns."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': ['x', 'y'], 'c': [10, 20]}")))
+    var keys = List[String]()
+    keys.append("a")
+    keys.append("b")
+    var indexed = df.set_index(keys)
+    var r = indexed.reset_index()
+    # Should have 'a', 'b', 'c' — three columns.
+    assert_equal(r.shape()[1], 3)
+    # Values from the expanded index columns match originals.
+    var pd_a = r["a"].to_pandas()
+    assert_true(Bool(pd_a.iloc[0] == 1))
+    assert_true(Bool(pd_a.iloc[1] == 2))
+    var pd_c = r["c"].to_pandas()
+    assert_true(Bool(pd_c.iloc[0] == 10))
+    assert_true(Bool(pd_c.iloc[1] == 20))
 
 
 def test_set_index_null_key() raises:
