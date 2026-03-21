@@ -9,7 +9,7 @@ from bison import DataFrame, Series, DFScalar, IAtIndexer, AtIndexer, ILocIndexe
 # IAtIndexer – integer-based scalar access
 # ------------------------------------------------------------------
 
-fn test_iat_getitem_int_column() raises:
+def test_iat_getitem_int_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -18,7 +18,7 @@ fn test_iat_getitem_int_column() raises:
     assert_true(iat[(2, 0)][Int64] == 30)
 
 
-fn test_iat_getitem_float_column() raises:
+def test_iat_getitem_float_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.5, 2.5]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -26,7 +26,7 @@ fn test_iat_getitem_float_column() raises:
     assert_true(iat[(1, 0)][Float64] == 2.5)
 
 
-fn test_iat_getitem_bool_column() raises:
+def test_iat_getitem_bool_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [True, False]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -34,7 +34,7 @@ fn test_iat_getitem_bool_column() raises:
     assert_true(iat[(1, 0)][Bool] == False)
 
 
-fn test_iat_getitem_negative_row() raises:
+def test_iat_getitem_negative_row() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -42,7 +42,7 @@ fn test_iat_getitem_negative_row() raises:
     assert_true(iat[(-3, 0)][Int64] == 1)
 
 
-fn test_iat_getitem_out_of_bounds_raises() raises:
+def test_iat_getitem_out_of_bounds_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -54,7 +54,7 @@ fn test_iat_getitem_out_of_bounds_raises() raises:
     assert_true(raised)
 
 
-fn test_iat_getitem_bad_col_raises() raises:
+def test_iat_getitem_bad_col_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -66,7 +66,7 @@ fn test_iat_getitem_bad_col_raises() raises:
     assert_true(raised)
 
 
-fn test_iat_setitem_int_column() raises:
+def test_iat_setitem_int_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -76,7 +76,7 @@ fn test_iat_setitem_int_column() raises:
     assert_true(df["a"].iloc(1)[Int64] == 20)
 
 
-fn test_iat_setitem_float_column() raises:
+def test_iat_setitem_float_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.0, 2.0]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -84,7 +84,7 @@ fn test_iat_setitem_float_column() raises:
     assert_true(df["x"].iloc(1)[Float64] == 9.9)
 
 
-fn test_iat_setitem_bool_column() raises:
+def test_iat_setitem_bool_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [True, True]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -92,7 +92,7 @@ fn test_iat_setitem_bool_column() raises:
     assert_true(df["b"].iloc(0)[Bool] == False)
 
 
-fn test_iat_setitem_multiple_columns() raises:
+def test_iat_setitem_multiple_columns() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
@@ -106,7 +106,7 @@ fn test_iat_setitem_multiple_columns() raises:
 # AtIndexer – label-based scalar access
 # ------------------------------------------------------------------
 
-fn test_at_getitem_default_int_index() raises:
+def test_at_getitem_default_int_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
     var at = AtIndexer(UnsafePointer(to=df))
@@ -115,7 +115,7 @@ fn test_at_getitem_default_int_index() raises:
     assert_true(at[("2", "a")][Int64] == 30)
 
 
-fn test_at_getitem_string_index() raises:
+def test_at_getitem_string_index() raises:
     var pd = Python.import_module("pandas")
     var py_df = pd.DataFrame(
         Python.evaluate("{'val': [100, 200]}"),
@@ -127,7 +127,7 @@ fn test_at_getitem_string_index() raises:
     assert_true(at[("r1", "val")][Int64] == 200)
 
 
-fn test_at_getitem_missing_col_raises() raises:
+def test_at_getitem_missing_col_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var at = AtIndexer(UnsafePointer(to=df))
@@ -139,7 +139,7 @@ fn test_at_getitem_missing_col_raises() raises:
     assert_true(raised)
 
 
-fn test_at_getitem_missing_row_raises() raises:
+def test_at_getitem_missing_row_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var at = AtIndexer(UnsafePointer(to=df))
@@ -151,7 +151,7 @@ fn test_at_getitem_missing_row_raises() raises:
     assert_true(raised)
 
 
-fn test_at_setitem_default_index() raises:
+def test_at_setitem_default_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var at = AtIndexer(UnsafePointer(to=df))
@@ -160,7 +160,7 @@ fn test_at_setitem_default_index() raises:
     assert_true(df["a"].iloc(1)[Int64] == 2)
 
 
-fn test_at_setitem_string_index() raises:
+def test_at_setitem_string_index() raises:
     var pd = Python.import_module("pandas")
     var py_df = pd.DataFrame(
         Python.evaluate("{'x': [10.0, 20.0]}"),
@@ -176,7 +176,7 @@ fn test_at_setitem_string_index() raises:
 # ILocIndexer – integer-position row access
 # ------------------------------------------------------------------
 
-fn test_iloc_getitem_returns_series() raises:
+def test_iloc_getitem_returns_series() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -185,7 +185,7 @@ fn test_iloc_getitem_returns_series() raises:
     assert_equal(row.size(), 2)
 
 
-fn test_iloc_getitem_row_values() raises:
+def test_iloc_getitem_row_values() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -197,7 +197,7 @@ fn test_iloc_getitem_row_values() raises:
     assert_true(row1.iloc(1)[PythonObject].__int__() == 40)
 
 
-fn test_iloc_getitem_negative_index() raises:
+def test_iloc_getitem_negative_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -205,7 +205,7 @@ fn test_iloc_getitem_negative_index() raises:
     assert_true(last.iloc(0)[PythonObject].__int__() == 3)
 
 
-fn test_iloc_getitem_out_of_bounds_raises() raises:
+def test_iloc_getitem_out_of_bounds_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -217,7 +217,7 @@ fn test_iloc_getitem_out_of_bounds_raises() raises:
     assert_true(raised)
 
 
-fn test_iloc_setitem_updates_dataframe() raises:
+def test_iloc_setitem_updates_dataframe() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -230,7 +230,7 @@ fn test_iloc_setitem_updates_dataframe() raises:
     assert_true(df["b"].iloc(1)[Int64] == 4)
 
 
-fn test_iloc_setitem_wrong_size_raises() raises:
+def test_iloc_setitem_wrong_size_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var iloc = ILocIndexer(UnsafePointer(to=df))
@@ -248,7 +248,7 @@ fn test_iloc_setitem_wrong_size_raises() raises:
 # LocIndexer – label-based row access
 # ------------------------------------------------------------------
 
-fn test_loc_getitem_default_int_index() raises:
+def test_loc_getitem_default_int_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
     var loc = LocIndexer(UnsafePointer(to=df))
@@ -258,7 +258,7 @@ fn test_loc_getitem_default_int_index() raises:
     assert_true(row0.iloc(1)[PythonObject].__int__() == 30)
 
 
-fn test_loc_getitem_string_index() raises:
+def test_loc_getitem_string_index() raises:
     var pd = Python.import_module("pandas")
     var py_df = pd.DataFrame(
         Python.evaluate("{'val': [100, 200, 300]}"),
@@ -270,7 +270,7 @@ fn test_loc_getitem_string_index() raises:
     assert_true(ry.iloc(0)[PythonObject].__int__() == 200)
 
 
-fn test_loc_getitem_missing_label_raises() raises:
+def test_loc_getitem_missing_label_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var loc = LocIndexer(UnsafePointer(to=df))
@@ -282,7 +282,7 @@ fn test_loc_getitem_missing_label_raises() raises:
     assert_true(raised)
 
 
-fn test_loc_setitem_updates_row() raises:
+def test_loc_setitem_updates_row() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var loc = LocIndexer(UnsafePointer(to=df))
@@ -295,7 +295,7 @@ fn test_loc_setitem_updates_row() raises:
     assert_true(df["b"].iloc(0)[Int64] == 3)
 
 
-fn test_loc_setitem_wrong_size_raises() raises:
+def test_loc_setitem_wrong_size_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var loc = LocIndexer(UnsafePointer(to=df))
@@ -308,5 +308,5 @@ fn test_loc_setitem_wrong_size_raises() raises:
     assert_true(raised)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

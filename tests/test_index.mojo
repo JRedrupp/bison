@@ -3,7 +3,7 @@ from testing import assert_equal, assert_true, TestSuite
 from bison import Index
 
 
-fn _make_index(a: String, b: String, c: String) -> Index:
+def _make_index(a: String, b: String, c: String) -> Index:
     var data = List[String]()
     data.append(a)
     data.append(b)
@@ -11,7 +11,7 @@ fn _make_index(a: String, b: String, c: String) -> Index:
     return Index(data^)
 
 
-fn _make_index_named(a: String, b: String, c: String, name: String) -> Index:
+def _make_index_named(a: String, b: String, c: String, name: String) -> Index:
     var data = List[String]()
     data.append(a)
     data.append(b)
@@ -19,14 +19,14 @@ fn _make_index_named(a: String, b: String, c: String, name: String) -> Index:
     return Index(data^, name)
 
 
-fn test_get_loc_found() raises:
+def test_get_loc_found() raises:
     var idx = _make_index("a", "b", "c")
     assert_equal(idx.get_loc("a"), 0)
     assert_equal(idx.get_loc("b"), 1)
     assert_equal(idx.get_loc("c"), 2)
 
 
-fn test_get_loc_first_occurrence() raises:
+def test_get_loc_first_occurrence() raises:
     var data = List[String]()
     data.append("x")
     data.append("y")
@@ -35,7 +35,7 @@ fn test_get_loc_first_occurrence() raises:
     assert_equal(idx.get_loc("x"), 0)
 
 
-fn test_get_loc_not_found() raises:
+def test_get_loc_not_found() raises:
     var idx = _make_index("a", "b", "c")
     var raised = False
     try:
@@ -45,7 +45,7 @@ fn test_get_loc_not_found() raises:
     assert_true(raised)
 
 
-fn test_unique_no_duplicates() raises:
+def test_unique_no_duplicates() raises:
     var idx = _make_index("a", "b", "c")
     var u = idx.unique()
     assert_equal(u.__len__(), 3)
@@ -54,7 +54,7 @@ fn test_unique_no_duplicates() raises:
     assert_equal(u[2], "c")
 
 
-fn test_unique_with_duplicates() raises:
+def test_unique_with_duplicates() raises:
     var data = List[String]()
     data.append("a")
     data.append("b")
@@ -69,20 +69,20 @@ fn test_unique_with_duplicates() raises:
     assert_equal(u[2], "c")
 
 
-fn test_unique_preserves_name() raises:
+def test_unique_preserves_name() raises:
     var idx = _make_index_named("x", "x", "y", "myname")
     var u = idx.unique()
     assert_equal(u.name, "myname")
 
 
-fn test_unique_empty() raises:
+def test_unique_empty() raises:
     var data = List[String]()
     var idx = Index(data^)
     var u = idx.unique()
     assert_equal(u.__len__(), 0)
 
 
-fn test_sort_values_ascending() raises:
+def test_sort_values_ascending() raises:
     var idx = _make_index("c", "a", "b")
     var s = idx.sort_values()
     assert_equal(s[0], "a")
@@ -90,7 +90,7 @@ fn test_sort_values_ascending() raises:
     assert_equal(s[2], "c")
 
 
-fn test_sort_values_descending() raises:
+def test_sort_values_descending() raises:
     var idx = _make_index("c", "a", "b")
     var s = idx.sort_values(ascending=False)
     assert_equal(s[0], "c")
@@ -98,7 +98,7 @@ fn test_sort_values_descending() raises:
     assert_equal(s[2], "a")
 
 
-fn test_sort_values_already_sorted() raises:
+def test_sort_values_already_sorted() raises:
     var idx = _make_index("a", "b", "c")
     var s = idx.sort_values()
     assert_equal(s[0], "a")
@@ -106,13 +106,13 @@ fn test_sort_values_already_sorted() raises:
     assert_equal(s[2], "c")
 
 
-fn test_sort_values_preserves_name() raises:
+def test_sort_values_preserves_name() raises:
     var idx = _make_index_named("b", "a", "c", "myname")
     var s = idx.sort_values()
     assert_equal(s.name, "myname")
 
 
-fn test_sort_values_single_element() raises:
+def test_sort_values_single_element() raises:
     var data = List[String]()
     data.append("a")
     var idx = Index(data^)
@@ -121,7 +121,7 @@ fn test_sort_values_single_element() raises:
     assert_equal(s[0], "a")
 
 
-fn test_sort_values_does_not_mutate_original() raises:
+def test_sort_values_does_not_mutate_original() raises:
     var idx = _make_index("c", "a", "b")
     _ = idx.sort_values()
     assert_equal(idx[0], "c")
@@ -129,5 +129,5 @@ fn test_sort_values_does_not_mutate_original() raises:
     assert_equal(idx[2], "b")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

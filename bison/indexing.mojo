@@ -10,7 +10,7 @@ from .dataframe import DataFrame
 # Private helpers
 # ------------------------------------------------------------------
 
-fn _df_col_index(df: DataFrame, name: String) raises -> Int:
+def _df_col_index(df: DataFrame, name: String) raises -> Int:
     """Return the integer position of column *name* in *df*."""
     for i in range(len(df._cols)):
         if df._cols[i].name == name:
@@ -18,7 +18,7 @@ fn _df_col_index(df: DataFrame, name: String) raises -> Int:
     raise Error("column '" + name + "' not found")
 
 
-fn _parse_int_label(label: String) raises -> Int:
+def _parse_int_label(label: String) raises -> Int:
     """Parse a decimal integer string into an ``Int``.
 
     Supports an optional leading ``'-'`` sign.  Raises when the string
@@ -46,7 +46,7 @@ fn _parse_int_label(label: String) raises -> Int:
     return -result if negative else result
 
 
-fn _df_row_index(df: DataFrame, label: String) raises -> Int:
+def _df_row_index(df: DataFrame, label: String) raises -> Int:
     """Return the integer row position for the given row *label*.
 
     If the first column has a non-empty ``_index`` list the label is
@@ -74,7 +74,7 @@ fn _df_row_index(df: DataFrame, label: String) raises -> Int:
     return row
 
 
-fn _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
+def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
     """Extract cell (*row*) from *col* as a ``DFScalar``.
 
     Raises for ``List[PythonObject]`` columns (object / datetime) since
@@ -92,7 +92,7 @@ fn _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
         raise Error("scalar access not supported for object/datetime columns")
 
 
-fn _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
+def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     """Write *value* into *col* at integer position *row*.
 
     Type coercion mirrors pandas ``at`` / ``iat`` behaviour:
@@ -140,7 +140,7 @@ fn _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
         raise Error("iat/at: scalar write not supported for object/datetime columns")
 
 
-fn _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
+def _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
     """Write a ``SeriesScalar`` cell into *col* at position *row*.
 
     Behaves like ``_set_scalar_in_col`` but also handles the
@@ -166,7 +166,7 @@ fn _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) rai
     _set_scalar_in_col(col, row, ds)
 
 
-fn _row_as_series(df: DataFrame, row: Int) raises -> Series:
+def _row_as_series(df: DataFrame, row: Int) raises -> Series:
     """Build a ``Series`` representing row *row* of *df*.
 
     The returned Series has ``object_`` dtype; each element is a
@@ -208,10 +208,10 @@ struct LocIndexer[O: MutOrigin]:
 
     var _df: UnsafePointer[DataFrame, Self.O]
 
-    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    fn __getitem__(self, key: String) raises -> Series:
+    def __getitem__(self, key: String) raises -> Series:
         """Return row *key* as a Series (index = column names)."""
         ref df = self._df[]
         var row = _df_row_index(df, key)
@@ -220,7 +220,7 @@ struct LocIndexer[O: MutOrigin]:
             raise Error("loc: row index out of bounds")
         return _row_as_series(df, row)
 
-    fn __setitem__(self, key: String, value: Series) raises:
+    def __setitem__(self, key: String, value: Series) raises:
         """Assign Series *value* to row *key*.
 
         *value* must have exactly as many elements as there are columns.
@@ -253,10 +253,10 @@ struct ILocIndexer[O: MutOrigin]:
 
     var _df: UnsafePointer[DataFrame, Self.O]
 
-    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    fn __getitem__(self, key: Int) raises -> Series:
+    def __getitem__(self, key: Int) raises -> Series:
         """Return row *key* (integer position) as a Series."""
         ref df = self._df[]
         var nrows = df.shape()[0]
@@ -273,7 +273,7 @@ struct ILocIndexer[O: MutOrigin]:
             )
         return _row_as_series(df, row)
 
-    fn __setitem__(self, key: Int, value: Series) raises:
+    def __setitem__(self, key: Int, value: Series) raises:
         """Assign Series *value* to row *key* (integer position).
 
         *value* must have exactly as many elements as there are columns.
@@ -312,17 +312,17 @@ struct AtIndexer[O: MutOrigin]:
 
     var _df: UnsafePointer[DataFrame, Self.O]
 
-    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    fn __getitem__(self, idx: Tuple[String, String]) raises -> DFScalar:
+    def __getitem__(self, idx: Tuple[String, String]) raises -> DFScalar:
         """Return the scalar at row label *idx[0]*, column name *idx[1]*."""
         ref df = self._df[]
         var row_idx = _df_row_index(df, idx[0])
         var col_idx = _df_col_index(df, idx[1])
         return _scalar_from_col(df._cols[col_idx], row_idx)
 
-    fn __setitem__(self, idx: Tuple[String, String], value: DFScalar) raises:
+    def __setitem__(self, idx: Tuple[String, String], value: DFScalar) raises:
         """Set the scalar at row label *idx[0]*, column name *idx[1]* to *value*."""
         ref df = self._df[]
         var row_idx = _df_row_index(df, idx[0])
@@ -338,10 +338,10 @@ struct IAtIndexer[O: MutOrigin]:
 
     var _df: UnsafePointer[DataFrame, Self.O]
 
-    fn __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    fn __getitem__(self, idx: Tuple[Int, Int]) raises -> DFScalar:
+    def __getitem__(self, idx: Tuple[Int, Int]) raises -> DFScalar:
         """Return the scalar at integer row *idx[0]*, column position *idx[1]*."""
         ref df = self._df[]
         var nrows = df.shape()[0]
@@ -369,7 +369,7 @@ struct IAtIndexer[O: MutOrigin]:
             )
         return _scalar_from_col(df._cols[col], r)
 
-    fn __setitem__(self, idx: Tuple[Int, Int], value: DFScalar) raises:
+    def __setitem__(self, idx: Tuple[Int, Int], value: DFScalar) raises:
         """Set the scalar at integer row *idx[0]*, column position *idx[1]*."""
         ref df = self._df[]
         var nrows = df.shape()[0]

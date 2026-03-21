@@ -5,7 +5,7 @@ from testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, Series, SeriesScalar, DFScalar
 
 
-fn test_sort_values_ascending_int() raises:
+def test_sort_values_ascending_int() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var by = List[String]()
@@ -16,7 +16,7 @@ fn test_sort_values_ascending_int() raises:
     assert_true(r["a"].iloc(2)[Int64] == 3)
 
 
-fn test_sort_values_descending_int() raises:
+def test_sort_values_descending_int() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var by = List[String]()
@@ -27,7 +27,7 @@ fn test_sort_values_descending_int() raises:
     assert_true(r["a"].iloc(2)[Int64] == 1)
 
 
-fn test_sort_values_multi_col() raises:
+def test_sort_values_multi_col() raises:
     # Sort by ['a', 'b']: primary key 'a', secondary key 'b'.
     # Input:  a=[1,1,2], b=[3,1,2]
     # Expected order: (1,1), (1,3), (2,2) → rows 1, 0, 2
@@ -45,7 +45,7 @@ fn test_sort_values_multi_col() raises:
     assert_true(r["b"].iloc(2)[Int64] == 2)
 
 
-fn test_sort_values_null_last() raises:
+def test_sort_values_null_last() raises:
     # Null should always appear at the end regardless of direction.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, None, 1]}")))
@@ -57,7 +57,7 @@ fn test_sort_values_null_last() raises:
     assert_true(r["a"].isnull().iloc(2)[Bool] == True)
 
 
-fn test_sort_values_preserves_columns() raises:
+def test_sort_values_preserves_columns() raises:
     # All columns must be reordered together, not just the sort key.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2], 'b': [30, 10, 20]}")))
@@ -72,7 +72,7 @@ fn test_sort_values_preserves_columns() raises:
     assert_true(r["b"].iloc(2)[Int64] == 30)
 
 
-fn test_sort_index_ascending_default() raises:
+def test_sort_index_ascending_default() raises:
     # Ascending sort on a default integer index is a no-op.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
@@ -82,7 +82,7 @@ fn test_sort_index_ascending_default() raises:
     assert_true(r["a"].iloc(2)[Int64] == 2)
 
 
-fn test_sort_index_descending_default() raises:
+def test_sort_index_descending_default() raises:
     # Descending sort on a default integer index reverses the rows.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
@@ -92,7 +92,7 @@ fn test_sort_index_descending_default() raises:
     assert_true(r["a"].iloc(2)[Int64] == 3)
 
 
-fn test_sort_index_axis1_ascending() raises:
+def test_sort_index_axis1_ascending() raises:
     # axis=1 sorts column labels lexicographically (ascending).
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'c': [1, 2], 'a': [3, 4], 'b': [5, 6]}")))
@@ -107,7 +107,7 @@ fn test_sort_index_axis1_ascending() raises:
     assert_true(r["c"].iloc(0)[Int64] == 1)
 
 
-fn test_sort_index_axis1_descending() raises:
+def test_sort_index_axis1_descending() raises:
     # axis=1 sorts column labels lexicographically (descending).
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'c': [2], 'b': [3]}")))
@@ -118,7 +118,7 @@ fn test_sort_index_axis1_descending() raises:
     assert_equal(cols[2], "a")
 
 
-fn test_sort_index_axis1_already_sorted() raises:
+def test_sort_index_axis1_already_sorted() raises:
     # No-op when columns are already in ascending order.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
@@ -129,7 +129,7 @@ fn test_sort_index_axis1_already_sorted() raises:
     assert_equal(cols[2], "c")
 
 
-fn test_sort_index_axis1_single_column() raises:
+def test_sort_index_axis1_single_column() raises:
     # Single-column DataFrame is unchanged.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'z': [10, 20]}")))
@@ -139,7 +139,7 @@ fn test_sort_index_axis1_single_column() raises:
     assert_true(r["z"].iloc(0)[Int64] == 10)
 
 
-fn test_pivot_stub() raises:
+def test_pivot_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var raised = False
@@ -150,7 +150,7 @@ fn test_pivot_stub() raises:
     assert_true(raised)
 
 
-fn test_melt_stub() raises:
+def test_melt_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'id': [1], 'val': [10]}")))
     var raised = False
@@ -161,7 +161,7 @@ fn test_melt_stub() raises:
     assert_true(raised)
 
 
-fn test_transpose_stub() raises:
+def test_transpose_stub() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var raised = False
@@ -172,7 +172,7 @@ fn test_transpose_stub() raises:
     assert_true(raised)
 
 
-fn test_drop_duplicates_removes_duplicates() raises:
+def test_drop_duplicates_removes_duplicates() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2], 'b': [10, 10, 20]}")))
     var r = df.drop_duplicates()
@@ -181,7 +181,7 @@ fn test_drop_duplicates_removes_duplicates() raises:
     assert_true(r["a"].iloc(1)[Int64] == 2)
 
 
-fn test_series_sort_values() raises:
+def test_series_sort_values() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
     var r = s.sort_values()
@@ -194,7 +194,7 @@ fn test_series_sort_values() raises:
 # rename
 # ------------------------------------------------------------------
 
-fn test_rename_columns() raises:
+def test_rename_columns() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var cols_map = Dict[String, String]()
@@ -205,7 +205,7 @@ fn test_rename_columns() raises:
     assert_true(r["x"].iloc(1)[Int64] == 2)
 
 
-fn test_rename_columns_partial() raises:
+def test_rename_columns_partial() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var cols_map = Dict[String, String]()
@@ -216,7 +216,7 @@ fn test_rename_columns_partial() raises:
     assert_true(r["b"].iloc(0)[Int64] == 2)
 
 
-fn test_rename_index() raises:
+def test_rename_index() raises:
     # Rename index label 'i' → 'z'; sort_index ascending gives j, k, z.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}"), index=Python.evaluate("['i', 'j', 'k']")))
@@ -234,7 +234,7 @@ fn test_rename_index() raises:
 # reset_index
 # ------------------------------------------------------------------
 
-fn test_reset_index_drop_true() raises:
+def test_reset_index_drop_true() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}"), index=Python.evaluate("['x', 'y']")))
     var r = df.reset_index(drop=True)
@@ -244,7 +244,7 @@ fn test_reset_index_drop_true() raises:
     assert_true(r["a"].iloc(1)[Int64] == 2)
 
 
-fn test_reset_index_drop_false() raises:
+def test_reset_index_drop_false() raises:
     # Index promoted to a new "index" column prepended to the result.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}"), index=Python.evaluate("['x', 'y']")))
@@ -254,7 +254,7 @@ fn test_reset_index_drop_false() raises:
     assert_true(r["a"].iloc(0)[Int64] == 1)
 
 
-fn test_reset_index_range_index() raises:
+def test_reset_index_range_index() raises:
     # On a default RangeIndex, reset_index is a copy.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
@@ -268,7 +268,7 @@ fn test_reset_index_range_index() raises:
 # set_index
 # ------------------------------------------------------------------
 
-fn test_set_index_single_drop_true() raises:
+def test_set_index_single_drop_true() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': ['x', 'y'], 'b': [10, 20]}")))
     var keys = List[String]()
@@ -279,7 +279,7 @@ fn test_set_index_single_drop_true() raises:
     assert_true(r["b"].iloc(1)[Int64] == 20)
 
 
-fn test_set_index_single_drop_false() raises:
+def test_set_index_single_drop_false() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': ['x', 'y'], 'b': [10, 20]}")))
     var keys = List[String]()
@@ -289,7 +289,7 @@ fn test_set_index_single_drop_false() raises:
     assert_true(r["b"].iloc(0)[Int64] == 10)
 
 
-fn test_set_index_multi_raises() raises:
+def test_set_index_multi_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var keys = List[String]()
@@ -303,7 +303,7 @@ fn test_set_index_multi_raises() raises:
     assert_true(raised)
 
 
-fn test_set_index_null_key() raises:
+def test_set_index_null_key() raises:
     """Null entries in the key column must become NaN/None in the resulting index."""
     var pd = Python.import_module("pandas")
     # "a" is a float column with a null at position 1.
@@ -324,7 +324,7 @@ fn test_set_index_null_key() raises:
 # rename_axis
 # ------------------------------------------------------------------
 
-fn test_rename_axis_is_copy() raises:
+def test_rename_axis_is_copy() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var r = df.rename_axis(mapper=Optional[String]("rows"))
@@ -337,7 +337,7 @@ fn test_rename_axis_is_copy() raises:
 # reindex
 # ------------------------------------------------------------------
 
-fn test_reindex_axis1_reorder() raises:
+def test_reindex_axis1_reorder() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var lbls = List[String]()
@@ -351,7 +351,7 @@ fn test_reindex_axis1_reorder() raises:
     assert_true(r["b"].iloc(0)[Int64] == 2)
 
 
-fn test_reindex_axis1_fill() raises:
+def test_reindex_axis1_fill() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var lbls = List[String]()
@@ -364,7 +364,7 @@ fn test_reindex_axis1_fill() raises:
     assert_true(r["x"].iloc(0)[Int64] == 99)
 
 
-fn test_reindex_axis1_null_fill() raises:
+def test_reindex_axis1_null_fill() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var lbls = List[String]()
@@ -375,7 +375,7 @@ fn test_reindex_axis1_null_fill() raises:
     assert_equal(r.shape()[0], 2)
 
 
-fn test_reindex_axis1_null_fill_dtype_inferred() raises:
+def test_reindex_axis1_null_fill_dtype_inferred() raises:
     # Missing columns should get the same dtype as existing columns,
     # not unconditionally float64 (tech debt fix).
     var pd = Python.import_module("pandas")
@@ -392,7 +392,7 @@ fn test_reindex_axis1_null_fill_dtype_inferred() raises:
     assert_true(r["x"].isna().iloc(1)[Bool] == True)
 
 
-fn test_reindex_axis0_reorder() raises:
+def test_reindex_axis0_reorder() raises:
     # index=['c', 'a', 'b'], values=[10, 20, 30]. Reindex to ['a', 'b', 'c'].
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}"), index=Python.evaluate("['c', 'a', 'b']")))
@@ -407,7 +407,7 @@ fn test_reindex_axis0_reorder() raises:
     assert_true(r["a"].iloc(2)[Int64] == 10)  # row 'c' had value 10
 
 
-fn test_reindex_axis0_fill() raises:
+def test_reindex_axis0_fill() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10]}"), index=Python.evaluate("['x']")))
     var lbls = List[String]()
@@ -420,7 +420,7 @@ fn test_reindex_axis0_fill() raises:
     assert_true(r["a"].iloc(1)[Int64] == 0)
 
 
-fn test_reindex_axis0_obj_fill_value() raises:
+def test_reindex_axis0_obj_fill_value() raises:
     # Object-dtype column with axis=0 reindex and fill_value: bug fix for
     # _ReindexRowsVisitor.on_obj ignoring fill_value.
     var pd = Python.import_module("pandas")
@@ -437,7 +437,7 @@ fn test_reindex_axis0_obj_fill_value() raises:
     assert_true(String(r["a"].iloc(1)[PythonObject]) == "FILL")
 
 
-fn test_reindex_axis0_obj_null_propagation() raises:
+def test_reindex_axis0_obj_null_propagation() raises:
     # Object-dtype column: existing null rows should propagate through reindex.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [None, 'y']}"), index=Python.evaluate("['r0', 'r1']")))
@@ -452,5 +452,5 @@ fn test_reindex_axis0_obj_null_propagation() raises:
     assert_true(r["a"].isna().iloc(1)[Bool] == True)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

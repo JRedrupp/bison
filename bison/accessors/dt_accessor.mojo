@@ -5,69 +5,69 @@ from ..column import Column
 struct DatetimeMethods:
     """Accessor for datetime properties on a Series (.dt accessor)."""
 
-    fn __init__(out self):
+    def __init__(out self):
         pass
 
-    fn year(self) raises -> Column:
+    def year(self) raises -> Column:
         _not_implemented("Series.dt.year")
         return Column()
 
-    fn month(self) raises -> Column:
+    def month(self) raises -> Column:
         _not_implemented("Series.dt.month")
         return Column()
 
-    fn day(self) raises -> Column:
+    def day(self) raises -> Column:
         _not_implemented("Series.dt.day")
         return Column()
 
-    fn hour(self) raises -> Column:
+    def hour(self) raises -> Column:
         _not_implemented("Series.dt.hour")
         return Column()
 
-    fn minute(self) raises -> Column:
+    def minute(self) raises -> Column:
         _not_implemented("Series.dt.minute")
         return Column()
 
-    fn second(self) raises -> Column:
+    def second(self) raises -> Column:
         _not_implemented("Series.dt.second")
         return Column()
 
-    fn dayofweek(self) raises -> Column:
+    def dayofweek(self) raises -> Column:
         _not_implemented("Series.dt.dayofweek")
         return Column()
 
-    fn dayofyear(self) raises -> Column:
+    def dayofyear(self) raises -> Column:
         _not_implemented("Series.dt.dayofyear")
         return Column()
 
-    fn quarter(self) raises -> Column:
+    def quarter(self) raises -> Column:
         _not_implemented("Series.dt.quarter")
         return Column()
 
-    fn date(self) raises -> Column:
+    def date(self) raises -> Column:
         _not_implemented("Series.dt.date")
         return Column()
 
-    fn time(self) raises -> Column:
+    def time(self) raises -> Column:
         _not_implemented("Series.dt.time")
         return Column()
 
-    fn tz_localize(self, tz: String) raises -> Column:
+    def tz_localize(self, tz: String) raises -> Column:
         _not_implemented("Series.dt.tz_localize")
         return Column()
 
-    fn tz_convert(self, tz: String) raises -> Column:
+    def tz_convert(self, tz: String) raises -> Column:
         _not_implemented("Series.dt.tz_convert")
         return Column()
 
-    fn floor(self, freq: String) raises -> Column:
+    def floor(self, freq: String) raises -> Column:
         _not_implemented("Series.dt.floor")
         return Column()
 
-    fn ceil(self, freq: String) raises -> Column:
+    def ceil(self, freq: String) raises -> Column:
         _not_implemented("Series.dt.ceil")
         return Column()
 
-    fn round(self, freq: String) raises -> Column:
+    def round(self, freq: String) raises -> Column:
         _not_implemented("Series.dt.round")
         return Column()

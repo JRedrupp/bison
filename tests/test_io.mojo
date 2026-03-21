@@ -4,7 +4,7 @@ from testing import assert_equal, assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
 
 
-fn test_read_csv_basic() raises:
+def test_read_csv_basic() raises:
     """Read a CSV file with int, float, and string columns."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -21,7 +21,7 @@ fn test_read_csv_basic() raises:
     assert_equal(cols[2], "c")
 
 
-fn test_read_csv_sep() raises:
+def test_read_csv_sep() raises:
     """Custom separator (tab-separated values)."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".tsv"))
@@ -35,7 +35,7 @@ fn test_read_csv_sep() raises:
     assert_equal(df.columns()[1], "y")
 
 
-fn test_read_csv_nrows() raises:
+def test_read_csv_nrows() raises:
     """Nrows parameter limits the number of data rows read."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -47,7 +47,7 @@ fn test_read_csv_nrows() raises:
     assert_equal(df.shape()[1], 2)
 
 
-fn test_read_csv_no_header() raises:
+def test_read_csv_no_header() raises:
     """With header=-1 there is no header row; columns are auto-numbered as strings."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".csv"))
@@ -63,7 +63,7 @@ fn test_read_csv_no_header() raises:
     assert_equal(cols[2], "2")
 
 
-fn test_to_csv_returns_string() raises:
+def test_to_csv_returns_string() raises:
     """Calling to_csv() with no path returns a non-empty CSV string."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
@@ -73,7 +73,7 @@ fn test_to_csv_returns_string() raises:
     assert_true(csv_str.find("b") >= 0)
 
 
-fn test_to_csv_no_index() raises:
+def test_to_csv_no_index() raises:
     """Passing index=False omits the row-number column (no leading comma in header)."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
@@ -85,7 +85,7 @@ fn test_to_csv_no_index() raises:
     assert_true(csv_str.find("20") >= 0)
 
 
-fn test_csv_roundtrip() raises:
+def test_csv_roundtrip() raises:
     """Write a DataFrame to CSV with index=False, read it back, check shape."""
     var pd = Python.import_module("pandas")
     var tempfile = Python.import_module("tempfile")
@@ -102,7 +102,7 @@ fn test_csv_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
-fn test_read_parquet_stub() raises:
+def test_read_parquet_stub() raises:
     var raised = False
     try:
         _ = read_parquet("/tmp/nonexistent.parquet")
@@ -111,7 +111,7 @@ fn test_read_parquet_stub() raises:
     assert_true(raised)
 
 
-fn test_read_json_records() raises:
+def test_read_json_records() raises:
     """Read a JSON file in records format (list of dicts)."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".json"))
@@ -126,7 +126,7 @@ fn test_read_json_records() raises:
     assert_equal(df.columns()[2], "c")
 
 
-fn test_read_json_lines() raises:
+def test_read_json_lines() raises:
     """Read a JSON Lines (NDJSON) file with lines=True."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".jsonl"))
@@ -140,7 +140,7 @@ fn test_read_json_lines() raises:
     assert_equal(df.columns()[1], "y")
 
 
-fn test_read_json_split() raises:
+def test_read_json_split() raises:
     """Read a JSON file in split format."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".json"))
@@ -154,7 +154,7 @@ fn test_read_json_split() raises:
     assert_equal(df.columns()[1], "b")
 
 
-fn test_to_json_records() raises:
+def test_to_json_records() raises:
     """Serialize a DataFrame to JSON records format."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
@@ -164,7 +164,7 @@ fn test_to_json_records() raises:
     assert_true(json_str.find('"b"') >= 0)
 
 
-fn test_to_json_split() raises:
+def test_to_json_split() raises:
     """Serialize a DataFrame to JSON split format."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
@@ -174,7 +174,7 @@ fn test_to_json_split() raises:
     assert_true(json_str.find('"index"') >= 0)
 
 
-fn test_json_roundtrip() raises:
+def test_json_roundtrip() raises:
     """Write a DataFrame to JSON (records orient), read it back, check shape/columns."""
     var pd = Python.import_module("pandas")
     var tempfile = Python.import_module("tempfile")
@@ -191,7 +191,7 @@ fn test_json_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
-fn test_read_excel_stub() raises:
+def test_read_excel_stub() raises:
     var raised = False
     try:
         _ = read_excel("/tmp/nonexistent.xlsx")
@@ -200,5 +200,5 @@ fn test_read_excel_stub() raises:
     assert_true(raised)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

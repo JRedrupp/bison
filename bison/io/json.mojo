@@ -9,12 +9,12 @@ from ..dtypes import int64, float64, object_, bool_
 # Private helpers
 # ------------------------------------------------------------------
 
-fn _json_py_type(val: PythonObject) raises -> String:
+def _json_py_type(val: PythonObject) raises -> String:
     """Return the Python class name of a JSON value."""
     return String(val.__class__.__name__)
 
 
-fn _json_infer_dtype(py_values: PythonObject, n: Int) raises -> String:
+def _json_infer_dtype(py_values: PythonObject, n: Int) raises -> String:
     """Determine the best bison dtype for a Python list of JSON values.
 
     Returns ``"int64"``, ``"float64"``, ``"bool"``, or ``"string"``.
@@ -48,7 +48,7 @@ fn _json_infer_dtype(py_values: PythonObject, n: Int) raises -> String:
     return "int64"  # default for all-null columns
 
 
-fn _json_build_column(
+def _json_build_column(
     name: String,
     py_values: PythonObject,
     n: Int,
@@ -133,7 +133,7 @@ fn _json_build_column(
         return col^
 
 
-fn _json_records_to_df(
+def _json_records_to_df(
     records: PythonObject,
     n: Int,
     py_builtins: PythonObject,
@@ -171,7 +171,7 @@ fn _json_records_to_df(
 # Public API
 # ------------------------------------------------------------------
 
-fn read_json(
+def read_json(
     path_or_buf: String,
     orient: String = "",
     dtype: Optional[PythonObject] = None,

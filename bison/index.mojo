@@ -6,28 +6,28 @@ struct Index(Copyable, Movable):
     var _data: List[String]
     var name: String
 
-    fn __init__(out self, var data: List[String], name: String = ""):
+    def __init__(out self, var data: List[String], name: String = ""):
         self._data = data^
         self.name = name
 
-    fn __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._data = copy._data.copy()
         self.name = copy.name
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self._data = take._data^
         self.name = take.name^
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return len(self._data)
 
-    fn __getitem__(self, i: Int) -> String:
+    def __getitem__(self, i: Int) -> String:
         return self._data[i]
 
-    fn tolist(self) -> List[String]:
+    def tolist(self) -> List[String]:
         return self._data.copy()
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         var s = String("Index([")
         for i in range(len(self._data)):
             if i > 0:
@@ -39,13 +39,13 @@ struct Index(Copyable, Movable):
         s += ")"
         return s
 
-    fn get_loc(self, key: String) raises -> Int:
+    def get_loc(self, key: String) raises -> Int:
         for i in range(len(self._data)):
             if self._data[i] == key:
                 return i
         raise Error("KeyError: '" + key + "'")
 
-    fn unique(self) raises -> Index:
+    def unique(self) raises -> Index:
         var seen = Set[String]()
         var result = List[String]()
         for i in range(len(self._data)):
@@ -54,7 +54,7 @@ struct Index(Copyable, Movable):
                 result.append(self._data[i])
         return Index(result^, self.name)
 
-    fn sort_values(self, ascending: Bool = True) raises -> Index:
+    def sort_values(self, ascending: Bool = True) raises -> Index:
         var result = self._data.copy()
         sort(result)
         if not ascending:
@@ -72,21 +72,21 @@ struct RangeIndex:
     var step: Int
     var name: String
 
-    fn __init__(out self, stop: Int, start: Int = 0, step: Int = 1, name: String = ""):
+    def __init__(out self, stop: Int, start: Int = 0, step: Int = 1, name: String = ""):
         self.start = start
         self.stop = stop
         self.step = step
         self.name = name
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         if self.step > 0:
             return max(0, (self.stop - self.start + self.step - 1) // self.step)
         return 0
 
-    fn __getitem__(self, i: Int) -> Int:
+    def __getitem__(self, i: Int) -> Int:
         return self.start + i * self.step
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         return (
             "RangeIndex(start=" + String(self.start)
             + ", stop=" + String(self.stop)

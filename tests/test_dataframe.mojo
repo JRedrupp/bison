@@ -5,7 +5,7 @@ from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import DataFrame, ColumnData, DFScalar, Series
 
 
-fn test_shape_from_pandas() raises:
+def test_shape_from_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
@@ -14,28 +14,28 @@ fn test_shape_from_pandas() raises:
     assert_equal(s[1], 2)
 
 
-fn test_len() raises:
+def test_len() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'x': [10, 20]}"))
     var df = DataFrame(pd_df)
     assert_equal(df.__len__(), 2)
 
 
-fn test_empty_false() raises:
+def test_empty_false() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1]}"))
     var df = DataFrame(pd_df)
     assert_false(df.empty())
 
 
-fn test_empty_true() raises:
+def test_empty_true() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame()
     var df = DataFrame(pd_df)
     assert_true(df.empty())
 
 
-fn test_columns() raises:
+def test_columns() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'col1': [1], 'col2': [2]}"))
     var df = DataFrame(pd_df)
@@ -45,26 +45,26 @@ fn test_columns() raises:
     assert_equal(cols[1], "col2")
 
 
-fn test_ndim() raises:
+def test_ndim() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     assert_equal(df.ndim(), 2)
 
 
-fn test_size() raises:
+def test_size() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     assert_equal(df.size(), 4)
 
 
-fn test_contains() raises:
+def test_contains() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     assert_true(df.__contains__("a"))
     assert_false(df.__contains__("z"))
 
 
-fn test_to_pandas_roundtrip() raises:
+def test_to_pandas_roundtrip() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
     var df = DataFrame.from_pandas(pd_df)
@@ -73,7 +73,7 @@ fn test_to_pandas_roundtrip() raises:
     assert_equal(back.__len__(), 3)
 
 
-fn test_from_dict() raises:
+def test_from_dict() raises:
     var d = Dict[String, ColumnData]()
     var col_a = List[Int64]()
     col_a.append(1)
@@ -95,14 +95,14 @@ fn test_from_dict() raises:
 # ------------------------------------------------------------------
 
 
-fn test_getitem_column() raises:
+def test_getitem_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
     var s = df["a"]
     assert_equal(s.size(), 3)
 
 
-fn test_getitem_missing_raises() raises:
+def test_getitem_missing_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var raised = False
@@ -113,7 +113,7 @@ fn test_getitem_missing_raises() raises:
     assert_true(raised)
 
 
-fn test_setitem_new_column() raises:
+def test_setitem_new_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_series = Series(pd.Series(Python.evaluate("[10, 20]"), name="b"))
@@ -122,7 +122,7 @@ fn test_setitem_new_column() raises:
     assert_true(df.__contains__("b"))
 
 
-fn test_setitem_replace_column() raises:
+def test_setitem_replace_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_series = Series(pd.Series(Python.evaluate("[99, 98]"), name="a"))
@@ -132,7 +132,7 @@ fn test_setitem_replace_column() raises:
     assert_equal(s.size(), 2)
 
 
-fn test_get_existing_key() raises:
+def test_get_existing_key() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var result = df.get("a")
@@ -140,14 +140,14 @@ fn test_get_existing_key() raises:
     assert_equal(result.value().size(), 3)
 
 
-fn test_get_missing_key_default_none() raises:
+def test_get_missing_key_default_none() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var result = df.get("z")
     assert_false(result.__bool__())
 
 
-fn test_head_basic() raises:
+def test_head_basic() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var h = df.head(3)
@@ -155,14 +155,14 @@ fn test_head_basic() raises:
     assert_equal(h.shape()[1], 1)
 
 
-fn test_head_larger_than_rows() raises:
+def test_head_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var h = df.head(10)
     assert_equal(h.shape()[0], 2)
 
 
-fn test_tail_basic() raises:
+def test_tail_basic() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var t = df.tail(2)
@@ -170,14 +170,14 @@ fn test_tail_basic() raises:
     assert_equal(t.shape()[1], 1)
 
 
-fn test_tail_larger_than_rows() raises:
+def test_tail_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var t = df.tail(10)
     assert_equal(t.shape()[0], 2)
 
 
-fn test_head_tail_values() raises:
+def test_head_tail_values() raises:
     """Verify head/tail return the correct rows using native sum aggregation."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30, 40, 50]}")))
@@ -189,7 +189,7 @@ fn test_head_tail_values() raises:
     assert_true(t.sum().sum() == 90.0)
 
 
-fn test_sample_n() raises:
+def test_sample_n() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var s = df.sample(3, random_state=42)
@@ -197,14 +197,14 @@ fn test_sample_n() raises:
     assert_equal(s.shape()[1], 1)
 
 
-fn test_sample_n_larger_than_rows() raises:
+def test_sample_n_larger_than_rows() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var s = df.sample(10, random_state=0)
     assert_equal(s.shape()[0], 2)
 
 
-fn test_filter_items() raises:
+def test_filter_items() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var items = List[String]()
@@ -217,7 +217,7 @@ fn test_filter_items() raises:
     assert_false(result.__contains__("b"))
 
 
-fn test_filter_like() raises:
+def test_filter_like() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'foo_1': [1], 'foo_2': [2], 'bar': [3]}")))
     var result = df.filter(like="foo")
@@ -227,7 +227,7 @@ fn test_filter_like() raises:
     assert_false(result.__contains__("bar"))
 
 
-fn test_filter_regex() raises:
+def test_filter_regex() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a1': [1], 'b2': [2], 'c1': [3]}")))
     var result = df.filter(regex=".*1$")
@@ -237,14 +237,14 @@ fn test_filter_regex() raises:
     assert_false(result.__contains__("b2"))
 
 
-fn test_filter_no_args_keeps_all() raises:
+def test_filter_no_args_keeps_all() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var result = df.filter()
     assert_equal(result.shape()[1], 2)
 
 
-fn test_select_dtypes_include() raises:
+def test_select_dtypes_include() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var inc = List[String]()
@@ -255,7 +255,7 @@ fn test_select_dtypes_include() raises:
     assert_false(result.__contains__("b"))
 
 
-fn test_select_dtypes_exclude() raises:
+def test_select_dtypes_exclude() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var exc = List[String]()
@@ -266,7 +266,7 @@ fn test_select_dtypes_exclude() raises:
     assert_false(result.__contains__("b"))
 
 
-fn test_sort_values_basic() raises:
+def test_sort_values_basic() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 1, 2]}")))
     var by = List[String]()
@@ -277,7 +277,7 @@ fn test_sort_values_basic() raises:
     assert_true(r["a"].iloc(2)[Int64] == 3)
 
 
-fn test_sort_values_na_last_default() raises:
+def test_sort_values_na_last_default() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
     var by = List[String]()
@@ -288,7 +288,7 @@ fn test_sort_values_na_last_default() raises:
     assert_true(r["a"].isna().iloc(2)[Bool])
 
 
-fn test_sort_values_na_first() raises:
+def test_sort_values_na_first() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
     var by = List[String]()
@@ -299,7 +299,7 @@ fn test_sort_values_na_first() raises:
     assert_true(r["a"].iloc(2)[Float64] == 3.0)
 
 
-fn test_sort_values_na_first_descending() raises:
+def test_sort_values_na_first_descending() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
     var by = List[String]()
@@ -310,14 +310,14 @@ fn test_sort_values_na_first_descending() raises:
     assert_true(r["a"].iloc(2)[Float64] == 1.0)
 
 
-fn test_dtypes_names() raises:
+def test_dtypes_names() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var dt = df.dtypes()
     assert_equal(dt.size(), 2)
 
 
-fn test_dtypes_values() raises:
+def test_dtypes_values() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
     var dt = df.dtypes()
@@ -325,14 +325,14 @@ fn test_dtypes_values() raises:
     assert_equal(dt.iloc(1)[String], "float64")
 
 
-fn test_memory_usage_length() raises:
+def test_memory_usage_length() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}")))
     var mu = df.memory_usage()
     assert_equal(mu.size(), 2)
 
 
-fn test_memory_usage_int64_bytes() raises:
+def test_memory_usage_int64_bytes() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var mu = df.memory_usage()
@@ -340,7 +340,7 @@ fn test_memory_usage_int64_bytes() raises:
     assert_equal(mu.iloc(0)[Int64], Int64(24))
 
 
-fn test_memory_usage_float64_bytes() raises:
+def test_memory_usage_float64_bytes() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [1.0, 2.0]}")))
     var mu = df.memory_usage()
@@ -348,20 +348,20 @@ fn test_memory_usage_float64_bytes() raises:
     assert_equal(mu.iloc(0)[Int64], Int64(16))
 
 
-fn test_info_no_raise() raises:
+def test_info_no_raise() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3.0, 4.0]}")))
     df.info()
 
 
-fn test_items_count() raises:
+def test_items_count() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var cols = df.items()
     assert_equal(len(cols), 2)
 
 
-fn test_items_names() raises:
+def test_items_names() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1], 'y': [2]}")))
     var cols = df.items()
@@ -369,7 +369,7 @@ fn test_items_names() raises:
     assert_equal(cols[1].name, "y")
 
 
-fn test_items_values() raises:
+def test_items_values() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20]}")))
     var cols = df.items()
@@ -377,14 +377,14 @@ fn test_items_values() raises:
     assert_equal(cols[0].iloc(1)[Int64], Int64(20))
 
 
-fn test_iterrows_count() raises:
+def test_iterrows_count() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var rows = df.iterrows()
     assert_equal(len(rows), 3)
 
 
-fn test_iterrows_values() raises:
+def test_iterrows_values() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
     var rows = df.iterrows()
@@ -393,7 +393,7 @@ fn test_iterrows_values() raises:
     assert_equal(rows[1].size(), 2)
 
 
-fn test_itertuples_with_index() raises:
+def test_itertuples_with_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var tuples = df.itertuples()
@@ -402,7 +402,7 @@ fn test_itertuples_with_index() raises:
     assert_equal(tuples[0].size(), 2)  # Index + a
 
 
-fn test_itertuples_without_index() raises:
+def test_itertuples_without_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var tuples = df.itertuples(index=False)
@@ -410,14 +410,14 @@ fn test_itertuples_without_index() raises:
     assert_equal(tuples[0].size(), 2)  # a + b only (no index)
 
 
-fn test_itertuples_name() raises:
+def test_itertuples_name() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var tuples = df.itertuples(index=True, name="Row")
     assert_equal(tuples[0].name, "Row")
 
 
-fn test_from_records_basic() raises:
+def test_from_records_basic() raises:
     var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(10)}
     var row1: Dict[String, DFScalar] = {"a": DFScalar(2), "b": DFScalar(20)}
     var records = List[Dict[String, DFScalar]]()
@@ -430,14 +430,14 @@ fn test_from_records_basic() raises:
     assert_equal(df.columns()[1], "b")
 
 
-fn test_from_records_empty() raises:
+def test_from_records_empty() raises:
     var records = List[Dict[String, DFScalar]]()
     var df = DataFrame.from_records(records)
     assert_equal(df.shape()[0], 0)
     assert_equal(df.shape()[1], 0)
 
 
-fn test_from_records_columns_param() raises:
+def test_from_records_columns_param() raises:
     var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(2), "c": DFScalar(3)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
@@ -450,7 +450,7 @@ fn test_from_records_columns_param() raises:
     assert_equal(df.columns()[1], "c")
 
 
-fn test_from_records_mixed_types() raises:
+def test_from_records_mixed_types() raises:
     var row0: Dict[String, DFScalar] = {"i": DFScalar(42), "s": DFScalar(String("hello"))}
     var row1: Dict[String, DFScalar] = {"i": DFScalar(7), "s": DFScalar(String("world"))}
     var records = List[Dict[String, DFScalar]]()
@@ -461,7 +461,7 @@ fn test_from_records_mixed_types() raises:
     assert_equal(df.shape()[1], 2)
 
 
-fn test_from_records_int_float_mixed() raises:
+def test_from_records_int_float_mixed() raises:
     # First row has Int64, second row has Float64 — column should be promoted to float64
     var row0: Dict[String, DFScalar] = {"x": DFScalar(1)}
     var row1: Dict[String, DFScalar] = {"x": Float64(2.5)}
@@ -478,7 +478,7 @@ fn test_from_records_int_float_mixed() raises:
     assert_true(Bool(pd_df["x"][1] == 2.5))
 
 
-fn test_from_records_bool_int_mixed() raises:
+def test_from_records_bool_int_mixed() raises:
     # First row has Bool, second row has Int64 — column should be promoted to int64
     var row0: Dict[String, DFScalar] = {"y": DFScalar(True)}
     var row1: Dict[String, DFScalar] = {"y": DFScalar(42)}
@@ -495,7 +495,7 @@ fn test_from_records_bool_int_mixed() raises:
     assert_true(Bool(pd_df["y"][1] == 42))
 
 
-fn test_from_records_missing_key() raises:
+def test_from_records_missing_key() raises:
     var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(10)}
     var row1: Dict[String, DFScalar] = {"a": DFScalar(2)}
     # "b" is missing in row1
@@ -510,7 +510,7 @@ fn test_from_records_missing_key() raises:
     assert_true(Bool(pd_df["b"].isna()[1]))
 
 
-fn test_from_records_column_order_deterministic() raises:
+def test_from_records_column_order_deterministic() raises:
     # Column names should be sorted alphabetically when `columns` is not provided,
     # so the result is deterministic regardless of Dict iteration order.
     var row0: Dict[String, DFScalar] = {"z": DFScalar(3), "a": DFScalar(1), "m": DFScalar(2)}
@@ -523,7 +523,7 @@ fn test_from_records_column_order_deterministic() raises:
     assert_equal(df.columns()[2], "z")
 
 
-fn test_from_records_bool_with_nulls() raises:
+def test_from_records_bool_with_nulls() raises:
     # Bool column containing a null should round-trip through to_pandas() without error.
     # Pandas cannot represent NaN in a bool dtype column, so bison must promote to object.
     var row0: Dict[String, DFScalar] = {"flag": DFScalar(True)}
@@ -543,5 +543,5 @@ fn test_from_records_bool_with_nulls() raises:
     assert_true(Bool(pd_df["flag"][2] == False))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

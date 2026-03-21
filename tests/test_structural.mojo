@@ -12,7 +12,7 @@ from bison import DataFrame, Series, ColumnData, DFScalar
 # copy
 # ------------------------------------------------------------------
 
-fn test_copy_returns_equal_shape() raises:
+def test_copy_returns_equal_shape() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
     var c = df.copy(True)
@@ -20,7 +20,7 @@ fn test_copy_returns_equal_shape() raises:
     assert_equal(c.shape()[1], 2)
 
 
-fn test_copy_values_match() raises:
+def test_copy_values_match() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20]}")))
     var c = df.copy(True)
@@ -28,7 +28,7 @@ fn test_copy_values_match() raises:
     assert_true(c["a"].iloc(1)[Int64] == 20)
 
 
-fn test_copy_is_independent() raises:
+def test_copy_is_independent() raises:
     # Modifying the copy must not change the original.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
@@ -39,7 +39,7 @@ fn test_copy_is_independent() raises:
     assert_true(df["a"].iloc(0)[Int64] == 1)
 
 
-fn test_copy_shallow_raises() raises:
+def test_copy_shallow_raises() raises:
     # copy(deep=False) must raise because shallow copy is not yet supported.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
@@ -55,7 +55,7 @@ fn test_copy_shallow_raises() raises:
 # round
 # ------------------------------------------------------------------
 
-fn test_round_float() raises:
+def test_round_float() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.234, 5.678]}")))
     var r = df.round(2)
@@ -63,7 +63,7 @@ fn test_round_float() raises:
     assert_true(r["a"].iloc(1)[Float64] == 5.68)
 
 
-fn test_round_int_identity() raises:
+def test_round_int_identity() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var r = df.round(0)
@@ -75,7 +75,7 @@ fn test_round_int_identity() raises:
 # astype
 # ------------------------------------------------------------------
 
-fn test_astype_int_to_float() raises:
+def test_astype_int_to_float() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var r = df.astype("float64")
@@ -83,7 +83,7 @@ fn test_astype_int_to_float() raises:
     assert_true(r["a"].iloc(2)[Float64] == 3.0)
 
 
-fn test_astype_float_to_int() raises:
+def test_astype_float_to_int() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.9, 2.1]}")))
     var r = df.astype("int64")
@@ -95,7 +95,7 @@ fn test_astype_float_to_int() raises:
 # clip
 # ------------------------------------------------------------------
 
-fn test_clip_both_bounds() raises:
+def test_clip_both_bounds() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 5.0, 10.0]}")))
     var r = df.clip(lower=2.0, upper=8.0)
@@ -104,7 +104,7 @@ fn test_clip_both_bounds() raises:
     assert_true(r["a"].iloc(2)[Float64] == 8.0)
 
 
-fn test_clip_lower_only() raises:
+def test_clip_lower_only() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 5.0, 10.0]}")))
     var r = df.clip(lower=3.0)
@@ -113,7 +113,7 @@ fn test_clip_lower_only() raises:
     assert_true(r["a"].iloc(2)[Float64] == 10.0)
 
 
-fn test_clip_upper_only() raises:
+def test_clip_upper_only() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 5.0, 10.0]}")))
     var r = df.clip(upper=7.0)
@@ -122,7 +122,7 @@ fn test_clip_upper_only() raises:
     assert_true(r["a"].iloc(2)[Float64] == 7.0)
 
 
-fn test_clip_no_bounds_returns_copy() raises:
+def test_clip_no_bounds_returns_copy() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
     var r = df.clip()
@@ -134,7 +134,7 @@ fn test_clip_no_bounds_returns_copy() raises:
 # insert
 # ------------------------------------------------------------------
 
-fn test_insert_at_front() raises:
+def test_insert_at_front() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [1, 2]}")))
     var v = DFScalar(Int64(99))
@@ -147,7 +147,7 @@ fn test_insert_at_front() raises:
     assert_true(df["a"].iloc(1)[Int64] == 99)
 
 
-fn test_insert_at_end() raises:
+def test_insert_at_end() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var v = DFScalar(Float64(3.0))
@@ -157,7 +157,7 @@ fn test_insert_at_end() raises:
     assert_equal(cols[1], "z")
 
 
-fn test_insert_duplicate_raises() raises:
+def test_insert_duplicate_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var v = DFScalar(Int64(0))
@@ -173,7 +173,7 @@ fn test_insert_duplicate_raises() raises:
 # pop
 # ------------------------------------------------------------------
 
-fn test_pop_returns_series() raises:
+def test_pop_returns_series() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var s = df.pop("a")
@@ -181,7 +181,7 @@ fn test_pop_returns_series() raises:
     assert_true(s.iloc(1)[Int64] == 2)
 
 
-fn test_pop_removes_column() raises:
+def test_pop_removes_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     _ = df.pop("a")
@@ -190,7 +190,7 @@ fn test_pop_removes_column() raises:
     assert_true(df.__contains__("b"))
 
 
-fn test_pop_missing_raises() raises:
+def test_pop_missing_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var raised = False
@@ -205,7 +205,7 @@ fn test_pop_missing_raises() raises:
 # assign
 # ------------------------------------------------------------------
 
-fn test_assign_adds_column() raises:
+def test_assign_adds_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_s = Series(pd.Series(Python.evaluate("[10, 20]"), dtype="int64"))
@@ -217,7 +217,7 @@ fn test_assign_adds_column() raises:
     assert_true(r["b"].iloc(1)[Int64] == 20)
 
 
-fn test_assign_replaces_column() raises:
+def test_assign_replaces_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_s = Series(pd.Series(Python.evaluate("[99, 99]"), dtype="int64"))
@@ -228,7 +228,7 @@ fn test_assign_replaces_column() raises:
     assert_true(r["a"].iloc(0)[Int64] == 99)
 
 
-fn test_assign_does_not_mutate_original() raises:
+def test_assign_does_not_mutate_original() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var new_s = Series(pd.Series(Python.evaluate("[10, 20]"), dtype="int64"))
@@ -242,7 +242,7 @@ fn test_assign_does_not_mutate_original() raises:
 # drop (columns)
 # ------------------------------------------------------------------
 
-fn test_drop_column() raises:
+def test_drop_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var labels = List[String]()
@@ -253,7 +253,7 @@ fn test_drop_column() raises:
     assert_true(r.__contains__("b"))
 
 
-fn test_drop_column_axis1() raises:
+def test_drop_column_axis1() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
     var labels = List[String]()
@@ -263,7 +263,7 @@ fn test_drop_column_axis1() raises:
     assert_false(r.__contains__("b"))
 
 
-fn test_drop_missing_column_raises() raises:
+def test_drop_missing_column_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var labels = List[String]()
@@ -280,7 +280,7 @@ fn test_drop_missing_column_raises() raises:
 # drop (rows, axis=0)
 # ------------------------------------------------------------------
 
-fn test_drop_rows_by_integer_label() raises:
+def test_drop_rows_by_integer_label() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
     var labels = List[String]()
@@ -295,7 +295,7 @@ fn test_drop_rows_by_integer_label() raises:
 # where / mask
 # ------------------------------------------------------------------
 
-fn test_where_keeps_true_positions() raises:
+def test_where_keeps_true_positions() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
@@ -305,7 +305,7 @@ fn test_where_keeps_true_positions() raises:
     assert_true(r["a"].iloc(2)[Float64] == 3.0)
 
 
-fn test_mask_nulls_true_positions() raises:
+def test_mask_nulls_true_positions() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
@@ -315,7 +315,7 @@ fn test_mask_nulls_true_positions() raises:
     assert_true(r["a"].isna().iloc(2)[Bool])
 
 
-fn test_where_other_fills() raises:
+def test_where_other_fills() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
@@ -327,7 +327,7 @@ fn test_where_other_fills() raises:
     assert_true(r["a"].iloc(2)[Float64] == 3.0)
 
 
-fn test_mask_other_fills() raises:
+def test_mask_other_fills() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True]")))
@@ -343,7 +343,7 @@ fn test_mask_other_fills() raises:
 # duplicated
 # ------------------------------------------------------------------
 
-fn test_duplicated_keep_first() raises:
+def test_duplicated_keep_first() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var d = df.duplicated()
@@ -352,7 +352,7 @@ fn test_duplicated_keep_first() raises:
     assert_false(d.iloc(2)[Bool])
 
 
-fn test_duplicated_keep_last() raises:
+def test_duplicated_keep_last() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var d = df.duplicated(keep="last")
@@ -361,7 +361,7 @@ fn test_duplicated_keep_last() raises:
     assert_false(d.iloc(2)[Bool])
 
 
-fn test_duplicated_keep_false() raises:
+def test_duplicated_keep_false() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var d = df.duplicated(keep="False")
@@ -370,7 +370,7 @@ fn test_duplicated_keep_false() raises:
     assert_false(d.iloc(2)[Bool])
 
 
-fn test_duplicated_subset() raises:
+def test_duplicated_subset() raises:
     # Rows differ in 'b' but not in 'a'; subset=['a'] treats them as duplicates.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1], 'b': [10, 20]}")))
@@ -381,7 +381,7 @@ fn test_duplicated_subset() raises:
     assert_true(d.iloc(1)[Bool])
 
 
-fn test_duplicated_nul_byte_no_false_positive() raises:
+def test_duplicated_nul_byte_no_false_positive() raises:
     # Regression test for the "\x00"-separator bug.
     # Row 0: a="a\x00b", b="c"      → old key "a\x00b\x00c"
     # Row 1: a="a",      b="b\x00c" → old key "a\x00b\x00c"  (COLLISION!)
@@ -403,7 +403,7 @@ fn test_duplicated_nul_byte_no_false_positive() raises:
 # drop_duplicates
 # ------------------------------------------------------------------
 
-fn test_drop_duplicates_keep_first() raises:
+def test_drop_duplicates_keep_first() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var r = df.drop_duplicates()
@@ -412,14 +412,14 @@ fn test_drop_duplicates_keep_first() raises:
     assert_true(r["a"].iloc(1)[Int64] == 2)
 
 
-fn test_drop_duplicates_keep_last() raises:
+def test_drop_duplicates_keep_last() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 1, 2]}")))
     var r = df.drop_duplicates(keep="last")
     assert_equal(r.shape()[0], 2)
 
 
-fn test_drop_duplicates_no_duplicates() raises:
+def test_drop_duplicates_no_duplicates() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var r = df.drop_duplicates()
@@ -430,7 +430,7 @@ fn test_drop_duplicates_no_duplicates() raises:
 # isin
 # ------------------------------------------------------------------
 
-fn test_isin_int_column() raises:
+def test_isin_int_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var vals = List[DFScalar]()
@@ -444,7 +444,7 @@ fn test_isin_int_column() raises:
     assert_true(r["a"].iloc(2)[Bool])
 
 
-fn test_isin_column_not_in_dict_is_all_false() raises:
+def test_isin_column_not_in_dict_is_all_false() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var vals = List[DFScalar]()
@@ -461,7 +461,7 @@ fn test_isin_column_not_in_dict_is_all_false() raises:
 # combine_first
 # ------------------------------------------------------------------
 
-fn test_combine_first_fills_nulls() raises:
+def test_combine_first_fills_nulls() raises:
     # self has nulls that other fills.
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
@@ -472,7 +472,7 @@ fn test_combine_first_fills_nulls() raises:
     assert_true(r["a"].iloc(2)[Float64] == 3.0)
 
 
-fn test_combine_first_appends_other_only_columns() raises:
+def test_combine_first_appends_other_only_columns() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [10, 20]}")))
@@ -482,7 +482,7 @@ fn test_combine_first_appends_other_only_columns() raises:
     assert_true(r.__contains__("b"))
 
 
-fn test_combine_first_self_wins_non_null() raises:
+def test_combine_first_self_wins_non_null() raises:
     # Where self is non-null, self's value is kept.
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}")))
@@ -496,7 +496,7 @@ fn test_combine_first_self_wins_non_null() raises:
 # update
 # ------------------------------------------------------------------
 
-fn test_update_other_wins_non_null() raises:
+def test_update_other_wins_non_null() raises:
     # other has non-null value; self gets overwritten.
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None]}")))
@@ -508,7 +508,7 @@ fn test_update_other_wins_non_null() raises:
     assert_true(df1["a"].iloc(1)[Float64] == 20.0)
 
 
-fn test_update_ignores_other_only_columns() raises:
+def test_update_ignores_other_only_columns() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [99]}")))
@@ -517,5 +517,5 @@ fn test_update_ignores_other_only_columns() raises:
     assert_false(df1.__contains__("b"))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

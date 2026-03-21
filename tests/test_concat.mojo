@@ -4,12 +4,12 @@ from testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, concat
 
 
-fn test_concat_empty_list() raises:
+def test_concat_empty_list() raises:
     var result = concat(List[DataFrame]())
     assert_true(result.empty())
 
 
-fn test_concat_single_df() raises:
+def test_concat_single_df() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var dfs = List[DataFrame]()
@@ -19,7 +19,7 @@ fn test_concat_single_df() raises:
     assert_equal(result.shape()[1], 2)
 
 
-fn test_concat_axis0_same_columns() raises:
+def test_concat_axis0_same_columns() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [5, 6], 'b': [7, 8]}")))
@@ -37,7 +37,7 @@ fn test_concat_axis0_same_columns() raises:
     assert_equal(s_a.iloc(3)[Int64], Int64(6))
 
 
-fn test_concat_axis0_outer_join() raises:
+def test_concat_axis0_outer_join() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3], 'c': [4]}")))
@@ -54,7 +54,7 @@ fn test_concat_axis0_outer_join() raises:
     assert_equal(s_b.iloc(1)[Int64], Int64(3))
 
 
-fn test_concat_axis0_inner_join() raises:
+def test_concat_axis0_inner_join() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3], 'c': [4]}")))
@@ -69,7 +69,7 @@ fn test_concat_axis0_inner_join() raises:
     assert_equal(cols[0], String("b"))
 
 
-fn test_concat_axis0_sort() raises:
+def test_concat_axis0_sort() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'z': [1], 'a': [2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'m': [3], 'a': [4]}")))
@@ -84,7 +84,7 @@ fn test_concat_axis0_sort() raises:
     assert_equal(cols[2], String("z"))
 
 
-fn test_concat_axis1() raises:
+def test_concat_axis1() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
@@ -100,7 +100,7 @@ fn test_concat_axis1() raises:
     assert_equal(s_b.iloc(0)[Int64], Int64(3))
 
 
-fn test_concat_axis1_ignore_index() raises:
+def test_concat_axis1_ignore_index() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [2]}")))
@@ -114,7 +114,7 @@ fn test_concat_axis1_ignore_index() raises:
     assert_equal(cols[1], String("1"))
 
 
-fn test_concat_axis0_float() raises:
+def test_concat_axis0_float() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.5, 2.5]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [3.5]}")))
@@ -127,7 +127,7 @@ fn test_concat_axis0_float() raises:
     assert_equal(s_x.iloc(2)[Float64], Float64(3.5))
 
 
-fn test_concat_three_dfs() raises:
+def test_concat_three_dfs() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'n': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'n': [2]}")))
@@ -144,7 +144,7 @@ fn test_concat_three_dfs() raises:
     assert_equal(s.iloc(2)[Int64], Int64(3))
 
 
-fn test_concat_keys_raises() raises:
+def test_concat_keys_raises() raises:
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2]}")))
@@ -162,5 +162,5 @@ fn test_concat_keys_raises() raises:
     assert_true(raised)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

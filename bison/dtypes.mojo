@@ -2,28 +2,28 @@ struct BisonDtype(ImplicitlyCopyable, Movable):
     var name: String
     var itemsize: Int
 
-    fn __init__(out self, name: String, itemsize: Int):
+    def __init__(out self, name: String, itemsize: Int):
         self.name = name
         self.itemsize = itemsize
 
-    fn __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.name = copy.name
         self.itemsize = copy.itemsize
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self.name = take.name^
         self.itemsize = take.itemsize
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         return self.name
 
-    fn __eq__(self, other: BisonDtype) -> Bool:
+    def __eq__(self, other: BisonDtype) -> Bool:
         return self.name == other.name
 
-    fn __ne__(self, other: BisonDtype) -> Bool:
+    def __ne__(self, other: BisonDtype) -> Bool:
         return self.name != other.name
 
-    fn is_integer(self) -> Bool:
+    def is_integer(self) -> Bool:
         """Return True if this dtype is any integer family (int8/16/32/64, uint8/16/32/64)."""
         return (
             self.name == "int8"
@@ -36,7 +36,7 @@ struct BisonDtype(ImplicitlyCopyable, Movable):
             or self.name == "uint64"
         )
 
-    fn is_float(self) -> Bool:
+    def is_float(self) -> Bool:
         """Return True if this dtype is any floating-point family (float32/float64)."""
         return self.name == "float32" or self.name == "float64"
 
@@ -57,7 +57,7 @@ comptime datetime64_ns  = BisonDtype("datetime64[ns]", 8)
 comptime timedelta64_ns = BisonDtype("timedelta64[ns]", 8)
 
 
-fn dtype_from_string(name: String) raises -> BisonDtype:
+def dtype_from_string(name: String) raises -> BisonDtype:
     """Convert a dtype name string to the corresponding BisonDtype constant.
 
     Raises an error if the name does not match any known dtype.

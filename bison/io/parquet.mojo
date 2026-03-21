@@ -4,7 +4,7 @@ from .._errors import _not_implemented
 from ..dataframe import DataFrame
 
 
-fn read_parquet(
+def read_parquet(
     path: String,
     engine: String = "auto",
     columns: Optional[PythonObject] = None,
@@ -15,7 +15,7 @@ fn read_parquet(
     return DataFrame(PythonObject(None))
 
 
-fn to_parquet(
+def to_parquet(
     df: PythonObject,
     path: String,
     engine: String = "auto",

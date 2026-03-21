@@ -4,7 +4,7 @@ from testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import Series, SeriesScalar, DFScalar, FloatTransformFn
 
 
-fn test_from_pandas() raises:
+def test_from_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"), name="vals")
     var s = Series.from_pandas(pd_s)
@@ -12,32 +12,32 @@ fn test_from_pandas() raises:
     assert_equal(s.__len__(), 3)
 
 
-fn test_size() raises:
+def test_size() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
     assert_equal(s.size(), 3)
 
 
-fn test_empty_false() raises:
+def test_empty_false() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1]")))
     assert_false(s.empty())
 
 
-fn test_empty_true() raises:
+def test_empty_true() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[]"), dtype="float64"))
     assert_true(s.empty())
 
 
-fn test_shape() raises:
+def test_shape() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4]")))
     var sh = s.shape()
     assert_equal(sh[0], 4)
 
 
-fn test_to_pandas_roundtrip() raises:
+def test_to_pandas_roundtrip() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[7, 8, 9]"))
     var s = Series(pd_s)
@@ -45,83 +45,83 @@ fn test_to_pandas_roundtrip() raises:
     assert_equal(back.__len__(), 3)
 
 
-fn test_sum() raises:
+def test_sum() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     assert_true(s.sum() == 6.0)
 
 
-fn test_mean() raises:
+def test_mean() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     assert_true(s.mean() == 2.0)
 
 
-fn test_median() raises:
+def test_median() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     assert_true(s.median() == 2.0)
 
 
-fn test_min() raises:
+def test_min() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
     assert_true(s.min() == 1.0)
 
 
-fn test_max() raises:
+def test_max() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]")))
     assert_true(s.max() == 3.0)
 
 
-fn test_std() raises:
+def test_std() raises:
     var pd = Python.import_module("pandas")
     # std([1, 3, 5], ddof=1) == 2.0
     var s = Series(pd.Series(Python.evaluate("[1, 3, 5]")))
     assert_true(s.std() == 2.0)
 
 
-fn test_var() raises:
+def test_var() raises:
     var pd = Python.import_module("pandas")
     # var([1, 3, 5], ddof=1) == 4.0
     var s = Series(pd.Series(Python.evaluate("[1, 3, 5]")))
     assert_true(s.var() == 4.0)
 
 
-fn test_count() raises:
+def test_count() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     assert_equal(s.count(), 3)
 
 
-fn test_nunique() raises:
+def test_nunique() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 2, 3, 3, 3]")))
     assert_equal(s.nunique(), 3)
 
 
-fn test_quantile() raises:
+def test_quantile() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
     assert_true(s.quantile(0.5) == 3.0)
 
 
-fn test_describe() raises:
+def test_describe() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
     var d = s.describe()
     assert_equal(d.size(), 8)
 
 
-fn test_value_counts() raises:
+def test_value_counts() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 2, 3, 3, 3]")))
     var vc = s.value_counts()
     assert_equal(vc.size(), 3)
 
 
-fn test_head() raises:
+def test_head() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
     var h = s.head(3)
@@ -130,21 +130,21 @@ fn test_head() raises:
     assert_true(Float64(String(h.to_pandas().iloc[2])) == 3.0)
 
 
-fn test_head_default() raises:
+def test_head_default() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5, 6, 7]")))
     var h = s.head()
     assert_equal(h.size(), 5)
 
 
-fn test_head_clamps() raises:
+def test_head_clamps() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2]")))
     var h = s.head(10)
     assert_equal(h.size(), 2)
 
 
-fn test_tail() raises:
+def test_tail() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
     var t = s.tail(3)
@@ -153,21 +153,21 @@ fn test_tail() raises:
     assert_true(Float64(String(t.to_pandas().iloc[2])) == 5.0)
 
 
-fn test_tail_default() raises:
+def test_tail_default() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5, 6, 7]")))
     var t = s.tail()
     assert_equal(t.size(), 5)
 
 
-fn test_tail_clamps() raises:
+def test_tail_clamps() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2]")))
     var t = s.tail(10)
     assert_equal(t.size(), 2)
 
 
-fn test_iloc() raises:
+def test_iloc() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
     assert_equal(s.iloc(0)[Int64], 10)
@@ -175,14 +175,14 @@ fn test_iloc() raises:
     assert_equal(s.iloc(2)[Int64], 30)
 
 
-fn test_iloc_negative() raises:
+def test_iloc_negative() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
     assert_equal(s.iloc(-1)[Int64], 30)
     assert_equal(s.iloc(-3)[Int64], 10)
 
 
-fn test_iloc_out_of_bounds() raises:
+def test_iloc_out_of_bounds() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var raised = False
@@ -193,7 +193,7 @@ fn test_iloc_out_of_bounds() raises:
     assert_true(raised)
 
 
-fn test_at() raises:
+def test_at() raises:
     var pd = Python.import_module("pandas")
     var idx = Python.evaluate("['a', 'b', 'c']")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), index=idx))
@@ -202,7 +202,7 @@ fn test_at() raises:
     assert_equal(s.at("c")[Int64], 30)
 
 
-fn test_at_missing_label() raises:
+def test_at_missing_label() raises:
     var pd = Python.import_module("pandas")
     var idx = Python.evaluate("['x', 'y']")
     var s = Series(pd.Series(Python.evaluate("[1, 2]"), index=idx))
@@ -214,7 +214,7 @@ fn test_at_missing_label() raises:
     assert_true(raised)
 
 
-fn test_add() raises:
+def test_add() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -224,7 +224,7 @@ fn test_add() raises:
     assert_true(Float64(String(rp.iloc[2])) == 9.0)
 
 
-fn test_sub() raises:
+def test_sub() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -234,7 +234,7 @@ fn test_sub() raises:
     assert_true(Float64(String(rp.iloc[2])) == -3.0)
 
 
-fn test_mul() raises:
+def test_mul() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -244,7 +244,7 @@ fn test_mul() raises:
     assert_true(Float64(String(rp.iloc[2])) == 18.0)
 
 
-fn test_div() raises:
+def test_div() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
@@ -254,7 +254,7 @@ fn test_div() raises:
     assert_true(Float64(String(rp.iloc[2])) == 0.5)
 
 
-fn test_floordiv() raises:
+def test_floordiv() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -264,7 +264,7 @@ fn test_floordiv() raises:
     assert_true(Float64(String(rp.iloc[2])) == 0.0)
 
 
-fn test_mod() raises:
+def test_mod() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[10, 7, 9]")))
     var s2 = Series(pd.Series(Python.evaluate("[3, 4, 5]")))
@@ -274,7 +274,7 @@ fn test_mod() raises:
     assert_true(Float64(String(rp.iloc[2])) == 4.0)
 
 
-fn test_pow() raises:
+def test_pow() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[2, 3, 4]")))
     var s2 = Series(pd.Series(Python.evaluate("[3, 2, 1]")))
@@ -284,7 +284,7 @@ fn test_pow() raises:
     assert_true(Float64(String(rp.iloc[2])) == 4.0)
 
 
-fn test_radd() raises:
+def test_radd() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -294,7 +294,7 @@ fn test_radd() raises:
     assert_true(Float64(String(rp.iloc[2])) == 9.0)
 
 
-fn test_rsub() raises:
+def test_rsub() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -304,7 +304,7 @@ fn test_rsub() raises:
     assert_true(Float64(String(rp.iloc[2])) == 3.0)
 
 
-fn test_rmul() raises:
+def test_rmul() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
@@ -314,7 +314,7 @@ fn test_rmul() raises:
     assert_true(Float64(String(rp.iloc[2])) == 18.0)
 
 
-fn test_rdiv() raises:
+def test_rdiv() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
     var s2 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
@@ -324,7 +324,7 @@ fn test_rdiv() raises:
     assert_true(Float64(String(rp.iloc[2])) == 0.5)
 
 
-fn test_rfloordiv() raises:
+def test_rfloordiv() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[4, 5, 6]")))
     var s2 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
@@ -334,7 +334,7 @@ fn test_rfloordiv() raises:
     assert_true(Float64(String(rp.iloc[2])) == 0.0)
 
 
-fn test_rmod() raises:
+def test_rmod() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[3, 4, 5]")))
     var s2 = Series(pd.Series(Python.evaluate("[10, 7, 9]")))
@@ -344,7 +344,7 @@ fn test_rmod() raises:
     assert_true(Float64(String(rp.iloc[2])) == 4.0)
 
 
-fn test_rpow() raises:
+def test_rpow() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[3, 2, 1]")))
     var s2 = Series(pd.Series(Python.evaluate("[2, 3, 4]")))
@@ -354,7 +354,7 @@ fn test_rpow() raises:
     assert_true(Float64(String(rp.iloc[2])) == 4.0)
 
 
-fn test_add_length_mismatch() raises:
+def test_add_length_mismatch() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2]")))
     var s2 = Series(pd.Series(Python.evaluate("[1]")))
@@ -366,7 +366,7 @@ fn test_add_length_mismatch() raises:
     assert_true(raised)
 
 
-fn test_isna() raises:
+def test_isna() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var na = s.isna()
@@ -376,7 +376,7 @@ fn test_isna() raises:
     assert_false(na.iloc(2)[Bool])
 
 
-fn test_isna_no_nulls() raises:
+def test_isna_no_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var na = s.isna()
@@ -385,7 +385,7 @@ fn test_isna_no_nulls() raises:
     assert_false(na.iloc(2)[Bool])
 
 
-fn test_isnull() raises:
+def test_isnull() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var na = s.isnull()
@@ -394,7 +394,7 @@ fn test_isnull() raises:
     assert_false(na.iloc(2)[Bool])
 
 
-fn test_notna() raises:
+def test_notna() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var na = s.notna()
@@ -404,7 +404,7 @@ fn test_notna() raises:
     assert_true(na.iloc(2)[Bool])
 
 
-fn test_notnull() raises:
+def test_notnull() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var na = s.notnull()
@@ -413,7 +413,7 @@ fn test_notnull() raises:
     assert_true(na.iloc(2)[Bool])
 
 
-fn test_fillna() raises:
+def test_fillna() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var filled = s.fillna(DFScalar(Float64(0.0)))
@@ -424,7 +424,7 @@ fn test_fillna() raises:
     assert_true(Float64(String(rp.iloc[2])) == 3.0)
 
 
-fn test_fillna_no_nulls() raises:
+def test_fillna_no_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var filled = s.fillna(DFScalar(Float64(0.0)))
@@ -433,7 +433,7 @@ fn test_fillna_no_nulls() raises:
     assert_true(Float64(String(rp.iloc[1])) == 2.0)
 
 
-fn test_fillna_int() raises:
+def test_fillna_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, None, 3]"), dtype="float64"))
     var filled = s.fillna(DFScalar(Float64(9.0)))
@@ -441,7 +441,7 @@ fn test_fillna_int() raises:
     assert_true(Float64(String(rp.iloc[1])) == 9.0)
 
 
-fn test_dropna() raises:
+def test_dropna() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var dropped = s.dropna()
@@ -451,21 +451,21 @@ fn test_dropna() raises:
     assert_true(Float64(String(rp.iloc[1])) == 3.0)
 
 
-fn test_dropna_no_nulls() raises:
+def test_dropna_no_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var dropped = s.dropna()
     assert_equal(dropped.size(), 3)
 
 
-fn test_dropna_all_nulls() raises:
+def test_dropna_all_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[None, None]"), dtype="float64"))
     var dropped = s.dropna()
     assert_equal(dropped.size(), 0)
 
 
-fn test_ffill() raises:
+def test_ffill() raises:
     var pd = Python.import_module("pandas")
     # [1.0, NaN, 3.0] → ffill → [1.0, 1.0, 3.0]
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
@@ -477,7 +477,7 @@ fn test_ffill() raises:
     assert_true(Float64(String(rp.iloc[2])) == 3.0)
 
 
-fn test_ffill_leading_null() raises:
+def test_ffill_leading_null() raises:
     var pd = Python.import_module("pandas")
     # [NaN, 2.0, NaN] → ffill → [NaN, 2.0, 2.0]
     var s = Series(pd.Series(Python.evaluate("[None, 2.0, None]")))
@@ -491,7 +491,7 @@ fn test_ffill_leading_null() raises:
     assert_true(Float64(String(rp.iloc[2])) == 2.0)
 
 
-fn test_ffill_no_nulls() raises:
+def test_ffill_no_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var filled = s.ffill()
@@ -500,7 +500,7 @@ fn test_ffill_no_nulls() raises:
     assert_true(Float64(String(rp.iloc[1])) == 2.0)
 
 
-fn test_bfill() raises:
+def test_bfill() raises:
     var pd = Python.import_module("pandas")
     # [1.0, NaN, 3.0] → bfill → [1.0, 3.0, 3.0]
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
@@ -512,7 +512,7 @@ fn test_bfill() raises:
     assert_true(Float64(String(rp.iloc[2])) == 3.0)
 
 
-fn test_bfill_trailing_null() raises:
+def test_bfill_trailing_null() raises:
     var pd = Python.import_module("pandas")
     # [NaN, 2.0, NaN] → bfill → [2.0, 2.0, NaN]
     var s = Series(pd.Series(Python.evaluate("[None, 2.0, None]")))
@@ -524,7 +524,7 @@ fn test_bfill_trailing_null() raises:
     assert_true(Float64(String(rp.iloc[0])) == 2.0)
 
 
-fn test_bfill_no_nulls() raises:
+def test_bfill_no_nulls() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var filled = s.bfill()
@@ -533,7 +533,7 @@ fn test_bfill_no_nulls() raises:
     assert_true(Float64(String(rp.iloc[1])) == 2.0)
 
 
-fn test_eq() raises:
+def test_eq() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[1, 0, 3]")))
@@ -543,7 +543,7 @@ fn test_eq() raises:
     assert_true(Bool(rp.iloc[2]) == True)
 
 
-fn test_ne() raises:
+def test_ne() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[1, 0, 3]")))
@@ -553,7 +553,7 @@ fn test_ne() raises:
     assert_true(Bool(rp.iloc[2]) == False)
 
 
-fn test_lt() raises:
+def test_lt() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
@@ -563,7 +563,7 @@ fn test_lt() raises:
     assert_true(Bool(rp.iloc[2]) == False)
 
 
-fn test_le() raises:
+def test_le() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
@@ -573,7 +573,7 @@ fn test_le() raises:
     assert_true(Bool(rp.iloc[2]) == False)
 
 
-fn test_gt() raises:
+def test_gt() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
@@ -583,7 +583,7 @@ fn test_gt() raises:
     assert_true(Bool(rp.iloc[2]) == True)
 
 
-fn test_ge() raises:
+def test_ge() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]")))
     var s2 = Series(pd.Series(Python.evaluate("[2, 2, 2]")))
@@ -593,7 +593,7 @@ fn test_ge() raises:
     assert_true(Bool(rp.iloc[2]) == True)
 
 
-fn test_eq_null_propagation() raises:
+def test_eq_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var s2 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
@@ -604,7 +604,7 @@ fn test_eq_null_propagation() raises:
 
 
 # Bool column comparison tests — exercises the direct Bool arm in _cmp_op
-fn test_bool_eq() raises:
+def test_bool_eq() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
@@ -615,7 +615,7 @@ fn test_bool_eq() raises:
     assert_true(Bool(rp.iloc[3]) == True)
 
 
-fn test_bool_ne() raises:
+def test_bool_ne() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
@@ -626,7 +626,7 @@ fn test_bool_ne() raises:
     assert_true(Bool(rp.iloc[3]) == False)
 
 
-fn test_bool_lt() raises:
+def test_bool_lt() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
@@ -637,7 +637,7 @@ fn test_bool_lt() raises:
     assert_true(Bool(rp.iloc[3]) == False)
 
 
-fn test_bool_le() raises:
+def test_bool_le() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
@@ -648,7 +648,7 @@ fn test_bool_le() raises:
     assert_true(Bool(rp.iloc[3]) == True)
 
 
-fn test_bool_gt() raises:
+def test_bool_gt() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
@@ -659,7 +659,7 @@ fn test_bool_gt() raises:
     assert_true(Bool(rp.iloc[3]) == False)
 
 
-fn test_bool_ge() raises:
+def test_bool_ge() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[False, False, True, True]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[False, True, False, True]"), dtype="bool"))
@@ -670,7 +670,7 @@ fn test_bool_ge() raises:
     assert_true(Bool(rp.iloc[3]) == True)
 
 
-fn test_copy() raises:
+def test_copy() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
     var c = s.copy()
@@ -678,7 +678,7 @@ fn test_copy() raises:
     assert_true(c.iloc(2)[Int64] == 3)
 
 
-fn test_rename() raises:
+def test_rename() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]")), "original")
     var r = s.rename("renamed")
@@ -686,7 +686,7 @@ fn test_rename() raises:
     assert_true(s.name == "original")
 
 
-fn test_abs_float() raises:
+def test_abs_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[-1.0, -2.5, 3.0, -4.0]")))
     var r = s.abs()
@@ -695,7 +695,7 @@ fn test_abs_float() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_abs_int() raises:
+def test_abs_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[-3, -1, 0, 2]"), dtype="int64"))
     var r = s.abs()
@@ -704,7 +704,7 @@ fn test_abs_int() raises:
     assert_true(r.iloc(3)[Int64] == 2)
 
 
-fn test_abs_null_propagation() raises:
+def test_abs_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[-1.0, None, 3.0]")))
     var result = s.abs()
@@ -712,7 +712,7 @@ fn test_abs_null_propagation() raises:
     assert_false(result.isna().iloc(0)[Bool])
 
 
-fn test_round_float() raises:
+def test_round_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.123, 2.567, 3.001]")))
     var r = s.round(2)
@@ -720,7 +720,7 @@ fn test_round_float() raises:
     assert_true(r.iloc(1)[Float64] == 2.57)
 
 
-fn test_round_int_identity() raises:
+def test_round_int_identity() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
     var r = s.round(0)
@@ -728,7 +728,7 @@ fn test_round_int_identity() raises:
     assert_true(r.iloc(2)[Int64] == 3)
 
 
-fn test_round_null_propagation() raises:
+def test_round_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.5, None, 3.7]")))
     var result = s.round(0)
@@ -736,7 +736,7 @@ fn test_round_null_propagation() raises:
     assert_false(result.isna().iloc(0)[Bool])
 
 
-fn test_round_bankers() raises:
+def test_round_bankers() raises:
     """Verify banker's rounding (round-half-to-even) at exact half-way points."""
     var pd = Python.import_module("pandas")
     # 0.5 → 0 (even), 1.5 → 2 (even), 2.5 → 2 (even), 3.5 → 4 (even)
@@ -754,7 +754,7 @@ fn test_round_bankers() raises:
     assert_true(r2.iloc(2)[Float64] == -2.0)
 
 
-fn test_clip_float() raises:
+def test_clip_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 10.0, 15.0]")))
     var r = s.clip(Float64(2.0), Float64(12.0))
@@ -764,7 +764,7 @@ fn test_clip_float() raises:
     assert_true(r.iloc(3)[Float64] == 12.0)
 
 
-fn test_clip_int() raises:
+def test_clip_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 5, 10, 20]"), dtype="int64"))
     var r = s.clip(Float64(3.0), Float64(15.0))
@@ -773,7 +773,7 @@ fn test_clip_int() raises:
     assert_true(r.iloc(3)[Int64] == 15)
 
 
-fn test_clip_null_propagation() raises:
+def test_clip_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 10.0]")))
     var result = s.clip(Float64(2.0), Float64(8.0))
@@ -781,7 +781,7 @@ fn test_clip_null_propagation() raises:
     assert_false(result.isna().iloc(0)[Bool])
 
 
-fn test_clip_lower_only() raises:
+def test_clip_lower_only() raises:
     # When only a lower bound is provided the upper side must not be clipped.
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 1000.0]")))
@@ -792,7 +792,7 @@ fn test_clip_lower_only() raises:
     assert_true(r.iloc(2)[Float64] == 1000.0)
 
 
-fn test_clip_upper_only() raises:
+def test_clip_upper_only() raises:
     # When only an upper bound is provided the lower side must not be clipped.
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[0.0, 5.0, 10.0]")))
@@ -803,16 +803,16 @@ fn test_clip_upper_only() raises:
     assert_true(r.iloc(2)[Float64] == 7.0)
 
 
-fn _double(v: Float64) -> Float64:
+def _double(v: Float64) -> Float64:
     return v * 2.0
 
-fn _identity(v: Float64) -> Float64:
+def _identity(v: Float64) -> Float64:
     return v
 
-fn _negate(v: Float64) -> Float64:
+def _negate(v: Float64) -> Float64:
     return -v
 
-fn test_apply() raises:
+def test_apply() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var r = s.apply[_double]()
@@ -821,7 +821,7 @@ fn test_apply() raises:
     assert_true(r.iloc(2)[Float64] == 6.0)
 
 
-fn test_apply_null_propagation() raises:
+def test_apply_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var result = s.apply[_identity]()
@@ -829,7 +829,7 @@ fn test_apply_null_propagation() raises:
     assert_false(result.isna().iloc(0)[Bool])
 
 
-fn test_map() raises:
+def test_map() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var r = s.map[_negate]()
@@ -838,7 +838,7 @@ fn test_map() raises:
     assert_true(r.iloc(2)[Float64] == -3.0)
 
 
-fn test_isin_int() raises:
+def test_isin_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4]"), dtype="int64"))
     var vals = List[Int64]()
@@ -851,7 +851,7 @@ fn test_isin_int() raises:
     assert_true(r.iloc(3)[Bool])
 
 
-fn test_isin_float() raises:
+def test_isin_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0]")))
     var vals = List[Float64]()
@@ -864,7 +864,7 @@ fn test_isin_float() raises:
     assert_false(r.iloc(3)[Bool])
 
 
-fn test_isin_str() raises:
+def test_isin_str() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate('["a", "b", "c", "d"]'), dtype="string"))
     var vals = List[String]()
@@ -877,7 +877,7 @@ fn test_isin_str() raises:
     assert_false(r.iloc(3)[Bool])
 
 
-fn test_isin_bool() raises:
+def test_isin_bool() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var vals = List[Bool]()
@@ -889,7 +889,7 @@ fn test_isin_bool() raises:
     assert_false(r.iloc(3)[Bool])
 
 
-fn test_between() raises:
+def test_between() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
     var r = s.between(Float64(2.0), Float64(4.0))
@@ -900,7 +900,7 @@ fn test_between() raises:
     assert_false(r.iloc(4)[Bool])
 
 
-fn test_where() raises:
+def test_where() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0]")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
@@ -911,7 +911,7 @@ fn test_where() raises:
     assert_true(result.isna().iloc(3)[Bool])
 
 
-fn test_where_null_propagation() raises:
+def test_where_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var cond = Series(pd.Series(Python.evaluate("[True, True, False]"), dtype="bool"))
@@ -921,7 +921,7 @@ fn test_where_null_propagation() raises:
     assert_true(result.isna().iloc(2)[Bool])
 
 
-fn test_mask() raises:
+def test_mask() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0]")))
     var cond = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
@@ -932,7 +932,7 @@ fn test_mask() raises:
     assert_true(result.iloc(3)[Float64] == 4.0)
 
 
-fn test_mask_null_propagation() raises:
+def test_mask_null_propagation() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var cond = Series(pd.Series(Python.evaluate("[False, False, True]"), dtype="bool"))
@@ -942,7 +942,7 @@ fn test_mask_null_propagation() raises:
     assert_true(result.isna().iloc(2)[Bool])
 
 
-fn test_unique_int() raises:
+def test_unique_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2, 1, 3]"), dtype="int64"))
     var r = s.unique()
@@ -952,7 +952,7 @@ fn test_unique_int() raises:
     assert_true(r.iloc(2)[Int64] == 2)
 
 
-fn test_unique_float() raises:
+def test_unique_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 1.0, 3.0]")))
     var r = s.unique()
@@ -962,7 +962,7 @@ fn test_unique_float() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_astype() raises:
+def test_astype() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
     var r = s.astype("float64")
@@ -970,7 +970,7 @@ fn test_astype() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_astype_null_propagation() raises:
+def test_astype_null_propagation() raises:
     var pd = Python.import_module("pandas")
     # Float64 → Int64: null at index 1 must propagate
     var sf = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
@@ -985,7 +985,7 @@ fn test_astype_null_propagation() raises:
     assert_false(rb.isna().iloc(2)[Bool])
 
 
-fn test_reset_index() raises:
+def test_reset_index() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), index=Python.evaluate("[5, 6, 7]")))
     var r = s.reset_index(drop=True)
@@ -997,7 +997,7 @@ fn test_reset_index() raises:
 # Sorting
 # ------------------------------------------------------------------
 
-fn test_sort_values_ascending_int() raises:
+def test_sort_values_ascending_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
     var r = s.sort_values()
@@ -1006,7 +1006,7 @@ fn test_sort_values_ascending_int() raises:
     assert_true(r.iloc(2)[Int64] == 3)
 
 
-fn test_sort_values_descending_int() raises:
+def test_sort_values_descending_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
     var r = s.sort_values(ascending=False)
@@ -1015,7 +1015,7 @@ fn test_sort_values_descending_int() raises:
     assert_true(r.iloc(2)[Int64] == 1)
 
 
-fn test_sort_values_float() raises:
+def test_sort_values_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
     var r = s.sort_values()
@@ -1024,7 +1024,7 @@ fn test_sort_values_float() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_sort_values_string() raises:
+def test_sort_values_string() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['c', 'a', 'b']"), dtype="string"))
     var r = s.sort_values()
@@ -1033,7 +1033,7 @@ fn test_sort_values_string() raises:
     assert_true(r.iloc(2)[String] == "c")
 
 
-fn test_sort_values_null_last() raises:
+def test_sort_values_null_last() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
     var r = s.sort_values()
@@ -1042,7 +1042,7 @@ fn test_sort_values_null_last() raises:
     assert_true(r.isna().iloc(2)[Bool])
 
 
-fn test_sort_values_null_first() raises:
+def test_sort_values_null_first() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
     var r = s.sort_values(na_position="first")
@@ -1051,7 +1051,7 @@ fn test_sort_values_null_first() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_sort_values_null_first_descending() raises:
+def test_sort_values_null_first_descending() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
     var r = s.sort_values(ascending=False, na_position="first")
@@ -1060,7 +1060,7 @@ fn test_sort_values_null_first_descending() raises:
     assert_true(r.iloc(2)[Float64] == 1.0)
 
 
-fn test_sort_values_preserves_index() raises:
+def test_sort_values_preserves_index() raises:
     var pd = Python.import_module("pandas")
     # s: label 'b'->3, 'a'->1, 'c'->2.  Sorted by value: 1,2,3 → labels a,c,b.
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64", index=Python.evaluate("['b', 'a', 'c']")))
@@ -1074,7 +1074,7 @@ fn test_sort_values_preserves_index() raises:
     assert_true(r.at("b")[Int64] == 3)
 
 
-fn test_sort_index_ascending_default() raises:
+def test_sort_index_ascending_default() raises:
     var pd = Python.import_module("pandas")
     # Default RangeIndex — ascending is a no-op.
     var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64"))
@@ -1084,7 +1084,7 @@ fn test_sort_index_ascending_default() raises:
     assert_true(r.iloc(2)[Int64] == 20)
 
 
-fn test_sort_index_descending_default() raises:
+def test_sort_index_descending_default() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64"))
     var r = s.sort_index(ascending=False)
@@ -1093,7 +1093,7 @@ fn test_sort_index_descending_default() raises:
     assert_true(r.iloc(2)[Int64] == 30)
 
 
-fn test_sort_index_custom() raises:
+def test_sort_index_custom() raises:
     var pd = Python.import_module("pandas")
     # index labels [2, 0, 1] → sorted ascending → [0, 1, 2] → data [10, 20, 30]
     var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64", index=Python.evaluate("[2, 0, 1]")))
@@ -1103,7 +1103,7 @@ fn test_sort_index_custom() raises:
     assert_true(r.iloc(2)[Int64] == 30)
 
 
-fn test_sort_index_custom_descending() raises:
+def test_sort_index_custom_descending() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[30, 10, 20]"), dtype="int64", index=Python.evaluate("[2, 0, 1]")))
     var r = s.sort_index(ascending=False)
@@ -1112,7 +1112,7 @@ fn test_sort_index_custom_descending() raises:
     assert_true(r.iloc(2)[Int64] == 10)
 
 
-fn test_argsort_int() raises:
+def test_argsort_int() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3, 1, 2]"), dtype="int64"))
     var r = s.argsort()
@@ -1122,7 +1122,7 @@ fn test_argsort_int() raises:
     assert_true(r.iloc(2)[Int64] == 0)
 
 
-fn test_argsort_float() raises:
+def test_argsort_float() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
     var r = s.argsort()
@@ -1131,7 +1131,7 @@ fn test_argsort_float() raises:
     assert_true(r.iloc(2)[Int64] == 0)
 
 
-fn test_argsort_with_null() raises:
+def test_argsort_with_null() raises:
     var pd = Python.import_module("pandas")
     # s=[3.0, None, 1.0]: perm=[2,0,1]; perm[2]=1 is null → NaN at result pos 2
     var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
@@ -1141,7 +1141,7 @@ fn test_argsort_with_null() raises:
     assert_true(r.isna().iloc(2)[Bool])
 
 
-fn test_rank_no_ties() raises:
+def test_rank_no_ties() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
     var r = s.rank()
@@ -1150,7 +1150,7 @@ fn test_rank_no_ties() raises:
     assert_true(r.iloc(2)[Float64] == 2.0)
 
 
-fn test_rank_with_ties() raises:
+def test_rank_with_ties() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 1.0, 2.0]")))
     var r = s.rank()
@@ -1160,7 +1160,7 @@ fn test_rank_with_ties() raises:
     assert_true(r.iloc(2)[Float64] == 3.0)
 
 
-fn test_rank_with_null() raises:
+def test_rank_with_null() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, None, 1.0]")))
     var r = s.rank()
@@ -1169,5 +1169,5 @@ fn test_rank_with_null() raises:
     assert_true(r.iloc(2)[Float64] == 1.0)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

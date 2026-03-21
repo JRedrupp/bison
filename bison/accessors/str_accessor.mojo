@@ -11,12 +11,12 @@ struct StringMethods:
     var _null_mask: List[Bool]
     var _name: String
 
-    fn __init__(out self):
+    def __init__(out self):
         self._data = List[String]()
         self._null_mask = List[Bool]()
         self._name = ""
 
-    fn __init__(out self, var data: List[String], var null_mask: List[Bool], name: String):
+    def __init__(out self, var data: List[String], var null_mask: List[Bool], name: String):
         self._data = data^
         self._null_mask = null_mask^
         self._name = name
@@ -25,14 +25,14 @@ struct StringMethods:
     # Helpers
     # ------------------------------------------------------------------
 
-    fn _is_null(self, i: Int) -> Bool:
+    def _is_null(self, i: Int) -> Bool:
         return len(self._null_mask) > i and self._null_mask[i]
 
     # ------------------------------------------------------------------
     # Case / transform
     # ------------------------------------------------------------------
 
-    fn upper(self) raises -> Column:
+    def upper(self) raises -> Column:
         var result = List[String]()
         for i in range(len(self._data)):
             if self._is_null(i):
@@ -43,7 +43,7 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    fn lower(self) raises -> Column:
+    def lower(self) raises -> Column:
         var result = List[String]()
         for i in range(len(self._data)):
             if self._is_null(i):
@@ -58,7 +58,7 @@ struct StringMethods:
     # Stripping
     # ------------------------------------------------------------------
 
-    fn strip(self, to_strip: String = "") raises -> Column:
+    def strip(self, to_strip: String = "") raises -> Column:
         var result = List[String]()
         for i in range(len(self._data)):
             if self._is_null(i):
@@ -71,7 +71,7 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    fn lstrip(self, to_strip: String = "") raises -> Column:
+    def lstrip(self, to_strip: String = "") raises -> Column:
         var result = List[String]()
         for i in range(len(self._data)):
             if self._is_null(i):
@@ -84,7 +84,7 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    fn rstrip(self, to_strip: String = "") raises -> Column:
+    def rstrip(self, to_strip: String = "") raises -> Column:
         var result = List[String]()
         for i in range(len(self._data)):
             if self._is_null(i):
@@ -101,7 +101,7 @@ struct StringMethods:
     # Predicates
     # ------------------------------------------------------------------
 
-    fn contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> Column:
+    def contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> Column:
         var result = List[Bool]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -118,7 +118,7 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    fn startswith(self, pat: String) raises -> Column:
+    def startswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -132,7 +132,7 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    fn endswith(self, pat: String) raises -> Column:
+    def endswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -150,7 +150,7 @@ struct StringMethods:
     # Replace / split
     # ------------------------------------------------------------------
 
-    fn replace(self, pat: String, repl: String, regex: Bool = True) raises -> Column:
+    def replace(self, pat: String, repl: String, regex: Bool = True) raises -> Column:
         var result = List[String]()
         var re_mod = Python.import_module("re")
         for i in range(len(self._data)):
@@ -166,7 +166,7 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    fn split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> List[List[String]]:
+    def split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> List[List[String]]:
         """Split strings around given separator/delimiter.
 
         Returns a List[List[String]] where each inner list contains the split
@@ -193,7 +193,7 @@ struct StringMethods:
     # Numeric operations
     # ------------------------------------------------------------------
 
-    fn len(self) raises -> Column:
+    def len(self) raises -> Column:
         var result = List[Int64]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -207,7 +207,7 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    fn find(self, sub: String, start: Int = 0, end: Int = -1) raises -> Column:
+    def find(self, sub: String, start: Int = 0, end: Int = -1) raises -> Column:
         var result = List[Int64]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -225,7 +225,7 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    fn count(self, pat: String) raises -> Column:
+    def count(self, pat: String) raises -> Column:
         var result = List[Int64]()
         var new_mask = List[Bool]()
         var re_mod = Python.import_module("re")
@@ -246,7 +246,7 @@ struct StringMethods:
     # Indexing / slicing
     # ------------------------------------------------------------------
 
-    fn get(self, i: Int) raises -> Column:
+    def get(self, i: Int) raises -> Column:
         var result = List[String]()
         var new_mask = List[Bool]()
         for idx in range(len(self._data)):
@@ -272,7 +272,7 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    fn slice(self, start: Int = 0, stop: Int = -1, step: Int = 1) raises -> Column:
+    def slice(self, start: Int = 0, stop: Int = -1, step: Int = 1) raises -> Column:
         var result = List[String]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -301,7 +301,7 @@ struct StringMethods:
     # Concatenation
     # ------------------------------------------------------------------
 
-    fn cat(self, sep: String = "") raises -> String:
+    def cat(self, sep: String = "") raises -> String:
         var result = String("")
         var first = True
         for i in range(len(self._data)):
@@ -317,7 +317,7 @@ struct StringMethods:
     # Regex operations
     # ------------------------------------------------------------------
 
-    fn match(self, pat: String) raises -> Column:
+    def match(self, pat: String) raises -> Column:
         var result = List[Bool]()
         var new_mask = List[Bool]()
         var re_mod = Python.import_module("re")
