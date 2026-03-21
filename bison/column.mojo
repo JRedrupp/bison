@@ -1944,7 +1944,12 @@ struct Column(Copyable, Movable, Sized):
             return String(self._index[List[PythonObject]][i])
 
     def _index_reorder(self, perm: List[Int]) -> ColumnIndex:
-        """Return a new ColumnIndex with labels reordered by *perm*."""
+        """Return a new ColumnIndex with labels reordered by *perm*.
+
+        The three arms must be handled separately because each builds a
+        different concrete List type; a single generic loop is not possible
+        in Mojo without full parametric polymorphism over the element type.
+        """
         var n = len(perm)
         if self._index.isa[Index]():
             ref old = self._index[Index]
@@ -1964,6 +1969,59 @@ struct Column(Copyable, Movable, Sized):
             for k in range(n):
                 objs.append(old[perm[k]])
             return ColumnIndex(objs^)
+
+    def _sort_perm_by_index(self, ascending: Bool) raises -> List[Int]:
+        """Return an insertion-sort permutation over the current index labels.
+
+        The result ``perm[i]`` is the original row position of the *i*-th row
+        in sorted order.  The three index arms (string, int64, PythonObject)
+        are dispatched once so callers don't need to repeat the branching.
+        """
+        var n = self._index_len()
+        var perm = List[Int]()
+        for i in range(n):
+            perm.append(i)
+        if self._index.isa[Index]():
+            ref idx = self._index[Index]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap = idx[key] < idx[prev] if ascending else idx[key] > idx[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._index.isa[List[Int64]]():
+            ref idx = self._index[List[Int64]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap = idx[key] < idx[prev] if ascending else idx[key] > idx[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        else:
+            # PythonObject fallback: use Python comparison.
+            ref idx = self._index[List[PythonObject]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap = Bool(idx[key] < idx[prev]) if ascending else Bool(idx[key] > idx[prev])
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        return perm^
 
     # ------------------------------------------------------------------
     # Length

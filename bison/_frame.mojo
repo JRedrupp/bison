@@ -904,62 +904,8 @@ struct Series(Copyable, Movable):
                 sorted_col._index = ColumnIndex(int_idx^)
                 return Series(sorted_col^)
             return Series(self._col.copy())
-        # Sort permutation by index labels.
-        var perm = List[Int]()
-        for i in range(n):
-            perm.append(i)
-        if self._col._index.isa[Index]():
-            ref idx = self._col._index[Index]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap: Bool
-                    if ascending:
-                        do_swap = idx[key] < idx[prev]
-                    else:
-                        do_swap = idx[key] > idx[prev]
-                    if not do_swap:
-                        break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
-        elif self._col._index.isa[List[Int64]]():
-            ref idx = self._col._index[List[Int64]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap: Bool
-                    if ascending:
-                        do_swap = idx[key] < idx[prev]
-                    else:
-                        do_swap = idx[key] > idx[prev]
-                    if not do_swap:
-                        break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
-        else:
-            # PythonObject fallback: use Python comparison.
-            ref idx = self._col._index[List[PythonObject]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap: Bool
-                    if ascending:
-                        do_swap = Bool(idx[key] < idx[prev])
-                    else:
-                        do_swap = Bool(idx[key] > idx[prev])
-                    if not do_swap:
-                        break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+        # Build sort permutation via the Column helper (handles all index arms).
+        var perm = self._col._sort_perm_by_index(ascending)
         var sorted_col = self._col.take(perm)
         sorted_col._index = self._col._index_reorder(perm)
         return Series(sorted_col^)
@@ -2413,61 +2359,8 @@ struct DataFrame(Copyable, Movable):
             for i in range(n_rows):
                 perm.append(n_rows - 1 - i)
         else:
-            # Explicit index: insertion sort by native comparison.
-            for i in range(n_rows):
-                perm.append(i)
-            if self._cols[0]._index.isa[Index]():
-                ref idx = self._cols[0]._index[Index]
-                for i in range(1, n_rows):
-                    var key = perm[i]
-                    var j = i - 1
-                    while j >= 0:
-                        var prev = perm[j]
-                        var do_swap: Bool
-                        if ascending:
-                            do_swap = idx[key] < idx[prev]
-                        else:
-                            do_swap = idx[key] > idx[prev]
-                        if not do_swap:
-                            break
-                        perm[j + 1] = prev
-                        j -= 1
-                    perm[j + 1] = key
-            elif self._cols[0]._index.isa[List[Int64]]():
-                ref idx = self._cols[0]._index[List[Int64]]
-                for i in range(1, n_rows):
-                    var key = perm[i]
-                    var j = i - 1
-                    while j >= 0:
-                        var prev = perm[j]
-                        var do_swap: Bool
-                        if ascending:
-                            do_swap = idx[key] < idx[prev]
-                        else:
-                            do_swap = idx[key] > idx[prev]
-                        if not do_swap:
-                            break
-                        perm[j + 1] = prev
-                        j -= 1
-                    perm[j + 1] = key
-            else:
-                # PythonObject fallback.
-                ref idx = self._cols[0]._index[List[PythonObject]]
-                for i in range(1, n_rows):
-                    var key = perm[i]
-                    var j = i - 1
-                    while j >= 0:
-                        var prev = perm[j]
-                        var do_swap: Bool
-                        if ascending:
-                            do_swap = Bool(idx[key] < idx[prev])
-                        else:
-                            do_swap = Bool(idx[key] > idx[prev])
-                        if not do_swap:
-                            break
-                        perm[j + 1] = prev
-                        j -= 1
-                    perm[j + 1] = key
+            # Explicit index: use the Column helper (dispatches on index arm).
+            perm = self._cols[0]._sort_perm_by_index(ascending)
 
         # Reorder index labels and apply permutation to every column.
         var has_index = self._cols[0]._index_len() > 0
