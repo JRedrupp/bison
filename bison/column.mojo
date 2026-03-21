@@ -2199,12 +2199,16 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         return visitor.result
 
-    def quantile(self, q: Float64 = 0.5) raises -> Float64:
+    def quantile(self, q: Float64 = 0.5, skipna: Bool = True) raises -> Float64:
         """Return the q-th quantile using linear interpolation.
 
-        Always skips null elements (matches pandas default behaviour).
+        When ``skipna=True`` (default) null/NaN elements are skipped.
+        When ``skipna=False`` the result is NaN if any null is present.
         Raises for non-numeric column types.
         """
+        if not skipna and self.has_nulls():
+            var zero = Float64(0)
+            return zero / zero
         var visitor = _QuantileCollectVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
         var vals = visitor.vals.copy()
@@ -2232,10 +2236,7 @@ struct Column(Copyable, Movable, Sized):
 
         When skipna=False and nulls are present, returns NaN.
         """
-        if not skipna and self.has_nulls():
-            var zero = Float64(0)
-            return zero / zero
-        return self.quantile(0.5)
+        return self.quantile(0.5, skipna)
 
     def describe(self) raises -> Column:
         """Return summary statistics as a new Column with a string index.
