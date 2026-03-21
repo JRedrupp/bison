@@ -90,7 +90,7 @@ TOP_LEVEL_KEY_MAP = {
 
 NOT_IMPLEMENTED_PATTERN = re.compile(r'_not_implemented\("([^"]+)"\)')
 STRUCT_PATTERN = re.compile(r"^\s*struct\s+([A-Za-z_][A-Za-z0-9_]*)\b")
-FN_PATTERN = re.compile(r"^\s*fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+FN_PATTERN = re.compile(r"^\s*(?:fn|def)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 
 def _category_for_key(key: str) -> str:
