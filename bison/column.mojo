@@ -29,7 +29,45 @@ comptime ColumnData = Variant[
 
 # Scalar type for a single cell in row-oriented input (from_records).
 # No PythonObject arm — record values must be explicitly typed.
-comptime DFScalar = Variant[Int64, Float64, Bool, String]
+#
+# Implemented as a thin struct rather than a bare Variant alias so that
+# Int (Mojo's native integer type) implicitly converts to Int64 at
+# construction time.  All four typed arms plus Int are accepted; Int is
+# normalised to Int64 immediately, so dispatch sites only ever see Int64.
+struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
+    var _v: Variant[Int64, Float64, Bool, String]
+
+    @implicit
+    fn __init__(out self, value: Int64):
+        self._v = Variant[Int64, Float64, Bool, String](value)
+
+    @implicit
+    fn __init__(out self, value: Float64):
+        self._v = Variant[Int64, Float64, Bool, String](value)
+
+    @implicit
+    fn __init__(out self, value: Bool):
+        self._v = Variant[Int64, Float64, Bool, String](value)
+
+    @implicit
+    fn __init__(out self, value: String):
+        self._v = Variant[Int64, Float64, Bool, String](value)
+
+    @implicit
+    fn __init__(out self, value: Int):
+        self._v = Variant[Int64, Float64, Bool, String](Int64(value))
+
+    fn __copyinit__(out self, other: Self):
+        self._v = other._v
+
+    fn __moveinit__(out self, deinit other: Self):
+        self._v = other._v^
+
+    fn isa[T: Copyable & Movable](self) -> Bool:
+        return self._v.isa[T]()
+
+    fn __getitem__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+        return self._v[T]
 
 # Scalar type returned by Series.iloc / Series.at.
 # Covers all five ColumnData arm types; the PythonObject arm is used only
