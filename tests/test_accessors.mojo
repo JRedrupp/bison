@@ -4,7 +4,7 @@ from testing import assert_true, assert_false, assert_equal, TestSuite
 from bison import Series
 
 
-fn test_str_upper() raises:
+def test_str_upper() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['foo', 'Bar', 'BAZ']"), dtype="string"))
     var result = Series(s.str().upper())
@@ -13,7 +13,7 @@ fn test_str_upper() raises:
     assert_equal(result.iloc(2)[String], "BAZ")
 
 
-fn test_str_lower() raises:
+def test_str_lower() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['FOO', 'Bar', 'baz']"), dtype="string"))
     var result = Series(s.str().lower())
@@ -22,7 +22,7 @@ fn test_str_lower() raises:
     assert_equal(result.iloc(2)[String], "baz")
 
 
-fn test_str_strip() raises:
+def test_str_strip() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['  hello  ', ' world ']"), dtype="string"))
     var result = Series(s.str().strip())
@@ -30,7 +30,7 @@ fn test_str_strip() raises:
     assert_equal(result.iloc(1)[String], "world")
 
 
-fn test_str_lstrip() raises:
+def test_str_lstrip() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['  hello  ', '  world']"), dtype="string"))
     var result = Series(s.str().lstrip())
@@ -38,7 +38,7 @@ fn test_str_lstrip() raises:
     assert_equal(result.iloc(1)[String], "world")
 
 
-fn test_str_rstrip() raises:
+def test_str_rstrip() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['  hello  ', 'world  ']"), dtype="string"))
     var result = Series(s.str().rstrip())
@@ -46,14 +46,14 @@ fn test_str_rstrip() raises:
     assert_equal(result.iloc(1)[String], "world")
 
 
-fn test_str_strip_chars() raises:
+def test_str_strip_chars() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['***hello***', '---world---']"), dtype="string"))
     var result = Series(s.str().strip("*"))
     assert_equal(result.iloc(0)[String], "hello")
 
 
-fn test_str_contains() raises:
+def test_str_contains() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world', 'hi']"), dtype="string"))
     var result = Series(s.str().contains("ello"))
@@ -62,7 +62,7 @@ fn test_str_contains() raises:
     assert_false(result.iloc(2)[Bool])
 
 
-fn test_str_contains_case_insensitive() raises:
+def test_str_contains_case_insensitive() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['Hello', 'WORLD', 'hi']"), dtype="string"))
     var result = Series(s.str().contains("hello", `case`=False))
@@ -71,7 +71,7 @@ fn test_str_contains_case_insensitive() raises:
     assert_false(result.iloc(2)[Bool])
 
 
-fn test_str_startswith() raises:
+def test_str_startswith() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world', 'hey']"), dtype="string"))
     var result = Series(s.str().startswith("he"))
@@ -80,7 +80,7 @@ fn test_str_startswith() raises:
     assert_true(result.iloc(2)[Bool])
 
 
-fn test_str_endswith() raises:
+def test_str_endswith() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world', 'jello']"), dtype="string"))
     var result = Series(s.str().endswith("llo"))
@@ -89,7 +89,7 @@ fn test_str_endswith() raises:
     assert_true(result.iloc(2)[Bool])
 
 
-fn test_str_replace_literal() raises:
+def test_str_replace_literal() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['foo bar', 'foo baz']"), dtype="string"))
     var result = Series(s.str().replace("foo", "qux", regex=False))
@@ -97,7 +97,7 @@ fn test_str_replace_literal() raises:
     assert_equal(result.iloc(1)[String], "qux baz")
 
 
-fn test_str_replace_regex() raises:
+def test_str_replace_regex() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['foo123', 'bar456']"), dtype="string"))
     var result = Series(s.str().replace("[0-9]+", "NUM"))
@@ -105,7 +105,7 @@ fn test_str_replace_regex() raises:
     assert_equal(result.iloc(1)[String], "barNUM")
 
 
-fn test_str_len() raises:
+def test_str_len() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'hi', 'hey there']"), dtype="string"))
     var result = Series(s.str().len())
@@ -114,7 +114,7 @@ fn test_str_len() raises:
     assert_equal(result.iloc(2)[Int64], Int64(9))
 
 
-fn test_str_get() raises:
+def test_str_get() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world']"), dtype="string"))
     var result = Series(s.str().get(1))
@@ -122,7 +122,7 @@ fn test_str_get() raises:
     assert_equal(result.iloc(1)[String], "o")
 
 
-fn test_str_slice() raises:
+def test_str_slice() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello', 'world']"), dtype="string"))
     var result = Series(s.str().slice(1, 4))
@@ -130,7 +130,7 @@ fn test_str_slice() raises:
     assert_equal(result.iloc(1)[String], "orl")
 
 
-fn test_str_slice_step() raises:
+def test_str_slice_step() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['abcdef', 'ghijkl']"), dtype="string"))
     var result = Series(s.str().slice(0, 6, 2))
@@ -138,14 +138,14 @@ fn test_str_slice_step() raises:
     assert_equal(result.iloc(1)[String], "gik")
 
 
-fn test_str_cat() raises:
+def test_str_cat() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['foo', 'bar', 'baz']"), dtype="string"))
     var result = s.str().cat(sep=",")
     assert_equal(result, "foo,bar,baz")
 
 
-fn test_str_find() raises:
+def test_str_find() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello world', 'foobar']"), dtype="string"))
     var result = Series(s.str().find("o"))
@@ -153,7 +153,7 @@ fn test_str_find() raises:
     assert_equal(result.iloc(1)[Int64], Int64(1))
 
 
-fn test_str_count() raises:
+def test_str_count() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['aabbcc', 'aaaa', 'b']"), dtype="string"))
     var result = Series(s.str().count("a"))
@@ -162,7 +162,7 @@ fn test_str_count() raises:
     assert_equal(result.iloc(2)[Int64], Int64(0))
 
 
-fn test_str_match() raises:
+def test_str_match() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['hello world', 'world hello', 'foo']"), dtype="string"))
     var result = Series(s.str().match("^hello"))
@@ -171,7 +171,7 @@ fn test_str_match() raises:
     assert_false(result.iloc(2)[Bool])
 
 
-fn test_str_split() raises:
+def test_str_split() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("['a,b,c', 'x,y']"), dtype="string"))
     var result = s.str().split(",")
@@ -180,7 +180,7 @@ fn test_str_split() raises:
     assert_equal(len(result[1]), 2)
 
 
-fn test_dt_year_stub() raises:
+def test_dt_year_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01', '2021-06-15']"))))
     var raised = False
@@ -192,7 +192,7 @@ fn test_dt_year_stub() raises:
     assert_true(raised)
 
 
-fn test_dt_month_stub() raises:
+def test_dt_month_stub() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01']"))))
     var raised = False
@@ -204,5 +204,5 @@ fn test_dt_month_stub() raises:
     assert_true(raised)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

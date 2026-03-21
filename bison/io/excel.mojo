@@ -4,7 +4,7 @@ from .._errors import _not_implemented
 from ..dataframe import DataFrame
 
 
-fn read_excel(
+def read_excel(
     io: String,
     sheet_name: Int = 0,
     header: Int = 0,
@@ -19,7 +19,7 @@ fn read_excel(
     return DataFrame(PythonObject(None))
 
 
-fn to_excel(
+def to_excel(
     df: PythonObject,
     excel_writer: String,
     sheet_name: String = "Sheet1",

@@ -10,7 +10,7 @@ from ..dtypes import int64, float64, object_
 # Private helpers
 # ------------------------------------------------------------------
 
-fn _in_na_set(s: String, na_set: List[String]) -> Bool:
+def _in_na_set(s: String, na_set: List[String]) -> Bool:
     """Return True if *s* matches any string in *na_set*."""
     for i in range(len(na_set)):
         if s == na_set[i]:
@@ -18,7 +18,7 @@ fn _in_na_set(s: String, na_set: List[String]) -> Bool:
     return False
 
 
-fn _infer_and_build_column(
+def _infer_and_build_column(
     name: String,
     raw: List[String],
     na_set: List[String],
@@ -120,7 +120,7 @@ fn _infer_and_build_column(
 # Public API
 # ------------------------------------------------------------------
 
-fn read_csv(
+def read_csv(
     filepath: String,
     sep: String = ",",
     header: Int = 0,
@@ -302,7 +302,7 @@ fn read_csv(
     return DataFrame(cols^)
 
 
-fn to_csv(
+def to_csv(
     df: PythonObject,
     path_or_buf: String = "",
     sep: String = ",",

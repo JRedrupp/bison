@@ -9,7 +9,7 @@ from ..dtypes import BisonDtype, int64, float64, bool_, object_
 # Private helpers
 # ------------------------------------------------------------------
 
-fn _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
+def _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
     """Return a Column of *n* null rows using *dtype* as the stored arm."""
     var mask = List[Bool]()
     for i in range(n):
@@ -44,7 +44,7 @@ fn _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
         return col^
 
 
-fn _dtype_for(dfs: List[DataFrame], col_name: String) -> BisonDtype:
+def _dtype_for(dfs: List[DataFrame], col_name: String) -> BisonDtype:
     """Return the dtype of *col_name* from the first DataFrame that has it."""
     for i in range(len(dfs)):
         for j in range(len(dfs[i]._cols)):
@@ -53,7 +53,7 @@ fn _dtype_for(dfs: List[DataFrame], col_name: String) -> BisonDtype:
     return object_
 
 
-fn _vstack(pieces: List[Column]) raises -> Column:
+def _vstack(pieces: List[Column]) raises -> Column:
     """Vertically stack a list of same-named Columns row-wise.
 
     When all pieces share the same typed data arm the result uses that arm.
@@ -203,7 +203,7 @@ fn _vstack(pieces: List[Column]) raises -> Column:
 
 
 
-fn _sort_result_cols(cols: List[Column]) raises -> List[Column]:
+def _sort_result_cols(cols: List[Column]) raises -> List[Column]:
     """Return a copy of *cols* sorted ascending by column name."""
     var n = len(cols)
     var order = List[Int]()
@@ -224,7 +224,7 @@ fn _sort_result_cols(cols: List[Column]) raises -> List[Column]:
     return result^
 
 
-fn _concat_axis0(
+def _concat_axis0(
     dfs: List[DataFrame],
     join: String,
     ignore_index: Bool,
@@ -283,7 +283,7 @@ fn _concat_axis0(
     return DataFrame(result_cols^)
 
 
-fn _concat_axis1(
+def _concat_axis1(
     dfs: List[DataFrame],
     join: String,
     ignore_index: Bool,
@@ -347,7 +347,7 @@ fn _concat_axis1(
 # Public API
 # ------------------------------------------------------------------
 
-fn concat(
+def concat(
     objs: List[DataFrame],
     axis: Int = 0,
     join: String = "outer",

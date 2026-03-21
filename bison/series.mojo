@@ -17,16 +17,16 @@ struct Series(Copyable, Movable):
     # Construction
     # ------------------------------------------------------------------
 
-    fn __init__(out self):
+    def __init__(out self):
         """Empty Series — used as stub return placeholder."""
         self._col = Column()
         self.name = ""
 
-    fn __init__(out self, var col: Column):
+    def __init__(out self, var col: Column):
         self.name = col.name
         self._col = col^
 
-    fn __init__(out self, pd_s: PythonObject, name: String = "") raises:
+    def __init__(out self, pd_s: PythonObject, name: String = "") raises:
         """Convenience constructor: wraps a pandas Series."""
         var col_name: String
         if name != "":
@@ -36,36 +36,36 @@ struct Series(Copyable, Movable):
         self._col = Column.from_pandas(pd_s, col_name)
         self.name = self._col.name
 
-    fn __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._col = copy._col.copy()
         self.name = copy.name
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self._col = take._col^
         self.name = take.name^
 
     @staticmethod
-    fn from_pandas(pd_s: PythonObject) raises -> Series:
+    def from_pandas(pd_s: PythonObject) raises -> Series:
         var col_name = String(pd_s.name)
         return Series(Column.from_pandas(pd_s, col_name))
 
-    fn to_pandas(self) raises -> PythonObject:
+    def to_pandas(self) raises -> PythonObject:
         return self._col.to_pandas()
 
     # ------------------------------------------------------------------
     # Attributes
     # ------------------------------------------------------------------
 
-    fn shape(self) -> Tuple[Int]:
+    def shape(self) -> Tuple[Int]:
         return (self._col.__len__(),)
 
-    fn size(self) -> Int:
+    def size(self) -> Int:
         return self._col.__len__()
 
-    fn empty(self) -> Bool:
+    def empty(self) -> Bool:
         return self._col.__len__() == 0
 
-    fn dtype(self) raises -> BisonDtype:
+    def dtype(self) raises -> BisonDtype:
         _not_implemented("Series.dtype")
         return object_
 
@@ -73,7 +73,7 @@ struct Series(Copyable, Movable):
     # Selection
     # ------------------------------------------------------------------
 
-    fn head(self, n: Int = 5) raises -> Series:
+    def head(self, n: Int = 5) raises -> Series:
         var size = self._col.__len__()
         var end = n
         if end > size:
@@ -82,14 +82,14 @@ struct Series(Copyable, Movable):
             end = 0
         return Series(self._col.slice(0, end))
 
-    fn tail(self, n: Int = 5) raises -> Series:
+    def tail(self, n: Int = 5) raises -> Series:
         var size = self._col.__len__()
         var start = size - n
         if start < 0:
             start = 0
         return Series(self._col.slice(start, size))
 
-    fn iloc(self, i: Int) raises -> SeriesScalar:
+    def iloc(self, i: Int) raises -> SeriesScalar:
         var size = self._col.__len__()
         var idx = i
         if idx < 0:
@@ -112,7 +112,7 @@ struct Series(Copyable, Movable):
         else:
             return SeriesScalar(self._col._data[List[PythonObject]][idx])
 
-    fn at(self, label: String) raises -> SeriesScalar:
+    def at(self, label: String) raises -> SeriesScalar:
         for i in range(len(self._col._index)):
             if String(self._col._index[i]) == label:
                 return self.iloc(i)
@@ -122,129 +122,129 @@ struct Series(Copyable, Movable):
     # Arithmetic
     # ------------------------------------------------------------------
 
-    fn add(self, other: Series) raises -> Series:
+    def add(self, other: Series) raises -> Series:
         return Series(self._col._arith_add(other._col))
 
-    fn sub(self, other: Series) raises -> Series:
+    def sub(self, other: Series) raises -> Series:
         return Series(self._col._arith_sub(other._col))
 
-    fn mul(self, other: Series) raises -> Series:
+    def mul(self, other: Series) raises -> Series:
         return Series(self._col._arith_mul(other._col))
 
-    fn div(self, other: Series) raises -> Series:
+    def div(self, other: Series) raises -> Series:
         return Series(self._col._arith_div(other._col))
 
-    fn floordiv(self, other: Series) raises -> Series:
+    def floordiv(self, other: Series) raises -> Series:
         return Series(self._col._arith_floordiv(other._col))
 
-    fn mod(self, other: Series) raises -> Series:
+    def mod(self, other: Series) raises -> Series:
         return Series(self._col._arith_mod(other._col))
 
-    fn pow(self, other: Series) raises -> Series:
+    def pow(self, other: Series) raises -> Series:
         return Series(self._col._arith_pow(other._col))
 
-    fn radd(self, other: Series) raises -> Series:
+    def radd(self, other: Series) raises -> Series:
         return other.add(self)
 
-    fn rsub(self, other: Series) raises -> Series:
+    def rsub(self, other: Series) raises -> Series:
         return other.sub(self)
 
-    fn rmul(self, other: Series) raises -> Series:
+    def rmul(self, other: Series) raises -> Series:
         return other.mul(self)
 
-    fn rdiv(self, other: Series) raises -> Series:
+    def rdiv(self, other: Series) raises -> Series:
         return other.div(self)
 
-    fn rfloordiv(self, other: Series) raises -> Series:
+    def rfloordiv(self, other: Series) raises -> Series:
         return other.floordiv(self)
 
-    fn rmod(self, other: Series) raises -> Series:
+    def rmod(self, other: Series) raises -> Series:
         return other.mod(self)
 
-    fn rpow(self, other: Series) raises -> Series:
+    def rpow(self, other: Series) raises -> Series:
         return other.pow(self)
 
     # ------------------------------------------------------------------
     # Comparison
     # ------------------------------------------------------------------
 
-    fn eq(self, other: Series) raises -> Series:
+    def eq(self, other: Series) raises -> Series:
         return Series(self._col._cmp_eq(other._col))
 
-    fn ne(self, other: Series) raises -> Series:
+    def ne(self, other: Series) raises -> Series:
         return Series(self._col._cmp_ne(other._col))
 
-    fn lt(self, other: Series) raises -> Series:
+    def lt(self, other: Series) raises -> Series:
         return Series(self._col._cmp_lt(other._col))
 
-    fn le(self, other: Series) raises -> Series:
+    def le(self, other: Series) raises -> Series:
         return Series(self._col._cmp_le(other._col))
 
-    fn gt(self, other: Series) raises -> Series:
+    def gt(self, other: Series) raises -> Series:
         return Series(self._col._cmp_gt(other._col))
 
-    fn ge(self, other: Series) raises -> Series:
+    def ge(self, other: Series) raises -> Series:
         return Series(self._col._cmp_ge(other._col))
 
     # ------------------------------------------------------------------
     # Aggregation
     # ------------------------------------------------------------------
 
-    fn sum(self, skipna: Bool = True) raises -> Float64:
+    def sum(self, skipna: Bool = True) raises -> Float64:
         return self._col.sum(skipna)
 
-    fn mean(self, skipna: Bool = True) raises -> Float64:
+    def mean(self, skipna: Bool = True) raises -> Float64:
         return self._col.mean(skipna)
 
-    fn median(self, skipna: Bool = True) raises -> Float64:
+    def median(self, skipna: Bool = True) raises -> Float64:
         return self._col.median(skipna)
 
-    fn min(self, skipna: Bool = True) raises -> Float64:
+    def min(self, skipna: Bool = True) raises -> Float64:
         return self._col.min(skipna)
 
-    fn max(self, skipna: Bool = True) raises -> Float64:
+    def max(self, skipna: Bool = True) raises -> Float64:
         return self._col.max(skipna)
 
-    fn std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+    def std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         return self._col.std(ddof, skipna)
 
-    fn var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+    def var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         return self._col.var(ddof, skipna)
 
-    fn count(self) -> Int:
+    def count(self) -> Int:
         return self._col.count()
 
-    fn nunique(self) raises -> Int:
+    def nunique(self) raises -> Int:
         return self._col.nunique()
 
-    fn describe(self) raises -> Series:
+    def describe(self) raises -> Series:
         """Return summary statistics as a Series (count, mean, std, min, quartiles, max)."""
         return Series(self._col.describe())
 
-    fn value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Series:
+    def value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Series:
         """Return a Series with the count (or proportion) of each unique value."""
         return Series(self._col.value_counts(normalize, sort))
 
-    fn quantile(self, q: Float64 = 0.5) raises -> Float64:
+    def quantile(self, q: Float64 = 0.5) raises -> Float64:
         return self._col.quantile(q)
 
-    fn cumsum(self, skipna: Bool = True) raises -> Series:
+    def cumsum(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cumsum(skipna))
 
-    fn cumprod(self, skipna: Bool = True) raises -> Series:
+    def cumprod(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cumprod(skipna))
 
-    fn cummin(self, skipna: Bool = True) raises -> Series:
+    def cummin(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cummin(skipna))
 
-    fn cummax(self, skipna: Bool = True) raises -> Series:
+    def cummax(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cummax(skipna))
 
     # ------------------------------------------------------------------
     # Missing data
     # ------------------------------------------------------------------
 
-    fn isna(self) raises -> Series:
+    def isna(self) raises -> Series:
         """Return a boolean Series that is True where values are null/NaN."""
         var n = len(self._col)
         var has_mask = len(self._col._null_mask) > 0
@@ -255,11 +255,11 @@ struct Series(Copyable, Movable):
         var col = Column(self._col.name, col_data^, bool_)
         return Series(col^)
 
-    fn isnull(self) raises -> Series:
+    def isnull(self) raises -> Series:
         """Alias for isna()."""
         return self.isna()
 
-    fn notna(self) raises -> Series:
+    def notna(self) raises -> Series:
         """Return a boolean Series that is True where values are not null/NaN."""
         var n = len(self._col)
         var has_mask = len(self._col._null_mask) > 0
@@ -270,11 +270,11 @@ struct Series(Copyable, Movable):
         var col = Column(self._col.name, col_data^, bool_)
         return Series(col^)
 
-    fn notnull(self) raises -> Series:
+    def notnull(self) raises -> Series:
         """Alias for notna()."""
         return self.notna()
 
-    fn fillna(self, value: DFScalar) raises -> Series:
+    def fillna(self, value: DFScalar) raises -> Series:
         """Return a copy of the Series with null/NaN values replaced by *value*."""
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
@@ -364,7 +364,7 @@ struct Series(Copyable, Movable):
         else:
             raise Error("fillna: PythonObject columns are not supported")
 
-    fn dropna(self) raises -> Series:
+    def dropna(self) raises -> Series:
         """Return a new Series with null/NaN elements removed."""
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
@@ -378,7 +378,7 @@ struct Series(Copyable, Movable):
         result_col._null_mask = List[Bool]()
         return Series(result_col^)
 
-    fn ffill(self) raises -> Series:
+    def ffill(self) raises -> Series:
         """Forward-fill: propagate the last non-null value forward over nulls."""
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
@@ -532,7 +532,7 @@ struct Series(Copyable, Movable):
                 col._null_mask = new_mask^
             return Series(col^)
 
-    fn bfill(self) raises -> Series:
+    def bfill(self) raises -> Series:
         """Backward-fill: propagate the next non-null value backward over nulls."""
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
@@ -720,7 +720,7 @@ struct Series(Copyable, Movable):
     # Sorting
     # ------------------------------------------------------------------
 
-    fn _sort_perm(self, ascending: Bool, na_last: Bool = True) raises -> List[Int]:
+    def _sort_perm(self, ascending: Bool, na_last: Bool = True) raises -> List[Int]:
         """Return an insertion-sort permutation over the column values.
 
         perm[i] = original index of the i-th element in sorted order.
@@ -861,7 +861,7 @@ struct Series(Copyable, Movable):
                 perm[j + 1] = key
         return perm^
 
-    fn sort_values(self, ascending: Bool = True, na_position: String = "last") raises -> Series:
+    def sort_values(self, ascending: Bool = True, na_position: String = "last") raises -> Series:
         """Return a new Series sorted by value.
 
         Null elements are placed at the end when na_position is ``"last"``
@@ -880,7 +880,7 @@ struct Series(Copyable, Movable):
             sorted_col._index = new_idx^
         return Series(sorted_col^)
 
-    fn sort_index(self, ascending: Bool = True) raises -> Series:
+    def sort_index(self, ascending: Bool = True) raises -> Series:
         """Return a new Series sorted by index label.
 
         When the Series has a default RangeIndex the data is already ordered
@@ -931,7 +931,7 @@ struct Series(Copyable, Movable):
         sorted_col._index = new_idx^
         return Series(sorted_col^)
 
-    fn argsort(self) raises -> Series:
+    def argsort(self) raises -> Series:
         """Return the integer indices that would sort the Series values.
 
         The result is a Series with the same index as the input.
@@ -975,7 +975,7 @@ struct Series(Copyable, Movable):
         col._null_mask = result_mask^
         return Series(col^)
 
-    fn rank(self) raises -> Series:
+    def rank(self) raises -> Series:
         """Return 1-based float ranks (average method for ties, NaN for nulls)."""
         var n = len(self._col)
         if n == 0:
@@ -1066,86 +1066,86 @@ struct Series(Copyable, Movable):
     # Reshaping / transformations
     # ------------------------------------------------------------------
 
-    fn apply[F: FloatTransformFn](self) raises -> Series:
+    def apply[F: FloatTransformFn](self) raises -> Series:
         """Apply a compile-time function element-wise. Call as ``s.apply[my_fn]()``."""
         return Series(self._col._apply[F]())
 
-    fn map[F: FloatTransformFn](self) raises -> Series:
+    def map[F: FloatTransformFn](self) raises -> Series:
         """Map a compile-time function element-wise. Call as ``s.map[my_fn]()``."""
         return Series(self._col._apply[F]())
 
-    fn astype(self, dtype: String) raises -> Series:
+    def astype(self, dtype: String) raises -> Series:
         return Series(self._col._astype(dtype_from_string(dtype)))
 
-    fn copy(self) -> Series:
+    def copy(self) -> Series:
         return Series(self._col.copy())
 
-    fn reset_index(self, drop: Bool = False) raises -> Series:
+    def reset_index(self, drop: Bool = False) raises -> Series:
         return Series(self._col._reset_index(drop))
 
-    fn rename(self, new_name: String) raises -> Series:
+    def rename(self, new_name: String) raises -> Series:
         var c = self._col.copy()
         c.name = new_name
         return Series(c^)
 
-    fn clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> Series:
+    def clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> Series:
         return Series(self._col._clip(lower, upper))
 
-    fn abs(self) raises -> Series:
+    def abs(self) raises -> Series:
         return Series(self._col._abs())
 
-    fn round(self, decimals: Int = 0) raises -> Series:
+    def round(self, decimals: Int = 0) raises -> Series:
         return Series(self._col._round(decimals))
 
-    fn unique(self) raises -> Series:
+    def unique(self) raises -> Series:
         return Series(self._col._unique())
 
-    fn isin(self, values: List[Int64]) raises -> Series:
+    def isin(self, values: List[Int64]) raises -> Series:
         return Series(self._col._isin_int(values))
 
-    fn isin(self, values: List[Float64]) raises -> Series:
+    def isin(self, values: List[Float64]) raises -> Series:
         return Series(self._col._isin_float(values))
 
-    fn isin(self, values: List[String]) raises -> Series:
+    def isin(self, values: List[String]) raises -> Series:
         return Series(self._col._isin_str(values))
 
-    fn isin(self, values: List[Bool]) raises -> Series:
+    def isin(self, values: List[Bool]) raises -> Series:
         return Series(self._col._isin_bool(values))
 
-    fn between(self, left: Float64, right: Float64) raises -> Series:
+    def between(self, left: Float64, right: Float64) raises -> Series:
         return Series(self._col._between(left, right))
 
-    fn where(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+    def where(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
         return Series(self._col._where(cond._col, other))
 
-    fn mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+    def mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
         return Series(self._col._mask(cond._col, other))
 
     # ------------------------------------------------------------------
     # Interop
     # ------------------------------------------------------------------
 
-    fn to_list(self) raises -> List[DFScalar]:
+    def to_list(self) raises -> List[DFScalar]:
         _not_implemented("Series.to_list")
         return List[DFScalar]()
 
-    fn to_numpy(self) raises -> List[Float64]:
+    def to_numpy(self) raises -> List[Float64]:
         _not_implemented("Series.to_numpy")
         return List[Float64]()
 
-    fn to_frame(self, name: String = "") raises -> Series:
+    def to_frame(self, name: String = "") raises -> Series:
         _not_implemented("Series.to_frame")
         return Series()
 
-    fn to_dict(self) raises -> Dict[String, DFScalar]:
+    def to_dict(self) raises -> Dict[String, DFScalar]:
         _not_implemented("Series.to_dict")
         return Dict[String, DFScalar]()
 
-    fn to_csv(self, path: String = "") raises -> String:
+    def to_csv(self, path: String = "") raises -> String:
         _not_implemented("Series.to_csv")
         return String("")
 
-    fn to_json(self, path: String = "") raises -> String:
+    def to_json(self, path: String = "") raises -> String:
         _not_implemented("Series.to_json")
         return String("")
 
@@ -1153,7 +1153,7 @@ struct Series(Copyable, Movable):
     # String / Datetime accessors (return accessor structs)
     # ------------------------------------------------------------------
 
-    fn str(self) raises -> StringMethods:
+    def str(self) raises -> StringMethods:
         if not self._col._data.isa[List[String]]():
             raise Error("Series.str: accessor requires a string Series")
         ref d = self._col._data[List[String]]
@@ -1161,7 +1161,7 @@ struct Series(Copyable, Movable):
         var null_mask = self._col._null_mask.copy()
         return StringMethods(data^, null_mask^, self._col.name)
 
-    fn dt(self) raises -> DatetimeMethods:
+    def dt(self) raises -> DatetimeMethods:
         _not_implemented("Series.dt")
         return DatetimeMethods()
 
@@ -1169,8 +1169,8 @@ struct Series(Copyable, Movable):
     # Repr
     # ------------------------------------------------------------------
 
-    fn __repr__(self) raises -> String:
+    def __repr__(self) raises -> String:
         return String(self.to_pandas())
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self._col.__len__()
