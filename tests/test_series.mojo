@@ -1,7 +1,7 @@
 """Tests for Series construction and basic attributes."""
 from std.python import Python, PythonObject
 from testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import Series, SeriesScalar, DFScalar, FloatTransformFn
+from bison import Series, SeriesScalar, DFScalar, FloatTransformFn, DataFrame
 
 
 def test_from_pandas() raises:
@@ -1278,19 +1278,19 @@ def test_to_numpy_null() raises:
 def test_to_frame_default_name() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), name="col1", dtype="int64"))
-    var df_py = s.to_frame()
-    # Should be a pandas DataFrame with one column named "col1"
-    assert_true(Bool(df_py.shape[0] == 3))
-    assert_true(Bool(df_py.shape[1] == 1))
-    assert_true(String(df_py.columns[0]) == "col1")
+    var df = s.to_frame()
+    # Should be a native bison DataFrame with one column named "col1"
+    assert_equal(df.shape()[0], 3)
+    assert_equal(df.shape()[1], 1)
+    assert_equal(df.columns()[0], "col1")
 
 
 def test_to_frame_custom_name() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20]"), name="old", dtype="int64"))
-    var df_py = s.to_frame(name="new_col")
-    assert_true(Bool(df_py.shape[1] == 1))
-    assert_true(String(df_py.columns[0]) == "new_col")
+    var df = s.to_frame(name="new_col")
+    assert_equal(df.shape()[1], 1)
+    assert_equal(df.columns()[0], "new_col")
 
 
 def test_to_dict_int() raises:
