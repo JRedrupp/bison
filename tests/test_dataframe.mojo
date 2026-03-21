@@ -418,8 +418,8 @@ fn test_itertuples_name() raises:
 
 
 fn test_from_records_basic() raises:
-    var row0: Dict[String, DFScalar] = {"a": 1, "b": 10}
-    var row1: Dict[String, DFScalar] = {"a": 2, "b": 20}
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(10)}
+    var row1: Dict[String, DFScalar] = {"a": DFScalar(2), "b": DFScalar(20)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     records.append(row1^)
@@ -438,7 +438,7 @@ fn test_from_records_empty() raises:
 
 
 fn test_from_records_columns_param() raises:
-    var row0: Dict[String, DFScalar] = {"a": 1, "b": 2, "c": 3}
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(2), "c": DFScalar(3)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     var cols = List[String]()
@@ -451,8 +451,8 @@ fn test_from_records_columns_param() raises:
 
 
 fn test_from_records_mixed_types() raises:
-    var row0: Dict[String, DFScalar] = {"i": 42, "s": "hello"}
-    var row1: Dict[String, DFScalar] = {"i": 7, "s": "world"}
+    var row0: Dict[String, DFScalar] = {"i": DFScalar(42), "s": DFScalar(String("hello"))}
+    var row1: Dict[String, DFScalar] = {"i": DFScalar(7), "s": DFScalar(String("world"))}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     records.append(row1^)
@@ -463,7 +463,7 @@ fn test_from_records_mixed_types() raises:
 
 fn test_from_records_int_float_mixed() raises:
     # First row has Int64, second row has Float64 — column should be promoted to float64
-    var row0: Dict[String, DFScalar] = {"x": 1}
+    var row0: Dict[String, DFScalar] = {"x": DFScalar(1)}
     var row1: Dict[String, DFScalar] = {"x": Float64(2.5)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
@@ -480,8 +480,8 @@ fn test_from_records_int_float_mixed() raises:
 
 fn test_from_records_bool_int_mixed() raises:
     # First row has Bool, second row has Int64 — column should be promoted to int64
-    var row0: Dict[String, DFScalar] = {"y": True}
-    var row1: Dict[String, DFScalar] = {"y": 42}
+    var row0: Dict[String, DFScalar] = {"y": DFScalar(True)}
+    var row1: Dict[String, DFScalar] = {"y": DFScalar(42)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     records.append(row1^)
@@ -496,8 +496,8 @@ fn test_from_records_bool_int_mixed() raises:
 
 
 fn test_from_records_missing_key() raises:
-    var row0: Dict[String, DFScalar] = {"a": 1, "b": 10}
-    var row1: Dict[String, DFScalar] = {"a": 2}
+    var row0: Dict[String, DFScalar] = {"a": DFScalar(1), "b": DFScalar(10)}
+    var row1: Dict[String, DFScalar] = {"a": DFScalar(2)}
     # "b" is missing in row1
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
@@ -513,7 +513,7 @@ fn test_from_records_missing_key() raises:
 fn test_from_records_column_order_deterministic() raises:
     # Column names should be sorted alphabetically when `columns` is not provided,
     # so the result is deterministic regardless of Dict iteration order.
-    var row0: Dict[String, DFScalar] = {"z": 3, "a": 1, "m": 2}
+    var row0: Dict[String, DFScalar] = {"z": DFScalar(3), "a": DFScalar(1), "m": DFScalar(2)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     var df = DataFrame.from_records(records)
@@ -526,9 +526,9 @@ fn test_from_records_column_order_deterministic() raises:
 fn test_from_records_bool_with_nulls() raises:
     # Bool column containing a null should round-trip through to_pandas() without error.
     # Pandas cannot represent NaN in a bool dtype column, so bison must promote to object.
-    var row0: Dict[String, DFScalar] = {"flag": True}
+    var row0: Dict[String, DFScalar] = {"flag": DFScalar(True)}
     var row1: Dict[String, DFScalar] = {}  # "flag" is missing → null
-    var row2: Dict[String, DFScalar] = {"flag": False}
+    var row2: Dict[String, DFScalar] = {"flag": DFScalar(False)}
     var records = List[Dict[String, DFScalar]]()
     records.append(row0^)
     records.append(row1^)
