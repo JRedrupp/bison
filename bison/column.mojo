@@ -75,7 +75,49 @@ struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
 # Scalar type returned by Series.iloc / Series.at.
 # Covers all five ColumnData arm types; the PythonObject arm is used only
 # for object/datetime/timedelta columns that have no native Mojo equivalent.
-comptime SeriesScalar = Variant[Int64, Float64, Bool, String, PythonObject]
+struct SeriesScalar(Copyable, Movable, ImplicitlyCopyable):
+    var _v: Variant[Int64, Float64, Bool, String, PythonObject]
+
+    @implicit
+    def __init__(out self, value: Int64):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](value)
+
+    @implicit
+    def __init__(out self, value: Float64):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](value)
+
+    @implicit
+    def __init__(out self, value: Bool):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](value)
+
+    @implicit
+    def __init__(out self, value: String):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](value)
+
+    @implicit
+    def __init__(out self, value: PythonObject):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](value)
+
+    @implicit
+    def __init__(out self, value: Int):
+        self._v = Variant[Int64, Float64, Bool, String, PythonObject](
+            Int64(value)
+        )
+
+    def __init__(out self, *, copy: Self):
+        self._v = copy._v
+
+    def __init__(out self, *, deinit take: Self):
+        self._v = take._v^
+
+    def isa[T: Copyable & Movable](self) -> Bool:
+        return self._v.isa[T]()
+
+    def __getitem__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+        return self._v[T]
+
+    def __getitem_param__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+        return self._v[T]
 
 
 # ------------------------------------------------------------------
