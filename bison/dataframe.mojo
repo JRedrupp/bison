@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
-from .column import Column, ColumnData, DFScalar
+from .column import Column, ColumnData, DFScalar, _csv_quote_field, _col_cell_pyobj, _col_cell_str
 from .dtypes import BisonDtype, dtype_from_string, bool_ as _bool_, float64 as _float64, object_ as _object_, int64 as _int64
 from .series import Series
 from .groupby import DataFrameGroupBy
@@ -30,67 +30,6 @@ def _sort_col_names(names: List[String]) -> List[String]:
     for i in range(n):
         result.append(names[order[i]])
     return result^
-
-
-# ------------------------------------------------------------------
-# CSV serialisation helpers (used by DataFrame.to_csv)
-# ------------------------------------------------------------------
-
-def _csv_quote_field(field: String, sep: String) -> String:
-    """Return *field* quoted for CSV output if it contains *sep*, a
-    newline, or a double-quote character; otherwise return *field* as-is.
-    Double-quote characters inside the field are escaped by doubling them.
-    """
-    var needs_quote = (
-        field.find(sep) >= 0
-        or field.find("\n") >= 0
-        or field.find('"') >= 0
-    )
-    if not needs_quote:
-        return field
-    return '"' + field.replace('"', '""') + '"'
-
-
-def _col_cell_pyobj(col: Column, row: Int) raises -> PythonObject:
-    """Return a PythonObject representation of cell *row* in *col*.
-
-    Null cells (masked entries) are returned as Python None.
-    """
-    var has_mask = len(col._null_mask) > 0
-    if has_mask and row < len(col._null_mask) and col._null_mask[row]:
-        return Python.evaluate("None")
-    if col._data.isa[List[Int64]]():
-        return PythonObject(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return PythonObject(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return PythonObject(col._data[List[Bool]][row])
-    elif col._data.isa[List[String]]():
-        return PythonObject(col._data[List[String]][row])
-    else:
-        return col._data[List[PythonObject]][row]
-
-
-def _col_cell_str(col: Column, row: Int) raises -> String:
-    """Return the string representation of cell *row* in *col*.
-
-    Null cells (masked entries) are returned as an empty string.
-    """
-    var has_mask = len(col._null_mask) > 0
-    if has_mask and row < len(col._null_mask) and col._null_mask[row]:
-        return String("")
-    if col._data.isa[List[Int64]]():
-        return String(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return String(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        if col._data[List[Bool]][row]:
-            return String("True")
-        return String("False")
-    elif col._data.isa[List[String]]():
-        return col._data[List[String]][row]
-    else:
-        return String(col._data[List[PythonObject]][row])
 
 
 struct DataFrame(Copyable, Movable):

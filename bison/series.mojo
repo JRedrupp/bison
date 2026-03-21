@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
-from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn
+from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -1126,28 +1126,208 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     def to_list(self) raises -> List[DFScalar]:
-        _not_implemented("Series.to_list")
-        return List[DFScalar]()
+        """Return the Series values as a ``List[DFScalar]``.
+
+        Null values are represented as the zero-like default for the dtype
+        (``0`` for integers, ``NaN`` for floats, ``False`` for bools,
+        ``""`` for strings).  Object-dtype columns raise ``Error``.
+        """
+        var result = List[DFScalar]()
+        ref col = self._col
+        var has_mask = len(col._null_mask) > 0
+        var n = col.__len__()
+        if col._data.isa[List[Int64]]():
+            ref data = col._data[List[Int64]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(DFScalar(Int64(0)))
+                else:
+                    result.append(DFScalar(data[i]))
+        elif col._data.isa[List[Float64]]():
+            var nan = Float64(0) / Float64(0)
+            ref data = col._data[List[Float64]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(DFScalar(nan))
+                else:
+                    result.append(DFScalar(data[i]))
+        elif col._data.isa[List[Bool]]():
+            ref data = col._data[List[Bool]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(DFScalar(False))
+                else:
+                    result.append(DFScalar(data[i]))
+        elif col._data.isa[List[String]]():
+            ref data = col._data[List[String]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(DFScalar(String("")))
+                else:
+                    result.append(DFScalar(data[i]))
+        else:
+            raise Error("Series.to_list: object dtype is not supported")
+        return result^
 
     def to_numpy(self) raises -> List[Float64]:
-        _not_implemented("Series.to_numpy")
-        return List[Float64]()
+        """Return the Series values as a ``List[Float64]``.
 
-    def to_frame(self, name: String = "") raises -> Series:
-        _not_implemented("Series.to_frame")
-        return Series()
+        Integer and bool values are cast to ``Float64``.  Null values become
+        ``NaN``.  String and object-dtype columns raise ``Error``.
+        """
+        var result = List[Float64]()
+        ref col = self._col
+        var has_mask = len(col._null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        var n = col.__len__()
+        if col._data.isa[List[Int64]]():
+            ref data = col._data[List[Int64]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(nan)
+                else:
+                    result.append(Float64(data[i]))
+        elif col._data.isa[List[Float64]]():
+            ref data = col._data[List[Float64]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(nan)
+                else:
+                    result.append(data[i])
+        elif col._data.isa[List[Bool]]():
+            ref data = col._data[List[Bool]]
+            for i in range(n):
+                if has_mask and col._null_mask[i]:
+                    result.append(nan)
+                else:
+                    result.append(Float64(1.0) if data[i] else Float64(0.0))
+        else:
+            raise Error("Series.to_numpy: non-numeric dtype is not supported")
+        return result^
+
+    def to_frame(self, name: String = "") raises -> PythonObject:
+        """Convert the Series to a single-column pandas DataFrame.
+
+        Parameters
+        ----------
+        name : Column name in the resulting DataFrame.  When empty the
+               Series' own name is used.
+
+        Returns
+        -------
+        PythonObject
+            A pandas ``DataFrame`` with one column.  Wrap with
+            ``DataFrame(...)`` to obtain a native bison ``DataFrame``.
+
+        Notes
+        -----
+        This method delegates to pandas because importing ``DataFrame``
+        from ``dataframe.mojo`` would create a circular module dependency.
+        The limitation is tracked as tech debt.
+        """
+        var pd_s = self.to_pandas()
+        if name != "":
+            return pd_s.to_frame(name=name)
+        return pd_s.to_frame()
 
     def to_dict(self) raises -> Dict[String, DFScalar]:
-        _not_implemented("Series.to_dict")
-        return Dict[String, DFScalar]()
+        """Return the Series as a ``Dict`` mapping index label → value.
+
+        Index labels are stringified.  Null values follow the same zero-like
+        defaults as ``to_list``.  Object-dtype columns raise ``Error``.
+        """
+        var result = Dict[String, DFScalar]()
+        ref col = self._col
+        var has_mask = len(col._null_mask) > 0
+        var has_index = len(col._index) > 0
+        var n = col.__len__()
+        if col._data.isa[List[Int64]]():
+            ref data = col._data[List[Int64]]
+            for i in range(n):
+                var key = String(col._index[i]) if has_index else String(i)
+                if has_mask and col._null_mask[i]:
+                    result[key] = DFScalar(Int64(0))
+                else:
+                    result[key] = DFScalar(data[i])
+        elif col._data.isa[List[Float64]]():
+            var nan = Float64(0) / Float64(0)
+            ref data = col._data[List[Float64]]
+            for i in range(n):
+                var key = String(col._index[i]) if has_index else String(i)
+                if has_mask and col._null_mask[i]:
+                    result[key] = DFScalar(nan)
+                else:
+                    result[key] = DFScalar(data[i])
+        elif col._data.isa[List[Bool]]():
+            ref data = col._data[List[Bool]]
+            for i in range(n):
+                var key = String(col._index[i]) if has_index else String(i)
+                if has_mask and col._null_mask[i]:
+                    result[key] = DFScalar(False)
+                else:
+                    result[key] = DFScalar(data[i])
+        elif col._data.isa[List[String]]():
+            ref data = col._data[List[String]]
+            for i in range(n):
+                var key = String(col._index[i]) if has_index else String(i)
+                if has_mask and col._null_mask[i]:
+                    result[key] = DFScalar(String(""))
+                else:
+                    result[key] = DFScalar(data[i])
+        else:
+            raise Error("Series.to_dict: object dtype is not supported")
+        return result^
 
     def to_csv(self, path: String = "") raises -> String:
-        _not_implemented("Series.to_csv")
-        return String("")
+        """Serialize the Series to a CSV-formatted string or file.
+
+        Each row is written as ``<index>,<value>`` with no header line,
+        matching pandas' default ``Series.to_csv`` output.
+
+        Parameters
+        ----------
+        path : File path to write.  When empty (default) the CSV text is
+               returned as a ``String``.
+        """
+        var result = String()
+        ref col = self._col
+        var has_index = len(col._index) > 0
+        var n = col.__len__()
+        for i in range(n):
+            var key = String(col._index[i]) if has_index else String(i)
+            var val = _col_cell_str(col, i)
+            result += _csv_quote_field(key, ",") + "," + _csv_quote_field(val, ",") + "\n"
+        if len(path) > 0:
+            with open(path, "w") as f:
+                f.write(result)
+            return String("")
+        return result^
 
     def to_json(self, path: String = "") raises -> String:
-        _not_implemented("Series.to_json")
-        return String("")
+        """Serialize the Series to a JSON-formatted string or file.
+
+        The output is a JSON object mapping each index label (as a string)
+        to its value, e.g. ``{"0":1,"1":2,"2":3}``.
+
+        Parameters
+        ----------
+        path : File path to write.  When empty (default) the JSON text is
+               returned as a ``String``.
+        """
+        var json_mod = Python.import_module("json")
+        ref col = self._col
+        var has_index = len(col._index) > 0
+        var n = col.__len__()
+        var py_dict = Python.evaluate("{}")
+        for i in range(n):
+            var key = String(col._index[i]) if has_index else String(i)
+            py_dict[key] = _col_cell_pyobj(col, i)
+        var result = String(json_mod.dumps(py_dict))
+        if len(path) > 0:
+            with open(path, "w") as f:
+                f.write(result)
+            return String("")
+        return result^
 
     # ------------------------------------------------------------------
     # String / Datetime accessors (return accessor structs)
