@@ -31,6 +31,10 @@ jobs:
         with:
           locked: ${{ matrix.pixi-locked }}
 
+      - name: Upgrade MAX to latest
+        if: matrix.max-version == 'latest'
+        run: pixi update max
+
       - name: Install pre-commit
         run: pip install pre-commit
 

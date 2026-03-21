@@ -57,16 +57,19 @@ struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
     fn __init__(out self, value: Int):
         self._v = Variant[Int64, Float64, Bool, String](Int64(value))
 
-    fn __copyinit__(out self, other: Self):
-        self._v = other._v
+    fn __copyinit__(out self, copy: Self):
+        self._v = copy._v
 
-    fn __moveinit__(out self, deinit other: Self):
-        self._v = other._v^
+    fn __moveinit__(out self, deinit take: Self):
+        self._v = take._v^
 
     fn isa[T: Copyable & Movable](self) -> Bool:
         return self._v.isa[T]()
 
     fn __getitem__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+        return self._v[T]
+
+    fn __getitem_param__[T: Copyable & Movable](ref self) -> ref [self._v] T:
         return self._v[T]
 
 # Scalar type returned by Series.iloc / Series.at.
