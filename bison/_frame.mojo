@@ -226,8 +226,8 @@ struct Series(Copyable, Movable):
         """Return a Series with the count (or proportion) of each unique value."""
         return Series(self._col.value_counts(normalize, sort))
 
-    def quantile(self, q: Float64 = 0.5) raises -> Float64:
-        return self._col.quantile(q)
+    def quantile(self, q: Float64 = 0.5, skipna: Bool = True) raises -> Float64:
+        return self._col.quantile(q, skipna)
 
     def cumsum(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cumsum(skipna))
@@ -1959,12 +1959,12 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.describe")
         return DataFrame()
 
-    def quantile(self, q: Float64 = 0.5, axis: Int = 0) raises -> Series:
+    def quantile(self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
             raise Error("DataFrame.quantile: axis=1 not yet implemented")
         var values = List[Float64]()
         for i in range(len(self._cols)):
-            values.append(self._cols[i].quantile(q))
+            values.append(self._cols[i].quantile(q, skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
         var result_col = Column("", col_data^, dtype)

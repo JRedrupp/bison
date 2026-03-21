@@ -107,6 +107,29 @@ def test_quantile() raises:
     assert_true(s.quantile(0.5) == 3.0)
 
 
+def test_quantile_skipna_true_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    # [1.0, None, 3.0] with skipna=True → quantile(0.5) of [1.0, 3.0] == 2.0
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    assert_true(s.quantile(0.5, skipna=True) == 2.0)
+
+
+def test_quantile_skipna_false_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    # [1.0, None, 3.0] with skipna=False → NaN
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var result = s.quantile(0.5, skipna=False)
+    # NaN != NaN is the standard IEEE test
+    assert_true(result != result)
+
+
+def test_quantile_skipna_false_no_nulls() raises:
+    var pd = Python.import_module("pandas")
+    # No nulls: skipna=False should still return the correct quantile
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    assert_true(s.quantile(0.5, skipna=False) == 3.0)
+
+
 def test_describe() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
