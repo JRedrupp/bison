@@ -1,6 +1,7 @@
 from std.python import PythonObject
 from std.memory import UnsafePointer
 from .column import Column, ColumnData, DFScalar, SeriesScalar
+from .index import ColumnIndex
 from .dtypes import object_
 from .series import Series
 from .dataframe import DataFrame
@@ -49,20 +50,20 @@ def _parse_int_label(label: String) raises -> Int:
 def _df_row_index(df: DataFrame, label: String) raises -> Int:
     """Return the integer row position for the given row *label*.
 
-    If the first column has a non-empty ``_index`` list the label is
-    matched via ``String()`` conversion.  When the index list is empty
-    the default integer range index (0, 1, …) is assumed and the label
-    must be a decimal integer string.
+    If the first column has a non-empty ``_index`` the label is matched
+    via ``Column._index_label()``.  When the index is empty the default
+    integer range index (0, 1, …) is assumed and the label must be a
+    decimal integer string.
     """
     var nrows = df.shape()[0]
     if nrows == 0:
         raise Error("loc: DataFrame is empty")
     if len(df._cols) == 0:
         raise Error("loc: DataFrame has no columns")
-    ref idx = df._cols[0]._index
-    if len(idx) > 0:
-        for i in range(len(idx)):
-            if String(idx[i]) == label:
+    var n_idx = df._cols[0]._index_len()
+    if n_idx > 0:
+        for i in range(n_idx):
+            if df._cols[0]._index_label(i) == label:
                 return i
         raise Error("loc: label '" + label + "' not found in index")
     # Default RangeIndex: parse the label as an integer.
