@@ -316,18 +316,18 @@ struct AtIndexer[O: MutOrigin]:
     def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    def __getitem__(self, idx: Tuple[String, String]) raises -> DFScalar:
-        """Return the scalar at row label *idx[0]*, column name *idx[1]*."""
+    def __getitem__(self, row: String, col: String) raises -> DFScalar:
+        """Return the scalar at row label *row*, column name *col*."""
         ref df = self._df[]
-        var row_idx = _df_row_index(df, idx[0])
-        var col_idx = _df_col_index(df, idx[1])
+        var row_idx = _df_row_index(df, row)
+        var col_idx = _df_col_index(df, col)
         return _scalar_from_col(df._cols[col_idx], row_idx)
 
-    def __setitem__(self, idx: Tuple[String, String], value: DFScalar) raises:
-        """Set the scalar at row label *idx[0]*, column name *idx[1]* to *value*."""
+    def __setitem__(self, row: String, col: String, value: DFScalar) raises:
+        """Set the scalar at row label *row*, column name *col* to *value*."""
         ref df = self._df[]
-        var row_idx = _df_row_index(df, idx[0])
-        var col_idx = _df_col_index(df, idx[1])
+        var row_idx = _df_row_index(df, row)
+        var col_idx = _df_col_index(df, col)
         _set_scalar_in_col(df._cols[col_idx], row_idx, value)
 
 
@@ -342,16 +342,12 @@ struct IAtIndexer[O: MutOrigin]:
     def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
         self._df = ptr
 
-    def __getitem__(self, idx: Tuple[Int, Int]) raises -> DFScalar:
-        """Return the scalar at integer row *idx[0]*, column position *idx[1]*."""
+    def __getitem__(self, row: Int, col: Int) raises -> DFScalar:
+        """Return the scalar at integer row *row*, column position *col*."""
         ref df = self._df[]
         var nrows = df.shape()[0]
         var ncols = df.shape()[1]
-        var row = idx[0]
-        var col = idx[1]
-        var r = row
-        if r < 0:
-            r = nrows + r
+        var r = row if row >= 0 else nrows + row
         if r < 0 or r >= nrows:
             raise Error(
                 "iat: row index "
@@ -370,16 +366,12 @@ struct IAtIndexer[O: MutOrigin]:
             )
         return _scalar_from_col(df._cols[col], r)
 
-    def __setitem__(self, idx: Tuple[Int, Int], value: DFScalar) raises:
-        """Set the scalar at integer row *idx[0]*, column position *idx[1]*."""
+    def __setitem__(self, row: Int, col: Int, value: DFScalar) raises:
+        """Set the scalar at integer row *row*, column position *col* to *value*."""
         ref df = self._df[]
         var nrows = df.shape()[0]
         var ncols = df.shape()[1]
-        var row = idx[0]
-        var col = idx[1]
-        var r = row
-        if r < 0:
-            r = nrows + r
+        var r = row if row >= 0 else nrows + row
         if r < 0 or r >= nrows:
             raise Error(
                 "iat: row index "
