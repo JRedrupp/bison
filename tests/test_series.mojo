@@ -175,6 +175,13 @@ def test_iloc() raises:
     assert_equal(s.iloc(2)[Int64], 30)
 
 
+def test_series_scalar_int_coercion() raises:
+    # A plain Int must coerce to SeriesScalar as an Int64 arm (mirrors DFScalar fix).
+    var ss: SeriesScalar = 42
+    assert_true(ss.isa[Int64]())
+    assert_equal(ss[Int64], 42)
+
+
 def test_iloc_negative() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[10, 20, 30]")))
