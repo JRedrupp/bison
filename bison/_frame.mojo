@@ -2,6 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
+from .index import Index, ColumnIndex
 from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -112,8 +113,9 @@ struct Series(Copyable, Movable):
             return SeriesScalar(self._col._data[List[PythonObject]][idx])
 
     def at(self, label: String) raises -> SeriesScalar:
-        for i in range(len(self._col._index)):
-            if String(self._col._index[i]) == label:
+        var n = self._col._index_len()
+        for i in range(n):
+            if self._col._index_label(i) == label:
                 return self.iloc(i)
         raise Error("Series.at: label '" + label + "' not found in index")
 
@@ -279,7 +281,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index.copy()
+        var idx = self._col._index
         if self._col._data.isa[List[Int64]]():
             var fill_val: Int64
             if value.isa[Int64]():
@@ -383,7 +385,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index.copy()
+        var idx = self._col._index
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
             var data = List[Int64]()
@@ -537,7 +539,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index.copy()
+        var idx = self._col._index
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
             var rev_data = List[Int64]()
@@ -872,11 +874,8 @@ struct Series(Copyable, Movable):
             return Series(self._col.copy())
         var perm = self._sort_perm(ascending, na_position == "last")
         var sorted_col = self._col.take(perm)
-        if len(self._col._index) > 0:
-            var new_idx = List[PythonObject]()
-            for k in range(n):
-                new_idx.append(self._col._index[perm[k]])
-            sorted_col._index = new_idx^
+        if self._col._index_len() > 0:
+            sorted_col._index = self._col._index_reorder(perm)
         return Series(sorted_col^)
 
     def sort_index(self, ascending: Bool = True) raises -> Series:
@@ -884,50 +883,85 @@ struct Series(Copyable, Movable):
 
         When the Series has a default RangeIndex the data is already ordered
         for ``ascending=True``; ``ascending=False`` reverses it.
-        For explicit index labels, Python comparison is used so any
-        comparable index type (int, float, str) works.
+        For explicit index labels, native comparison is used for string and
+        int64 index arms; Python comparison is used for the PythonObject
+        fallback arm.
         """
         var n = len(self._col)
         if n == 0:
             return Series(self._col.copy())
-        if len(self._col._index) == 0:
+        if self._col._index_len() == 0:
             # Default RangeIndex [0, 1, ..., n-1].
             if not ascending:
                 var rev_perm = List[Int]()
                 for i in range(n):
                     rev_perm.append(n - 1 - i)
                 var sorted_col = self._col.take(rev_perm)
-                var builtins = Python.import_module("builtins")
-                var new_idx = List[PythonObject]()
+                # Materialise the reversed RangeIndex as Int64.
+                var int_idx = List[Int64]()
                 for k in range(n):
-                    new_idx.append(builtins.int(n - 1 - k))
-                sorted_col._index = new_idx^
+                    int_idx.append(Int64(n - 1 - k))
+                sorted_col._index = ColumnIndex(int_idx^)
                 return Series(sorted_col^)
             return Series(self._col.copy())
-        # Sort permutation by index labels via Python comparison.
+        # Sort permutation by index labels.
         var perm = List[Int]()
         for i in range(n):
             perm.append(i)
-        for i in range(1, n):
-            var key = perm[i]
-            var j = i - 1
-            while j >= 0:
-                var prev = perm[j]
-                var do_swap: Bool
-                if ascending:
-                    do_swap = Bool(self._col._index[key] < self._col._index[prev])
-                else:
-                    do_swap = Bool(self._col._index[key] > self._col._index[prev])
-                if not do_swap:
-                    break
-                perm[j + 1] = prev
-                j -= 1
-            perm[j + 1] = key
+        if self._col._index.isa[Index]():
+            ref idx = self._col._index[Index]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap: Bool
+                    if ascending:
+                        do_swap = idx[key] < idx[prev]
+                    else:
+                        do_swap = idx[key] > idx[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._col._index.isa[List[Int64]]():
+            ref idx = self._col._index[List[Int64]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap: Bool
+                    if ascending:
+                        do_swap = idx[key] < idx[prev]
+                    else:
+                        do_swap = idx[key] > idx[prev]
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        else:
+            # PythonObject fallback: use Python comparison.
+            ref idx = self._col._index[List[PythonObject]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap: Bool
+                    if ascending:
+                        do_swap = Bool(idx[key] < idx[prev])
+                    else:
+                        do_swap = Bool(idx[key] > idx[prev])
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
         var sorted_col = self._col.take(perm)
-        var new_idx = List[PythonObject]()
-        for k in range(n):
-            new_idx.append(self._col._index[perm[k]])
-        sorted_col._index = new_idx^
+        sorted_col._index = self._col._index_reorder(perm)
         return Series(sorted_col^)
 
     def argsort(self) raises -> Series:
@@ -951,7 +985,7 @@ struct Series(Copyable, Movable):
                 if self._col._null_mask[i]:
                     has_any_null = True
                     break
-        var idx = self._col._index.copy()
+        var idx = self._col._index
         if not has_any_null:
             var result_data = List[Int64]()
             for i in range(n):
@@ -1054,7 +1088,7 @@ struct Series(Copyable, Movable):
                 for k in range(i, j + 1):
                     ranks[perm[k]] = avg_rank
                 i = j + 1
-        var idx = self._col._index.copy()
+        var idx = self._col._index
         var col = Column(self._col.name, ColumnData(ranks^), float64, idx^)
         # n_non_null < n iff there are nulls — no need to re-scan the mask.
         if n_non_null < n:
@@ -1233,12 +1267,12 @@ struct Series(Copyable, Movable):
         var result = Dict[String, DFScalar]()
         ref col = self._col
         var has_mask = len(col._null_mask) > 0
-        var has_index = len(col._index) > 0
+        var has_index = col._index_len() > 0
         var n = col.__len__()
         if col._data.isa[List[Int64]]():
             ref data = col._data[List[Int64]]
             for i in range(n):
-                var key = String(col._index[i]) if has_index else String(i)
+                var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
                     result[key] = DFScalar(Int64(0))
                 else:
@@ -1247,7 +1281,7 @@ struct Series(Copyable, Movable):
             var nan = Float64(0) / Float64(0)
             ref data = col._data[List[Float64]]
             for i in range(n):
-                var key = String(col._index[i]) if has_index else String(i)
+                var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
                     result[key] = DFScalar(nan)
                 else:
@@ -1255,7 +1289,7 @@ struct Series(Copyable, Movable):
         elif col._data.isa[List[Bool]]():
             ref data = col._data[List[Bool]]
             for i in range(n):
-                var key = String(col._index[i]) if has_index else String(i)
+                var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
                     result[key] = DFScalar(False)
                 else:
@@ -1263,7 +1297,7 @@ struct Series(Copyable, Movable):
         elif col._data.isa[List[String]]():
             ref data = col._data[List[String]]
             for i in range(n):
-                var key = String(col._index[i]) if has_index else String(i)
+                var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
                     result[key] = DFScalar(String(""))
                 else:
@@ -1285,10 +1319,10 @@ struct Series(Copyable, Movable):
         """
         var result = String()
         ref col = self._col
-        var has_index = len(col._index) > 0
+        var has_index = col._index_len() > 0
         var n = col.__len__()
         for i in range(n):
-            var key = String(col._index[i]) if has_index else String(i)
+            var key = col._index_label(i) if has_index else String(i)
             var val = _col_cell_str(col, i)
             result += _csv_quote_field(key, ",") + "," + _csv_quote_field(val, ",") + "\n"
         if len(path) > 0:
@@ -1310,11 +1344,11 @@ struct Series(Copyable, Movable):
         """
         var json_mod = Python.import_module("json")
         ref col = self._col
-        var has_index = len(col._index) > 0
+        var has_index = col._index_len() > 0
         var n = col.__len__()
         var py_dict = Python.evaluate("{}")
         for i in range(n):
-            var key = String(col._index[i]) if has_index else String(i)
+            var key = col._index_label(i) if has_index else String(i)
             py_dict[key] = _col_cell_pyobj(col, i)
         var result = String(json_mod.dumps(py_dict))
         if len(path) > 0:
@@ -2267,7 +2301,7 @@ struct DataFrame(Copyable, Movable):
                             new_mask[k] = False
                     seg_start = j
             var col_data = ColumnData(data^)
-            var new_col = Column(col.name, col_data^, col.dtype, col._index.copy())
+            var new_col = Column(col.name, col_data^, col.dtype, col._index)
             result_cols.append(new_col^)
         return DataFrame(result_cols^)
 
@@ -2309,18 +2343,19 @@ struct DataFrame(Copyable, Movable):
             k -= 1
 
         # Reorder index labels (parallel to the data).
-        var has_index = len(self._cols[0]._index) > 0
-        var new_idx = List[PythonObject]()
+        var has_index = self._cols[0]._index_len() > 0
+        var new_idx: ColumnIndex
         if has_index:
-            for k in range(n_rows):
-                new_idx.append(self._cols[0]._index[perm[k]])
+            new_idx = self._cols[0]._index_reorder(perm)
+        else:
+            new_idx = ColumnIndex(List[PythonObject]())
 
         # Apply permutation to every column.
         var new_cols = List[Column]()
         for i in range(len(self._cols)):
             var taken = self._cols[i].take(perm)
             if has_index:
-                taken._index = new_idx.copy()
+                taken._index = new_idx
             new_cols.append(taken^)
         return DataFrame(new_cols^)
 
@@ -2371,43 +2406,81 @@ struct DataFrame(Copyable, Movable):
             return DataFrame(self._cols.copy())
 
         var perm = List[Int]()
-        if len(self._cols[0]._index) == 0:
+        if self._cols[0]._index_len() == 0:
             # Default RangeIndex — ascending is already sorted.
             if ascending:
                 return DataFrame(self._cols.copy())
             for i in range(n_rows):
                 perm.append(n_rows - 1 - i)
         else:
-            # Explicit index: insertion sort by Python comparison.
+            # Explicit index: insertion sort by native comparison.
             for i in range(n_rows):
                 perm.append(i)
-            for i in range(1, n_rows):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap: Bool
-                    if ascending:
-                        do_swap = Bool(self._cols[0]._index[key] < self._cols[0]._index[prev])
-                    else:
-                        do_swap = Bool(self._cols[0]._index[key] > self._cols[0]._index[prev])
-                    if not do_swap:
-                        break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+            if self._cols[0]._index.isa[Index]():
+                ref idx = self._cols[0]._index[Index]
+                for i in range(1, n_rows):
+                    var key = perm[i]
+                    var j = i - 1
+                    while j >= 0:
+                        var prev = perm[j]
+                        var do_swap: Bool
+                        if ascending:
+                            do_swap = idx[key] < idx[prev]
+                        else:
+                            do_swap = idx[key] > idx[prev]
+                        if not do_swap:
+                            break
+                        perm[j + 1] = prev
+                        j -= 1
+                    perm[j + 1] = key
+            elif self._cols[0]._index.isa[List[Int64]]():
+                ref idx = self._cols[0]._index[List[Int64]]
+                for i in range(1, n_rows):
+                    var key = perm[i]
+                    var j = i - 1
+                    while j >= 0:
+                        var prev = perm[j]
+                        var do_swap: Bool
+                        if ascending:
+                            do_swap = idx[key] < idx[prev]
+                        else:
+                            do_swap = idx[key] > idx[prev]
+                        if not do_swap:
+                            break
+                        perm[j + 1] = prev
+                        j -= 1
+                    perm[j + 1] = key
+            else:
+                # PythonObject fallback.
+                ref idx = self._cols[0]._index[List[PythonObject]]
+                for i in range(1, n_rows):
+                    var key = perm[i]
+                    var j = i - 1
+                    while j >= 0:
+                        var prev = perm[j]
+                        var do_swap: Bool
+                        if ascending:
+                            do_swap = Bool(idx[key] < idx[prev])
+                        else:
+                            do_swap = Bool(idx[key] > idx[prev])
+                        if not do_swap:
+                            break
+                        perm[j + 1] = prev
+                        j -= 1
+                    perm[j + 1] = key
 
         # Reorder index labels and apply permutation to every column.
-        var has_index = len(self._cols[0]._index) > 0
-        var new_idx = List[PythonObject]()
+        var has_index = self._cols[0]._index_len() > 0
+        var new_idx: ColumnIndex
         if has_index:
-            for k in range(n_rows):
-                new_idx.append(self._cols[0]._index[perm[k]])
+            new_idx = self._cols[0]._index_reorder(perm)
+        else:
+            new_idx = ColumnIndex(List[PythonObject]())
         var new_cols = List[Column]()
         for i in range(len(self._cols)):
             var taken = self._cols[i].take(perm)
             if has_index:
-                taken._index = new_idx.copy()
+                taken._index = new_idx
             new_cols.append(taken^)
         return DataFrame(new_cols^)
 
@@ -2423,18 +2496,34 @@ struct DataFrame(Copyable, Movable):
         var ncols = len(self._cols)
         if ncols == 0:
             return DataFrame()
-        var has_index = len(self._cols[0]._index) > 0
+        var n_idx = self._cols[0]._index_len()
+        var has_index = n_idx > 0
         var new_cols = List[Column]()
         if not drop and has_index:
-            # Promote the index to a PythonObject column called "index".
-            var idx_data = List[PythonObject]()
-            for i in range(len(self._cols[0]._index)):
-                idx_data.append(self._cols[0]._index[i])
-            var empty_idx = List[PythonObject]()
-            new_cols.append(Column("index", ColumnData(idx_data^), object_, empty_idx^))
+            # Promote the index to a typed column called "index".
+            var empty_col_idx = ColumnIndex(List[PythonObject]())
+            if self._cols[0]._index.isa[Index]():
+                ref str_idx = self._cols[0]._index[Index]
+                var str_data = List[String]()
+                for i in range(n_idx):
+                    str_data.append(str_idx[i])
+                new_cols.append(Column("index", ColumnData(str_data^), object_, empty_col_idx^))
+            elif self._cols[0]._index.isa[List[Int64]]():
+                ref int_idx = self._cols[0]._index[List[Int64]]
+                var int_data = List[Int64]()
+                for i in range(n_idx):
+                    int_data.append(int_idx[i])
+                new_cols.append(Column("index", ColumnData(int_data^), int64, empty_col_idx^))
+            else:
+                ref obj_idx = self._cols[0]._index[List[PythonObject]]
+                var obj_data = List[PythonObject]()
+                for i in range(n_idx):
+                    obj_data.append(obj_idx[i])
+                var empty2 = ColumnIndex(List[PythonObject]())
+                new_cols.append(Column("index", ColumnData(obj_data^), object_, empty2^))
         for i in range(ncols):
             var c = self._cols[i].copy()
-            c._index = List[PythonObject]()
+            c._index = ColumnIndex(List[PythonObject]())
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
@@ -2462,14 +2551,14 @@ struct DataFrame(Copyable, Movable):
         if key_col_idx == -1:
             raise Error("DataFrame.set_index: column not found: " + key)
         # Extract the key column's values as the new index.
-        var new_idx = self._cols[key_col_idx]._to_pyobj_index()
+        var new_idx = self._cols[key_col_idx]._to_column_index()
         # Build result columns (skip key column when drop=True).
         var new_cols = List[Column]()
         for i in range(len(self._cols)):
             if drop and i == key_col_idx:
                 continue
             var c = self._cols[i].copy()
-            c._index = new_idx.copy()
+            c._index = new_idx
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
@@ -2481,19 +2570,49 @@ struct DataFrame(Copyable, Movable):
         keys are left unchanged.  Both can be applied in the same call.
         """
         var new_cols = List[Column]()
-        var builtins = Python.import_module("builtins")
         for i in range(len(self._cols)):
             var c = self._cols[i].copy()
             if columns:
                 ref col_map = columns.value()
                 if c.name in col_map:
                     c.name = col_map[c.name]
-            if index and len(c._index) > 0:
+            if index and c._index_len() > 0:
                 ref idx_map = index.value()
-                for k in range(len(c._index)):
-                    var lbl = String(c._index[k])
-                    if lbl in idx_map:
-                        c._index[k] = builtins.str(idx_map[lbl])
+                # Rename only supports string index arms natively.  For
+                # other arms fall back to string conversion.
+                var n_idx = c._index_len()
+                if c._index.isa[Index]():
+                    ref old = c._index[Index]
+                    var new_labels = List[String]()
+                    for k in range(n_idx):
+                        var lbl = old[k]
+                        if lbl in idx_map:
+                            new_labels.append(idx_map[lbl])
+                        else:
+                            new_labels.append(lbl)
+                    c._index = ColumnIndex(Index(new_labels^))
+                elif c._index.isa[List[Int64]]():
+                    ref old = c._index[List[Int64]]
+                    var new_ints = List[Int64]()
+                    for k in range(n_idx):
+                        var lbl = String(Int(old[k]))
+                        if lbl in idx_map:
+                            new_ints.append(Int64(atol(idx_map[lbl])))
+                        else:
+                            new_ints.append(old[k])
+                    c._index = ColumnIndex(new_ints^)
+                else:
+                    # PythonObject fallback: stringify labels.
+                    var builtins = Python.import_module("builtins")
+                    ref old = c._index[List[PythonObject]]
+                    var new_objs = List[PythonObject]()
+                    for k in range(n_idx):
+                        var lbl = String(old[k])
+                        if lbl in idx_map:
+                            new_objs.append(builtins.str(idx_map[lbl]))
+                        else:
+                            new_objs.append(old[k])
+                    c._index = ColumnIndex(new_objs^)
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
@@ -2529,9 +2648,9 @@ struct DataFrame(Copyable, Movable):
             for i in range(ncols):
                 col_map[self._cols[i].name] = i
             # Determine the shared index for the result.
-            var shared_idx = List[PythonObject]()
+            var shared_idx = ColumnIndex(List[PythonObject]())
             if ncols > 0:
-                shared_idx = self._cols[0]._index.copy()
+                shared_idx = self._cols[0]._index
             # Infer a common dtype from existing columns for null-fill.
             # If all columns share the same dtype, use it; otherwise fall back
             # to float64 (the widest numeric type).
@@ -2551,13 +2670,13 @@ struct DataFrame(Copyable, Movable):
                 else:
                     # Insert a fill/null column.
                     if fill_value:
-                        var c = Column._fill_scalar(lbl, fill_value.value(), nrows, shared_idx.copy())
+                        var c = Column._fill_scalar(lbl, fill_value.value(), nrows, shared_idx)
                         new_cols.append(c^)
                     else:
                         # Null column: infer dtype from existing columns so
                         # that a frame of all-int64 columns produces an int64
                         # null column rather than float64.
-                        var c = Column._null_column(lbl, inferred_dtype, nrows, shared_idx.copy())
+                        var c = Column._null_column(lbl, inferred_dtype, nrows, shared_idx)
                         new_cols.append(c^)
             return DataFrame(new_cols^)
         else:
@@ -2565,37 +2684,33 @@ struct DataFrame(Copyable, Movable):
             if ncols == 0:
                 return DataFrame()
             var nrows = self.shape()[0]
-            var has_index = len(self._cols[0]._index) > 0
+            var has_index = self._cols[0]._index_len() > 0
             # Build label → row-position map.
             var label_to_row = Dict[String, Int]()
             for i in range(nrows):
-                var key: String
-                if has_index:
-                    key = String(self._cols[0]._index[i])
-                else:
-                    key = String(i)
+                var key = self._cols[0]._index_label(i) if has_index else String(i)
                 label_to_row[key] = i
             # Build the per-output-row index list (row_indices) and new _index.
             var row_indices = List[Int]()
-            var new_pyidx = List[PythonObject]()
-            var builtins = Python.import_module("builtins")
+            var new_str_idx = List[String]()
             for k in range(len(new_labels)):
                 var lbl = new_labels[k]
                 if lbl in label_to_row:
                     var src_row = label_to_row[lbl]
                     row_indices.append(src_row)
                     if has_index:
-                        new_pyidx.append(self._cols[0]._index[src_row])
+                        new_str_idx.append(self._cols[0]._index_label(src_row))
                     else:
-                        new_pyidx.append(builtins.int(src_row))
+                        new_str_idx.append(String(src_row))
                 else:
                     row_indices.append(-1)
-                    new_pyidx.append(builtins.str(lbl))
+                    new_str_idx.append(lbl)
+            var new_col_idx = ColumnIndex(Index(new_str_idx^))
             # Reindex each column.
             var new_cols = List[Column]()
             for i in range(ncols):
                 var c = self._cols[i]._reindex_rows(row_indices, fill_value)
-                c._index = new_pyidx.copy()
+                c._index = new_col_idx
                 new_cols.append(c^)
             return DataFrame(new_cols^)
 
@@ -2653,27 +2768,19 @@ struct DataFrame(Copyable, Movable):
         else:
             # Row drop: match drop_labels against the index.
             var nrows = self.shape()[0]
-            var has_index = ncols > 0 and len(self._cols[0]._index) > 0
+            var has_index = ncols > 0 and self._cols[0]._index_len() > 0
             var drop_set = Dict[String, Bool]()
             for i in range(len(drop_labels)):
                 drop_set[drop_labels[i]] = True
             var keep_indices = List[Int]()
             for i in range(nrows):
-                var key: String
-                if has_index:
-                    key = String(self._cols[0]._index[i])
-                else:
-                    key = String(i)
+                var key = self._cols[0]._index_label(i) if has_index else String(i)
                 if key not in drop_set:
                     keep_indices.append(i)
             # Verify all requested labels were found.
             var found_set = Dict[String, Bool]()
             for i in range(nrows):
-                var key: String
-                if has_index:
-                    key = String(self._cols[0]._index[i])
-                else:
-                    key = String(i)
+                var key = self._cols[0]._index_label(i) if has_index else String(i)
                 if key in drop_set:
                     found_set[key] = True
             for i in range(len(drop_labels)):
@@ -2898,9 +3005,9 @@ struct DataFrame(Copyable, Movable):
             if self._cols[i].name == column:
                 raise Error("DataFrame.insert: column already exists: " + column)
         var nrows = self.shape()[0]
-        var idx = List[PythonObject]()
+        var idx = ColumnIndex(List[PythonObject]())
         if len(self._cols) > 0:
-            idx = self._cols[0]._index.copy()
+            idx = self._cols[0]._index
         var new_col = Column._fill_scalar(column, value, nrows, idx)
         var insert_at = loc
         if insert_at < 0:

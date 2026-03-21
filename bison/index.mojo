@@ -1,5 +1,7 @@
 from std.collections import Set
+from std.python import PythonObject
 from builtin.sort import sort
+from std.utils import Variant
 
 
 struct Index(Copyable, Movable):
@@ -92,3 +94,14 @@ struct RangeIndex:
             + ", stop=" + String(self.stop)
             + ", step=" + String(self.step) + ")"
         )
+
+
+# ColumnIndex is the native row-index storage type for Column.
+#
+# Three active arms:
+#   Index (List[String])  — string labels (most common case)
+#   List[Int64]           — integer labels
+#   List[PythonObject]    — fallback for DatetimeIndex, MultiIndex, etc.
+#                           An *empty* List[PythonObject] means "no explicit
+#                           index" (i.e. a default RangeIndex).
+comptime ColumnIndex = Variant[Index, List[Int64], List[PythonObject]]

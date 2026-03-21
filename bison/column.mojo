@@ -3,6 +3,7 @@ from std.utils import Variant
 from std.memory import bitcast
 from std.collections import Dict, Set
 from math import sqrt, floor
+from .index import Index, ColumnIndex
 from .dtypes import (
     BisonDtype,
     int8, int16, int32, int64,
@@ -1527,16 +1528,18 @@ struct _ValueCountsCountVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 struct _ValueCountsIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Phase 2 of value_counts: builds the typed Python index.
+    """Phase 2 of value_counts: builds the native-typed index.
 
     Given ``sorted_order``, ``unique_keys``, and ``count_vals`` from phase 1,
-    converts string keys back to typed ``PythonObject`` values and accumulates
+    converts string keys back to typed native values and accumulates
     ``result_counts``.  Raises for String/PythonObject arms.
+    Int64 columns produce a List[Int64] index; float64 and bool columns fall
+    back to List[PythonObject] (float values cannot be stored in Index).
     """
     var sorted_order: List[Int]
     var unique_keys: List[String]
     var count_vals: List[Int]
-    var result_idx: List[PythonObject]
+    var result_idx: ColumnIndex
     var result_counts: List[Int64]
 
     def __init__(out self, sorted_order: List[Int], unique_keys: List[String],
@@ -1544,28 +1547,33 @@ struct _ValueCountsIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.sorted_order = sorted_order.copy()
         self.unique_keys = unique_keys.copy()
         self.count_vals = count_vals.copy()
-        self.result_idx = List[PythonObject]()
+        self.result_idx = ColumnIndex(List[PythonObject]())
         self.result_counts = List[Int64]()
 
     def on_int64(mut self, data: List[Int64]) raises:
-        var builtins = Python.import_module("builtins")
+        var int_idx = List[Int64]()
         for i in range(len(self.sorted_order)):
             var si = self.sorted_order[i]
             self.result_counts.append(Int64(self.count_vals[si]))
-            self.result_idx.append(builtins.int(self.unique_keys[si]))
+            int_idx.append(Int64(atol(self.unique_keys[si])))
+        self.result_idx = ColumnIndex(int_idx^)
 
     def on_float64(mut self, data: List[Float64]) raises:
         var builtins = Python.import_module("builtins")
+        var obj_idx = List[PythonObject]()
         for i in range(len(self.sorted_order)):
             var si = self.sorted_order[i]
             self.result_counts.append(Int64(self.count_vals[si]))
-            self.result_idx.append(builtins.float(self.unique_keys[si]))
+            obj_idx.append(builtins.float(self.unique_keys[si]))
+        self.result_idx = ColumnIndex(obj_idx^)
 
     def on_bool(mut self, data: List[Bool]) raises:
+        var obj_idx = List[PythonObject]()
         for i in range(len(self.sorted_order)):
             var si = self.sorted_order[i]
             self.result_counts.append(Int64(self.count_vals[si]))
-            self.result_idx.append(PythonObject(self.unique_keys[si] == "True"))
+            obj_idx.append(PythonObject(self.unique_keys[si] == "True"))
+        self.result_idx = ColumnIndex(obj_idx^)
 
     def on_str(mut self, data: List[String]) raises:
         raise Error("value_counts: unsupported column type")
@@ -1829,7 +1837,7 @@ struct Column(Copyable, Movable, Sized):
     var name: String
     var dtype: BisonDtype
     var _data: ColumnData
-    var _index: List[PythonObject]
+    var _index: ColumnIndex
     var _null_mask: List[Bool]
 
     # ------------------------------------------------------------------
@@ -1841,17 +1849,17 @@ struct Column(Copyable, Movable, Sized):
         self.name  = ""
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
-        self._index = List[PythonObject]()
+        self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
 
     def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype):
         self.name  = name
         self.dtype = dtype
         self._data = data^
-        self._index = List[PythonObject]()
+        self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
 
-    def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: List[PythonObject]):
+    def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: ColumnIndex):
         self.name  = name
         self.dtype = dtype
         self._data = data^
@@ -1860,20 +1868,16 @@ struct Column(Copyable, Movable, Sized):
 
     # ------------------------------------------------------------------
     # Traits
-    # NOTE: List[PythonObject] is NOT ImplicitlyCopyable because
-    # PythonObject does not implement ImplicitlyCopyable.  Any field of
-    # type List[PythonObject] (currently _index) MUST use an explicit
-    # .copy() call here; implicit assignment will not compile.  If you
-    # add more List[PythonObject] fields to Column, remember to copy
-    # them explicitly in __copyinit__ as well.
+    # NOTE: ColumnIndex is a Variant, so it supports implicit copy (unlike the
+    # former List[PythonObject] storage which required explicit .copy() here).
+    # _null_mask: List[Bool] is still explicitly copied below.
     # ------------------------------------------------------------------
 
     def __init__(out self, *, copy: Self):
         self.name  = copy.name
         self.dtype = copy.dtype
         self._data = copy._data
-        # PythonObject is not ImplicitlyCopyable — explicit .copy() required.
-        self._index = copy._index.copy()
+        self._index = copy._index
         self._null_mask = copy._null_mask.copy()
 
     def __init__(out self, *, deinit take: Self):
@@ -1911,11 +1915,55 @@ struct Column(Copyable, Movable, Sized):
         """Return an independent copy of this Column."""
         var visitor = _CopyDataVisitor()
         visit_col_data(visitor, self._data)
-        var idx = self._index.copy()
+        var idx = self._index
         var mask = self._null_mask.copy()
         var col = Column(self.name, visitor^.result, self.dtype, idx^)
         col._null_mask = mask^
         return col^
+
+    # ------------------------------------------------------------------
+    # Index helpers — dispatch-free access to the active ColumnIndex arm
+    # ------------------------------------------------------------------
+
+    def _index_len(self) -> Int:
+        """Return the number of explicit index labels (0 = default RangeIndex)."""
+        if self._index.isa[Index]():
+            return self._index[Index].__len__()
+        elif self._index.isa[List[Int64]]():
+            return len(self._index[List[Int64]])
+        else:
+            return len(self._index[List[PythonObject]])
+
+    def _index_label(self, i: Int) -> String:
+        """Return the index label at position *i* as a String."""
+        if self._index.isa[Index]():
+            return self._index[Index][i]
+        elif self._index.isa[List[Int64]]():
+            return String(Int(self._index[List[Int64]][i]))
+        else:
+            return String(self._index[List[PythonObject]][i])
+
+    def _index_reorder(self, perm: List[Int]) -> ColumnIndex:
+        """Return a new ColumnIndex with labels reordered by *perm*."""
+        var n = len(perm)
+        if self._index.isa[Index]():
+            ref old = self._index[Index]
+            var labels = List[String]()
+            for k in range(n):
+                labels.append(old[perm[k]])
+            return ColumnIndex(Index(labels^))
+        elif self._index.isa[List[Int64]]():
+            ref old = self._index[List[Int64]]
+            var ints = List[Int64]()
+            for k in range(n):
+                ints.append(old[perm[k]])
+            return ColumnIndex(ints^)
+        else:
+            ref old = self._index[List[PythonObject]]
+            var objs = List[PythonObject]()
+            for k in range(n):
+                objs.append(old[perm[k]])
+            return ColumnIndex(objs^)
 
     # ------------------------------------------------------------------
     # Length
@@ -2139,16 +2187,17 @@ struct Column(Copyable, Movable, Sized):
         data.append(self.quantile(0.75))
         data.append(self.max())
 
-        var idx = List[PythonObject]()
-        idx.append(PythonObject("count"))
-        idx.append(PythonObject("mean"))
-        idx.append(PythonObject("std"))
-        idx.append(PythonObject("min"))
-        idx.append(PythonObject("25%"))
-        idx.append(PythonObject("50%"))
-        idx.append(PythonObject("75%"))
-        idx.append(PythonObject("max"))
+        var labels = List[String]()
+        labels.append("count")
+        labels.append("mean")
+        labels.append("std")
+        labels.append("min")
+        labels.append("25%")
+        labels.append("50%")
+        labels.append("75%")
+        labels.append("max")
 
+        var idx = ColumnIndex(Index(labels^))
         return Column(self.name, ColumnData(data^), float64, idx^)
 
     def value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Column:
@@ -2190,7 +2239,7 @@ struct Column(Copyable, Movable, Sized):
         )
         visit_col_data_raises(index_visitor, self._data)
         var result_counts = index_visitor.result_counts.copy()
-        var result_idx = index_visitor.result_idx.copy()
+        var result_idx = index_visitor.result_idx
 
         if normalize:
             var total = Float64(self.count())
@@ -2654,9 +2703,40 @@ struct Column(Copyable, Movable, Sized):
                 + "pass drop=True or use DataFrame.reset_index"
             )
         var c = self.copy()
-        c._index = List[PythonObject]()
+        c._index = ColumnIndex(List[PythonObject]())
         return c^
 
+    def _to_column_index(self) raises -> ColumnIndex:
+        """Extract column values as a ColumnIndex for use as a row index.
+
+        Int64 columns produce a List[Int64] ColumnIndex; String columns produce
+        an Index (List[String]) ColumnIndex; all other types fall back to
+        List[PythonObject] via the _ToPandasVisitor pattern.
+        """
+        var n = len(self)
+        if self._data.isa[List[Int64]]():
+            var int_idx = List[Int64]()
+            ref d = self._data[List[Int64]]
+            for i in range(n):
+                int_idx.append(d[i])
+            return ColumnIndex(int_idx^)
+        elif self._data.isa[List[String]]():
+            var str_idx = List[String]()
+            ref d = self._data[List[String]]
+            for i in range(n):
+                str_idx.append(d[i])
+            return ColumnIndex(Index(str_idx^))
+        else:
+            var py_list = Python.evaluate("[]")
+            var py_none = Python.evaluate("None")
+            var visitor = _ToPandasVisitor(py_list, py_none, self._null_mask)
+            visit_col_data_raises(visitor, self._data)
+            var result = List[PythonObject]()
+            for i in range(n):
+                result.append(py_list[i])
+            return ColumnIndex(result^)
+
+    # Kept for backward compatibility with callers that still need raw PythonObject.
     def _to_pyobj_index(self) raises -> List[PythonObject]:
         """Extract column values as a List[PythonObject] for use as a row index.
 
@@ -3025,10 +3105,48 @@ struct Column(Copyable, Movable, Sized):
         var dtype_str = String(pd_series.dtype)
         var n = Int(pd_series.__len__())
         var py_list = pd_series.tolist()
-        var py_index = pd_series.index.tolist()
-        var idx_list = List[PythonObject]()
-        for i in range(n):
-            idx_list.append(py_index[i])
+        var pd_idx = pd_series.index
+        var py_index = pd_idx.tolist()
+
+        # Detect the pandas index type and convert to the most-native ColumnIndex.
+        var bison_idx: ColumnIndex
+        var idx_class = String(pd_idx.__class__.__name__)
+        var idx_dtype = String(pd_idx.dtype)
+        if idx_class == "RangeIndex":
+            var idx_start = Int(py=pd_idx.start)
+            var idx_stop = Int(py=pd_idx.stop)
+            var idx_step = Int(py=pd_idx.step)
+            if idx_start == 0 and idx_step == 1 and idx_stop == n:
+                # Default 0-based RangeIndex — use empty list (no explicit index).
+                bison_idx = ColumnIndex(List[PythonObject]())
+            else:
+                # Non-default RangeIndex — materialise as Int64.
+                var int_idx = List[Int64]()
+                for i in range(n):
+                    int_idx.append(Int64(idx_start + i * idx_step))
+                bison_idx = ColumnIndex(int_idx^)
+        elif (
+            idx_dtype == "int8"   or idx_dtype == "int16"  or
+            idx_dtype == "int32"  or idx_dtype == "int64"  or
+            idx_dtype == "uint8"  or idx_dtype == "uint16" or
+            idx_dtype == "uint32" or idx_dtype == "uint64"
+        ):
+            var int_idx = List[Int64]()
+            for i in range(n):
+                int_idx.append(Int64(Int(py=py_index[i])))
+            bison_idx = ColumnIndex(int_idx^)
+        elif idx_dtype == "object" and idx_class == "Index":
+            # Treat as a string index (most common object-dtype index).
+            var str_idx = List[String]()
+            for i in range(n):
+                str_idx.append(String(py_index[i]))
+            bison_idx = ColumnIndex(Index(str_idx^))
+        else:
+            # Fallback: keep as PythonObject (DatetimeIndex, Float64Index, …).
+            var obj_idx = List[PythonObject]()
+            for i in range(n):
+                obj_idx.append(py_index[i])
+            bison_idx = ColumnIndex(obj_idx^)
 
         # Build the null mask once, used by every branch below.
         var null_list = pd_series.isna().tolist()
@@ -3062,7 +3180,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(Int64(0))  # placeholder for null
                 else:
                     data.append(Int64(Int(py=py_list[i])))
-            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             return col^
         elif bison_dtype == float64:
@@ -3077,7 +3195,7 @@ struct Column(Copyable, Movable, Sized):
                     var packed = struct_mod.unpack(unpack_fmt, struct_mod.pack(pack_fmt, py_list[i]))
                     var bits = Int64(Int(py=packed[0]))
                     data.append(bitcast[DType.float64](bits))
-            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             return col^
         elif bison_dtype == bool_:
@@ -3087,7 +3205,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(False)  # placeholder for null
                 else:
                     data.append(Bool(py_list[i].__bool__()))
-            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             return col^
         elif dtype_str == "string":
@@ -3097,14 +3215,14 @@ struct Column(Copyable, Movable, Sized):
                     data.append(String(""))  # placeholder for null
                 else:
                     data.append(String(py_list[i]))
-            var col = Column(name, ColumnData(data^), object_, idx_list^)
+            var col = Column(name, ColumnData(data^), object_, bison_idx^)
             col._null_mask = null_mask.copy()
             return col^
         else:
             var data = List[PythonObject]()
             for i in range(n):
                 data.append(py_list[i])
-            var col = Column(name, ColumnData(data^), bison_dtype, idx_list^)
+            var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask^
             return col^
 
@@ -3116,7 +3234,7 @@ struct Column(Copyable, Movable, Sized):
         return visitor.result
 
     @staticmethod
-    def _null_column(name: String, dtype: BisonDtype, n: Int, var index: List[PythonObject]) raises -> Column:
+    def _null_column(name: String, dtype: BisonDtype, n: Int, var index: ColumnIndex) raises -> Column:
         """Create an all-null Column of length *n* with the given *dtype*.
 
         The underlying storage uses the canonical Mojo type for *dtype*
@@ -3153,7 +3271,7 @@ struct Column(Copyable, Movable, Sized):
         return c^
 
     @staticmethod
-    def _fill_scalar(name: String, value: DFScalar, n: Int, index: List[PythonObject]) -> Column:
+    def _fill_scalar(name: String, value: DFScalar, n: Int, index: ColumnIndex) -> Column:
         """Create a Column of length *n* with every element equal to *value*.
 
         The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
@@ -3164,25 +3282,25 @@ struct Column(Copyable, Movable, Sized):
             var data = List[Int64]()
             for i in range(n):
                 data.append(v)
-            return Column(name, ColumnData(data^), int64, index.copy())
+            return Column(name, ColumnData(data^), int64, index)
         elif value.isa[Float64]():
             var v = value[Float64]
             var data = List[Float64]()
             for i in range(n):
                 data.append(v)
-            return Column(name, ColumnData(data^), float64, index.copy())
+            return Column(name, ColumnData(data^), float64, index)
         elif value.isa[Bool]():
             var v = value[Bool]
             var data = List[Bool]()
             for i in range(n):
                 data.append(v)
-            return Column(name, ColumnData(data^), bool_, index.copy())
+            return Column(name, ColumnData(data^), bool_, index)
         else:
             var v = value[String]
             var data = List[String]()
             for i in range(n):
                 data.append(v)
-            return Column(name, ColumnData(data^), object_, index.copy())
+            return Column(name, ColumnData(data^), object_, index)
 
     def to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
@@ -3218,10 +3336,21 @@ struct Column(Copyable, Movable, Sized):
                     dtype_name = "UInt32"
                 else:  # uint64
                     dtype_name = "UInt64"
-        if len(self._index) > 0:
+        var n_idx = self._index_len()
+        if n_idx > 0:
             var idx_py = Python.evaluate("[]")
-            for i in range(len(self._index)):
-                _ = idx_py.append(self._index[i])
+            if self._index.isa[Index]():
+                ref str_idx = self._index[Index]
+                for i in range(n_idx):
+                    _ = idx_py.append(PythonObject(str_idx[i]))
+            elif self._index.isa[List[Int64]]():
+                ref int_idx = self._index[List[Int64]]
+                for i in range(n_idx):
+                    _ = idx_py.append(PythonObject(Int(int_idx[i])))
+            else:
+                ref obj_idx = self._index[List[PythonObject]]
+                for i in range(n_idx):
+                    _ = idx_py.append(obj_idx[i])
             return pd.Series(py_list, name=self.name, dtype=dtype_name, index=idx_py)
         return pd.Series(py_list, name=self.name, dtype=dtype_name)
 
