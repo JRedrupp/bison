@@ -1584,7 +1584,7 @@ comptime _CMP_GT = 4
 comptime _CMP_GE = 5
 
 # Compile-time function type for element-wise Float64 transforms (_apply kernel)
-comptime FloatTransformFn = fn(Float64) -> Float64
+comptime FloatTransformFn = def(Float64) -> Float64
 
 
 # ------------------------------------------------------------------
