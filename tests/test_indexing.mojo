@@ -13,33 +13,33 @@ def test_iat_getitem_int_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    assert_true(iat[(0, 0)][Int64] == 10)
-    assert_true(iat[(1, 0)][Int64] == 20)
-    assert_true(iat[(2, 0)][Int64] == 30)
+    assert_true(iat[0, 0][Int64] == 10)
+    assert_true(iat[1, 0][Int64] == 20)
+    assert_true(iat[2, 0][Int64] == 30)
 
 
 def test_iat_getitem_float_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.5, 2.5]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    assert_true(iat[(0, 0)][Float64] == 1.5)
-    assert_true(iat[(1, 0)][Float64] == 2.5)
+    assert_true(iat[0, 0][Float64] == 1.5)
+    assert_true(iat[1, 0][Float64] == 2.5)
 
 
 def test_iat_getitem_bool_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [True, False]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    assert_true(iat[(0, 0)][Bool] == True)
-    assert_true(iat[(1, 0)][Bool] == False)
+    assert_true(iat[0, 0][Bool] == True)
+    assert_true(iat[1, 0][Bool] == False)
 
 
 def test_iat_getitem_negative_row() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    assert_true(iat[(-1, 0)][Int64] == 3)
-    assert_true(iat[(-3, 0)][Int64] == 1)
+    assert_true(iat[-1, 0][Int64] == 3)
+    assert_true(iat[-3, 0][Int64] == 1)
 
 
 def test_iat_getitem_out_of_bounds_raises() raises:
@@ -48,7 +48,7 @@ def test_iat_getitem_out_of_bounds_raises() raises:
     var iat = IAtIndexer(UnsafePointer(to=df))
     var raised = False
     try:
-        _ = iat[(5, 0)]
+        _ = iat[5, 0]
     except:
         raised = True
     assert_true(raised)
@@ -60,7 +60,7 @@ def test_iat_getitem_bad_col_raises() raises:
     var iat = IAtIndexer(UnsafePointer(to=df))
     var raised = False
     try:
-        _ = iat[(0, 99)]
+        _ = iat[0, 99]
     except:
         raised = True
     assert_true(raised)
@@ -70,7 +70,7 @@ def test_iat_setitem_int_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    iat[(0, 0)] = DFScalar(Int64(99))
+    iat[0, 0] = DFScalar(Int64(99))
     # Mutation propagates to the original DataFrame.
     assert_true(df["a"].iloc(0)[Int64] == 99)
     assert_true(df["a"].iloc(1)[Int64] == 20)
@@ -80,7 +80,7 @@ def test_iat_setitem_float_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.0, 2.0]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    iat[(1, 0)] = DFScalar(Float64(9.9))
+    iat[1, 0] = DFScalar(Float64(9.9))
     assert_true(df["x"].iloc(1)[Float64] == 9.9)
 
 
@@ -88,7 +88,7 @@ def test_iat_setitem_bool_column() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'b': [True, True]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    iat[(0, 0)] = DFScalar(Bool(False))
+    iat[0, 0] = DFScalar(Bool(False))
     assert_true(df["b"].iloc(0)[Bool] == False)
 
 
@@ -96,8 +96,8 @@ def test_iat_setitem_multiple_columns() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var iat = IAtIndexer(UnsafePointer(to=df))
-    iat[(0, 0)] = DFScalar(Int64(10))
-    iat[(1, 1)] = DFScalar(Int64(40))
+    iat[0, 0] = DFScalar(Int64(10))
+    iat[1, 1] = DFScalar(Int64(40))
     assert_true(df["a"].iloc(0)[Int64] == 10)
     assert_true(df["b"].iloc(1)[Int64] == 40)
 
@@ -110,9 +110,9 @@ def test_at_getitem_default_int_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
     var at = AtIndexer(UnsafePointer(to=df))
-    assert_true(at[("0", "a")][Int64] == 10)
-    assert_true(at[("1", "a")][Int64] == 20)
-    assert_true(at[("2", "a")][Int64] == 30)
+    assert_true(at["0", "a"][Int64] == 10)
+    assert_true(at["1", "a"][Int64] == 20)
+    assert_true(at["2", "a"][Int64] == 30)
 
 
 def test_at_getitem_string_index() raises:
@@ -123,8 +123,8 @@ def test_at_getitem_string_index() raises:
     )
     var df = DataFrame(py_df)
     var at = AtIndexer(UnsafePointer(to=df))
-    assert_true(at[("r0", "val")][Int64] == 100)
-    assert_true(at[("r1", "val")][Int64] == 200)
+    assert_true(at["r0", "val"][Int64] == 100)
+    assert_true(at["r1", "val"][Int64] == 200)
 
 
 def test_at_getitem_missing_col_raises() raises:
@@ -133,7 +133,7 @@ def test_at_getitem_missing_col_raises() raises:
     var at = AtIndexer(UnsafePointer(to=df))
     var raised = False
     try:
-        _ = at[("0", "z")]
+        _ = at["0", "z"]
     except:
         raised = True
     assert_true(raised)
@@ -145,7 +145,7 @@ def test_at_getitem_missing_row_raises() raises:
     var at = AtIndexer(UnsafePointer(to=df))
     var raised = False
     try:
-        _ = at[("99", "a")]
+        _ = at["99", "a"]
     except:
         raised = True
     assert_true(raised)
@@ -155,7 +155,7 @@ def test_at_setitem_default_index() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var at = AtIndexer(UnsafePointer(to=df))
-    at[("0", "a")] = DFScalar(Int64(55))
+    at["0", "a"] = DFScalar(Int64(55))
     assert_true(df["a"].iloc(0)[Int64] == 55)
     assert_true(df["a"].iloc(1)[Int64] == 2)
 
@@ -168,7 +168,7 @@ def test_at_setitem_string_index() raises:
     )
     var df = DataFrame(py_df)
     var at = AtIndexer(UnsafePointer(to=df))
-    at[("b", "x")] = DFScalar(Float64(99.0))
+    at["b", "x"] = DFScalar(Float64(99.0))
     assert_true(df["x"].iloc(1)[Float64] == 99.0)
 
 
