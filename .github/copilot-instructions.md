@@ -105,9 +105,9 @@ Use names from the refactoring.guru catalogs:
 
 `SESSION.md` is for Claude's working notes only — it is gitignored and must never be committed.
 
-### Session notes in pull requests
+### IMPORTANT Session notes in pull requests
 
-When opening a pull request, include a `## Session Notes Needing Issues` section at the end of the PR description. List every SESSION.md entry that does **not** already carry an issue annotation (`<!-- #N -->`). Use the full entry text (heading + bullet fields) so the reviewer can create GitHub issues directly from the PR without needing to open the local file.
+When opening a pull request ALWAYS include a `## Session Notes Needing Issues` section at the end of the PR description. List every SESSION.md entry that does **not** already carry an issue annotation (`<!-- #N -->`). Use the full entry text (heading + bullet fields) so the reviewer can create GitHub issues directly from the PR without needing to open the local file.
 
 
 ## Constraints
