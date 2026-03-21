@@ -3191,9 +3191,36 @@ struct Column(Copyable, Movable, Sized):
         var py_none = Python.evaluate("None")
         var visitor = _ToPandasVisitor(py_list, py_none, self._null_mask)
         visit_col_data_raises(visitor, self._data)
+        # Detect integer columns that contain nulls and promote to the
+        # corresponding pandas nullable integer dtype (e.g. "Int64") so that
+        # the None entries in py_list are accepted without raising.
+        var dtype_name = self.dtype.name
+        if self.dtype.is_integer():
+            var has_nulls = False
+            for i in range(len(self._null_mask)):
+                if self._null_mask[i]:
+                    has_nulls = True
+                    break
+            if has_nulls:
+                if dtype_name == "int8":
+                    dtype_name = "Int8"
+                elif dtype_name == "int16":
+                    dtype_name = "Int16"
+                elif dtype_name == "int32":
+                    dtype_name = "Int32"
+                elif dtype_name == "int64":
+                    dtype_name = "Int64"
+                elif dtype_name == "uint8":
+                    dtype_name = "UInt8"
+                elif dtype_name == "uint16":
+                    dtype_name = "UInt16"
+                elif dtype_name == "uint32":
+                    dtype_name = "UInt32"
+                else:  # uint64
+                    dtype_name = "UInt64"
         if len(self._index) > 0:
             var idx_py = Python.evaluate("[]")
             for i in range(len(self._index)):
                 _ = idx_py.append(self._index[i])
-            return pd.Series(py_list, name=self.name, dtype=self.dtype.name, index=idx_py)
-        return pd.Series(py_list, name=self.name, dtype=self.dtype.name)
+            return pd.Series(py_list, name=self.name, dtype=dtype_name, index=idx_py)
+        return pd.Series(py_list, name=self.name, dtype=dtype_name)

@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
 from testing import assert_equal, assert_true, TestSuite
-from bison import DataFrame, Series, Column
+from bison import DataFrame, Series, Column, ColumnData, int64
 
 
 def test_df_from_pandas_preserves_shape() raises:
@@ -145,6 +145,59 @@ def test_float64_bitcast_roundtrip() raises:
         var packed_got = struct_mod.unpack("q", struct_mod.pack("d", data[i]))
         var got_bits = Int64(Int(py=packed_got[0]))
         assert_equal(got_bits, expected_bits)
+
+
+def test_int_column_with_nulls_to_pandas() raises:
+    """Integer Column with null entries must round-trip through to_pandas() without raising.
+
+    When a Column has integer dtype and any _null_mask entries are True,
+    to_pandas() must use the pandas nullable integer dtype (e.g. "Int64")
+    so that None values are accepted.  The resulting pandas Series must
+    expose pd.isna() == True at the null positions and the correct integer
+    values elsewhere.
+    """
+    var pd = Python.import_module("pandas")
+    # Build an int64 Series with a NaN in position 1 (pandas uses Int64 for nullable int).
+    var pd_s = pd.Series(
+        Python.evaluate("[1, None, 3]"),
+        dtype="Int64",
+        name="with_nulls",
+    )
+    var col = Column.from_pandas(pd_s, "with_nulls")
+    # The column must have a null mask with True at index 1.
+    assert_true(col._null_mask[1], "null mask should be True at index 1")
+    # Round-trip back to pandas must not raise.
+    var back = col.to_pandas()
+    # Non-null values must be preserved.
+    assert_equal(Int(py=back[0]), 1)
+    assert_equal(Int(py=back[2]), 3)
+    # Null position must be NA in the result.
+    assert_true(Bool(py=pd.isna(back[1])), "position 1 should be NA after round-trip")
+
+
+def test_int_column_direct_null_mask_to_pandas() raises:
+    """Column constructed directly with an int64 arm and a _null_mask must not raise on to_pandas().
+
+    This covers the code path where a caller builds a Column manually
+    (e.g. from_dict or direct Column(...)) and sets _null_mask instead of
+    going through from_records.
+    """
+    var pd = Python.import_module("pandas")
+    var data = List[Int64]()
+    data.append(10)
+    data.append(0)
+    data.append(30)
+    var col = Column("x", ColumnData(data^), int64)
+    var mask = List[Bool]()
+    mask.append(False)
+    mask.append(True)
+    mask.append(False)
+    col._null_mask = mask^
+    # Must not raise even though dtype is int64 and mask has True entries.
+    var back = col.to_pandas()
+    assert_equal(Int(py=back[0]), 10)
+    assert_equal(Int(py=back[2]), 30)
+    assert_true(Bool(py=pd.isna(back[1])), "position 1 should be NA")
 
 
 def main() raises:
