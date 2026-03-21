@@ -82,16 +82,13 @@ In CI it runs after the test suite and the result is committed back to the branc
 <!-- COMPAT_TABLE_START -->
 | Category | Stubs | Implemented |
 |----------|-------|-------------|
-| DataFrame | 33 | 89 |
-| Series | 7 | 80 |
-| GroupBy (DataFrame) | 16 | 1 |
-| GroupBy (Series) | 15 | 1 |
-| String accessor | 0 | 21 |
-| Datetime accessor | 17 | 1 |
-| Index | 0 | 14 |
-| IO | 7 | 4 |
-| Reshape | 0 | 1 |
-| **Total** | **95** | **212** |
+| DataFrame | 33 | 0 |
+| Series | 7 | 0 |
+| GroupBy (DataFrame) | 16 | 0 |
+| GroupBy (Series) | 15 | 0 |
+| Datetime accessor | 17 | 0 |
+| IO | 7 | 0 |
+| **Total** | **95** | **0** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations
