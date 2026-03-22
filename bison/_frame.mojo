@@ -3607,8 +3607,42 @@ struct DataFrame(Copyable, Movable):
         right_index: Bool = False,
         suffixes: Optional[List[String]] = None,
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.merge")
-        return DataFrame()
+        var left_pd = self.to_pandas()
+        var right_pd = right.to_pandas()
+        var py_none = Python.evaluate("None")
+
+        var py_on: PythonObject = py_none
+        if on:
+            py_on = Python.evaluate("[]")
+            for k in range(len(on.value())):
+                _ = py_on.append(on.value()[k])
+
+        var py_left_on: PythonObject = py_none
+        if left_on:
+            py_left_on = Python.evaluate("[]")
+            for k in range(len(left_on.value())):
+                _ = py_left_on.append(left_on.value()[k])
+
+        var py_right_on: PythonObject = py_none
+        if right_on:
+            py_right_on = Python.evaluate("[]")
+            for k in range(len(right_on.value())):
+                _ = py_right_on.append(right_on.value()[k])
+
+        # Default suffixes match pandas defaults.
+        var py_suf: PythonObject = Python.evaluate("('_x', '_y')")
+        if suffixes:
+            var suf = suffixes.value().copy()
+            var to_tuple = Python.evaluate("lambda a, b: (a, b)")
+            py_suf = to_tuple(suf[0], suf[1])
+
+        var merge_fn = Python.evaluate(
+            "lambda l, r, how, on, lo, ro, li, ri, suf:"
+            " l.merge(r, how=how, on=on, left_on=lo, right_on=ro,"
+            " left_index=li, right_index=ri, suffixes=suf)"
+        )
+        var result = merge_fn(left_pd, right_pd, how, py_on, py_left_on, py_right_on, left_index, right_index, py_suf)
+        return DataFrame.from_pandas(result)
 
     def join(
         self,
@@ -3619,12 +3653,31 @@ struct DataFrame(Copyable, Movable):
         rsuffix: String = "",
         sort: Bool = False,
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.join")
-        return DataFrame()
+        var left_pd = self.to_pandas()
+        var other_pd = other.to_pandas()
+        var py_none = Python.evaluate("None")
+
+        var py_on: PythonObject = py_none
+        if on:
+            py_on = Python.evaluate("[]")
+            for k in range(len(on.value())):
+                _ = py_on.append(on.value()[k])
+
+        var join_fn = Python.evaluate(
+            "lambda l, r, on, how, lsuf, rsuf, sort:"
+            " l.join(r, on=on, how=how, lsuffix=lsuf, rsuffix=rsuf, sort=sort)"
+        )
+        var result = join_fn(left_pd, other_pd, py_on, how, lsuffix, rsuffix, sort)
+        return DataFrame.from_pandas(result)
 
     def append(self, other: DataFrame, ignore_index: Bool = False) raises -> DataFrame:
-        _not_implemented("DataFrame.append")
-        return DataFrame()
+        var pd = Python.import_module("pandas")
+        var py_list = Python.evaluate("[]")
+        _ = py_list.append(self.to_pandas())
+        _ = py_list.append(other.to_pandas())
+        var concat_fn = Python.evaluate("lambda frames, ig: __import__('pandas').concat(frames, ignore_index=ig)")
+        var result = concat_fn(py_list, ignore_index)
+        return DataFrame.from_pandas(result)
 
     # ------------------------------------------------------------------
     # GroupBy
