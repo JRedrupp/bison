@@ -2086,8 +2086,10 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def abs(self) raises -> DataFrame:
-        _not_implemented("DataFrame.abs")
-        return DataFrame()
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i]._abs())
+        return DataFrame(result_cols^)
 
     def cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis != 0:
@@ -2162,14 +2164,41 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     def agg(self, func: String, axis: Int = 0) raises -> Series:
-        _not_implemented("DataFrame.agg")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.agg")
+        if func == "sum":
+            return self.sum()
+        elif func == "mean":
+            return self.mean()
+        elif func == "median":
+            return self.median()
+        elif func == "min":
+            return self.min()
+        elif func == "max":
+            return self.max()
+        elif func == "std":
+            return self.std()
+        elif func == "var":
+            return self.var()
+        elif func == "count":
+            return self.count()
+        elif func == "nunique":
+            return self.nunique()
+        else:
+            raise Error(
+                "DataFrame.agg: unsupported aggregation '" + func
+                + "'. Supported: sum, mean, median, min, max, std, var, count, nunique"
+            )
 
     def aggregate(self, func: String, axis: Int = 0) raises -> Series:
-        _not_implemented("DataFrame.aggregate")
-        return Series()
+        return self.agg(func, axis)
 
     def apply(self, func: String, axis: Int = 0) raises -> DataFrame:
+        if axis == 0:
+            raise Error(
+                "DataFrame.apply: axis=0 string aggregation returns a Series — "
+                "use DataFrame.agg(func) instead"
+            )
         _not_implemented("DataFrame.apply")
         return DataFrame()
 
@@ -2178,16 +2207,36 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     def transform(self, func: String, axis: Int = 0) raises -> DataFrame:
+        if axis != 0:
+            _not_implemented("DataFrame.transform")
+        if func == "abs":
+            return self.abs()
         _not_implemented("DataFrame.transform")
         return DataFrame()
 
     def eval(self, expr: String) raises -> Series:
-        _not_implemented("DataFrame.eval")
-        return Series()
+        var pd_df = self.to_pandas()
+        # Use module-level pd.eval() with an explicit local_dict so that pandas
+        # skips its sys._getframe() caller-scope resolution, which fails when
+        # called from Mojo's shallow Python call stack.
+        var eval_fn = Python.evaluate(
+            "lambda df, e: __import__('pandas').eval("
+            "e, local_dict={c: df[c] for c in df.columns}, engine='python')"
+        )
+        var result = eval_fn(pd_df, expr)
+        return Series.from_pandas(result)
 
     def query(self, expr: String) raises -> DataFrame:
-        _not_implemented("DataFrame.query")
-        return DataFrame()
+        var pd_df = self.to_pandas()
+        # Filter via module-level pd.eval() with explicit local_dict to avoid
+        # sys._getframe() failures when called from Mojo's shallow call stack.
+        var query_fn = Python.evaluate(
+            "lambda df, e: df.loc["
+            "__import__('pandas').eval("
+            "e, local_dict={c: df[c] for c in df.columns}, engine='python')]"
+        )
+        var result = query_fn(pd_df, expr)
+        return DataFrame.from_pandas(result)
 
     def pipe(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
