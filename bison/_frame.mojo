@@ -1858,7 +1858,7 @@ struct DataFrame(Copyable, Movable):
 
     def sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.sum: axis=1 not yet implemented")
+            _not_implemented("DataFrame.sum")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].sum(skipna))
@@ -1869,7 +1869,7 @@ struct DataFrame(Copyable, Movable):
 
     def mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.mean: axis=1 not yet implemented")
+            _not_implemented("DataFrame.mean")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].mean(skipna))
@@ -1880,7 +1880,7 @@ struct DataFrame(Copyable, Movable):
 
     def median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.median: axis=1 not yet implemented")
+            _not_implemented("DataFrame.median")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].median(skipna))
@@ -1891,7 +1891,7 @@ struct DataFrame(Copyable, Movable):
 
     def min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.min: axis=1 not yet implemented")
+            _not_implemented("DataFrame.min")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].min(skipna))
@@ -1902,7 +1902,7 @@ struct DataFrame(Copyable, Movable):
 
     def max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.max: axis=1 not yet implemented")
+            _not_implemented("DataFrame.max")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].max(skipna))
@@ -1913,7 +1913,7 @@ struct DataFrame(Copyable, Movable):
 
     def std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.std: axis=1 not yet implemented")
+            _not_implemented("DataFrame.std")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].std(ddof, skipna))
@@ -1924,7 +1924,7 @@ struct DataFrame(Copyable, Movable):
 
     def var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.var: axis=1 not yet implemented")
+            _not_implemented("DataFrame.var")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].var(ddof, skipna))
@@ -1935,7 +1935,7 @@ struct DataFrame(Copyable, Movable):
 
     def count(self, axis: Int = 0) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.count: axis=1 not yet implemented")
+            _not_implemented("DataFrame.count")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(Float64(self._cols[i].count()))
@@ -1946,7 +1946,7 @@ struct DataFrame(Copyable, Movable):
 
     def nunique(self, axis: Int = 0) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.nunique: axis=1 not yet implemented")
+            _not_implemented("DataFrame.nunique")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(Float64(self._cols[i].nunique()))
@@ -1961,7 +1961,7 @@ struct DataFrame(Copyable, Movable):
 
     def quantile(self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
-            raise Error("DataFrame.quantile: axis=1 not yet implemented")
+            _not_implemented("DataFrame.quantile")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].quantile(q, skipna))
@@ -1976,7 +1976,7 @@ struct DataFrame(Copyable, Movable):
 
     def cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis != 0:
-            raise Error("DataFrame.cumsum: axis=1 not yet implemented")
+            _not_implemented("DataFrame.cumsum")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cumsum(skipna))
@@ -1984,7 +1984,7 @@ struct DataFrame(Copyable, Movable):
 
     def cumprod(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis != 0:
-            raise Error("DataFrame.cumprod: axis=1 not yet implemented")
+            _not_implemented("DataFrame.cumprod")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cumprod(skipna))
@@ -1992,7 +1992,7 @@ struct DataFrame(Copyable, Movable):
 
     def cummin(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis != 0:
-            raise Error("DataFrame.cummin: axis=1 not yet implemented")
+            _not_implemented("DataFrame.cummin")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cummin(skipna))
@@ -2000,7 +2000,7 @@ struct DataFrame(Copyable, Movable):
 
     def cummax(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis != 0:
-            raise Error("DataFrame.cummax: axis=1 not yet implemented")
+            _not_implemented("DataFrame.cummax")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cummax(skipna))
