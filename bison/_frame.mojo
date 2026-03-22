@@ -3097,7 +3097,6 @@ struct DataFrame(Copyable, Movable):
                     val_names.append(self._cols[j].name)
 
         var n_val = len(val_names)
-        var n_out = nrows * n_val
         var result_cols = List[Column]()
 
         # ID columns: repeat each id column n_val times (interleaved by row).
