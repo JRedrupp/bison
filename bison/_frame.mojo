@@ -1375,6 +1375,41 @@ struct Series(Copyable, Movable):
 # Shared string-list utilities
 # ------------------------------------------------------------------
 
+def _frame_cell_as_python(col: Column, row: Int, py_none: PythonObject) raises -> PythonObject:
+    """Return the value at *row* in *col* as a PythonObject.
+
+    Null cells return *py_none*.  Used by the native reshaping methods
+    (transpose, melt, pivot, stack, explode) to avoid repeated isa chains.
+    """
+    if col._data.isa[List[Int64]]():
+        return PythonObject(Int(col._data[List[Int64]][row]))
+    elif col._data.isa[List[Float64]]():
+        return PythonObject(col._data[List[Float64]][row])
+    elif col._data.isa[List[Bool]]():
+        return PythonObject(col._data[List[Bool]][row])
+    elif col._data.isa[List[String]]():
+        return PythonObject(col._data[List[String]][row])
+    else:
+        return col._data[List[PythonObject]][row]
+
+
+def _frame_cell_as_str(col: Column, row: Int) raises -> String:
+    """Return the value at *row* in *col* as a String key.
+
+    Used by ``DataFrame.pivot`` to build row/column key dictionaries.
+    """
+    if col._data.isa[List[Int64]]():
+        return String(Int(col._data[List[Int64]][row]))
+    elif col._data.isa[List[Float64]]():
+        return String(col._data[List[Float64]][row])
+    elif col._data.isa[List[Bool]]():
+        return String("True") if col._data[List[Bool]][row] else String("False")
+    elif col._data.isa[List[String]]():
+        return col._data[List[String]][row]
+    else:
+        return String(col._data[List[PythonObject]][row])
+
+
 def _sort_col_names(names: List[String]) -> List[String]:
     """Return a copy of *names* sorted in ascending order (selection sort)."""
     var n = len(names)
@@ -2929,40 +2964,393 @@ struct DataFrame(Copyable, Movable):
         return Series(col^)
 
     def pivot(self, index: String = "", columns: String = "", values: String = "") raises -> DataFrame:
-        _not_implemented("DataFrame.pivot")
-        return DataFrame()
+        """Reshape from long to wide format.
+
+        Each unique value in *index* becomes a row, each unique value in
+        *columns* becomes a column, and the corresponding *values* cell fills
+        each intersection.  Missing intersections are ``None`` / null.
+        Raises if *index*, *columns*, or *values* is not a column name, or if
+        any (index, columns) pair appears more than once.
+        """
+        # Locate the three columns.
+        var idx_ci = -1
+        var col_ci = -1
+        var val_ci = -1
+        for j in range(len(self._cols)):
+            if self._cols[j].name == index:
+                idx_ci = j
+            if self._cols[j].name == columns:
+                col_ci = j
+            if self._cols[j].name == values:
+                val_ci = j
+        if idx_ci == -1:
+            raise Error("DataFrame.pivot: index column not found: " + index)
+        if col_ci == -1:
+            raise Error("DataFrame.pivot: columns column not found: " + columns)
+        if val_ci == -1:
+            raise Error("DataFrame.pivot: values column not found: " + values)
+
+        var nrows = self.shape()[0]
+        var py_none = Python.evaluate("None")
+
+        # Collect unique row-keys (preserve insertion order).
+        var row_keys = List[String]()
+        var seen_rows = Dict[String, Int]()
+        for r in range(nrows):
+            var k = _frame_cell_as_str(self._cols[idx_ci], r)
+            if k not in seen_rows:
+                seen_rows[k] = len(row_keys)
+                row_keys.append(k)
+
+        # Collect unique column-keys (preserve insertion order).
+        var col_keys = List[String]()
+        var seen_cols = Dict[String, Int]()
+        for r in range(nrows):
+            var k = _frame_cell_as_str(self._cols[col_ci], r)
+            if k not in seen_cols:
+                seen_cols[k] = len(col_keys)
+                col_keys.append(k)
+
+        var n_rk = len(row_keys)
+        var n_ck = len(col_keys)
+
+        # Build a dense values table (row_key × col_key).
+        # _table[rk][ck] holds a PythonObject value or py_none.
+        # We also track which cells were filled to detect duplicates.
+        var table = List[List[PythonObject]]()
+        var filled = List[List[Bool]]()
+        for rk in range(n_rk):
+            var row_data = List[PythonObject]()
+            var row_filled = List[Bool]()
+            for ck in range(n_ck):
+                row_data.append(py_none)
+                row_filled.append(False)
+            table.append(row_data^)
+            filled.append(row_filled^)
+
+        for r in range(nrows):
+            var rk = seen_rows[_frame_cell_as_str(self._cols[idx_ci], r)]
+            var ck = seen_cols[_frame_cell_as_str(self._cols[col_ci], r)]
+            if filled[rk][ck]:
+                raise Error("DataFrame.pivot: duplicate entry for (" +
+                            row_keys[rk] + ", " + col_keys[ck] + ")")
+            table[rk][ck] = _frame_cell_as_python(self._cols[val_ci], r, py_none)
+            filled[rk][ck] = True
+
+        # Construct index labels (string Index) shared by all result columns.
+        var result_idx = ColumnIndex(Index(row_keys^))
+
+        # Build one output Column per col_key.
+        var result_cols = List[Column]()
+        for ck in range(n_ck):
+            var data = List[PythonObject]()
+            var null_mask = List[Bool]()
+            var any_null = False
+            for rk in range(n_rk):
+                if not filled[rk][ck]:
+                    data.append(py_none)
+                    null_mask.append(True)
+                    any_null = True
+                else:
+                    data.append(table[rk][ck])
+                    null_mask.append(False)
+            var col = Column(col_keys[ck], ColumnData(data^), object_)
+            col._index = result_idx
+            if any_null:
+                col._null_mask = null_mask^
+            result_cols.append(col^)
+
+        return DataFrame(result_cols^)
 
     def pivot_table(self, values: Optional[List[String]] = None, index: Optional[List[String]] = None, columns: Optional[List[String]] = None, aggfunc: String = "mean") raises -> DataFrame:
         _not_implemented("DataFrame.pivot_table")
         return DataFrame()
 
     def melt(self, id_vars: Optional[List[String]] = None, value_vars: Optional[List[String]] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
-        _not_implemented("DataFrame.melt")
-        return DataFrame()
+        """Unpivot a DataFrame from wide to long format.
+
+        *id_vars*: columns to keep as identifier variables (repeated).
+        *value_vars*: columns to unpivot into rows (default: all non-id cols).
+        *var_name*: name for the new column holding original column names.
+        *value_name*: name for the new column holding the cell values.
+        """
+        var nrows = self.shape()[0]
+        var py_none = Python.evaluate("None")
+
+        # Resolve id_vars.
+        var id_names = List[String]()
+        if id_vars:
+            id_names = id_vars.value().copy()
+
+        # Resolve value_vars (all non-id columns by default).
+        var val_names = List[String]()
+        if value_vars:
+            val_names = value_vars.value().copy()
+        else:
+            for j in range(len(self._cols)):
+                var in_id = False
+                for k in range(len(id_names)):
+                    if self._cols[j].name == id_names[k]:
+                        in_id = True
+                        break
+                if not in_id:
+                    val_names.append(self._cols[j].name)
+
+        var n_val = len(val_names)
+        var n_out = nrows * n_val
+        var result_cols = List[Column]()
+
+        # ID columns: repeat each id column n_val times (interleaved by row).
+        for k in range(len(id_names)):
+            var id_ci = -1
+            for j in range(len(self._cols)):
+                if self._cols[j].name == id_names[k]:
+                    id_ci = j
+                    break
+            if id_ci == -1:
+                raise Error("DataFrame.melt: id column not found: " + id_names[k])
+            var indices = List[Int]()
+            for v in range(n_val):
+                for r in range(nrows):
+                    indices.append(r)
+            var new_col = self._cols[id_ci].take(indices)
+            new_col.name = id_names[k]
+            new_col._index = ColumnIndex(List[PythonObject]())
+            result_cols.append(new_col^)
+
+        # Variable column: for each value column, repeat its name nrows times.
+        var var_data = List[String]()
+        for v in range(n_val):
+            for r in range(nrows):
+                var_data.append(val_names[v])
+        result_cols.append(Column(var_name, ColumnData(var_data^), object_))
+
+        # Value column: concat all value columns row-by-row.
+        var val_data = List[PythonObject]()
+        var val_null_mask = List[Bool]()
+        var any_null = False
+        for v in range(n_val):
+            var val_ci = -1
+            for j in range(len(self._cols)):
+                if self._cols[j].name == val_names[v]:
+                    val_ci = j
+                    break
+            if val_ci == -1:
+                raise Error("DataFrame.melt: value column not found: " + val_names[v])
+            ref vcol = self._cols[val_ci]
+            for r in range(nrows):
+                var is_null = (len(vcol._null_mask) > 0 and vcol._null_mask[r])
+                if is_null:
+                    val_data.append(py_none)
+                    val_null_mask.append(True)
+                    any_null = True
+                else:
+                    val_null_mask.append(False)
+                    val_data.append(_frame_cell_as_python(vcol, r, py_none))
+        var val_col = Column(value_name, ColumnData(val_data^), object_)
+        if any_null:
+            val_col._null_mask = val_null_mask^
+        result_cols.append(val_col^)
+
+        return DataFrame(result_cols^)
 
     def stack(self, level: Int = -1) raises -> Series:
-        _not_implemented("DataFrame.stack")
-        return Series()
+        """Pivot column labels to the innermost row index level.
+
+        Returns a Series whose index is a MultiIndex of
+        (original_row_label, column_name) tuples.  All cell values are
+        converted to Python objects, so the result uses ``object`` dtype.
+        Only level=-1 (the default, single column level) is supported.
+        """
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return Series()
+        var nrows = self.shape()[0]
+        var py = Python.import_module("builtins")
+        var py_none = Python.evaluate("None")
+
+        var val_data = List[PythonObject]()
+        var null_mask = List[Bool]()
+        var idx_objs = List[PythonObject]()
+        var any_null = False
+
+        for r in range(nrows):
+            # Determine row label.
+            var row_label: PythonObject
+            if self._cols[0]._index_len() > 0:
+                row_label = PythonObject(self._cols[0]._index_label(r))
+            else:
+                row_label = PythonObject(r)
+            for j in range(ncols):
+                ref col = self._cols[j]
+                var is_null = (len(col._null_mask) > 0 and col._null_mask[r])
+                var tup_items = py.list()
+                _ = tup_items.append(row_label)
+                _ = tup_items.append(PythonObject(col.name))
+                var tup = py.tuple(tup_items)
+                idx_objs.append(tup)
+                if is_null:
+                    val_data.append(py_none)
+                    null_mask.append(True)
+                    any_null = True
+                else:
+                    null_mask.append(False)
+                    val_data.append(_frame_cell_as_python(col, r, py_none))
+
+        var result_col = Column("", ColumnData(val_data^), object_,
+                                ColumnIndex(idx_objs^))
+        if any_null:
+            result_col._null_mask = null_mask^
+        return Series(result_col^)
 
     def unstack(self, level: Int = -1) raises -> DataFrame:
         _not_implemented("DataFrame.unstack")
         return DataFrame()
 
     def transpose(self) raises -> DataFrame:
-        _not_implemented("DataFrame.transpose")
-        return DataFrame()
+        """Transpose rows and columns.
+
+        Returns a new DataFrame where each original column becomes a row and
+        each original row becomes a column.  Because rows may contain mixed
+        types the result always uses ``object`` dtype.  Column names of the
+        result are the original row-index labels; the row index of the result
+        holds the original column names.
+        """
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return DataFrame()
+        var nrows = self.shape()[0]
+        var py_none = Python.evaluate("None")
+
+        # Index shared by all result columns: the original column names.
+        var orig_col_names = List[String]()
+        for j in range(ncols):
+            orig_col_names.append(self._cols[j].name)
+        var shared_idx = ColumnIndex(Index(orig_col_names^))
+
+        var result_cols = List[Column]()
+        for r in range(nrows):
+            # Result column name = original row-index label.
+            var col_name: String
+            if self._cols[0]._index_len() > 0:
+                col_name = self._cols[0]._index_label(r)
+            else:
+                col_name = String(r)
+
+            var data = List[PythonObject]()
+            var null_mask = List[Bool]()
+            var any_null = False
+            for j in range(ncols):
+                ref col = self._cols[j]
+                var is_null = (len(col._null_mask) > 0 and col._null_mask[r])
+                if is_null:
+                    data.append(py_none)
+                    null_mask.append(True)
+                    any_null = True
+                else:
+                    null_mask.append(False)
+                    data.append(_frame_cell_as_python(col, r, py_none))
+
+            var new_col = Column(col_name, ColumnData(data^), object_)
+            new_col._index = shared_idx
+            if any_null:
+                new_col._null_mask = null_mask^
+            result_cols.append(new_col^)
+
+        return DataFrame(result_cols^)
 
     def T(self) raises -> DataFrame:
-        _not_implemented("DataFrame.T")
-        return DataFrame()
+        """Transpose rows and columns (alias for ``transpose()``)."""
+        return self.transpose()
 
     def swaplevel(self, i: Int = -2, j: Int = -1, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.swaplevel")
         return DataFrame()
 
     def explode(self, column: String) raises -> DataFrame:
-        _not_implemented("DataFrame.explode")
-        return DataFrame()
+        """Expand list-like values in *column* into separate rows.
+
+        Each element of a list-like cell in *column* becomes its own row.
+        All other columns have their values repeated once per element.
+        Scalar (non-list) cells in *column* are kept as single rows.
+        """
+        var col_ci = -1
+        for j in range(len(self._cols)):
+            if self._cols[j].name == column:
+                col_ci = j
+                break
+        if col_ci == -1:
+            raise Error("DataFrame.explode: column not found: " + column)
+
+        var nrows = self.shape()[0]
+        var py = Python.import_module("builtins")
+        var py_none = Python.evaluate("None")
+
+        # First pass: build the expanded row indices and sub-indices.
+        # For each original row r: if cell is list-like, expand; else keep once.
+        var src_indices = List[Int]()   # source row for each output row
+        var sub_indices = List[Int]()   # position within expanded cell (-1 = scalar)
+        ref exp_col = self._cols[col_ci]
+        for r in range(nrows):
+            var is_null = (len(exp_col._null_mask) > 0 and exp_col._null_mask[r])
+            if is_null:
+                src_indices.append(r)
+                sub_indices.append(-1)
+                continue
+            # Try to treat the cell as an iterable list.
+            var expanded = False
+            if exp_col._data.isa[List[PythonObject]]():
+                var cell = exp_col._data[List[PythonObject]][r]
+                try:
+                    var cell_len = Int(cell.__len__())
+                    for sub in range(cell_len):
+                        src_indices.append(r)
+                        sub_indices.append(sub)
+                    expanded = True
+                except:
+                    pass
+            if not expanded:
+                src_indices.append(r)
+                sub_indices.append(-1)
+
+        var n_out = len(src_indices)
+
+        # Build each output column.
+        var result_cols = List[Column]()
+        for j in range(len(self._cols)):
+            if j == col_ci:
+                # The explode column: pull individual elements for list rows.
+                var data = List[PythonObject]()
+                var null_mask = List[Bool]()
+                var any_null = False
+                for k in range(n_out):
+                    var r = src_indices[k]
+                    var sub = sub_indices[k]
+                    var is_null = (len(exp_col._null_mask) > 0 and exp_col._null_mask[r])
+                    if is_null:
+                        data.append(py_none)
+                        null_mask.append(True)
+                        any_null = True
+                    elif sub == -1:
+                        # Scalar: keep value as-is.
+                        data.append(_frame_cell_as_python(exp_col, r, py_none))
+                        null_mask.append(False)
+                    else:
+                        # List element.
+                        var cell = exp_col._data[List[PythonObject]][r]
+                        data.append(cell[sub])
+                        null_mask.append(False)
+                var new_col = Column(column, ColumnData(data^), object_)
+                if any_null:
+                    new_col._null_mask = null_mask^
+                result_cols.append(new_col^)
+            else:
+                # Other columns: repeat values by source row index.
+                var new_col = self._cols[j].take(src_indices)
+                new_col._index = ColumnIndex(List[PythonObject]())
+                result_cols.append(new_col^)
+
+        return DataFrame(result_cols^)
 
     def clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> DataFrame:
         """Clamp numeric column values to [lower, upper].

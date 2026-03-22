@@ -139,37 +139,93 @@ def test_sort_index_axis1_single_column() raises:
     assert_true(r["z"].iloc(0)[Int64] == 10)
 
 
-def test_pivot_stub() raises:
+def test_pivot_basic() raises:
+    # long format: rows=date, cols=city, vals=temperature
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2], 'c': [3]}")))
+    var df = DataFrame(pd.DataFrame(Python.evaluate(
+        "{'date': ['2020-01-01', '2020-01-01', '2020-01-02', '2020-01-02'],"
+        " 'city': ['NYC', 'LA', 'NYC', 'LA'],"
+        " 'temp': [32, 75, 28, 70]}"
+    )))
+    var r = df.pivot(index="date", columns="city", values="temp")
+    # Two columns: LA and NYC (insertion order).
+    assert_equal(r.shape()[0], 2)  # two unique dates
+    assert_equal(r.shape()[1], 2)  # two unique cities
+    # NYC on 2020-01-01 = 32, on 2020-01-02 = 28
+    var nyc = r["NYC"]
+    assert_true(Bool(nyc.iloc(0)[PythonObject] == 32))
+    assert_true(Bool(nyc.iloc(1)[PythonObject] == 28))
+
+
+def test_pivot_duplicate_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate(
+        "{'idx': ['a', 'a'], 'col': ['x', 'x'], 'val': [1, 2]}"
+    )))
     var raised = False
     try:
-        _ = df.pivot(index="a", columns="b", values="c")
+        _ = df.pivot(index="idx", columns="col", values="val")
     except:
         raised = True
     assert_true(raised)
 
 
-def test_melt_stub() raises:
+def test_melt_no_id_vars() raises:
+    # All columns become value_vars when id_vars is empty.
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'id': [1], 'val': [10]}")))
-    var raised = False
-    try:
-        _ = df.melt()
-    except:
-        raised = True
-    assert_true(raised)
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r = df.melt()
+    # 2 cols × 2 rows = 4 rows; columns: "variable" and "value"
+    assert_equal(r.shape()[0], 4)
+    assert_equal(r.shape()[1], 2)
 
 
-def test_transpose_stub() raises:
+def test_melt_with_id_vars() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var raised = False
-    try:
-        _ = df.transpose()
-    except:
-        raised = True
-    assert_true(raised)
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'id': [1, 2], 'a': [10, 20], 'b': [30, 40]}")))
+    var id_v = List[String]()
+    id_v.append("id")
+    var r = df.melt(id_vars=Optional[List[String]](id_v^))
+    # 2 value cols × 2 rows = 4 rows; 3 cols (id, variable, value)
+    assert_equal(r.shape()[0], 4)
+    assert_equal(r.shape()[1], 3)
+    # id column retains its original int64 dtype; values are [1, 2, 1, 2]
+    assert_true(r["id"].iloc(0)[Int64] == 1)
+    assert_true(r["id"].iloc(1)[Int64] == 2)
+    assert_true(r["id"].iloc(2)[Int64] == 1)
+    assert_true(r["id"].iloc(3)[Int64] == 2)
+
+
+def test_transpose_shape() raises:
+    # A 3-row × 2-col DataFrame transposes to 2 rows × 3 cols.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
+    var r = df.transpose()
+    assert_equal(r.shape()[0], 2)  # 2 rows (one per original column)
+    assert_equal(r.shape()[1], 3)  # 3 columns (one per original row)
+
+
+def test_transpose_values() raises:
+    # Values at each position are correct.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
+    var r = df.transpose()
+    # Original col 'x' becomes row 0 in result; col 'y' becomes row 1.
+    # Original row 0 (10, 30) becomes result col '0'; row 1 (20, 40) → col '1'.
+    assert_true(Bool(r["0"].iloc(0)[PythonObject] == 10))  # x, row 0
+    assert_true(Bool(r["0"].iloc(1)[PythonObject] == 30))  # y, row 0
+    assert_true(Bool(r["1"].iloc(0)[PythonObject] == 20))  # x, row 1
+    assert_true(Bool(r["1"].iloc(1)[PythonObject] == 40))  # y, row 1
+
+
+def test_T_alias() raises:
+    # T() is an alias for transpose().
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r1 = df.transpose()
+    var r2 = df.T()
+    assert_equal(r1.shape()[0], r2.shape()[0])
+    assert_equal(r1.shape()[1], r2.shape()[1])
 
 
 def test_drop_duplicates_removes_duplicates() raises:
@@ -518,6 +574,55 @@ def test_reindex_axis0_obj_null_propagation() raises:
     assert_true(String(r["a"].iloc(0)[PythonObject]) == "y")
     # row that was null in the source should still be null
     assert_true(r["a"].isna().iloc(1)[Bool] == True)
+
+
+def test_stack_shape() raises:
+    # A 2×3 DataFrame stacks to a Series of length 6.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4], 'c': [5, 6]}")))
+    var s = df.stack()
+    assert_equal(s.shape()[0], 6)
+
+
+def test_stack_values() raises:
+    # Values should be row-major: row0/col0, row0/col1, row1/col0, row1/col1.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
+    var s = df.stack()
+    assert_equal(s.shape()[0], 4)
+    assert_true(Bool(s.iloc(0)[PythonObject] == 10))
+    assert_true(Bool(s.iloc(1)[PythonObject] == 30))
+    assert_true(Bool(s.iloc(2)[PythonObject] == 20))
+    assert_true(Bool(s.iloc(3)[PythonObject] == 40))
+
+
+def test_explode_basic() raises:
+    # Each list element becomes its own row; other columns repeat.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [[10, 11], [20]]}")))
+    var r = df.explode("b")
+    # Row 0 has 2 elements, row 1 has 1 → 3 output rows.
+    assert_equal(r.shape()[0], 3)
+    assert_equal(r.shape()[1], 2)
+    # 'a' retains its int64 dtype; values are repeated by source row.
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["a"].iloc(2)[Int64] == 2)
+    # 'b' values are individual elements.
+    assert_true(Bool(r["b"].iloc(0)[PythonObject] == 10))
+    assert_true(Bool(r["b"].iloc(1)[PythonObject] == 11))
+    assert_true(Bool(r["b"].iloc(2)[PythonObject] == 20))
+
+
+def test_explode_missing_column_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var raised = False
+    try:
+        _ = df.explode("zzz")
+    except:
+        raised = True
+    assert_true(raised)
 
 
 def main() raises:
