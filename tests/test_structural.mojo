@@ -492,6 +492,29 @@ def test_combine_first_self_wins_non_null() raises:
     assert_true(r["a"].iloc(1)[Float64] == 2.0)
 
 
+def test_combine_first_dtype_mismatch_float_self_int_other() raises:
+    # self is Float64, other is Int64 → result is Float64 (pandas upcasts).
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
+    var r = df1.combine_first(df2)
+    assert_true(r["a"].iloc(0)[Float64] == 1.0)
+    assert_true(r["a"].iloc(1)[Float64] == 20.0)
+    assert_true(r["a"].iloc(2)[Float64] == 3.0)
+
+
+def test_combine_first_dtype_mismatch_int_self_float_other() raises:
+    # self is Int64, other is Float64 → result is Float64 (pandas upcasts).
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10.0, 20.0, 30.0]}")))
+    var r = df1.combine_first(df2)
+    # self is non-null everywhere, so self's values are kept (upcasted to Float64).
+    assert_true(r["a"].iloc(0)[Float64] == 1.0)
+    assert_true(r["a"].iloc(1)[Float64] == 2.0)
+    assert_true(r["a"].iloc(2)[Float64] == 3.0)
+
+
 # ------------------------------------------------------------------
 # update
 # ------------------------------------------------------------------

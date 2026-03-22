@@ -955,6 +955,13 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.other_null_mask = other_null_mask.copy()
 
     def on_int64(mut self, data: List[Int64]) raises:
+        if self.other_data.isa[List[Float64]]():
+            # Upcast self (Int64) to Float64 to match other, then delegate to on_float64.
+            var upcast = List[Float64]()
+            for i in range(len(data)):
+                upcast.append(Float64(data[i]))
+            self.on_float64(upcast)
+            return
         if not self.other_data.isa[List[Int64]]():
             raise Error("combine_first: dtype mismatch between columns")
         ref od = self.other_data[List[Int64]]
@@ -978,12 +985,20 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.col_data = ColumnData(result^)
 
     def on_float64(mut self, data: List[Float64]) raises:
-        if not self.other_data.isa[List[Float64]]():
+        var od: List[Float64]
+        if self.other_data.isa[List[Float64]]():
+            od = self.other_data[List[Float64]].copy()
+        elif self.other_data.isa[List[Int64]]():
+            # Upcast other (Int64) to Float64 to match self.
+            od = List[Float64]()
+            ref odi = self.other_data[List[Int64]]
+            for i in range(len(odi)):
+                od.append(Float64(odi[i]))
+        else:
             raise Error("combine_first: dtype mismatch between columns")
-        ref od = self.other_data[List[Float64]]
+        var nan = Float64(0) / Float64(0)
         var has_self_mask = len(self.self_null_mask) > 0
         var has_other_mask = len(self.other_null_mask) > 0
-        var nan = Float64(0) / Float64(0)
         var result = List[Float64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
