@@ -1865,14 +1865,41 @@ struct DataFrame(Copyable, Movable):
         regex: String = "",
         axis: Int = 1,
     ) raises -> DataFrame:
-        """Select columns by label.
+        """Select columns (axis=1) or rows (axis=0) by label.
 
-        *items*: keep only columns whose name is in the list.
-        *like*:  keep columns whose name contains the substring.
-        *regex*: keep columns whose name matches the pattern (uses Python re).
+        *items*: keep only labels in the list.
+        *like*:  keep labels whose name contains the substring.
+        *regex*: keep labels whose name matches the pattern (uses Python re).
         """
-        if axis != 1:
-            raise Error("DataFrame.filter: axis=0 not yet implemented")
+        if axis == 0:
+            # Row filtering by index label.
+            if len(self._cols) == 0:
+                return self.copy()
+            var n_rows = self._cols[0].__len__()
+            var has_index = self._cols[0]._index_len() > 0
+            var keep_rows = List[Int]()
+            for i in range(n_rows):
+                var label = self._cols[0]._index_label(i) if has_index else String(i)
+                var keep = False
+                if items:
+                    ref items_list = items.value()
+                    for j in range(len(items_list)):
+                        if label == items_list[j]:
+                            keep = True
+                            break
+                elif like != "":
+                    keep = label.find(like) != -1
+                elif regex != "":
+                    var re_mod = Python.import_module("re")
+                    keep = Bool(re_mod.search(regex, label).__bool__())
+                else:
+                    keep = True
+                if keep:
+                    keep_rows.append(i)
+            var result_cols = List[Column]()
+            for ci in range(len(self._cols)):
+                result_cols.append(self._cols[ci].take(keep_rows))
+            return DataFrame(result_cols^)
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             var col_name = self._cols[i].name

@@ -244,6 +244,43 @@ def test_filter_no_args_keeps_all() raises:
     assert_equal(result.shape()[1], 2)
 
 
+def test_filter_axis0_items() raises:
+    var pd = Python.import_module("pandas")
+    # DataFrame with a string index
+    var pdf = pd.DataFrame(
+        Python.evaluate("{'val': [10, 20, 30]}"),
+        index=Python.evaluate("['x', 'y', 'z']"),
+    )
+    var df = DataFrame(pdf)
+    var items = List[String]()
+    items.append("x")
+    items.append("z")
+    var result = df.filter(items=items^, axis=0)
+    assert_equal(result.shape()[0], 2)
+
+
+def test_filter_axis0_like() raises:
+    var pd = Python.import_module("pandas")
+    var pdf = pd.DataFrame(
+        Python.evaluate("{'val': [1, 2, 3]}"),
+        index=Python.evaluate("['foo_1', 'foo_2', 'bar']"),
+    )
+    var df = DataFrame(pdf)
+    var result = df.filter(like="foo", axis=0)
+    assert_equal(result.shape()[0], 2)
+
+
+def test_filter_axis0_regex() raises:
+    var pd = Python.import_module("pandas")
+    var pdf = pd.DataFrame(
+        Python.evaluate("{'val': [1, 2, 3]}"),
+        index=Python.evaluate("['a1', 'b2', 'c1']"),
+    )
+    var df = DataFrame(pdf)
+    var result = df.filter(regex=".*1$", axis=0)
+    assert_equal(result.shape()[0], 2)
+
+
 def test_select_dtypes_include() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
