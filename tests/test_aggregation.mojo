@@ -614,5 +614,195 @@ def test_df_cummax_axis1_raises() raises:
         raise Error("DataFrame.cummax axis=1 should have raised")
 
 
+# ---------------------------------------------------------------------------
+# sem — stub
+# ---------------------------------------------------------------------------
+
+def test_series_sem_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var raised = False
+    try:
+        _ = s.sem()
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.sem should have raised")
+
+
+def test_df_sem_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
+    var raised = False
+    try:
+        _ = df.sem()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.sem should have raised")
+
+
+# ---------------------------------------------------------------------------
+# skew — stub
+# ---------------------------------------------------------------------------
+
+def test_series_skew_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var raised = False
+    try:
+        _ = s.skew()
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.skew should have raised")
+
+
+def test_df_skew_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
+    var raised = False
+    try:
+        _ = df.skew()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.skew should have raised")
+
+
+# ---------------------------------------------------------------------------
+# kurt — stub
+# ---------------------------------------------------------------------------
+
+def test_series_kurt_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var raised = False
+    try:
+        _ = s.kurt()
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.kurt should have raised")
+
+
+def test_df_kurt_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
+    var raised = False
+    try:
+        _ = df.kurt()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.kurt should have raised")
+
+
+# ---------------------------------------------------------------------------
+# idxmin / idxmax — stubs
+# ---------------------------------------------------------------------------
+
+def test_series_idxmin_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
+    var raised = False
+    try:
+        _ = s.idxmin()
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.idxmin should have raised")
+
+
+def test_series_idxmax_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
+    var raised = False
+    try:
+        _ = s.idxmax()
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.idxmax should have raised")
+
+
+def test_df_idxmin_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0]}")))
+    var raised = False
+    try:
+        _ = df.idxmin()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.idxmin should have raised")
+
+
+def test_df_idxmax_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0]}")))
+    var raised = False
+    try:
+        _ = df.idxmax()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.idxmax should have raised")
+
+
+# ---------------------------------------------------------------------------
+# corr / cov — stubs
+# ---------------------------------------------------------------------------
+
+def test_series_corr_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
+    var raised = False
+    try:
+        _ = s1.corr(s2)
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.corr should have raised")
+
+
+def test_series_cov_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
+    var raised = False
+    try:
+        _ = s1.cov(s2)
+    except:
+        raised = True
+    if not raised:
+        raise Error("Series.cov should have raised")
+
+
+def test_df_corr_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
+    var raised = False
+    try:
+        _ = df.corr()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.corr should have raised")
+
+
+def test_df_cov_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
+    var raised = False
+    try:
+        _ = df.cov()
+    except:
+        raised = True
+    if not raised:
+        raise Error("DataFrame.cov should have raised")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

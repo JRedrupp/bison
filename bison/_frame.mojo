@@ -241,6 +241,46 @@ struct Series(Copyable, Movable):
     def cummax(self, skipna: Bool = True) raises -> Series:
         return Series(self._col.cummax(skipna))
 
+    def sem(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
+        _not_implemented("Series.sem")
+        return 0.0
+
+    def skew(self, skipna: Bool = True) raises -> Float64:
+        _not_implemented("Series.skew")
+        return 0.0
+
+    def kurt(self, skipna: Bool = True) raises -> Float64:
+        _not_implemented("Series.kurt")
+        return 0.0
+
+    def idxmin(self, skipna: Bool = True) raises -> Int:
+        _not_implemented("Series.idxmin")
+        return 0
+
+    def idxmax(self, skipna: Bool = True) raises -> Int:
+        _not_implemented("Series.idxmax")
+        return 0
+
+    def corr(self, other: Series) raises -> Float64:
+        _not_implemented("Series.corr")
+        return 0.0
+
+    def cov(self, other: Series, ddof: Int = 1) raises -> Float64:
+        _not_implemented("Series.cov")
+        return 0.0
+
+    def shift(self, periods: Int = 1) raises -> Series:
+        _not_implemented("Series.shift")
+        return Series()
+
+    def diff(self, periods: Int = 1) raises -> Series:
+        _not_implemented("Series.diff")
+        return Series()
+
+    def pct_change(self, periods: Int = 1) raises -> Series:
+        _not_implemented("Series.pct_change")
+        return Series()
+
     # ------------------------------------------------------------------
     # Missing data
     # ------------------------------------------------------------------
@@ -2005,6 +2045,46 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cummax(skipna))
         return DataFrame(result_cols^)
+
+    def sem(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
+        _not_implemented("DataFrame.sem")
+        return Series()
+
+    def skew(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
+        _not_implemented("DataFrame.skew")
+        return Series()
+
+    def kurt(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
+        _not_implemented("DataFrame.kurt")
+        return Series()
+
+    def idxmin(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
+        _not_implemented("DataFrame.idxmin")
+        return Series()
+
+    def idxmax(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
+        _not_implemented("DataFrame.idxmax")
+        return Series()
+
+    def corr(self, method: String = "pearson", min_periods: Int = 1) raises -> DataFrame:
+        _not_implemented("DataFrame.corr")
+        return DataFrame()
+
+    def cov(self, min_periods: Int = 1, ddof: Int = 1) raises -> DataFrame:
+        _not_implemented("DataFrame.cov")
+        return DataFrame()
+
+    def shift(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
+        _not_implemented("DataFrame.shift")
+        return DataFrame()
+
+    def diff(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
+        _not_implemented("DataFrame.diff")
+        return DataFrame()
+
+    def pct_change(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
+        _not_implemented("DataFrame.pct_change")
+        return DataFrame()
 
     def agg(self, func: String, axis: Int = 0) raises -> Series:
         _not_implemented("DataFrame.agg")
