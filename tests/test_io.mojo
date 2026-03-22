@@ -1,7 +1,7 @@
-"""Tests for read_csv and DataFrame.to_csv."""
+"""Tests for DataFrame IO (read and write methods)."""
 from std.python import Python
 from testing import assert_equal, assert_true, TestSuite
-from bison import read_csv, read_parquet, read_json, read_excel, DataFrame
+from bison import read_csv, read_parquet, read_json, read_excel, DataFrame, DFScalar
 
 
 def test_read_csv_basic() raises:
@@ -198,6 +198,200 @@ def test_read_excel_stub() raises:
     except:
         raised = True
     assert_true(raised)
+
+
+def test_to_parquet_writes_file() raises:
+    """Write a DataFrame to Parquet and verify the file exists (skipped when pyarrow is absent)."""
+    var pyarrow_available = False
+    try:
+        _ = Python.import_module("pyarrow")
+        pyarrow_available = True
+    except:
+        pass
+    if not pyarrow_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3.0, 4.0]}")))
+    df.to_parquet(path)
+    var os = Python.import_module("os")
+    assert_true(Bool(os.path.exists(path)))
+
+
+def test_to_excel_writes_file() raises:
+    """Write a DataFrame to Excel and verify the file exists (skipped when openpyxl is absent)."""
+    var openpyxl_available = False
+    try:
+        _ = Python.import_module("openpyxl")
+        openpyxl_available = True
+    except:
+        pass
+    if not openpyxl_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".xlsx"))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
+    df.to_excel(path, index=False)
+    var os = Python.import_module("os")
+    assert_true(Bool(os.path.exists(path)))
+
+
+def test_to_dict_int_columns() raises:
+    """DataFrame.to_dict returns a dict mapping column name to list of values (int)."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
+    var d = df.to_dict()
+    # Column 'a' should have 3 entries
+    assert_equal(len(d["a"]), 3)
+    assert_equal(len(d["b"]), 3)
+    assert_true(d["a"][0].isa[Int64]())
+    assert_equal(Int(d["a"][0][Int64]), 1)
+    assert_equal(Int(d["a"][1][Int64]), 2)
+    assert_equal(Int(d["b"][0][Int64]), 4)
+
+
+def test_to_dict_list_orient() raises:
+    """DataFrame.to_dict with orient='list' produces the same result as the default."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
+    var d = df.to_dict(orient="list")
+    assert_equal(len(d["x"]), 2)
+    assert_equal(Int(d["x"][0][Int64]), 10)
+    assert_equal(Int(d["x"][1][Int64]), 20)
+
+
+def test_to_dict_unsupported_orient() raises:
+    """DataFrame.to_dict raises for orient values other than 'dict' and 'list'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
+    var raised = False
+    try:
+        _ = df.to_dict(orient="records")
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_to_records_basic() raises:
+    """DataFrame.to_records returns a list of row dicts with index included by default."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
+    var records = df.to_records()
+    assert_equal(len(records), 2)
+    # Each record contains 'index', 'a', 'b'
+    assert_equal(Int(records[0]["index"][Int64]), 0)
+    assert_equal(Int(records[0]["a"][Int64]), 10)
+    assert_equal(Int(records[0]["b"][Int64]), 30)
+    assert_equal(Int(records[1]["index"][Int64]), 1)
+    assert_equal(Int(records[1]["a"][Int64]), 20)
+    assert_equal(Int(records[1]["b"][Int64]), 40)
+
+
+def test_to_records_no_index() raises:
+    """DataFrame.to_records with index=False omits the 'index' key from each record."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'v': [1, 2]}")))
+    var records = df.to_records(index=False)
+    assert_equal(len(records), 2)
+    # 'index' key must not be present
+    var has_index = False
+    try:
+        _ = records[0]["index"]
+        has_index = True
+    except:
+        pass
+    assert_true(not has_index)
+    assert_equal(Int(records[0]["v"][Int64]), 1)
+
+
+def test_to_numpy_int_float() raises:
+    """DataFrame.to_numpy returns a row-major list of Float64 lists for numeric columns."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3.5, 4.5]}")))
+    var arr = df.to_numpy()
+    assert_equal(len(arr), 2)
+    assert_equal(len(arr[0]), 2)
+    assert_equal(arr[0][0], Float64(1.0))
+    assert_equal(arr[0][1], Float64(3.5))
+    assert_equal(arr[1][0], Float64(2.0))
+    assert_equal(arr[1][1], Float64(4.5))
+
+
+def test_to_numpy_string_raises() raises:
+    """DataFrame.to_numpy raises for non-numeric (string) columns."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': ['x', 'y']}"))
+    )
+    var raised = False
+    try:
+        _ = df.to_numpy()
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_to_string_contains_headers() raises:
+    """DataFrame.to_string output contains the column names."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'alpha': [1, 2], 'beta': [3, 4]}")))
+    var s = df.to_string()
+    assert_true(len(s) > 0)
+    assert_true(s.find("alpha") >= 0)
+    assert_true(s.find("beta") >= 0)
+
+
+def test_to_string_contains_values() raises:
+    """DataFrame.to_string output contains the cell values."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [42, 99], 'b': [7, 8]}")))
+    var s = df.to_string()
+    assert_true(s.find("42") >= 0)
+    assert_true(s.find("99") >= 0)
+    assert_true(s.find("7") >= 0)
+
+
+def test_to_html_structure() raises:
+    """DataFrame.to_html output contains expected HTML table tags."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'b': [2]}")))
+    var h = df.to_html()
+    assert_true(h.find("<table") >= 0)
+    assert_true(h.find("</table>") >= 0)
+    assert_true(h.find("<thead>") >= 0)
+    assert_true(h.find("<tbody>") >= 0)
+    assert_true(h.find("<th>a</th>") >= 0)
+    assert_true(h.find("<th>b</th>") >= 0)
+    assert_true(h.find("<td>1</td>") >= 0)
+    assert_true(h.find("<td>2</td>") >= 0)
+
+
+def test_to_html_escapes_special_chars() raises:
+    """DataFrame.to_html escapes '<', '>', '&' in column names and cell values."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'x<y': [1]}"))
+    )
+    var h = df.to_html()
+    assert_true(h.find("x&lt;y") >= 0)
+
+
+def test_to_markdown_structure() raises:
+    """DataFrame.to_markdown output is a valid Markdown pipe table with a separator row."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'col1': [1, 2], 'col2': [3, 4]}")))
+    var m = df.to_markdown()
+    assert_true(len(m) > 0)
+    assert_true(m.find("|") >= 0)
+    assert_true(m.find("---") >= 0)
+    assert_true(m.find("col1") >= 0)
+    assert_true(m.find("col2") >= 0)
+    assert_true(m.find("1") >= 0)
+    assert_true(m.find("3") >= 0)
 
 
 def main() raises:

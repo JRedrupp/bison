@@ -1410,6 +1410,19 @@ def _frame_cell_as_str(col: Column, row: Int) raises -> String:
         return String(col._data[List[PythonObject]][row])
 
 
+def _html_escape(s: String) -> String:
+    """Return *s* with HTML special characters replaced by entities.
+
+    Handles ``&``, ``<``, ``>``, ``"``, and ``'``.
+    """
+    var result = s.replace("&", "&amp;")
+    result = result.replace("<", "&lt;")
+    result = result.replace(">", "&gt;")
+    result = result.replace('"', "&quot;")
+    result = result.replace("'", "&#39;")
+    return result^
+
+
 def _sort_col_names(names: List[String]) -> List[String]:
     """Return a copy of *names* sorted in ascending order (selection sort)."""
     var n = len(names)
@@ -3694,7 +3707,20 @@ struct DataFrame(Copyable, Movable):
         return result^
 
     def to_parquet(self, path: String, engine: String = "auto", compression: String = "snappy") raises:
-        _not_implemented("DataFrame.to_parquet")
+        """Write the DataFrame to a Parquet file.
+
+        Uses pandas interop: converts to a pandas DataFrame then calls
+        ``pandas.DataFrame.to_parquet``.
+
+        Parameters
+        ----------
+        path        : Destination file path.
+        engine      : Parquet library to use (``"auto"``, ``"pyarrow"``,
+                      ``"fastparquet"``).  Passed directly to pandas.
+        compression : Compression codec (default ``"snappy"``).
+        """
+        var pd_df = self.to_pandas()
+        pd_df.to_parquet(path, engine=engine, compression=compression)
 
     def to_json(self, path_or_buf: String = "", orient: String = "") raises -> String:
         """Serialize the DataFrame to a JSON-formatted string or file.
@@ -3780,31 +3806,344 @@ struct DataFrame(Copyable, Movable):
         return result^
 
     def to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
-        _not_implemented("DataFrame.to_excel")
+        """Write the DataFrame to an Excel file.
+
+        Uses pandas interop: converts to a pandas DataFrame then calls
+        ``pandas.DataFrame.to_excel``.
+
+        Parameters
+        ----------
+        excel_writer : Destination file path (``*.xlsx``).
+        sheet_name   : Name of the target worksheet (default ``"Sheet1"``).
+        index        : Whether to write the row index (default ``True``).
+        """
+        var pd_df = self.to_pandas()
+        pd_df.to_excel(excel_writer, sheet_name=sheet_name, index=index)
 
     def to_dict(self, orient: String = "dict") raises -> Dict[String, List[DFScalar]]:
-        _not_implemented("DataFrame.to_dict")
-        return Dict[String, List[DFScalar]]()
+        """Return the DataFrame as a ``Dict`` mapping column names to value lists.
+
+        Both ``orient="dict"`` (the pandas default) and ``orient="list"``
+        produce the same ``{column: [v1, v2, ...]}`` layout because bison's
+        native ``Dict`` type does not support nested dicts.  All other orient
+        values raise ``Error``.
+
+        Parameters
+        ----------
+        orient : Serialisation orientation.  Only ``"dict"`` and ``"list"``
+                 are supported.
+        """
+        if orient != "dict" and orient != "list":
+            raise Error(
+                "DataFrame.to_dict: orient '"
+                + orient
+                + "' is not supported; use 'list' or 'dict'"
+            )
+        var result = Dict[String, List[DFScalar]]()
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var nan = Float64(0) / Float64(0)
+        for ci in range(ncols):
+            ref col = self._cols[ci]
+            var values = List[DFScalar]()
+            var has_mask = len(col._null_mask) > 0
+            if col._data.isa[List[Int64]]():
+                ref data = col._data[List[Int64]]
+                for i in range(nrows):
+                    if has_mask and col._null_mask[i]:
+                        values.append(DFScalar(Int64(0)))
+                    else:
+                        values.append(DFScalar(data[i]))
+            elif col._data.isa[List[Float64]]():
+                ref data = col._data[List[Float64]]
+                for i in range(nrows):
+                    if has_mask and col._null_mask[i]:
+                        values.append(DFScalar(nan))
+                    else:
+                        values.append(DFScalar(data[i]))
+            elif col._data.isa[List[Bool]]():
+                ref data = col._data[List[Bool]]
+                for i in range(nrows):
+                    if has_mask and col._null_mask[i]:
+                        values.append(DFScalar(False))
+                    else:
+                        values.append(DFScalar(data[i]))
+            elif col._data.isa[List[String]]():
+                ref data = col._data[List[String]]
+                for i in range(nrows):
+                    if has_mask and col._null_mask[i]:
+                        values.append(DFScalar(String("")))
+                    else:
+                        values.append(DFScalar(data[i]))
+            else:
+                ref data = col._data[List[PythonObject]]
+                for i in range(nrows):
+                    if has_mask and col._null_mask[i]:
+                        values.append(DFScalar(String("")))
+                    else:
+                        values.append(DFScalar(String(data[i])))
+            result[col.name] = values^
+        return result^
 
     def to_records(self, index: Bool = True) raises -> List[Dict[String, DFScalar]]:
-        _not_implemented("DataFrame.to_records")
-        return List[Dict[String, DFScalar]]()
+        """Return the DataFrame as a list of row dicts.
+
+        Each dict maps column name to the cell value for that row.  When
+        *index* is ``True`` (the default) the row index is included under
+        the key ``"index"``.
+
+        Parameters
+        ----------
+        index : Whether to include the row index (default ``True``).
+        """
+        var result = List[Dict[String, DFScalar]]()
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var nan = Float64(0) / Float64(0)
+        for ri in range(nrows):
+            var row = Dict[String, DFScalar]()
+            if index:
+                row["index"] = DFScalar(Int64(ri))
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                var has_mask = len(col._null_mask) > 0
+                if has_mask and ri < len(col._null_mask) and col._null_mask[ri]:
+                    if col._data.isa[List[Int64]]():
+                        row[col.name] = DFScalar(Int64(0))
+                    elif col._data.isa[List[Float64]]():
+                        row[col.name] = DFScalar(nan)
+                    elif col._data.isa[List[Bool]]():
+                        row[col.name] = DFScalar(False)
+                    else:
+                        row[col.name] = DFScalar(String(""))
+                elif col._data.isa[List[Int64]]():
+                    row[col.name] = DFScalar(col._data[List[Int64]][ri])
+                elif col._data.isa[List[Float64]]():
+                    row[col.name] = DFScalar(col._data[List[Float64]][ri])
+                elif col._data.isa[List[Bool]]():
+                    row[col.name] = DFScalar(col._data[List[Bool]][ri])
+                elif col._data.isa[List[String]]():
+                    row[col.name] = DFScalar(col._data[List[String]][ri])
+                else:
+                    row[col.name] = DFScalar(
+                        String(col._data[List[PythonObject]][ri])
+                    )
+            result.append(row^)
+        return result^
 
     def to_numpy(self) raises -> List[List[Float64]]:
-        _not_implemented("DataFrame.to_numpy")
-        return List[List[Float64]]()
+        """Return the DataFrame values as a row-major ``List[List[Float64]]``.
+
+        Integer and bool values are cast to ``Float64``.  Null values become
+        ``NaN``.  Columns with string or object dtypes raise ``Error``.
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var nan = Float64(0) / Float64(0)
+        for ci in range(ncols):
+            ref col = self._cols[ci]
+            if not (
+                col._data.isa[List[Int64]]()
+                or col._data.isa[List[Float64]]()
+                or col._data.isa[List[Bool]]()
+            ):
+                raise Error(
+                    "DataFrame.to_numpy: column '"
+                    + col.name
+                    + "' has non-numeric dtype"
+                )
+        var result = List[List[Float64]]()
+        for ri in range(nrows):
+            var row = List[Float64]()
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                var has_mask = len(col._null_mask) > 0
+                if has_mask and ri < len(col._null_mask) and col._null_mask[ri]:
+                    row.append(nan)
+                elif col._data.isa[List[Int64]]():
+                    row.append(Float64(col._data[List[Int64]][ri]))
+                elif col._data.isa[List[Float64]]():
+                    row.append(col._data[List[Float64]][ri])
+                else:
+                    row.append(
+                        Float64(1.0) if col._data[List[Bool]][ri] else Float64(0.0)
+                    )
+            result.append(row^)
+        return result^
 
     def to_string(self) raises -> String:
-        _not_implemented("DataFrame.to_string")
-        return ""
+        """Return a human-readable tabular string representation.
+
+        Mirrors the output format of ``pandas.DataFrame.to_string()``:
+        an index column followed by value columns, all right-padded to
+        the maximum width needed for each column.  Columns are separated
+        by two spaces.
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+
+        # Index column width: width of the largest row-index label.
+        var idx_width = 1
+        if nrows > 1:
+            var tmp = nrows - 1
+            var w = 0
+            while tmp > 0:
+                tmp //= 10
+                w += 1
+            idx_width = w
+
+        # Compute per-column display widths.
+        var widths = List[Int]()
+        for ci in range(ncols):
+            var w = len(self._cols[ci].name)
+            for ri in range(nrows):
+                var s = _col_cell_str(self._cols[ci], ri)
+                if len(s) > w:
+                    w = len(s)
+            widths.append(w)
+
+        # Header row.
+        var result = String()
+        var line = String()
+        for _ in range(idx_width):
+            line += " "
+        for ci in range(ncols):
+            line += "  "
+            var name = self._cols[ci].name
+            var pad = widths[ci] - len(name)
+            for _ in range(pad):
+                line += " "
+            line += name
+        result += line + "\n"
+
+        # Data rows.
+        for ri in range(nrows):
+            var idx_str = String(ri)
+            var row_line = idx_str
+            var pad = idx_width - len(idx_str)
+            for _ in range(pad):
+                row_line += " "
+            for ci in range(ncols):
+                row_line += "  "
+                var cell = _col_cell_str(self._cols[ci], ri)
+                var col_pad = widths[ci] - len(cell)
+                for _ in range(col_pad):
+                    row_line += " "
+                row_line += cell
+            result += row_line + "\n"
+
+        return result^
 
     def to_html(self) raises -> String:
-        _not_implemented("DataFrame.to_html")
-        return ""
+        """Return an HTML table representation of the DataFrame.
+
+        Produces the same ``<table>`` skeleton as
+        ``pandas.DataFrame.to_html()``, with a ``<thead>`` containing
+        the column names and a ``<tbody>`` containing the data rows.
+        Cell values are HTML-escaped.
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+
+        var result = String(
+            '<table border="1" class="dataframe">\n'
+            "  <thead>\n"
+            '    <tr style="text-align: right;">\n'
+            "      <th></th>\n"
+        )
+        for ci in range(ncols):
+            result += "      <th>" + _html_escape(self._cols[ci].name) + "</th>\n"
+        result += "    </tr>\n  </thead>\n  <tbody>\n"
+
+        for ri in range(nrows):
+            result += "    <tr>\n"
+            result += "      <th>" + String(ri) + "</th>\n"
+            for ci in range(ncols):
+                result += (
+                    "      <td>"
+                    + _html_escape(_col_cell_str(self._cols[ci], ri))
+                    + "</td>\n"
+                )
+            result += "    </tr>\n"
+
+        result += "  </tbody>\n</table>"
+        return result^
 
     def to_markdown(self) raises -> String:
-        _not_implemented("DataFrame.to_markdown")
-        return ""
+        """Return a GitHub-Flavored Markdown table representation.
+
+        Produces a pipe-delimited Markdown table with an index column,
+        a separator row of dashes, and one data row per DataFrame row.
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+
+        # Index column width.
+        var idx_width = 5  # len("index")
+        if nrows > 0:
+            var tmp_w = len(String(nrows - 1))
+            if tmp_w > idx_width:
+                idx_width = tmp_w
+
+        # Per-column widths (at least as wide as the header).
+        var widths = List[Int]()
+        for ci in range(ncols):
+            var w = len(self._cols[ci].name)
+            for ri in range(nrows):
+                var s = _col_cell_str(self._cols[ci], ri)
+                if len(s) > w:
+                    w = len(s)
+            widths.append(w)
+
+        # Header row.
+        var result = String("| ")
+        var idx_pad = idx_width - 5  # 5 = len("index")
+        result += "index"
+        for _ in range(idx_pad):
+            result += " "
+        result += " |"
+        for ci in range(ncols):
+            result += " "
+            var name = self._cols[ci].name
+            result += name
+            var col_pad = widths[ci] - len(name)
+            for _ in range(col_pad):
+                result += " "
+            result += " |"
+        result += "\n"
+
+        # Separator row.
+        result += "|"
+        result += ":"
+        for _ in range(idx_width):
+            result += "-"
+        result += "|"
+        for ci in range(ncols):
+            result += ":"
+            for _ in range(widths[ci]):
+                result += "-"
+            result += "|"
+        result += "\n"
+
+        # Data rows.
+        for ri in range(nrows):
+            var idx_str = String(ri)
+            result += "| " + idx_str
+            var ri_pad = idx_width - len(idx_str)
+            for _ in range(ri_pad):
+                result += " "
+            result += " |"
+            for ci in range(ncols):
+                result += " "
+                var cell = _col_cell_str(self._cols[ci], ri)
+                result += cell
+                var col_pad = widths[ci] - len(cell)
+                for _ in range(col_pad):
+                    result += " "
+                result += " |"
+            result += "\n"
+
+        return result^
 
     # ------------------------------------------------------------------
     # Repr / iteration
