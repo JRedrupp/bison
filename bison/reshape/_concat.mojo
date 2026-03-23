@@ -3,6 +3,7 @@ from std.collections import Optional
 from ..dataframe import DataFrame, _sort_col_names
 from ..column import Column, ColumnData
 from ..dtypes import BisonDtype, int64, float64, bool_, object_
+from .._errors import _not_implemented
 
 
 # ------------------------------------------------------------------
@@ -379,7 +380,7 @@ def concat(
         return DataFrame()
 
     if keys:
-        raise Error("concat: the 'keys' parameter (hierarchical index) is not yet implemented")
+        _not_implemented("concat")
 
     if axis == 1:
         return _concat_axis1(objs, join, ignore_index, sort)

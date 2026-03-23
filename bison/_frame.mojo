@@ -2194,11 +2194,6 @@ struct DataFrame(Copyable, Movable):
         return self.agg(func, axis)
 
     def apply(self, func: String, axis: Int = 0) raises -> DataFrame:
-        if axis == 0:
-            raise Error(
-                "DataFrame.apply: axis=0 string aggregation returns a Series — "
-                "use DataFrame.agg(func) instead"
-            )
         _not_implemented("DataFrame.apply")
         return DataFrame()
 
@@ -3491,11 +3486,7 @@ struct DataFrame(Copyable, Movable):
         deep copy.
         """
         if not deep:
-            raise Error(
-                "DataFrame.copy: deep=False is not yet supported; Mojo's"
-                " ownership model requires reference-counted storage for"
-                " shallow copies"
-            )
+            _not_implemented("DataFrame.copy")
         return self._deep_copy()
 
     def assign(self, cols: Dict[String, Series]) raises -> DataFrame:
