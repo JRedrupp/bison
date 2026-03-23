@@ -103,7 +103,7 @@ def test_df_apply_axis0_raises_redirect() raises:
         msg = String(e)
     if not raised:
         raise Error("DataFrame.apply axis=0 should have raised")
-    assert_true("agg" in msg)
+    assert_true("not implemented" in msg)
 
 
 def test_df_apply_axis1_not_implemented() raises:
