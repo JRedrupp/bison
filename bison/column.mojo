@@ -2209,6 +2209,10 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data(visitor, self._data)
         return visitor.result
 
+    def len(self) -> Int:
+        """Return the number of elements in this column."""
+        return self.__len__()
+
     # ------------------------------------------------------------------
     # Row selection helpers
     # ------------------------------------------------------------------
