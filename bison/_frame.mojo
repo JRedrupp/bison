@@ -317,6 +317,8 @@ struct Series(Copyable, Movable):
 
     def fillna(self, value: DFScalar) raises -> Series:
         """Return a copy of the Series with null/NaN values replaced by *value*."""
+        if value.is_null():
+            raise Error("fillna: fill value cannot be null")
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
             return Series(self._col.copy())
