@@ -4013,6 +4013,14 @@ struct DataFrame(Copyable, Movable):
         var result = List[Dict[String, DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
+        if index:
+            for ci in range(ncols):
+                if self._cols[ci].name == "index":
+                    raise Error(
+                        "DataFrame.to_records: column named 'index' conflicts"
+                        " with the index key; pass index=False or rename the"
+                        " column"
+                    )
         for ri in range(nrows):
             var row = Dict[String, DFScalar]()
             if index:
