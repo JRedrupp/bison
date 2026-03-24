@@ -3,8 +3,29 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TESTS_DIR="$REPO_ROOT/tests"
+CACHE_DIR="$REPO_ROOT/.bison-cache"
+PKG_FILE="$CACHE_DIR/bison.mojopkg"
 TMP_DIR="$(mktemp -d)"
+PKG_TMP="$TMP_DIR/bison.mojopkg"
 trap 'rm -rf "$TMP_DIR"' EXIT
+
+mkdir -p "$CACHE_DIR"
+
+# Rebuild the bison package if it is missing or any source file is newer.
+needs_package_rebuild() {
+    [ ! -f "$PKG_FILE" ] && return 0
+    find "$REPO_ROOT/bison" -name "*.mojo" -newer "$PKG_FILE" -print -quit | grep -q . && return 0
+    return 1
+}
+
+if needs_package_rebuild; then
+    echo "Packaging bison/ -> $PKG_FILE ..."
+    # Write to a temp path so an interrupted build never leaves a corrupt cache file.
+    mojo package "$REPO_ROOT/bison" -o "$PKG_TMP"
+    mv "$PKG_TMP" "$PKG_FILE"
+else
+    echo "Package up to date: bison.mojopkg"
+fi
 
 pids=()
 files=()
@@ -13,7 +34,7 @@ for f in "$TESTS_DIR"/test_*.mojo; do
     result_file="$TMP_DIR/$(basename "$f").result"
     echo "Running $f ..."
     (
-        if mojo run -I "$REPO_ROOT" "$f"; then
+        if mojo run -I "$CACHE_DIR" -I "$REPO_ROOT" "$f"; then
             echo "pass" > "$result_file"
         else
             echo "fail" > "$result_file"
