@@ -3375,12 +3375,14 @@ struct Column(Copyable, Movable, Sized):
         return c^
 
     @staticmethod
-    def _fill_scalar(name: String, value: DFScalar, n: Int, index: ColumnIndex) -> Column:
+    def _fill_scalar(name: String, value: DFScalar, n: Int, index: ColumnIndex) raises -> Column:
         """Create a Column of length *n* with every element equal to *value*.
 
         The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
         Bool → bool, String → object (matching pandas string storage).
         """
+        if value.is_null():
+            raise Error("_fill_scalar: fill value cannot be null")
         if value.isa[Int64]():
             var v = value[Int64]
             var data = List[Int64]()

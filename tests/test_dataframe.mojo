@@ -580,5 +580,16 @@ def test_from_records_bool_with_nulls() raises:
     assert_true(Bool(pd_df["flag"][2] == False))
 
 
+def test_fillna_null_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
+    var raised = False
+    try:
+        _ = df.fillna(DFScalar.null())
+    except e:
+        raised = "null" in String(e)
+    assert_true(raised)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

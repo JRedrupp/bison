@@ -471,6 +471,17 @@ def test_fillna_int() raises:
     assert_true(Float64(String(rp.iloc[1])) == 9.0)
 
 
+def test_fillna_null_raises() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var raised = False
+    try:
+        _ = s.fillna(DFScalar.null())
+    except e:
+        raised = "null" in String(e)
+    assert_true(raised)
+
+
 def test_dropna() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
