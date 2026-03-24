@@ -82,7 +82,7 @@ In CI it runs after the test suite and the result is committed back to the branc
 <!-- COMPAT_TABLE_START -->
 | Category | Stubs | Implemented |
 |----------|-------|-------------|
-| DataFrame | 40 | 95 |
+| DataFrame | 39 | 96 |
 | Series | 11 | 86 |
 | GroupBy (DataFrame) | 16 | 1 |
 | GroupBy (Series) | 15 | 1 |
@@ -91,7 +91,7 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Index | 0 | 14 |
 | IO | 5 | 6 |
 | Reshape | 1 | 0 |
-| **Total** | **105** | **225** |
+| **Total** | **104** | **226** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations

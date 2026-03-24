@@ -2204,8 +2204,20 @@ struct DataFrame(Copyable, Movable):
             _not_implemented("DataFrame.transform")
         if func == "abs":
             return self.abs()
-        _not_implemented("DataFrame.transform")
-        return DataFrame()
+        elif func == "cumsum":
+            return self.cumsum()
+        elif func == "cumprod":
+            return self.cumprod()
+        elif func == "cummin":
+            return self.cummin()
+        elif func == "cummax":
+            return self.cummax()
+        else:
+            raise Error(
+                "DataFrame.transform: unsupported func '"
+                + func
+                + "'. Supported: abs, cumsum, cumprod, cummin, cummax"
+            )
 
     def eval(self, expr: String) raises -> Series:
         var pd_df = self.to_pandas()
