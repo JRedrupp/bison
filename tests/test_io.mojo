@@ -318,7 +318,6 @@ def test_to_records_index_collision() raises:
     var raised = False
     try:
         _ = df.to_records()
-        raised = False
     except:
         raised = True
     assert_true(raised)

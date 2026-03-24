@@ -13,22 +13,23 @@ Use this workflow when coding is complete and the next step is to ship changes c
 - Optional branch name and PR title
 
 ## Procedure
-1. Confirm repository state.
-2. Verify `SESSION.md` exists at the repo root.
-3. Check `git status --short --branch` and list changed files.
-4. If there are uncommitted changes, stash them with a named stash.
-5. Sync main with remote:
+1. Review the current session's work and update `SESSION.md` with any tech debt, bugs, or refactoring opportunities observed during the session that have not yet been recorded. Add entries under the appropriate section following the entry format in CLAUDE.md before proceeding.
+2. Confirm repository state.
+3. Verify `SESSION.md` exists at the repo root.
+4. Check `git status --short --branch` and list changed files.
+5. If there are uncommitted changes, stash them with a named stash.
+6. Sync main with remote:
    - `git fetch origin`
    - `git checkout main`
    - `git pull --ff-only origin main`
-6. Rebase work onto updated main:
+7. Rebase work onto updated main:
    - If work was stashed on main, create a new branch from main and pop the stash.
    - If work is on an existing feature branch with commits, run `git rebase origin/main`.
-7. Run targeted validation for modified files (tests/checks/format as appropriate).
-8. Stage only intended files and commit with an issue-referenced message.
-9. Push branch to origin and open a PR against `main`.
-10. Run the `session-to-issues` skill to sync untracked `SESSION.md` entries into GitHub issues.
-11. If new issues are created or matched, ensure `SESSION.md` headings are annotated with `<!-- #N -->`.
+8. Run targeted validation for modified files (tests/checks/format as appropriate).
+9. Stage only intended files and commit with an issue-referenced message.
+10. Push branch to origin and open a PR against `main`.
+11. Run the `session-to-issues` skill to sync untracked `SESSION.md` entries into GitHub issues.
+12. If new issues are created or matched, ensure `SESSION.md` headings are annotated with `<!-- #N -->`.
 
 ## Decision Points
 - If `git pull --ff-only` fails, stop and resolve divergence before continuing.

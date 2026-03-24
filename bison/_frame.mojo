@@ -3089,10 +3089,10 @@ struct DataFrame(Copyable, Movable):
         # We also track which cells were filled to detect duplicates.
         var table = List[List[PythonObject]]()
         var filled = List[List[Bool]]()
-        for rk in range(n_rk):
+        for _ in range(n_rk):
             var row_data = List[PythonObject]()
             var row_filled = List[Bool]()
-            for ck in range(n_ck):
+            for _ in range(n_ck):
                 row_data.append(py_none)
                 row_filled.append(False)
             table.append(row_data^)
@@ -3179,7 +3179,7 @@ struct DataFrame(Copyable, Movable):
             if id_ci == -1:
                 raise Error("DataFrame.melt: id column not found: " + id_names[k])
             var indices = List[Int]()
-            for v in range(n_val):
+            for _ in range(n_val):
                 for r in range(nrows):
                     indices.append(r)
             var new_col = self._cols[id_ci].take(indices)
@@ -3190,7 +3190,7 @@ struct DataFrame(Copyable, Movable):
         # Variable column: for each value column, repeat its name nrows times.
         var var_data = List[String]()
         for v in range(n_val):
-            for r in range(nrows):
+            for _ in range(nrows):
                 var_data.append(val_names[v])
         result_cols.append(Column(var_name, ColumnData(var_data^), object_))
 
@@ -3566,7 +3566,7 @@ struct DataFrame(Copyable, Movable):
             if col_name not in values:
                 # All-False Bool column for columns not in the dict.
                 var false_data = List[Bool]()
-                for j in range(nrows):
+                for _ in range(nrows):
                     false_data.append(False)
                 result_cols.append(Column(col_name, ColumnData(false_data^), bool_))
             else:

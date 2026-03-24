@@ -13,32 +13,32 @@ from .._errors import _not_implemented
 def _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
     """Return a Column of *n* null rows using *dtype* as the stored arm."""
     var mask = List[Bool]()
-    for i in range(n):
+    for _ in range(n):
         mask.append(True)
     if dtype == int64:
         var data = List[Int64]()
-        for i in range(n):
+        for _ in range(n):
             data.append(Int64(0))
         var col = Column(name, ColumnData(data^), dtype)
         col._null_mask = mask^
         return col^
     elif dtype == float64:
         var data = List[Float64]()
-        for i in range(n):
+        for _ in range(n):
             data.append(Float64(0))
         var col = Column(name, ColumnData(data^), dtype)
         col._null_mask = mask^
         return col^
     elif dtype == bool_:
         var data = List[Bool]()
-        for i in range(n):
+        for _ in range(n):
             data.append(False)
         var col = Column(name, ColumnData(data^), dtype)
         col._null_mask = mask^
         return col^
     else:
         var data = List[PythonObject]()
-        for i in range(n):
+        for _ in range(n):
             data.append(Python.evaluate("None"))
         var col = Column(name, ColumnData(data^), object_)
         col._null_mask = mask^
