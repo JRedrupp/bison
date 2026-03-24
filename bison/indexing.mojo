@@ -1,6 +1,6 @@
 from std.python import PythonObject
 from std.memory import UnsafePointer
-from .column import Column, ColumnData, DFScalar, SeriesScalar
+from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col
 from .index import ColumnIndex
 from .dtypes import object_
 from .series import Series
@@ -75,22 +75,6 @@ def _df_row_index(df: DataFrame, label: String) raises -> Int:
     return row
 
 
-def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
-    """Extract cell (*row*) from *col* as a ``DFScalar``.
-
-    Raises for ``List[PythonObject]`` columns (object / datetime) since
-    ``DFScalar`` has no ``PythonObject`` arm.
-    """
-    if col._data.isa[List[Int64]]():
-        return DFScalar(col._data[List[Int64]][row])
-    elif col._data.isa[List[Float64]]():
-        return DFScalar(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return DFScalar(col._data[List[Bool]][row])
-    elif col._data.isa[List[String]]():
-        return DFScalar(col._data[List[String]][row])
-    else:
-        raise Error("scalar access not supported for object/datetime columns")
 
 
 def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
