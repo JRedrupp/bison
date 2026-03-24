@@ -2450,6 +2450,20 @@ struct DataFrame(Copyable, Movable):
         ``"last"`` (default) or at the beginning when na_position is
         ``"first"``.
         """
+        var asc = List[Bool]()
+        asc.append(ascending)
+        return self._sort_values_impl(by, asc, na_position)
+
+    def sort_values(self, by: List[String], ascending: List[Bool], na_position: String = "last") raises -> DataFrame:
+        """Return a new DataFrame sorted by one or more columns.
+
+        ``ascending`` may be a list with one entry per key in ``by``,
+        allowing each key column to be sorted independently.  If the list is
+        shorter than ``by`` the remaining keys default to ascending order.
+        """
+        return self._sort_values_impl(by, ascending, na_position)
+
+    def _sort_values_impl(self, by: List[String], ascending: List[Bool], na_position: String) raises -> DataFrame:
         var n_rows = self.shape()[0]
         if n_rows == 0 or len(by) == 0:
             return DataFrame(self._cols.copy())
@@ -2465,8 +2479,9 @@ struct DataFrame(Copyable, Movable):
             perm.append(i)
         var k = len(by) - 1
         while k >= 0:
+            var asc = ascending[k] if k < len(ascending) else True
             var key_col = self[by[k]]
-            var sub_perm = Series(key_col._col.take(perm))._sort_perm(ascending, na_position == "last")
+            var sub_perm = Series(key_col._col.take(perm))._sort_perm(asc, na_position == "last")
             var new_perm = List[Int]()
             for j in range(n_rows):
                 new_perm.append(perm[sub_perm[j]])
