@@ -357,6 +357,29 @@ def test_sort_values_na_first_descending() raises:
     assert_true(r["a"].iloc(2)[Float64] == 1.0)
 
 
+def test_sort_values_per_column_ascending() raises:
+    # Sort by two columns with independent ascending flags:
+    # primary key 'a' descending, secondary key 'b' ascending.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 1, 2], 'b': [3, 1, 2]}"))
+    )
+    var by = List[String]()
+    by.append("a")
+    by.append("b")
+    var asc = List[Bool]()
+    asc.append(False)
+    asc.append(True)
+    var r = df.sort_values(by, asc)
+    # Row with a=2 should come first (a descending).
+    assert_true(r["a"].iloc(0)[Int64] == 2)
+    # Rows with a=1 should be ordered by b ascending: b=1 then b=3.
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["b"].iloc(1)[Int64] == 1)
+    assert_true(r["a"].iloc(2)[Int64] == 1)
+    assert_true(r["b"].iloc(2)[Int64] == 3)
+
+
 def test_dtypes_names() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [1.0, 2.0]}")))
