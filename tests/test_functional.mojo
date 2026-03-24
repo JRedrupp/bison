@@ -144,6 +144,46 @@ def test_df_transform_unknown_raises() raises:
         raise Error("DataFrame.transform with unsupported func should have raised")
 
 
+def test_df_transform_cumsum() raises:
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("cumsum").to_pandas()
+    var expected_pd = pd_df.transform("cumsum")
+    testing.assert_frame_equal(result_pd, expected_pd)
+
+
+def test_df_transform_cumprod() raises:
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("cumprod").to_pandas()
+    var expected_pd = pd_df.transform("cumprod")
+    testing.assert_frame_equal(result_pd, expected_pd)
+
+
+def test_df_transform_cummin() raises:
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0], 'b': [6.0, 4.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("cummin").to_pandas()
+    var expected_pd = pd_df.transform("cummin")
+    testing.assert_frame_equal(result_pd, expected_pd)
+
+
+def test_df_transform_cummax() raises:
+    var pd = Python.import_module("pandas")
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 3.0, 2.0], 'b': [4.0, 6.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("cummax").to_pandas()
+    var expected_pd = pd_df.transform("cummax")
+    testing.assert_frame_equal(result_pd, expected_pd)
+
+
 # ---------------------------------------------------------------------------
 # eval
 # ---------------------------------------------------------------------------
