@@ -3931,68 +3931,72 @@ struct DataFrame(Copyable, Movable):
         var pd_df = self.to_pandas()
         pd_df.to_excel(excel_writer, sheet_name=sheet_name, index=index)
 
-    def to_dict(self, orient: String = "dict") raises -> Dict[String, List[DFScalar]]:
-        """Return the DataFrame as a ``Dict`` mapping column names to value lists.
+    def to_dict(self, orient: String = "dict") raises -> Dict[String, Dict[String, DFScalar]]:
+        """Return the DataFrame as a nested ``Dict`` mapping column names to
+        index-label → value dicts.
 
-        Both ``orient="dict"`` (the pandas default) and ``orient="list"``
-        produce the same ``{column: [v1, v2, ...]}`` layout because bison's
-        native ``Dict`` type does not support nested dicts.  All other orient
-        values raise ``Error``.
+        Matches pandas ``orient="dict"`` semantics: the outer key is the
+        column name and the inner key is the stringified row-index label
+        (e.g. ``"0"``, ``"1"`` for the default integer index).
+
+        All other orient values raise ``Error``.  For row-oriented output use
+        ``to_records()`` (equivalent to ``orient="records"``).
 
         Parameters
         ----------
-        orient : Serialisation orientation.  Only ``"dict"`` and ``"list"``
-                 are supported.
+        orient : Serialisation orientation.  Only ``"dict"`` is supported.
         """
-        if orient != "dict" and orient != "list":
-            raise Error(
-                "DataFrame.to_dict: orient '"
-                + orient
-                + "' is not supported; use 'list' or 'dict'"
-            )
-        var result = Dict[String, List[DFScalar]]()
+        if orient != "dict":
+            _not_implemented("DataFrame.to_dict with orient='" + orient + "'")
+        var result = Dict[String, Dict[String, DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
+        var has_index = self._cols.__len__() > 0 and self._cols[0]._index_len() > 0
         for ci in range(ncols):
             ref col = self._cols[ci]
-            var values = List[DFScalar]()
+            var inner = Dict[String, DFScalar]()
             var has_mask = len(col._null_mask) > 0
             if col._data.isa[List[Int64]]():
                 ref data = col._data[List[Int64]]
                 for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar.null())
+                        inner[key] = DFScalar.null()
                     else:
-                        values.append(DFScalar(data[i]))
+                        inner[key] = DFScalar(data[i])
             elif col._data.isa[List[Float64]]():
                 ref data = col._data[List[Float64]]
                 for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar.null())
+                        inner[key] = DFScalar.null()
                     else:
-                        values.append(DFScalar(data[i]))
+                        inner[key] = DFScalar(data[i])
             elif col._data.isa[List[Bool]]():
                 ref data = col._data[List[Bool]]
                 for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar.null())
+                        inner[key] = DFScalar.null()
                     else:
-                        values.append(DFScalar(data[i]))
+                        inner[key] = DFScalar(data[i])
             elif col._data.isa[List[String]]():
                 ref data = col._data[List[String]]
                 for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar.null())
+                        inner[key] = DFScalar.null()
                     else:
-                        values.append(DFScalar(data[i]))
+                        inner[key] = DFScalar(data[i])
             else:
                 ref data = col._data[List[PythonObject]]
                 for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar.null())
+                        inner[key] = DFScalar.null()
                     else:
-                        values.append(DFScalar(String(data[i])))
-            result[col.name] = values^
+                        inner[key] = DFScalar(String(data[i]))
+            result[col.name] = inner^
         return result^
 
     def to_records(self, index: Bool = True) raises -> List[Dict[String, DFScalar]]:
