@@ -2523,7 +2523,7 @@ struct Column(Copyable, Movable, Sized):
         """Core element-wise binary arithmetic kernel.
 
         ``op`` is a compile-time constant (``_ARITH_*``) that selects the
-        operation; ``@parameter`` folds the branch at compile time so each
+        operation; ``comptime if`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         """
         var inp = self._binary_op_prepare(op_name, other)
@@ -2539,8 +2539,7 @@ struct Column(Copyable, Movable, Sized):
                 has_any_null = True
             else:
                 var v: Float64
-                @parameter
-                if op == _ARITH_ADD:
+                comptime if op == _ARITH_ADD:
                     v = inp.a[i] + inp.b[i]
                 elif op == _ARITH_SUB:
                     v = inp.a[i] - inp.b[i]
@@ -2589,7 +2588,7 @@ struct Column(Copyable, Movable, Sized):
         """Core element-wise binary comparison kernel.
 
         ``op`` is a compile-time constant (``_CMP_*``) that selects the
-        operation; ``@parameter`` folds the branch at compile time so each
+        operation; ``comptime if`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
         Null propagation: if either input element is null, the result is null.
 
@@ -2614,8 +2613,7 @@ struct Column(Copyable, Movable, Sized):
                     has_any_null = True
                 else:
                     var v: Bool
-                    @parameter
-                    if op == _CMP_EQ:
+                    comptime if op == _CMP_EQ:
                         v = da[i] == db[i]
                     elif op == _CMP_NE:
                         v = da[i] != db[i]
@@ -2641,8 +2639,7 @@ struct Column(Copyable, Movable, Sized):
                     has_any_null = True
                 else:
                     var v: Bool
-                    @parameter
-                    if op == _CMP_EQ:
+                    comptime if op == _CMP_EQ:
                         v = inp.a[i] == inp.b[i]
                     elif op == _CMP_NE:
                         v = inp.a[i] != inp.b[i]
