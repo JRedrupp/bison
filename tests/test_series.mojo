@@ -1249,13 +1249,12 @@ def test_to_list_string() raises:
 
 def test_to_list_null_float() raises:
     var pd = Python.import_module("pandas")
-    # null becomes NaN for float columns
+    # null becomes DFScalar.null() — not a NaN float
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
     var lst = s.to_list()
     assert_equal(len(lst), 3)
     assert_true(lst[0][Float64] == 1.0)
-    # NaN != NaN is the standard IEEE test
-    assert_true(lst[1][Float64] != lst[1][Float64])
+    assert_true(lst[1].is_null())
     assert_true(lst[2][Float64] == 3.0)
 
 

@@ -3,7 +3,7 @@ from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
 from .index import Index, ColumnIndex
-from .column import Column, ColumnData, DFScalar, SeriesScalar, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj
+from .column import Column, ColumnData, DFScalar, SeriesScalar, _Null, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -1147,9 +1147,8 @@ struct Series(Copyable, Movable):
     def to_list(self) raises -> List[DFScalar]:
         """Return the Series values as a ``List[DFScalar]``.
 
-        Null values are represented as the zero-like default for the dtype
-        (``0`` for integers, ``NaN`` for floats, ``False`` for bools,
-        ``""`` for strings).  Object-dtype columns raise ``Error``.
+        Null values are represented as ``DFScalar.null()``.
+        Object-dtype columns raise ``Error``.
         """
         var result = List[DFScalar]()
         ref col = self._col
@@ -1159,29 +1158,28 @@ struct Series(Copyable, Movable):
             ref data = col._data[List[Int64]]
             for i in range(n):
                 if has_mask and col._null_mask[i]:
-                    result.append(DFScalar(Int64(0)))
+                    result.append(DFScalar.null())
                 else:
                     result.append(DFScalar(data[i]))
         elif col._data.isa[List[Float64]]():
-            var nan = Float64(0) / Float64(0)
             ref data = col._data[List[Float64]]
             for i in range(n):
                 if has_mask and col._null_mask[i]:
-                    result.append(DFScalar(nan))
+                    result.append(DFScalar.null())
                 else:
                     result.append(DFScalar(data[i]))
         elif col._data.isa[List[Bool]]():
             ref data = col._data[List[Bool]]
             for i in range(n):
                 if has_mask and col._null_mask[i]:
-                    result.append(DFScalar(False))
+                    result.append(DFScalar.null())
                 else:
                     result.append(DFScalar(data[i]))
         elif col._data.isa[List[String]]():
             ref data = col._data[List[String]]
             for i in range(n):
                 if has_mask and col._null_mask[i]:
-                    result.append(DFScalar(String("")))
+                    result.append(DFScalar.null())
                 else:
                     result.append(DFScalar(data[i]))
         else:
@@ -1247,8 +1245,8 @@ struct Series(Copyable, Movable):
     def to_dict(self) raises -> Dict[String, DFScalar]:
         """Return the Series as a ``Dict`` mapping index label → value.
 
-        Index labels are stringified.  Null values follow the same zero-like
-        defaults as ``to_list``.  Object-dtype columns raise ``Error``.
+        Index labels are stringified.  Null values are represented as
+        ``DFScalar.null()``.  Object-dtype columns raise ``Error``.
         """
         var result = Dict[String, DFScalar]()
         ref col = self._col
@@ -1260,16 +1258,15 @@ struct Series(Copyable, Movable):
             for i in range(n):
                 var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
-                    result[key] = DFScalar(Int64(0))
+                    result[key] = DFScalar.null()
                 else:
                     result[key] = DFScalar(data[i])
         elif col._data.isa[List[Float64]]():
-            var nan = Float64(0) / Float64(0)
             ref data = col._data[List[Float64]]
             for i in range(n):
                 var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
-                    result[key] = DFScalar(nan)
+                    result[key] = DFScalar.null()
                 else:
                     result[key] = DFScalar(data[i])
         elif col._data.isa[List[Bool]]():
@@ -1277,7 +1274,7 @@ struct Series(Copyable, Movable):
             for i in range(n):
                 var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
-                    result[key] = DFScalar(False)
+                    result[key] = DFScalar.null()
                 else:
                     result[key] = DFScalar(data[i])
         elif col._data.isa[List[String]]():
@@ -1285,7 +1282,7 @@ struct Series(Copyable, Movable):
             for i in range(n):
                 var key = col._index_label(i) if has_index else String(i)
                 if has_mask and col._null_mask[i]:
-                    result[key] = DFScalar(String(""))
+                    result[key] = DFScalar.null()
                 else:
                     result[key] = DFScalar(data[i])
         else:
@@ -1545,8 +1542,9 @@ struct DataFrame(Copyable, Movable):
                         has_float = True
                     elif v.isa[Bool]():
                         has_bool = True
-                    else:  # String
+                    elif v.isa[String]():
                         has_string = True
+                    # _Null arm: contributes no type info, but row exists
                     found = True
                 except:
                     pass
@@ -1569,6 +1567,10 @@ struct DataFrame(Copyable, Movable):
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
+                        if v.is_null():
+                            data.append(String(""))
+                            null_mask.append(True)
+                            continue
                         var val: String
                         if v.isa[String]():
                             val = v[String]
@@ -1592,6 +1594,10 @@ struct DataFrame(Copyable, Movable):
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
+                        if v.is_null():
+                            data.append(Float64(0.0))
+                            null_mask.append(True)
+                            continue
                         var val: Float64
                         if v.isa[Float64]():
                             val = v[Float64]
@@ -1614,6 +1620,11 @@ struct DataFrame(Copyable, Movable):
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
+                        if v.is_null():
+                            data.append(Int64(0))
+                            null_mask.append(True)
+                            has_nulls = True
+                            continue
                         var val: Int64
                         if v.isa[Int64]():
                             val = v[Int64]
@@ -1643,6 +1654,11 @@ struct DataFrame(Copyable, Movable):
                 for ri in range(len(records)):
                     try:
                         var v = records[ri][col_name]
+                        if v.is_null():
+                            data.append(False)
+                            null_mask.append(True)
+                            has_nulls = True
+                            continue
                         data.append(v[Bool])
                         null_mask.append(False)
                     except:
@@ -3935,7 +3951,6 @@ struct DataFrame(Copyable, Movable):
         var result = Dict[String, List[DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
-        var nan = Float64(0) / Float64(0)
         for ci in range(ncols):
             ref col = self._cols[ci]
             var values = List[DFScalar]()
@@ -3944,35 +3959,35 @@ struct DataFrame(Copyable, Movable):
                 ref data = col._data[List[Int64]]
                 for i in range(nrows):
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar(Int64(0)))
+                        values.append(DFScalar.null())
                     else:
                         values.append(DFScalar(data[i]))
             elif col._data.isa[List[Float64]]():
                 ref data = col._data[List[Float64]]
                 for i in range(nrows):
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar(nan))
+                        values.append(DFScalar.null())
                     else:
                         values.append(DFScalar(data[i]))
             elif col._data.isa[List[Bool]]():
                 ref data = col._data[List[Bool]]
                 for i in range(nrows):
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar(False))
+                        values.append(DFScalar.null())
                     else:
                         values.append(DFScalar(data[i]))
             elif col._data.isa[List[String]]():
                 ref data = col._data[List[String]]
                 for i in range(nrows):
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar(String("")))
+                        values.append(DFScalar.null())
                     else:
                         values.append(DFScalar(data[i]))
             else:
                 ref data = col._data[List[PythonObject]]
                 for i in range(nrows):
                     if has_mask and col._null_mask[i]:
-                        values.append(DFScalar(String("")))
+                        values.append(DFScalar.null())
                     else:
                         values.append(DFScalar(String(data[i])))
             result[col.name] = values^
@@ -3992,7 +4007,6 @@ struct DataFrame(Copyable, Movable):
         var result = List[Dict[String, DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
-        var nan = Float64(0) / Float64(0)
         for ri in range(nrows):
             var row = Dict[String, DFScalar]()
             if index:
@@ -4001,14 +4015,7 @@ struct DataFrame(Copyable, Movable):
                 ref col = self._cols[ci]
                 var has_mask = len(col._null_mask) > 0
                 if has_mask and ri < len(col._null_mask) and col._null_mask[ri]:
-                    if col._data.isa[List[Int64]]():
-                        row[col.name] = DFScalar(Int64(0))
-                    elif col._data.isa[List[Float64]]():
-                        row[col.name] = DFScalar(nan)
-                    elif col._data.isa[List[Bool]]():
-                        row[col.name] = DFScalar(False)
-                    else:
-                        row[col.name] = DFScalar(String(""))
+                    row[col.name] = DFScalar.null()
                 elif col._data.isa[List[Int64]]():
                     row[col.name] = DFScalar(col._data[List[Int64]][ri])
                 elif col._data.isa[List[Float64]]():
