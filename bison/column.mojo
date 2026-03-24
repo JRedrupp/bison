@@ -227,6 +227,85 @@ def visit_col_data_raises[V: ColumnDataVisitorRaises](mut visitor: V, data: Colu
 
 
 # ------------------------------------------------------------------
+# DFScalar visit primitive — single canonical dispatch site
+# ------------------------------------------------------------------
+
+trait DFScalarVisitor:
+    """Protocol for visiting the active arm of a ``DFScalar`` Variant.
+
+    Implement one ``on_*`` method per arm.  Use a ``mut self`` field to
+    accumulate or return a result.  Pass an instance to ``visit_scalar``,
+    which contains the **only** non-raises ``isa`` chain over ``DFScalar``;
+    all callers should delegate here instead of writing their own discriminant
+    checks.
+
+    For visitors that need to call Python APIs or otherwise raise, implement
+    ``DFScalarVisitorRaises`` and use ``visit_scalar_raises`` instead.
+    """
+
+    def on_int64(mut self, value: Int64): ...
+    def on_float64(mut self, value: Float64): ...
+    def on_bool(mut self, value: Bool): ...
+    def on_str(mut self, value: String): ...
+    def on_null(mut self): ...
+
+
+def visit_scalar[V: DFScalarVisitor](mut visitor: V, scalar: DFScalar):
+    """Dispatch *visitor* to the active ``DFScalar`` arm (non-raises).
+
+    This is the **only** non-raises place in the codebase that reads the
+    ``DFScalar`` discriminant via ``isa``.  Add new ``DFScalar`` arms here,
+    in ``DFScalarVisitor``, and in ``visit_scalar_raises`` — every other
+    dispatch site is then updated automatically because it delegates here.
+    For visitors that may raise, use ``visit_scalar_raises`` instead.
+    """
+    if scalar.isa[Int64]():
+        visitor.on_int64(scalar[Int64])
+    elif scalar.isa[Float64]():
+        visitor.on_float64(scalar[Float64])
+    elif scalar.isa[Bool]():
+        visitor.on_bool(scalar[Bool])
+    elif scalar.isa[String]():
+        visitor.on_str(scalar[String])
+    else:
+        visitor.on_null()
+
+
+trait DFScalarVisitorRaises:
+    """Raises-capable counterpart to ``DFScalarVisitor``.
+
+    Use when ``on_*`` methods must call Python APIs or otherwise raise.
+    Implement one ``on_*`` method per ``DFScalar`` arm and pass an instance
+    to ``visit_scalar_raises``.
+    """
+
+    def on_int64(mut self, value: Int64) raises: ...
+    def on_float64(mut self, value: Float64) raises: ...
+    def on_bool(mut self, value: Bool) raises: ...
+    def on_str(mut self, value: String) raises: ...
+    def on_null(mut self) raises: ...
+
+
+def visit_scalar_raises[V: DFScalarVisitorRaises](mut visitor: V, scalar: DFScalar) raises:
+    """Raises-capable dispatch for visitors that may raise.
+
+    Mirrors ``visit_scalar`` but each ``on_*`` call site is in a ``raises``
+    context.  Add new ``DFScalar`` arms here, in ``DFScalarVisitorRaises``,
+    *and* in ``visit_scalar``.
+    """
+    if scalar.isa[Int64]():
+        visitor.on_int64(scalar[Int64])
+    elif scalar.isa[Float64]():
+        visitor.on_float64(scalar[Float64])
+    elif scalar.isa[Bool]():
+        visitor.on_bool(scalar[Bool])
+    elif scalar.isa[String]():
+        visitor.on_str(scalar[String])
+    else:
+        visitor.on_null()
+
+
+# ------------------------------------------------------------------
 # Private visitor implementations used by Column methods
 # ------------------------------------------------------------------
 
@@ -265,6 +344,59 @@ struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
     def on_bool(mut self, data: List[Bool]): self.result = ColumnData(data.copy())
     def on_str(mut self, data: List[String]): self.result = ColumnData(data.copy())
     def on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
+
+
+struct _FillScalarVisitor(DFScalarVisitorRaises, Copyable, Movable):
+    """Visitor that builds a typed ColumnData of length *n* from a DFScalar.
+
+    After visiting, construct the Column via
+    ``Column(name, visitor._col_data^, visitor._dtype, index)``.
+    The dtype is inferred from the DFScalar arm: Int64 → int64,
+    Float64 → float64, Bool → bool_, String → object_.
+    ``on_null`` raises because a null fill value is not meaningful here.
+    ``_col_data`` is initialised with the List[PythonObject] fallback arm
+    (following _CopyDataVisitor), but it is always replaced by an ``on_*``
+    call before the visitor result is consumed.
+    """
+    var _n: Int
+    var _col_data: ColumnData
+    var _dtype: BisonDtype
+
+    def __init__(out self, n: Int):
+        self._n = n
+        self._col_data = ColumnData(List[PythonObject]())
+        self._dtype = object_
+
+    def on_int64(mut self, value: Int64) raises:
+        var data = List[Int64]()
+        for _ in range(self._n):
+            data.append(value)
+        self._col_data = ColumnData(data^)
+        self._dtype = int64
+
+    def on_float64(mut self, value: Float64) raises:
+        var data = List[Float64]()
+        for _ in range(self._n):
+            data.append(value)
+        self._col_data = ColumnData(data^)
+        self._dtype = float64
+
+    def on_bool(mut self, value: Bool) raises:
+        var data = List[Bool]()
+        for _ in range(self._n):
+            data.append(value)
+        self._col_data = ColumnData(data^)
+        self._dtype = bool_
+
+    def on_str(mut self, value: String) raises:
+        var data = List[String]()
+        for _ in range(self._n):
+            data.append(value)
+        self._col_data = ColumnData(data^)
+        self._dtype = object_
+
+    def on_null(mut self) raises:
+        raise Error("_fill_scalar: fill value cannot be null")
 
 
 struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
@@ -3379,34 +3511,13 @@ struct Column(Copyable, Movable, Sized):
         """Create a Column of length *n* with every element equal to *value*.
 
         The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
-        Bool → bool, String → object (matching pandas string storage).
+        Bool → bool_, String → object (matching pandas string storage).
+        Raises if *value* is null — use the null-mask path instead.
         """
-        if value.is_null():
-            raise Error("_fill_scalar: fill value cannot be null")
-        if value.isa[Int64]():
-            var v = value[Int64]
-            var data = List[Int64]()
-            for i in range(n):
-                data.append(v)
-            return Column(name, ColumnData(data^), int64, index)
-        elif value.isa[Float64]():
-            var v = value[Float64]
-            var data = List[Float64]()
-            for i in range(n):
-                data.append(v)
-            return Column(name, ColumnData(data^), float64, index)
-        elif value.isa[Bool]():
-            var v = value[Bool]
-            var data = List[Bool]()
-            for i in range(n):
-                data.append(v)
-            return Column(name, ColumnData(data^), bool_, index)
-        else:
-            var v = value[String]
-            var data = List[String]()
-            for i in range(n):
-                data.append(v)
-            return Column(name, ColumnData(data^), object_, index)
+        var visitor = _FillScalarVisitor(n)
+        visit_scalar_raises(visitor, value)
+        var dtype = visitor._dtype
+        return Column(name, visitor^._col_data, dtype, index)
 
     def to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
