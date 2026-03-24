@@ -1875,7 +1875,7 @@ struct DataFrame(Copyable, Movable):
             if len(self._cols) == 0:
                 return self.copy()
             var n_rows = self._cols[0].__len__()
-            var has_index = self._cols[0]._index_len() > 0
+            var has_index = self._has_index()
             var keep_rows = List[Int]()
             for i in range(n_rows):
                 var label = self._cols[0]._index_label(i) if has_index else String(i)
@@ -2474,7 +2474,7 @@ struct DataFrame(Copyable, Movable):
             k -= 1
 
         # Reorder index labels (parallel to the data).
-        var has_index = self._cols[0]._index_len() > 0
+        var has_index = self._has_index()
         var new_idx: ColumnIndex
         if has_index:
             new_idx = self._cols[0]._index_reorder(perm)
@@ -2548,7 +2548,7 @@ struct DataFrame(Copyable, Movable):
             perm = self._cols[0]._sort_perm_by_index(ascending)
 
         # Reorder index labels and apply permutation to every column.
-        var has_index = self._cols[0]._index_len() > 0
+        var has_index = self._has_index()
         var new_idx: ColumnIndex
         if has_index:
             new_idx = self._cols[0]._index_reorder(perm)
@@ -2826,7 +2826,7 @@ struct DataFrame(Copyable, Movable):
             if ncols == 0:
                 return DataFrame()
             var nrows = self.shape()[0]
-            var has_index = self._cols[0]._index_len() > 0
+            var has_index = self._has_index()
             # Build label → row-position map.
             var label_to_row = Dict[String, Int]()
             for i in range(nrows):
@@ -2910,7 +2910,7 @@ struct DataFrame(Copyable, Movable):
         else:
             # Row drop: match drop_labels against the index.
             var nrows = self.shape()[0]
-            var has_index = ncols > 0 and self._cols[0]._index_len() > 0
+            var has_index = self._has_index()
             var drop_set = Dict[String, Bool]()
             for i in range(len(drop_labels)):
                 drop_set[drop_labels[i]] = True
@@ -3246,7 +3246,7 @@ struct DataFrame(Copyable, Movable):
         for r in range(nrows):
             # Determine row label.
             var row_label: PythonObject
-            if self._cols[0]._index_len() > 0:
+            if self._has_index():
                 row_label = PythonObject(self._cols[0]._index_label(r))
             else:
                 row_label = PythonObject(r)
@@ -3301,7 +3301,7 @@ struct DataFrame(Copyable, Movable):
         for r in range(nrows):
             # Result column name = original row-index label.
             var col_name: String
-            if self._cols[0]._index_len() > 0:
+            if self._has_index():
                 col_name = self._cols[0]._index_label(r)
             else:
                 col_name = String(r)
@@ -3919,7 +3919,7 @@ struct DataFrame(Copyable, Movable):
         var result = Dict[String, Dict[String, DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
-        var has_index = self._cols.__len__() > 0 and self._cols[0]._index_len() > 0
+        var has_index = self._has_index()
         for ci in range(ncols):
             ref col = self._cols[ci]
             var inner = Dict[String, DFScalar]()
@@ -4186,6 +4186,10 @@ struct DataFrame(Copyable, Movable):
         if self._cols.__len__() == 0:
             return 0
         return self._cols[0].__len__()
+
+    def _has_index(self) -> Bool:
+        """Return ``True`` when the DataFrame carries an explicit row index."""
+        return self._cols.__len__() > 0 and self._cols[0]._index_len() > 0
 
     def __contains__(self, key: String) -> Bool:
         for i in range(self._cols.__len__()):
