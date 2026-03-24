@@ -28,41 +28,62 @@ comptime ColumnData = Variant[
     List[PythonObject],
 ]
 
+# Sentinel type for a null / missing cell in DFScalar.
+struct _Null(Copyable, Movable, ImplicitlyCopyable):
+    """Sentinel for a missing / null cell in DFScalar."""
+
+    def __init__(out self):
+        pass
+
 # Scalar type for a single cell in row-oriented input (from_records).
 # No PythonObject arm — record values must be explicitly typed.
 #
 # Implemented as a thin struct rather than a bare Variant alias so that
 # Int (Mojo's native integer type) implicitly converts to Int64 at
-# construction time.  All four typed arms plus Int are accepted; Int is
-# normalised to Int64 immediately, so dispatch sites only ever see Int64.
+# construction time.  All four typed arms plus Int and _Null are accepted;
+# Int is normalised to Int64 immediately, so dispatch sites only ever see
+# Int64.  Use DFScalar.null() / is_null() to represent missing values.
 struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
-    var _v: Variant[Int64, Float64, Bool, String]
+    var _v: Variant[Int64, Float64, Bool, String, _Null]
 
     @implicit
     def __init__(out self, value: Int64):
-        self._v = Variant[Int64, Float64, Bool, String](value)
+        self._v = Variant[Int64, Float64, Bool, String, _Null](value)
 
     @implicit
     def __init__(out self, value: Float64):
-        self._v = Variant[Int64, Float64, Bool, String](value)
+        self._v = Variant[Int64, Float64, Bool, String, _Null](value)
 
     @implicit
     def __init__(out self, value: Bool):
-        self._v = Variant[Int64, Float64, Bool, String](value)
+        self._v = Variant[Int64, Float64, Bool, String, _Null](value)
 
     @implicit
     def __init__(out self, value: String):
-        self._v = Variant[Int64, Float64, Bool, String](value)
+        self._v = Variant[Int64, Float64, Bool, String, _Null](value)
 
     @implicit
     def __init__(out self, value: Int):
-        self._v = Variant[Int64, Float64, Bool, String](Int64(value))
+        self._v = Variant[Int64, Float64, Bool, String, _Null](Int64(value))
+
+    @implicit
+    def __init__(out self, value: _Null):
+        self._v = Variant[Int64, Float64, Bool, String, _Null](value)
 
     def __init__(out self, *, copy: Self):
         self._v = copy._v
 
     def __init__(out self, *, deinit take: Self):
         self._v = take._v^
+
+    @staticmethod
+    def null() -> Self:
+        """Return a null sentinel scalar."""
+        return Self(_Null())
+
+    def is_null(self) -> Bool:
+        """Return True if this scalar represents a missing / null value."""
+        return self._v.isa[_Null]()
 
     def isa[T: Copyable & Movable](self) -> Bool:
         return self._v.isa[T]()

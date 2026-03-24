@@ -394,5 +394,56 @@ def test_to_markdown_structure() raises:
     assert_true(m.find("3") >= 0)
 
 
+def test_null_sentinel_to_records() raises:
+    """Null cells in to_records produce DFScalar.null(), not zero-like defaults."""
+    var pd = Python.import_module("pandas")
+    var py = Python.evaluate("{'a': [1, None, 3], 'b': ['x', 'y', None]}")
+    var df = DataFrame(pd.DataFrame(py))
+    var records = df.to_records(index=False)
+    assert_equal(len(records), 3)
+    # Non-null cells have values
+    assert_true(not records[0]["a"].is_null())
+    assert_true(not records[2]["a"].is_null())
+    assert_true(not records[0]["b"].is_null())
+    assert_true(not records[1]["b"].is_null())
+    # Null cells must report is_null() == True (not zero/empty string)
+    assert_true(records[1]["a"].is_null())
+    assert_true(records[2]["b"].is_null())
+
+
+def test_null_sentinel_to_dict() raises:
+    """Null cells in DataFrame.to_dict produce DFScalar.null(), not zero-like defaults."""
+    var pd = Python.import_module("pandas")
+    var py = Python.evaluate("{'v': [10, None, 30]}")
+    var df = DataFrame(pd.DataFrame(py))
+    var d = df.to_dict()
+    var values = d["v"].copy()
+    assert_true(not values[0].is_null())
+    assert_true(values[1].is_null())
+    assert_true(not values[2].is_null())
+
+
+def test_null_roundtrip_records() raises:
+    """Nulls survive a to_records -> from_records round-trip."""
+    var pd = Python.import_module("pandas")
+    var py = Python.evaluate("{'a': [1, None, 3], 'b': ['x', None, 'z']}")
+    var df = DataFrame(pd.DataFrame(py))
+    var records = df.to_records(index=False)
+    var df2 = DataFrame.from_records(records)
+    # Shape is preserved
+    var shape = df2.shape()
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    # Null mask is propagated: isna() should match the original
+    var isna_a = df2["a"].isna()
+    assert_true(not isna_a.iloc(0)[Bool])
+    assert_true(isna_a.iloc(1)[Bool])
+    assert_true(not isna_a.iloc(2)[Bool])
+    var isna_b = df2["b"].isna()
+    assert_true(not isna_b.iloc(0)[Bool])
+    assert_true(isna_b.iloc(1)[Bool])
+    assert_true(not isna_b.iloc(2)[Bool])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
