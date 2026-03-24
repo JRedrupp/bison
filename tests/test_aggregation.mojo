@@ -300,6 +300,7 @@ def test_series_cumsum_int() raises:
     assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
     assert_true(Float64(String(result_pd.iloc[1])) == 3.0)
     assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+    assert_true(String(result_pd.dtype) == "int64")
 
 
 def test_series_cumsum_float() raises:
@@ -341,6 +342,8 @@ def test_df_cumsum() raises:
     assert_true(Float64(String(result_pd["a"].iloc[2])) == 6.0)
     assert_true(Float64(String(result_pd["b"].iloc[0])) == 4.0)
     assert_true(Float64(String(result_pd["b"].iloc[2])) == 15.0)
+    assert_true(String(result_pd["a"].dtype) == "int64")
+    assert_true(String(result_pd["b"].dtype) == "float64")
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +357,7 @@ def test_series_cumprod_int() raises:
     assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
     assert_true(Float64(String(result_pd.iloc[1])) == 2.0)
     assert_true(Float64(String(result_pd.iloc[2])) == 6.0)
+    assert_true(String(result_pd.dtype) == "int64")
 
 
 def test_series_cumprod_skipna_true() raises:
@@ -387,6 +391,7 @@ def test_series_cummin_int() raises:
     assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
     assert_true(Float64(String(result_pd.iloc[1])) == 1.0)
     assert_true(Float64(String(result_pd.iloc[2])) == 1.0)
+    assert_true(String(result_pd.dtype) == "int64")
 
 
 def test_series_cummin_skipna_true() raises:
@@ -420,6 +425,7 @@ def test_series_cummax_int() raises:
     assert_true(Float64(String(result_pd.iloc[0])) == 3.0)
     assert_true(Float64(String(result_pd.iloc[1])) == 3.0)
     assert_true(Float64(String(result_pd.iloc[2])) == 5.0)
+    assert_true(String(result_pd.dtype) == "int64")
 
 
 def test_series_cummax_skipna_true() raises:
