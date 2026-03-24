@@ -1248,14 +1248,12 @@ struct Series(Copyable, Movable):
         """Return the Series as a ``Dict`` mapping index label → value.
 
         Index labels are stringified.  Null values are represented as
-        ``DFScalar.null()``.  Object-dtype columns raise ``Error``.
+        ``DFScalar.null()``.  Object-dtype cells are stringified.
         """
         var result = Dict[String, DFScalar]()
         ref col = self._col
         var has_index = col._index_len() > 0
         var n = col.__len__()
-        if col._data.isa[List[PythonObject]]():
-            raise Error("Series.to_dict: object dtype is not supported")
         for i in range(n):
             var key = col._index_label(i) if has_index else String(i)
             result[key] = _scalar_from_col(col, i)
@@ -3925,17 +3923,9 @@ struct DataFrame(Copyable, Movable):
         for ci in range(ncols):
             ref col = self._cols[ci]
             var inner = Dict[String, DFScalar]()
-            var is_object = col._data.isa[List[PythonObject]]()
             for i in range(nrows):
                 var key = col._index_label(i) if has_index else String(i)
-                if is_object:
-                    var has_mask = len(col._null_mask) > 0
-                    if has_mask and col._null_mask[i]:
-                        inner[key] = DFScalar.null()
-                    else:
-                        inner[key] = DFScalar(String(col._data[List[PythonObject]][i]))
-                else:
-                    inner[key] = _scalar_from_col(col, i)
+                inner[key] = _scalar_from_col(col, i)
             result[col.name] = inner^
         return result^
 
@@ -3967,16 +3957,7 @@ struct DataFrame(Copyable, Movable):
                 row["index"] = DFScalar(Int64(ri))
             for ci in range(ncols):
                 ref col = self._cols[ci]
-                if col._data.isa[List[PythonObject]]():
-                    var has_mask = len(col._null_mask) > 0
-                    if has_mask and col._null_mask[ri]:
-                        row[col.name] = DFScalar.null()
-                    else:
-                        row[col.name] = DFScalar(
-                            String(col._data[List[PythonObject]][ri])
-                        )
-                else:
-                    row[col.name] = _scalar_from_col(col, ri)
+                row[col.name] = _scalar_from_col(col, ri)
             result.append(row^)
         return result^
 
