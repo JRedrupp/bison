@@ -1810,48 +1810,60 @@ struct DataFrame(Copyable, Movable):
         self,
         n: Int = 1,
         frac: Optional[Float64] = None,
+        replace: Bool = False,
         random_state: Optional[Int] = None,
     ) raises -> DataFrame:
         """Return a random sample of rows.
 
-        Uses a Fisher-Yates shuffle driven by a 32-bit xorshift PRNG.
-        Pass *random_state* (any non-zero integer) for reproducibility.
+        When *replace* is ``False`` (default) rows are sampled without
+        replacement using a Fisher-Yates shuffle; *n* is capped at the number
+        of rows.  When *replace* is ``True`` rows may repeat and *n* may
+        exceed the number of rows.
+
+        Uses a 32-bit xorshift PRNG.  Pass *random_state* (any non-zero
+        integer) for reproducibility.
         """
         var nrows = self.shape()[0]
         if nrows == 0:
             return DataFrame()
         var take: Int
         if frac:
-            var frac_val = frac.value()
-            take = Int(Float64(nrows) * frac_val)
+            take = Int(Float64(nrows) * frac.value())
         else:
             take = n
-        if take > nrows:
-            take = nrows
-        # Build index list [0, 1, ..., nrows-1]
-        var indices = List[Int]()
-        for i in range(nrows):
-            indices.append(i)
-        # Fisher-Yates shuffle — xorshift32 PRNG
+        # xorshift32 PRNG state
         var state: Int = 1
         if random_state:
             state = random_state.value()
         if state == 0:
             state = 1  # xorshift must not start at 0
-        for i in range(nrows):
-            # xorshift32 step (kept positive via masking)
-            state = state ^ (state << 13)
-            state = state ^ (state >> 17)
-            state = state ^ (state << 5)
-            state = state & 0x7FFFFFFF
-            var j = i + (state % (nrows - i))
-            var tmp = indices[i]
-            indices[i] = indices[j]
-            indices[j] = tmp
-        # Collect the first `take` shuffled indices
         var selected = List[Int]()
-        for i in range(take):
-            selected.append(indices[i])
+        if replace:
+            # Independent draws — each row may appear more than once.
+            for _ in range(take):
+                state = state ^ (state << 13)
+                state = state ^ (state >> 17)
+                state = state ^ (state << 5)
+                state = state & 0x7FFFFFFF
+                selected.append(state % nrows)
+        else:
+            if take > nrows:
+                take = nrows
+            # Fisher-Yates partial shuffle for sampling without replacement.
+            var indices = List[Int]()
+            for i in range(nrows):
+                indices.append(i)
+            for i in range(take):
+                state = state ^ (state << 13)
+                state = state ^ (state >> 17)
+                state = state ^ (state << 5)
+                state = state & 0x7FFFFFFF
+                var j = i + (state % (nrows - i))
+                var tmp = indices[i]
+                indices[i] = indices[j]
+                indices[j] = tmp
+            for i in range(take):
+                selected.append(indices[i])
         var result_cols = List[Column]()
         for ci in range(len(self._cols)):
             result_cols.append(self._cols[ci].take(selected))

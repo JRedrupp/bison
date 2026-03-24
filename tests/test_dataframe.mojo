@@ -198,10 +198,20 @@ def test_sample_n() raises:
 
 
 def test_sample_n_larger_than_rows() raises:
+    # Without replace, n is capped at nrows.
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var s = df.sample(10, random_state=0)
     assert_equal(s.shape()[0], 2)
+
+
+def test_sample_replace() raises:
+    # With replace=True, n may exceed nrows and rows may repeat.
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var s = df.sample(10, replace=True, random_state=42)
+    assert_equal(s.shape()[0], 10)
+    assert_equal(s.shape()[1], 1)
 
 
 def test_filter_items() raises:
