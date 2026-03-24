@@ -310,6 +310,24 @@ def test_to_records_no_index() raises:
     assert_equal(Int(records[0]["v"][Int64]), 1)
 
 
+def test_to_records_index_collision() raises:
+    """DataFrame.to_records raises when a column is named 'index' and index=True."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1], 'index': [99]}")))
+    # index=True (default) must raise
+    var raised = False
+    try:
+        _ = df.to_records()
+        raised = False
+    except:
+        raised = True
+    assert_true(raised)
+    # index=False must succeed and return the column value
+    var records = df.to_records(index=False)
+    assert_equal(len(records), 1)
+    assert_equal(Int(records[0]["index"][Int64]), 99)
+
+
 def test_to_numpy_int_float() raises:
     """DataFrame.to_numpy returns a row-major list of Float64 lists for numeric columns."""
     var pd = Python.import_module("pandas")
