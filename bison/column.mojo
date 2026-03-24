@@ -3611,9 +3611,9 @@ def _col_cell_pyobj(col: Column, row: Int) raises -> PythonObject:
 def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
     """Extract cell (*row*) from *col* as a ``DFScalar``.
 
-    Returns ``DFScalar.null()`` when the cell is masked.  Raises for
-    ``List[PythonObject]`` columns (object / datetime) since ``DFScalar``
-    has no ``PythonObject`` arm.
+    Returns ``DFScalar.null()`` when the cell is masked.
+    ``List[PythonObject]`` cells are stringified since ``DFScalar`` has no
+    ``PythonObject`` arm.
     """
     if len(col._null_mask) > 0 and col._null_mask[row]:
         return DFScalar.null()
@@ -3626,7 +3626,7 @@ def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
     elif col._data.isa[List[String]]():
         return DFScalar(col._data[List[String]][row])
     else:
-        raise Error("scalar access not supported for object/datetime columns")
+        return DFScalar(String(col._data[List[PythonObject]][row]))
 
 
 def _col_cell_str(col: Column, row: Int) raises -> String:
