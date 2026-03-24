@@ -1,6 +1,6 @@
 """Tests for DataFrame combining methods: merge, join, append."""
 from std.python import Python
-from testing import assert_true, assert_equal, TestSuite
+from std.testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame
 
 

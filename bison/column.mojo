@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.utils import Variant
 from std.memory import bitcast
 from std.collections import Dict, Set
-from math import sqrt, floor
+from std.math import sqrt, floor
 from .index import Index, ColumnIndex
 from .dtypes import (
     BisonDtype,

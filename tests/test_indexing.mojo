@@ -1,7 +1,7 @@
 """Tests for DataFrame loc / iloc / at / iat indexers (issue #5)."""
 from std.python import Python, PythonObject
 from std.memory import UnsafePointer
-from testing import assert_equal, assert_true, assert_false, TestSuite
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import DataFrame, Series, DFScalar, IAtIndexer, AtIndexer, ILocIndexer, LocIndexer
 
 

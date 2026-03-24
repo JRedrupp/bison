@@ -1,6 +1,6 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
-from testing import assert_equal, assert_true, TestSuite
+from std.testing import assert_equal, assert_true, TestSuite
 from bison import DataFrame, Series, Column, ColumnData, int64
 
 

@@ -1,6 +1,6 @@
 """Tests that groupby stubs raise 'not implemented'."""
 from std.python import Python
-from testing import assert_true, TestSuite
+from std.testing import assert_true, TestSuite
 from bison import DataFrame, DataFrameGroupBy
 
 

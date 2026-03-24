@@ -1,6 +1,6 @@
 from std.collections import Set
 from std.python import PythonObject
-from builtin.sort import sort
+from std.builtin.sort import sort
 from std.utils import Variant
 
 

@@ -1,6 +1,6 @@
 """Tests for bison.concat."""
 from std.python import Python, PythonObject
-from testing import assert_true, assert_equal, TestSuite
+from std.testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, concat
 
 

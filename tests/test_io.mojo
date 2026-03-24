@@ -1,6 +1,6 @@
 """Tests for DataFrame IO (read and write methods)."""
 from std.python import Python
-from testing import assert_equal, assert_true, TestSuite
+from std.testing import assert_equal, assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame, DFScalar
 
 

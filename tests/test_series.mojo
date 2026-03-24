@@ -1,6 +1,6 @@
 """Tests for Series construction and basic attributes."""
 from std.python import Python, PythonObject
-from testing import assert_equal, assert_true, assert_false, TestSuite
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import Series, SeriesScalar, DFScalar, FloatTransformFn, DataFrame
 
 

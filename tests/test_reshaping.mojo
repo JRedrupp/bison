@@ -1,7 +1,7 @@
 """Tests for reshaping operations."""
 from std.python import Python, PythonObject
 from std.collections import Dict, Optional
-from testing import assert_true, assert_equal, TestSuite
+from std.testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame, Series, SeriesScalar, DFScalar
 
 
