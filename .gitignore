@@ -5,5 +5,7 @@ __pycache__/
 .claude/
 SESSION.md
 *.mojopkg
+.bison-cache/
+.test-bin/
 dist/
 .test-pass-count
