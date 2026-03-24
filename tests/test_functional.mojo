@@ -1,6 +1,6 @@
 """Tests functional methods: abs, agg, aggregate, apply, transform, eval, query, pipe, applymap."""
 from std.python import Python
-from testing import assert_true, TestSuite
+from std.testing import assert_true, TestSuite
 from bison import DataFrame, Series
 
 

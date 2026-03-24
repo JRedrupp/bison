@@ -1,7 +1,7 @@
 """Tests aggregation methods."""
 from std.python import Python
-from testing import assert_true, TestSuite
-from math import isnan
+from std.testing import assert_true, TestSuite
+from std.math import isnan
 from bison import DataFrame, Series
 
 

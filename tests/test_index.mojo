@@ -1,5 +1,5 @@
 """Tests for Index methods: get_loc, unique, sort_values."""
-from testing import assert_equal, assert_true, TestSuite
+from std.testing import assert_equal, assert_true, TestSuite
 from bison import Index
 
 

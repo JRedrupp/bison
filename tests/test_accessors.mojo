@@ -1,6 +1,6 @@
 """Tests for .str string accessor methods and .dt accessor stubs."""
 from std.python import Python
-from testing import assert_true, assert_false, assert_equal, TestSuite
+from std.testing import assert_true, assert_false, assert_equal, TestSuite
 from bison import Series
 
 

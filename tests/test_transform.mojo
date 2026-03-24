@@ -1,6 +1,6 @@
 """Tests transformation methods: shift, diff, pct_change."""
 from std.python import Python
-from testing import assert_true, TestSuite
+from std.testing import assert_true, TestSuite
 from bison import DataFrame, Series
 
 
