@@ -31,10 +31,10 @@ def _parse_int_label(label: String) raises -> Int:
     var bytes = label.as_bytes()
     var start = 0
     var negative = False
-    if bytes[0] == ord('-'):
+    if bytes[0] == UInt8(ord('-')):
         negative = True
         start = 1
-    elif bytes[0] == ord('+'):
+    elif bytes[0] == UInt8(ord('+')):
         start = 1
     if start >= n:
         raise Error("loc: invalid row label: " + label)
