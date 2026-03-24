@@ -241,31 +241,33 @@ def test_to_excel_writes_file() raises:
 
 
 def test_to_dict_int_columns() raises:
-    """DataFrame.to_dict returns a dict mapping column name to list of values (int)."""
+    """DataFrame.to_dict returns a nested dict {col: {index_label: value}}."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
     var d = df.to_dict()
-    # Column 'a' should have 3 entries
+    # Each column maps to an inner dict keyed by stringified row index
     assert_equal(len(d["a"]), 3)
     assert_equal(len(d["b"]), 3)
-    assert_true(d["a"][0].isa[Int64]())
-    assert_equal(Int(d["a"][0][Int64]), 1)
-    assert_equal(Int(d["a"][1][Int64]), 2)
-    assert_equal(Int(d["b"][0][Int64]), 4)
+    assert_true(d["a"]["0"].isa[Int64]())
+    assert_equal(Int(d["a"]["0"][Int64]), 1)
+    assert_equal(Int(d["a"]["1"][Int64]), 2)
+    assert_equal(Int(d["b"]["0"][Int64]), 4)
 
 
 def test_to_dict_list_orient() raises:
-    """DataFrame.to_dict with orient='list' produces the same result as the default."""
+    """DataFrame.to_dict raises for orient='list' (unsupported; use to_records)."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
-    var d = df.to_dict(orient="list")
-    assert_equal(len(d["x"]), 2)
-    assert_equal(Int(d["x"][0][Int64]), 10)
-    assert_equal(Int(d["x"][1][Int64]), 20)
+    var raised = False
+    try:
+        _ = df.to_dict(orient="list")
+    except:
+        raised = True
+    assert_true(raised)
 
 
 def test_to_dict_unsupported_orient() raises:
-    """DataFrame.to_dict raises for orient values other than 'dict' and 'list'."""
+    """DataFrame.to_dict raises for orient values other than 'dict'."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var raised = False
@@ -417,10 +419,10 @@ def test_null_sentinel_to_dict() raises:
     var py = Python.evaluate("{'v': [10, None, 30]}")
     var df = DataFrame(pd.DataFrame(py))
     var d = df.to_dict()
-    var values = d["v"].copy()
-    assert_true(not values[0].is_null())
-    assert_true(values[1].is_null())
-    assert_true(not values[2].is_null())
+    # Inner dict is keyed by stringified row index
+    assert_true(not d["v"]["0"].is_null())
+    assert_true(d["v"]["1"].is_null())
+    assert_true(not d["v"]["2"].is_null())
 
 
 def test_null_roundtrip_records() raises:
