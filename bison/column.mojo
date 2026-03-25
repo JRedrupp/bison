@@ -227,6 +227,47 @@ def visit_col_data_raises[V: ColumnDataVisitorRaises](mut visitor: V, data: Colu
 
 
 # ------------------------------------------------------------------
+# Mutable raises-capable visitor — for in-place writes to ColumnData
+# ------------------------------------------------------------------
+
+trait ColumnDataMutVisitorRaises:
+    """Mutable raises-capable visitor for in-place writes to a ``ColumnData`` arm.
+
+    Implement one ``on_*`` method per arm.  Each method receives a *mutable*
+    reference to the underlying list, allowing O(1) element writes without
+    copying the whole list.  Pass an instance to
+    ``visit_col_data_mut_raises``.
+    """
+
+    def on_int64(mut self, mut data: List[Int64]) raises: ...
+    def on_float64(mut self, mut data: List[Float64]) raises: ...
+    def on_bool(mut self, mut data: List[Bool]) raises: ...
+    def on_str(mut self, mut data: List[String]) raises: ...
+    def on_obj(mut self, mut data: List[PythonObject]) raises: ...
+
+
+def visit_col_data_mut_raises[V: ColumnDataMutVisitorRaises](mut visitor: V, mut data: ColumnData) raises:
+    """Mutable raises-capable dispatch that passes each arm by mutable reference.
+
+    Because *data* is ``mut``, each ``data[ArmType]`` subscript yields a
+    mutable reference, enabling O(1) in-place element writes inside ``on_*``
+    methods.  Add new ``ColumnData`` arms here, in
+    ``ColumnDataMutVisitorRaises``, ``visit_col_data``, and
+    ``visit_col_data_raises``.
+    """
+    if data.isa[List[Int64]]():
+        visitor.on_int64(data[List[Int64]])
+    elif data.isa[List[Float64]]():
+        visitor.on_float64(data[List[Float64]])
+    elif data.isa[List[Bool]]():
+        visitor.on_bool(data[List[Bool]])
+    elif data.isa[List[String]]():
+        visitor.on_str(data[List[String]])
+    else:
+        visitor.on_obj(data[List[PythonObject]])
+
+
+# ------------------------------------------------------------------
 # DFScalar visit primitive — single canonical dispatch site
 # ------------------------------------------------------------------
 
@@ -2082,67 +2123,60 @@ struct _ScalarFromColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = DFScalar(String(data[self.row]))
 
 
-struct _SetScalarInColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Visitor that writes a ``DFScalar`` into position *row* of a column.
+struct _SetScalarInColMutVisitor(ColumnDataMutVisitorRaises, Copyable, Movable):
+    """Visitor that writes a ``DFScalar`` in-place at position *row* of a column.
 
-    Produces a new ``ColumnData`` stored in ``col_data``; the caller must
-    assign ``col._data = visitor.col_data^`` after dispatching.
+    Mutates the ``ColumnData`` arm directly (O(1)) without copying the list.
     Type-coercion mirrors pandas ``at`` / ``iat`` behaviour.
+
+    The caller is responsible for bounds-checking *row* before constructing
+    this visitor.  Out-of-bounds access will raise at the list subscript site,
+    which is the same observable behaviour as the previous copy-based approach.
     """
     var row: Int
     var value: DFScalar
-    var col_data: ColumnData
 
     def __init__(out self, row: Int, value: DFScalar):
         self.row = row
         self.value = value
-        self.col_data = ColumnData(List[PythonObject]())
 
-    def on_int64(mut self, data: List[Int64]) raises:
-        var new_data = data.copy()
+    def on_int64(mut self, mut data: List[Int64]) raises:
         if self.value.isa[Int64]():
-            new_data[self.row] = self.value[Int64]
+            data[self.row] = self.value[Int64]
         elif self.value.isa[Float64]():
-            new_data[self.row] = Int64(Int(self.value[Float64]))
+            data[self.row] = Int64(Int(self.value[Float64]))
         elif self.value.isa[Bool]():
-            new_data[self.row] = Int64(1) if self.value[Bool] else Int64(0)
+            data[self.row] = Int64(1) if self.value[Bool] else Int64(0)
         else:
             raise Error("iat/at: cannot assign String to int column")
-        self.col_data = ColumnData(new_data^)
 
-    def on_float64(mut self, data: List[Float64]) raises:
-        var new_data = data.copy()
+    def on_float64(mut self, mut data: List[Float64]) raises:
         if self.value.isa[Float64]():
-            new_data[self.row] = self.value[Float64]
+            data[self.row] = self.value[Float64]
         elif self.value.isa[Int64]():
-            new_data[self.row] = Float64(Int(self.value[Int64]))
+            data[self.row] = Float64(Int(self.value[Int64]))
         elif self.value.isa[Bool]():
-            new_data[self.row] = Float64(1) if self.value[Bool] else Float64(0)
+            data[self.row] = Float64(1) if self.value[Bool] else Float64(0)
         else:
             raise Error("iat/at: cannot assign String to float column")
-        self.col_data = ColumnData(new_data^)
 
-    def on_bool(mut self, data: List[Bool]) raises:
-        var new_data = data.copy()
+    def on_bool(mut self, mut data: List[Bool]) raises:
         if self.value.isa[Bool]():
-            new_data[self.row] = self.value[Bool]
+            data[self.row] = self.value[Bool]
         elif self.value.isa[Int64]():
-            new_data[self.row] = self.value[Int64] != 0
+            data[self.row] = self.value[Int64] != 0
         elif self.value.isa[Float64]():
-            new_data[self.row] = self.value[Float64] != 0.0
+            data[self.row] = self.value[Float64] != 0.0
         else:
             raise Error("iat/at: cannot assign String to bool column")
-        self.col_data = ColumnData(new_data^)
 
-    def on_str(mut self, data: List[String]) raises:
-        var new_data = data.copy()
+    def on_str(mut self, mut data: List[String]) raises:
         if self.value.isa[String]():
-            new_data[self.row] = self.value[String]
+            data[self.row] = self.value[String]
         else:
             raise Error("iat/at: cannot assign non-String to string column")
-        self.col_data = ColumnData(new_data^)
 
-    def on_obj(mut self, data: List[PythonObject]) raises:
+    def on_obj(mut self, mut data: List[PythonObject]) raises:
         raise Error("iat/at: scalar write not supported for object/datetime columns")
 
 

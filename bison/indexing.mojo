@@ -1,6 +1,6 @@
 from std.python import PythonObject
 from std.memory import UnsafePointer
-from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col, _col_cell_pyobj, _SetScalarInColVisitor, visit_col_data_raises
+from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col, _col_cell_pyobj, _SetScalarInColMutVisitor, visit_col_data_mut_raises
 from .index import ColumnIndex
 from .dtypes import object_
 from .series import Series
@@ -89,9 +89,8 @@ def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     * String value → String column only.
     Raises when the types are incompatible.
     """
-    var visitor = _SetScalarInColVisitor(row, value)
-    visit_col_data_raises(visitor, col._data)
-    col._data = visitor.col_data.copy()
+    var visitor = _SetScalarInColMutVisitor(row, value)
+    visit_col_data_mut_raises(visitor, col._data)
 
 
 def _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
