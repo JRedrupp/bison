@@ -1342,7 +1342,7 @@ struct Series(Copyable, Movable):
 # Shared string-list utilities
 # ------------------------------------------------------------------
 
-def _frame_cell_as_python(col: Column, row: Int, py_none: PythonObject) raises -> PythonObject:
+def _frame_cell_as_python(col: Column, row: Int) raises -> PythonObject:
     """Return the value at *row* in *col* as a PythonObject.
 
     Null cells return Python ``None``.  Used by the native reshaping methods
@@ -3106,7 +3106,7 @@ struct DataFrame(Copyable, Movable):
         var n_ck = len(col_keys)
 
         # Build a dense values table (row_key × col_key).
-        # _table[rk][ck] holds a PythonObject value or py_none.
+        # _table[rk][ck] holds a PythonObject value or Python None.
         # We also track which cells were filled to detect duplicates.
         var table = List[List[PythonObject]]()
         var filled = List[List[Bool]]()
@@ -3125,7 +3125,7 @@ struct DataFrame(Copyable, Movable):
             if filled[rk][ck]:
                 raise Error("DataFrame.pivot: duplicate entry for (" +
                             row_keys[rk] + ", " + col_keys[ck] + ")")
-            table[rk][ck] = _frame_cell_as_python(self._cols[val_ci], r, py_none)
+            table[rk][ck] = _frame_cell_as_python(self._cols[val_ci], r)
             filled[rk][ck] = True
 
         # Construct index labels (string Index) shared by all result columns.
@@ -3236,7 +3236,7 @@ struct DataFrame(Copyable, Movable):
                     any_null = True
                 else:
                     val_null_mask.append(False)
-                    val_data.append(_frame_cell_as_python(vcol, r, py_none))
+                    val_data.append(_frame_cell_as_python(vcol, r))
         var val_col = Column(value_name, ColumnData(val_data^), object_)
         if any_null:
             val_col._null_mask = val_null_mask^
@@ -3285,7 +3285,7 @@ struct DataFrame(Copyable, Movable):
                     any_null = True
                 else:
                     null_mask.append(False)
-                    val_data.append(_frame_cell_as_python(col, r, py_none))
+                    val_data.append(_frame_cell_as_python(col, r))
 
         var result_col = Column("", ColumnData(val_data^), object_,
                                 ColumnIndex(idx_objs^))
@@ -3339,7 +3339,7 @@ struct DataFrame(Copyable, Movable):
                     any_null = True
                 else:
                     null_mask.append(False)
-                    data.append(_frame_cell_as_python(col, r, py_none))
+                    data.append(_frame_cell_as_python(col, r))
 
             var new_col = Column(col_name, ColumnData(data^), object_)
             new_col._index = shared_idx
@@ -3423,7 +3423,7 @@ struct DataFrame(Copyable, Movable):
                         any_null = True
                     elif sub == -1:
                         # Scalar: keep value as-is.
-                        data.append(_frame_cell_as_python(exp_col, r, py_none))
+                        data.append(_frame_cell_as_python(exp_col, r))
                         null_mask.append(False)
                     else:
                         # List element.
