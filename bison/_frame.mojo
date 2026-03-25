@@ -1345,19 +1345,10 @@ struct Series(Copyable, Movable):
 def _frame_cell_as_python(col: Column, row: Int, py_none: PythonObject) raises -> PythonObject:
     """Return the value at *row* in *col* as a PythonObject.
 
-    Null cells return *py_none*.  Used by the native reshaping methods
+    Null cells return Python ``None``.  Used by the native reshaping methods
     (transpose, melt, pivot, stack, explode) to avoid repeated isa chains.
     """
-    if col._data.isa[List[Int64]]():
-        return PythonObject(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return PythonObject(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return PythonObject(col._data[List[Bool]][row])
-    elif col._data.isa[List[String]]():
-        return PythonObject(col._data[List[String]][row])
-    else:
-        return col._data[List[PythonObject]][row]
+    return _col_cell_pyobj(col, row)
 
 
 def _frame_cell_as_str(col: Column, row: Int) raises -> String:
@@ -1365,16 +1356,7 @@ def _frame_cell_as_str(col: Column, row: Int) raises -> String:
 
     Used by ``DataFrame.pivot`` to build row/column key dictionaries.
     """
-    if col._data.isa[List[Int64]]():
-        return String(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return String(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return String("True") if col._data[List[Bool]][row] else String("False")
-    elif col._data.isa[List[String]]():
-        return col._data[List[String]][row]
-    else:
-        return String(col._data[List[PythonObject]][row])
+    return _col_cell_str(col, row)
 
 
 def _html_escape(s: String) -> String:
