@@ -1989,6 +1989,642 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.col_data = ColumnData(result^)
 
 
+# ------------------------------------------------------------------
+# Single-cell extraction visitors
+# ------------------------------------------------------------------
+
+struct _CellToPyObjVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that extracts one cell at *row* as a ``PythonObject``.
+
+    Does not check the null mask — callers that need null handling must check
+    before dispatching (see ``_col_cell_pyobj``).
+    """
+    var row: Int
+    var result: PythonObject
+
+    def __init__(out self, row: Int):
+        self.row = row
+        self.result = PythonObject(0)
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self.result = PythonObject(Int(data[self.row]))
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self.result = PythonObject(data[self.row])
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self.result = PythonObject(data[self.row])
+
+    def on_str(mut self, data: List[String]) raises:
+        self.result = PythonObject(data[self.row])
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        self.result = data[self.row]
+
+
+struct _CellToStrVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that extracts one cell at *row* as a ``String``.
+
+    Does not check the null mask — callers that need null handling must check
+    before dispatching (see ``_col_cell_str``).
+    """
+    var row: Int
+    var result: String
+
+    def __init__(out self, row: Int):
+        self.row = row
+        self.result = String("")
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self.result = String(Int(data[self.row]))
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self.result = String(data[self.row])
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self.result = String("True") if data[self.row] else String("False")
+
+    def on_str(mut self, data: List[String]) raises:
+        self.result = data[self.row]
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        self.result = String(data[self.row])
+
+
+struct _ScalarFromColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that extracts one cell at *row* as a ``DFScalar``.
+
+    Does not check the null mask — callers that need null handling must check
+    before dispatching (see ``_scalar_from_col``).
+    ``List[PythonObject]`` cells are stringified since ``DFScalar`` has no
+    ``PythonObject`` arm.
+    """
+    var row: Int
+    var result: DFScalar
+
+    def __init__(out self, row: Int):
+        self.row = row
+        self.result = DFScalar.null()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self.result = DFScalar(data[self.row])
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self.result = DFScalar(data[self.row])
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self.result = DFScalar(data[self.row])
+
+    def on_str(mut self, data: List[String]) raises:
+        self.result = DFScalar(data[self.row])
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        self.result = DFScalar(String(data[self.row]))
+
+
+struct _SetScalarInColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that writes a ``DFScalar`` into position *row* of a column.
+
+    Produces a new ``ColumnData`` stored in ``col_data``; the caller must
+    assign ``col._data = visitor.col_data^`` after dispatching.
+    Type-coercion mirrors pandas ``at`` / ``iat`` behaviour.
+    """
+    var row: Int
+    var value: DFScalar
+    var col_data: ColumnData
+
+    def __init__(out self, row: Int, value: DFScalar):
+        self.row = row
+        self.value = value
+        self.col_data = ColumnData(List[PythonObject]())
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var new_data = data.copy()
+        if self.value.isa[Int64]():
+            new_data[self.row] = self.value[Int64]
+        elif self.value.isa[Float64]():
+            new_data[self.row] = Int64(Int(self.value[Float64]))
+        elif self.value.isa[Bool]():
+            new_data[self.row] = Int64(1) if self.value[Bool] else Int64(0)
+        else:
+            raise Error("iat/at: cannot assign String to int column")
+        self.col_data = ColumnData(new_data^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var new_data = data.copy()
+        if self.value.isa[Float64]():
+            new_data[self.row] = self.value[Float64]
+        elif self.value.isa[Int64]():
+            new_data[self.row] = Float64(Int(self.value[Int64]))
+        elif self.value.isa[Bool]():
+            new_data[self.row] = Float64(1) if self.value[Bool] else Float64(0)
+        else:
+            raise Error("iat/at: cannot assign String to float column")
+        self.col_data = ColumnData(new_data^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var new_data = data.copy()
+        if self.value.isa[Bool]():
+            new_data[self.row] = self.value[Bool]
+        elif self.value.isa[Int64]():
+            new_data[self.row] = self.value[Int64] != 0
+        elif self.value.isa[Float64]():
+            new_data[self.row] = self.value[Float64] != 0.0
+        else:
+            raise Error("iat/at: cannot assign String to bool column")
+        self.col_data = ColumnData(new_data^)
+
+    def on_str(mut self, data: List[String]) raises:
+        var new_data = data.copy()
+        if self.value.isa[String]():
+            new_data[self.row] = self.value[String]
+        else:
+            raise Error("iat/at: cannot assign non-String to string column")
+        self.col_data = ColumnData(new_data^)
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("iat/at: scalar write not supported for object/datetime columns")
+
+
+# ------------------------------------------------------------------
+# Cumulative operation visitors
+# ------------------------------------------------------------------
+
+struct _CumSumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that computes the cumulative sum of the active ColumnData arm.
+
+    Stores ``col_data``, ``result_mask``, and ``has_any_null`` for use with
+    ``_build_result_col``.  Integer input produces an Int64 result; Float64
+    and Bool input produce Float64.
+    """
+    var skipna: Bool
+    var null_mask: List[Bool]
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+        self.skipna = skipna
+        self.null_mask = null_mask.copy()
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Int64(0)
+        var result_data = List[Int64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running += data[i]
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running += data[i]
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running += Float64(1.0) if data[i] else Float64(0.0)
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cumsum: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("cumsum: non-numeric column type")
+
+
+struct _CumProdVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that computes the cumulative product of the active ColumnData arm.
+
+    Stores ``col_data``, ``result_mask``, and ``has_any_null`` for use with
+    ``_build_result_col``.  Integer input produces an Int64 result; Float64
+    and Bool input produce Float64.
+    """
+    var skipna: Bool
+    var null_mask: List[Bool]
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+        self.skipna = skipna
+        self.null_mask = null_mask.copy()
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Int64(1)
+        var result_data = List[Int64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running *= data[i]
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Float64(1)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running *= data[i]
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var running = Float64(1)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                running *= Float64(1.0) if data[i] else Float64(0.0)
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cumprod: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("cumprod: non-numeric column type")
+
+
+struct _CumMinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that computes the cumulative minimum of the active ColumnData arm.
+
+    Stores ``col_data``, ``result_mask``, and ``has_any_null`` for use with
+    ``_build_result_col``.  Integer input produces an Int64 result; Float64
+    and Bool input produce Float64.
+    """
+    var skipna: Bool
+    var null_mask: List[Bool]
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+        self.skipna = skipna
+        self.null_mask = null_mask.copy()
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Int64(0)
+        var result_data = List[Int64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if not found or v < running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if not found or v < running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = Float64(1.0) if data[i] else Float64(0.0)
+                if not found or v < running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cummin: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("cummin: non-numeric column type")
+
+
+struct _CumMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that computes the cumulative maximum of the active ColumnData arm.
+
+    Stores ``col_data``, ``result_mask``, and ``has_any_null`` for use with
+    ``_build_result_col``.  Integer input produces an Int64 result; Float64
+    and Bool input produce Float64.
+    """
+    var skipna: Bool
+    var null_mask: List[Bool]
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+        self.skipna = skipna
+        self.null_mask = null_mask.copy()
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Int64(0)
+        var result_data = List[Int64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(Int64(0))
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if not found or v > running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = data[i]
+                if not found or v > running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var propagate_nan = False
+        var found = False
+        var running = Float64(0)
+        var nan = Float64(0) / Float64(0)
+        var result_data = List[Float64]()
+        for i in range(len(data)):
+            var is_null = has_mask and self.null_mask[i]
+            if is_null:
+                if not self.skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v = Float64(1.0) if data[i] else Float64(0.0)
+                if not found or v > running:
+                    running = v
+                    found = True
+                result_data.append(running)
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result_data^)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cummax: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("cummax: non-numeric column type")
+
+
+# ------------------------------------------------------------------
+# Index conversion visitor
+# ------------------------------------------------------------------
+
+struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that converts the active ColumnData arm to a ``ColumnIndex``.
+
+    Int64 → ``List[Int64]`` ColumnIndex; String → ``Index`` (List[String])
+    ColumnIndex; all other types → ``List[PythonObject]`` ColumnIndex,
+    respecting the null mask.
+    """
+    var null_mask: List[Bool]
+    var result: ColumnIndex
+
+    def __init__(out self, null_mask: List[Bool]):
+        self.null_mask = null_mask.copy()
+        self.result = ColumnIndex(List[PythonObject]())
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var result = List[Int64]()
+        for i in range(len(data)):
+            result.append(data[i])
+        self.result = ColumnIndex(result^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var py_none = Python.evaluate("None")
+        var result = List[PythonObject]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(py_none)
+            else:
+                result.append(PythonObject(data[i]))
+        self.result = ColumnIndex(result^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        var py_none = Python.evaluate("None")
+        var result = List[PythonObject]()
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                result.append(py_none)
+            else:
+                result.append(PythonObject(data[i]))
+        self.result = ColumnIndex(result^)
+
+    def on_str(mut self, data: List[String]) raises:
+        var result = List[String]()
+        for i in range(len(data)):
+            result.append(data[i])
+        self.result = ColumnIndex(Index(result^))
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        var result = List[PythonObject]()
+        for i in range(len(data)):
+            result.append(data[i])
+        self.result = ColumnIndex(result^)
+
+
 struct Column(Copyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -2948,30 +3584,11 @@ struct Column(Copyable, Movable, Sized):
 
         Int64 columns produce a List[Int64] ColumnIndex; String columns produce
         an Index (List[String]) ColumnIndex; all other types fall back to
-        List[PythonObject] via the _ToPandasVisitor pattern.
+        List[PythonObject].
         """
-        var n = len(self)
-        if self._data.isa[List[Int64]]():
-            var int_idx = List[Int64]()
-            ref d = self._data[List[Int64]]
-            for i in range(n):
-                int_idx.append(d[i])
-            return ColumnIndex(int_idx^)
-        elif self._data.isa[List[String]]():
-            var str_idx = List[String]()
-            ref d = self._data[List[String]]
-            for i in range(n):
-                str_idx.append(d[i])
-            return ColumnIndex(Index(str_idx^))
-        else:
-            var py_list = Python.evaluate("[]")
-            var py_none = Python.evaluate("None")
-            var visitor = _ToPandasVisitor(py_list, py_none, self._null_mask)
-            visit_col_data_raises(visitor, self._data)
-            var result = List[PythonObject]()
-            for i in range(n):
-                result.append(py_list[i])
-            return ColumnIndex(result^)
+        var visitor = _ToColumnIndexVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return visitor.result
 
     # Kept for backward compatibility with callers that still need raw PythonObject.
     def _to_pyobj_index(self) raises -> List[PythonObject]:
@@ -3019,79 +3636,9 @@ struct Column(Copyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
-        var has_mask = len(self._null_mask) > 0
-        var propagate_nan = False
-        var result_mask = List[Bool]()
-
-        if self._data.isa[List[Int64]]():
-            var running = Int64(0)
-            var result_data = List[Int64]()
-            for i in range(len(self._data[List[Int64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(Int64(0))  # masked by result_mask; value irrelevant
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(Int64(0))  # masked
-                    result_mask.append(True)
-                else:
-                    running += self._data[List[Int64]][i]
-                    result_data.append(running)
-                    result_mask.append(False)
-            var col_data = ColumnData(result_data^)
-            var has_any_null = False
-            for i in range(len(result_mask)):
-                if result_mask[i]:
-                    has_any_null = True
-                    break
-            return self._build_result_col(col_data^, result_mask^, has_any_null)
-
-        var running = Float64(0)
-        var result_data = List[Float64]()
-        var nan = Float64(0) / Float64(0)
-
-        if self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    running += self._data[List[Float64]][i]
-                    result_data.append(running)
-                    result_mask.append(False)
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    running += Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                    result_data.append(running)
-                    result_mask.append(False)
-        else:
-            raise Error("cumsum: non-numeric column type")
-
-        var col_data = ColumnData(result_data^)
-        var has_any_null = False
-        for i in range(len(result_mask)):
-            if result_mask[i]:
-                has_any_null = True
-                break
-        return self._build_result_col(col_data^, result_mask^, has_any_null)
+        var visitor = _CumSumVisitor(skipna, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     def cumprod(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative products, preserving dtype.
@@ -3102,79 +3649,9 @@ struct Column(Copyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
-        var has_mask = len(self._null_mask) > 0
-        var propagate_nan = False
-        var result_mask = List[Bool]()
-
-        if self._data.isa[List[Int64]]():
-            var running = Int64(1)
-            var result_data = List[Int64]()
-            for i in range(len(self._data[List[Int64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                else:
-                    running *= self._data[List[Int64]][i]
-                    result_data.append(running)
-                    result_mask.append(False)
-            var col_data = ColumnData(result_data^)
-            var has_any_null = False
-            for i in range(len(result_mask)):
-                if result_mask[i]:
-                    has_any_null = True
-                    break
-            return self._build_result_col(col_data^, result_mask^, has_any_null)
-
-        var running = Float64(1)
-        var result_data = List[Float64]()
-        var nan = Float64(0) / Float64(0)
-
-        if self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    running *= self._data[List[Float64]][i]
-                    result_data.append(running)
-                    result_mask.append(False)
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    running *= Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                    result_data.append(running)
-                    result_mask.append(False)
-        else:
-            raise Error("cumprod: non-numeric column type")
-
-        var col_data = ColumnData(result_data^)
-        var has_any_null = False
-        for i in range(len(result_mask)):
-            if result_mask[i]:
-                has_any_null = True
-                break
-        return self._build_result_col(col_data^, result_mask^, has_any_null)
+        var visitor = _CumProdVisitor(skipna, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     def cummin(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative minimums, preserving dtype.
@@ -3185,89 +3662,9 @@ struct Column(Copyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
-        var has_mask = len(self._null_mask) > 0
-        var found = False
-        var propagate_nan = False
-        var result_mask = List[Bool]()
-
-        if self._data.isa[List[Int64]]():
-            var running = Int64(0)
-            var result_data = List[Int64]()
-            for i in range(len(self._data[List[Int64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                else:
-                    var v = self._data[List[Int64]][i]
-                    if not found or v < running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-            var col_data = ColumnData(result_data^)
-            var has_any_null = False
-            for i in range(len(result_mask)):
-                if result_mask[i]:
-                    has_any_null = True
-                    break
-            return self._build_result_col(col_data^, result_mask^, has_any_null)
-
-        var running = Float64(0)
-        var result_data = List[Float64]()
-        var nan = Float64(0) / Float64(0)
-
-        if self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    var v = self._data[List[Float64]][i]
-                    if not found or v < running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                    if not found or v < running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-        else:
-            raise Error("cummin: non-numeric column type")
-
-        var col_data = ColumnData(result_data^)
-        var has_any_null = False
-        for i in range(len(result_mask)):
-            if result_mask[i]:
-                has_any_null = True
-                break
-        return self._build_result_col(col_data^, result_mask^, has_any_null)
+        var visitor = _CumMinVisitor(skipna, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     def cummax(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative maximums, preserving dtype.
@@ -3278,89 +3675,9 @@ struct Column(Copyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
-        var has_mask = len(self._null_mask) > 0
-        var found = False
-        var propagate_nan = False
-        var result_mask = List[Bool]()
-
-        if self._data.isa[List[Int64]]():
-            var running = Int64(0)
-            var result_data = List[Int64]()
-            for i in range(len(self._data[List[Int64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(Int64(0))
-                    result_mask.append(True)
-                else:
-                    var v = self._data[List[Int64]][i]
-                    if not found or v > running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-            var col_data = ColumnData(result_data^)
-            var has_any_null = False
-            for i in range(len(result_mask)):
-                if result_mask[i]:
-                    has_any_null = True
-                    break
-            return self._build_result_col(col_data^, result_mask^, has_any_null)
-
-        var running = Float64(0)
-        var result_data = List[Float64]()
-        var nan = Float64(0) / Float64(0)
-
-        if self._data.isa[List[Float64]]():
-            for i in range(len(self._data[List[Float64]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    var v = self._data[List[Float64]][i]
-                    if not found or v > running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-        elif self._data.isa[List[Bool]]():
-            for i in range(len(self._data[List[Bool]])):
-                var is_null = has_mask and self._null_mask[i]
-                if is_null:
-                    if not skipna:
-                        propagate_nan = True
-                    result_data.append(nan)
-                    result_mask.append(True)
-                elif propagate_nan:
-                    result_data.append(nan)
-                    result_mask.append(True)
-                else:
-                    var v = Float64(1.0) if self._data[List[Bool]][i] else Float64(0.0)
-                    if not found or v > running:
-                        running = v
-                        found = True
-                    result_data.append(running)
-                    result_mask.append(False)
-        else:
-            raise Error("cummax: non-numeric column type")
-
-        var col_data = ColumnData(result_data^)
-        var has_any_null = False
-        for i in range(len(result_mask)):
-            if result_mask[i]:
-                has_any_null = True
-                break
-        return self._build_result_col(col_data^, result_mask^, has_any_null)
+        var visitor = _CumMaxVisitor(skipna, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
 
     # ------------------------------------------------------------------
     # Pandas interop
@@ -3630,16 +3947,9 @@ def _col_cell_pyobj(col: Column, row: Int) raises -> PythonObject:
     var has_mask = len(col._null_mask) > 0
     if has_mask and row < len(col._null_mask) and col._null_mask[row]:
         return Python.evaluate("None")
-    if col._data.isa[List[Int64]]():
-        return PythonObject(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return PythonObject(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return PythonObject(col._data[List[Bool]][row])
-    elif col._data.isa[List[String]]():
-        return PythonObject(col._data[List[String]][row])
-    else:
-        return col._data[List[PythonObject]][row]
+    var visitor = _CellToPyObjVisitor(row)
+    visit_col_data_raises(visitor, col._data)
+    return visitor.result
 
 
 def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
@@ -3651,16 +3961,9 @@ def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
     """
     if len(col._null_mask) > 0 and col._null_mask[row]:
         return DFScalar.null()
-    if col._data.isa[List[Int64]]():
-        return DFScalar(col._data[List[Int64]][row])
-    elif col._data.isa[List[Float64]]():
-        return DFScalar(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        return DFScalar(col._data[List[Bool]][row])
-    elif col._data.isa[List[String]]():
-        return DFScalar(col._data[List[String]][row])
-    else:
-        return DFScalar(String(col._data[List[PythonObject]][row]))
+    var visitor = _ScalarFromColVisitor(row)
+    visit_col_data_raises(visitor, col._data)
+    return visitor.result
 
 
 def _col_cell_str(col: Column, row: Int) raises -> String:
@@ -3671,15 +3974,6 @@ def _col_cell_str(col: Column, row: Int) raises -> String:
     var has_mask = len(col._null_mask) > 0
     if has_mask and row < len(col._null_mask) and col._null_mask[row]:
         return String("")
-    if col._data.isa[List[Int64]]():
-        return String(Int(col._data[List[Int64]][row]))
-    elif col._data.isa[List[Float64]]():
-        return String(col._data[List[Float64]][row])
-    elif col._data.isa[List[Bool]]():
-        if col._data[List[Bool]][row]:
-            return String("True")
-        return String("False")
-    elif col._data.isa[List[String]]():
-        return col._data[List[String]][row]
-    else:
-        return String(col._data[List[PythonObject]][row])
+    var visitor = _CellToStrVisitor(row)
+    visit_col_data_raises(visitor, col._data)
+    return visitor.result

@@ -1,6 +1,6 @@
 from std.python import PythonObject
 from std.memory import UnsafePointer
-from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col
+from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col, _col_cell_pyobj, _SetScalarInColVisitor, visit_col_data_raises
 from .index import ColumnIndex
 from .dtypes import object_
 from .series import Series
@@ -89,40 +89,9 @@ def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     * String value → String column only.
     Raises when the types are incompatible.
     """
-    if col._data.isa[List[Int64]]():
-        if value.isa[Int64]():
-            col._data[List[Int64]][row] = value[Int64]
-        elif value.isa[Float64]():
-            col._data[List[Int64]][row] = Int64(Int(value[Float64]))
-        elif value.isa[Bool]():
-            col._data[List[Int64]][row] = Int64(1) if value[Bool] else Int64(0)
-        else:
-            raise Error("iat/at: cannot assign String to int column")
-    elif col._data.isa[List[Float64]]():
-        if value.isa[Float64]():
-            col._data[List[Float64]][row] = value[Float64]
-        elif value.isa[Int64]():
-            col._data[List[Float64]][row] = Float64(Int(value[Int64]))
-        elif value.isa[Bool]():
-            col._data[List[Float64]][row] = Float64(1) if value[Bool] else Float64(0)
-        else:
-            raise Error("iat/at: cannot assign String to float column")
-    elif col._data.isa[List[Bool]]():
-        if value.isa[Bool]():
-            col._data[List[Bool]][row] = value[Bool]
-        elif value.isa[Int64]():
-            col._data[List[Bool]][row] = value[Int64] != 0
-        elif value.isa[Float64]():
-            col._data[List[Bool]][row] = value[Float64] != 0.0
-        else:
-            raise Error("iat/at: cannot assign String to bool column")
-    elif col._data.isa[List[String]]():
-        if value.isa[String]():
-            col._data[List[String]][row] = value[String]
-        else:
-            raise Error("iat/at: cannot assign non-String to string column")
-    else:
-        raise Error("iat/at: scalar write not supported for object/datetime columns")
+    var visitor = _SetScalarInColVisitor(row, value)
+    visit_col_data_raises(visitor, col._data)
+    col._data = visitor.col_data.copy()
 
 
 def _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
@@ -164,17 +133,7 @@ def _row_as_series(df: DataFrame, row: Int) raises -> Series:
     var index = List[PythonObject]()
     for ci in range(ncols):
         index.append(PythonObject(df._cols[ci].name))
-        ref col = df._cols[ci]
-        if col._data.isa[List[Int64]]():
-            data.append(PythonObject(col._data[List[Int64]][row]))
-        elif col._data.isa[List[Float64]]():
-            data.append(PythonObject(col._data[List[Float64]][row]))
-        elif col._data.isa[List[Bool]]():
-            data.append(PythonObject(col._data[List[Bool]][row]))
-        elif col._data.isa[List[String]]():
-            data.append(PythonObject(col._data[List[String]][row]))
-        else:
-            data.append(col._data[List[PythonObject]][row])
+        data.append(_col_cell_pyobj(df._cols[ci], row))
     var result_col = Column("", ColumnData(data^), object_, index^)
     return Series(result_col^)
 
