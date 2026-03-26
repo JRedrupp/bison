@@ -1843,7 +1843,7 @@ struct _SliceVisitor(ColumnDataVisitor, Copyable, Movable):
         self.result = ColumnData(result^)
 
 
-struct _ConcatDataVisitor(ColumnDataVisitor, Copyable, Movable):
+struct _ConcatDataVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Appends *other* data onto the visited arm's list."""
 
     var other: ColumnData
@@ -1853,44 +1853,49 @@ struct _ConcatDataVisitor(ColumnDataVisitor, Copyable, Movable):
         self.other = other
         self.result = ColumnData(List[PythonObject]())
 
-    def on_int64(mut self, data: List[Int64]):
+    def on_int64(mut self, data: List[Int64]) raises:
+        if not self.other.isa[List[Int64]]():
+            raise Error("concat: dtype mismatch")
         var out = data.copy()
-        if self.other.isa[List[Int64]]():
-            ref o = self.other[List[Int64]]
-            for i in range(len(o)):
-                out.append(o[i])
+        ref o = self.other[List[Int64]]
+        for i in range(len(o)):
+            out.append(o[i])
         self.result = ColumnData(out^)
 
-    def on_float64(mut self, data: List[Float64]):
+    def on_float64(mut self, data: List[Float64]) raises:
+        if not self.other.isa[List[Float64]]():
+            raise Error("concat: dtype mismatch")
         var out = data.copy()
-        if self.other.isa[List[Float64]]():
-            ref o = self.other[List[Float64]]
-            for i in range(len(o)):
-                out.append(o[i])
+        ref o = self.other[List[Float64]]
+        for i in range(len(o)):
+            out.append(o[i])
         self.result = ColumnData(out^)
 
-    def on_bool(mut self, data: List[Bool]):
+    def on_bool(mut self, data: List[Bool]) raises:
+        if not self.other.isa[List[Bool]]():
+            raise Error("concat: dtype mismatch")
         var out = data.copy()
-        if self.other.isa[List[Bool]]():
-            ref o = self.other[List[Bool]]
-            for i in range(len(o)):
-                out.append(o[i])
+        ref o = self.other[List[Bool]]
+        for i in range(len(o)):
+            out.append(o[i])
         self.result = ColumnData(out^)
 
-    def on_str(mut self, data: List[String]):
+    def on_str(mut self, data: List[String]) raises:
+        if not self.other.isa[List[String]]():
+            raise Error("concat: dtype mismatch")
         var out = data.copy()
-        if self.other.isa[List[String]]():
-            ref o = self.other[List[String]]
-            for i in range(len(o)):
-                out.append(o[i])
+        ref o = self.other[List[String]]
+        for i in range(len(o)):
+            out.append(o[i])
         self.result = ColumnData(out^)
 
-    def on_obj(mut self, data: List[PythonObject]):
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        if not self.other.isa[List[PythonObject]]():
+            raise Error("concat: dtype mismatch")
         var out = data.copy()
-        if self.other.isa[List[PythonObject]]():
-            ref o = self.other[List[PythonObject]]
-            for i in range(len(o)):
-                out.append(o[i])
+        ref o = self.other[List[PythonObject]]
+        for i in range(len(o)):
+            out.append(o[i])
         self.result = ColumnData(out^)
 
 
@@ -3384,7 +3389,7 @@ struct Column(Copyable, Movable, Sized):
     def concat(self, other: Column) raises -> Column:
         """Return a new Column with *other* appended row-wise."""
         var visitor = _ConcatDataVisitor(other._data)
-        visit_col_data(visitor, self._data)
+        visit_col_data_raises(visitor, self._data)
         var col = Column(self.name, visitor^.result, self.dtype)
         # Merge null masks only when at least one side has nulls
         if len(self._null_mask) > 0 or len(other._null_mask) > 0:
