@@ -144,6 +144,81 @@ def test_rpow() raises:
     assert_true(Float64(String(rp.iloc[2])) == 4.0)
 
 
+def test_int64_dtype_preserved_add() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[4, 5, 6]"), dtype="int64"))
+    var rp = s1.add(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 5.0)
+    assert_true(Float64(String(rp.iloc[1])) == 7.0)
+    assert_true(Float64(String(rp.iloc[2])) == 9.0)
+
+
+def test_int64_dtype_preserved_sub() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[4, 5, 6]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
+    var rp = s1.sub(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 3.0)
+
+
+def test_int64_dtype_preserved_mul() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[2, 3, 4]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[3, 2, 1]"), dtype="int64"))
+    var rp = s1.mul(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 6.0)
+    assert_true(Float64(String(rp.iloc[1])) == 6.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_int64_div_yields_float64() raises:
+    # True division always returns float64 even for int64 inputs (pandas behaviour).
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[4, 6, 9]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[2, 3, 3]"), dtype="int64"))
+    var rp = s1.div(s2).to_pandas()
+    assert_equal(String(rp.dtype), "float64")
+    assert_true(Float64(String(rp.iloc[0])) == 2.0)
+
+
+def test_int64_dtype_preserved_floordiv() raises:
+    var pd = Python.import_module("pandas")
+    # Python floor division: 7//2=3, -7//2=-4, 7//-2=-4
+    var s1 = Series(pd.Series(Python.evaluate("[7, -7, 7]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[2,  2, -2]"), dtype="int64"))
+    var rp = s1.floordiv(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 3.0)
+    assert_true(Float64(String(rp.iloc[1])) == -4.0)
+    assert_true(Float64(String(rp.iloc[2])) == -4.0)
+
+
+def test_int64_dtype_preserved_mod() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[10, 7, 9]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[3, 4, 5]"), dtype="int64"))
+    var rp = s1.mod(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 1.0)
+    assert_true(Float64(String(rp.iloc[1])) == 3.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
+def test_int64_dtype_preserved_pow() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[2, 3, 4]"), dtype="int64"))
+    var s2 = Series(pd.Series(Python.evaluate("[3, 2, 1]"), dtype="int64"))
+    var rp = s1.pow(s2).to_pandas()
+    assert_equal(String(rp.dtype), "int64")
+    assert_true(Float64(String(rp.iloc[0])) == 8.0)
+    assert_true(Float64(String(rp.iloc[1])) == 9.0)
+    assert_true(Float64(String(rp.iloc[2])) == 4.0)
+
+
 def test_add_length_mismatch() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1, 2]")))

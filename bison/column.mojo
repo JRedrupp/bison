@@ -1832,6 +1832,44 @@ comptime _ARITH_MOD      = 5
 comptime _ARITH_POW      = 6
 
 
+fn _int64_floordiv(a: Int64, b: Int64) -> Int64:
+    """Integer floor division with Python semantics (rounds toward −∞).
+
+    C-style truncating division (``/``) rounds toward zero; when the operands
+    have different signs and the division is not exact the quotient must be
+    decremented by one to match Python's ``//`` behaviour.
+    """
+    var q = a / b
+    if (a < 0) != (b < 0):
+        if q * b != a:
+            q -= Int64(1)
+    return q
+
+
+fn _int64_mod(a: Int64, b: Int64) -> Int64:
+    """Integer modulo with Python semantics (result has the sign of the divisor)."""
+    return a - _int64_floordiv(a, b) * b
+
+
+fn _int64_pow(base: Int64, exp: Int64) -> Int64:
+    """Integer exponentiation by squaring.
+
+    Negative exponents yield 0 for ``|base| > 1``, matching numpy's int64
+    behaviour (integer division truncates the fractional result to zero).
+    """
+    if exp < Int64(0):
+        return Int64(0)
+    var result = Int64(1)
+    var b = base
+    var e = exp
+    while e > Int64(0):
+        if e & Int64(1) == Int64(1):
+            result *= b
+        b *= b
+        e = e >> Int64(1)
+    return result
+
+
 # ------------------------------------------------------------------
 # Compile-time operation selectors for Column._cmp_op
 # ------------------------------------------------------------------
@@ -3199,7 +3237,52 @@ struct Column(Copyable, Movable, Sized):
         ``op`` is a compile-time constant (``_ARITH_*``) that selects the
         operation; ``comptime if`` folds the branch at compile time so each
         specialisation compiles to a tight scalar loop with no runtime dispatch.
+
+        When both columns hold ``int64`` data and the operation is not true
+        division (``_ARITH_DIV``), the kernel works directly on ``List[Int64]``
+        and returns an ``int64`` column, matching pandas' dtype-preserving
+        behaviour.  True division always yields ``float64``.
         """
+        if len(self) != len(other):
+            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+
+        # Int64 fast path: int64 op int64 → int64 for all ops except true division.
+        comptime if op != _ARITH_DIV:
+            if self.dtype == int64 and other.dtype == int64:
+                ref a = self._int64_data()
+                ref b = other._int64_data()
+                var has_a_mask = len(self._null_mask) > 0
+                var has_b_mask = len(other._null_mask) > 0
+                var result = List[Int64]()
+                var result_mask = List[Bool]()
+                var has_any_null = False
+                for i in range(len(a)):
+                    var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+                    if is_null:
+                        result.append(Int64(0))
+                        result_mask.append(True)
+                        has_any_null = True
+                    else:
+                        var v: Int64
+                        comptime if op == _ARITH_ADD:
+                            v = a[i] + b[i]
+                        elif op == _ARITH_SUB:
+                            v = a[i] - b[i]
+                        elif op == _ARITH_MUL:
+                            v = a[i] * b[i]
+                        elif op == _ARITH_FLOORDIV:
+                            v = _int64_floordiv(a[i], b[i])
+                        elif op == _ARITH_MOD:
+                            v = _int64_mod(a[i], b[i])
+                        elif op == _ARITH_POW:
+                            v = _int64_pow(a[i], b[i])
+                        else:
+                            v = Int64(0)  # unreachable
+                        result.append(v)
+                        result_mask.append(False)
+                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+
+        # Float64 path: used when either operand is float64/bool, or for true division.
         var inp = self._binary_op_prepare(op_name, other)
         var result = List[Float64]()
         var result_mask = List[Bool]()
