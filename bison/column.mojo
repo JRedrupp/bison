@@ -6,11 +6,20 @@ from std.math import sqrt, floor
 from .index import Index, ColumnIndex
 from .dtypes import (
     BisonDtype,
-    int8, int16, int32, int64,
-    uint8, uint16, uint32, uint64,
-    float32, float64,
-    bool_, object_,
-    datetime64_ns, timedelta64_ns,
+    int8,
+    int16,
+    int32,
+    int64,
+    uint8,
+    uint16,
+    uint32,
+    uint64,
+    float32,
+    float64,
+    bool_,
+    object_,
+    datetime64_ns,
+    timedelta64_ns,
     dtype_from_string,
 )
 
@@ -28,12 +37,14 @@ comptime ColumnData = Variant[
     List[PythonObject],
 ]
 
+
 # Sentinel type for a null / missing cell in DFScalar.
-struct _Null(Copyable, Movable, ImplicitlyCopyable):
+struct _Null(Copyable, ImplicitlyCopyable, Movable):
     """Sentinel for a missing / null cell in DFScalar."""
 
     def __init__(out self):
         pass
+
 
 # Scalar type for a single cell in row-oriented input (from_records).
 # No PythonObject arm — record values must be explicitly typed.
@@ -43,7 +54,7 @@ struct _Null(Copyable, Movable, ImplicitlyCopyable):
 # construction time.  All four typed arms plus Int and _Null are accepted;
 # Int is normalised to Int64 immediately, so dispatch sites only ever see
 # Int64.  Use DFScalar.null() / is_null() to represent missing values.
-struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
+struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
     var _v: Variant[Int64, Float64, Bool, String, _Null]
 
     @implicit
@@ -88,16 +99,17 @@ struct DFScalar(Copyable, Movable, ImplicitlyCopyable):
     def isa[T: Copyable & Movable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
         return self._v[T]
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
         return self._v[T]
+
 
 # Scalar type returned by Series.iloc / Series.at.
 # Covers all five ColumnData arm types; the PythonObject arm is used only
 # for object/datetime/timedelta columns that have no native Mojo equivalent.
-struct SeriesScalar(Copyable, Movable, ImplicitlyCopyable):
+struct SeriesScalar(Copyable, ImplicitlyCopyable, Movable):
     var _v: Variant[Int64, Float64, Bool, String, PythonObject]
 
     @implicit
@@ -135,16 +147,17 @@ struct SeriesScalar(Copyable, Movable, ImplicitlyCopyable):
     def isa[T: Copyable & Movable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
         return self._v[T]
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref [self._v] T:
+    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
         return self._v[T]
 
 
 # ------------------------------------------------------------------
 # Visit primitive — the single canonical dispatch site for ColumnData
 # ------------------------------------------------------------------
+
 
 trait ColumnDataVisitor:
     """Protocol for visiting the active arm of a ``ColumnData`` Variant.
@@ -159,11 +172,20 @@ trait ColumnDataVisitor:
     ``ColumnDataVisitorRaises`` and use ``visit_col_data_raises`` instead.
     """
 
-    def on_int64(mut self, data: List[Int64]): ...
-    def on_float64(mut self, data: List[Float64]): ...
-    def on_bool(mut self, data: List[Bool]): ...
-    def on_str(mut self, data: List[String]): ...
-    def on_obj(mut self, data: List[PythonObject]): ...
+    def on_int64(mut self, data: List[Int64]):
+        ...
+
+    def on_float64(mut self, data: List[Float64]):
+        ...
+
+    def on_bool(mut self, data: List[Bool]):
+        ...
+
+    def on_str(mut self, data: List[String]):
+        ...
+
+    def on_obj(mut self, data: List[PythonObject]):
+        ...
 
 
 def visit_col_data[V: ColumnDataVisitor](mut visitor: V, data: ColumnData):
@@ -192,6 +214,7 @@ def visit_col_data[V: ColumnDataVisitor](mut visitor: V, data: ColumnData):
 # or other potentially-failing work (e.g. to_pandas).
 # ------------------------------------------------------------------
 
+
 trait ColumnDataVisitorRaises:
     """Raises-capable counterpart to ``ColumnDataVisitor``.
 
@@ -200,14 +223,25 @@ trait ColumnDataVisitorRaises:
     instance to ``visit_col_data_raises``.
     """
 
-    def on_int64(mut self, data: List[Int64]) raises: ...
-    def on_float64(mut self, data: List[Float64]) raises: ...
-    def on_bool(mut self, data: List[Bool]) raises: ...
-    def on_str(mut self, data: List[String]) raises: ...
-    def on_obj(mut self, data: List[PythonObject]) raises: ...
+    def on_int64(mut self, data: List[Int64]) raises:
+        ...
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        ...
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        ...
+
+    def on_str(mut self, data: List[String]) raises:
+        ...
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        ...
 
 
-def visit_col_data_raises[V: ColumnDataVisitorRaises](mut visitor: V, data: ColumnData) raises:
+def visit_col_data_raises[
+    V: ColumnDataVisitorRaises
+](mut visitor: V, data: ColumnData) raises:
     """Raises-capable dispatch for visitors that may raise (e.g. Python interop).
 
     Mirrors ``visit_col_data`` but each ``on_*`` call site is in a ``raises``
@@ -230,6 +264,7 @@ def visit_col_data_raises[V: ColumnDataVisitorRaises](mut visitor: V, data: Colu
 # Mutable raises-capable visitor — for in-place writes to ColumnData
 # ------------------------------------------------------------------
 
+
 trait ColumnDataMutVisitorRaises:
     """Mutable raises-capable visitor for in-place writes to a ``ColumnData`` arm.
 
@@ -239,14 +274,25 @@ trait ColumnDataMutVisitorRaises:
     ``visit_col_data_mut_raises``.
     """
 
-    def on_int64(mut self, mut data: List[Int64]) raises: ...
-    def on_float64(mut self, mut data: List[Float64]) raises: ...
-    def on_bool(mut self, mut data: List[Bool]) raises: ...
-    def on_str(mut self, mut data: List[String]) raises: ...
-    def on_obj(mut self, mut data: List[PythonObject]) raises: ...
+    def on_int64(mut self, mut data: List[Int64]) raises:
+        ...
+
+    def on_float64(mut self, mut data: List[Float64]) raises:
+        ...
+
+    def on_bool(mut self, mut data: List[Bool]) raises:
+        ...
+
+    def on_str(mut self, mut data: List[String]) raises:
+        ...
+
+    def on_obj(mut self, mut data: List[PythonObject]) raises:
+        ...
 
 
-def visit_col_data_mut_raises[V: ColumnDataMutVisitorRaises](mut visitor: V, mut data: ColumnData) raises:
+def visit_col_data_mut_raises[
+    V: ColumnDataMutVisitorRaises
+](mut visitor: V, mut data: ColumnData) raises:
     """Mutable raises-capable dispatch that passes each arm by mutable reference.
 
     Because *data* is ``mut``, each ``data[ArmType]`` subscript yields a
@@ -271,6 +317,7 @@ def visit_col_data_mut_raises[V: ColumnDataMutVisitorRaises](mut visitor: V, mut
 # DFScalar visit primitive — single canonical dispatch site
 # ------------------------------------------------------------------
 
+
 trait DFScalarVisitor:
     """Protocol for visiting the active arm of a ``DFScalar`` Variant.
 
@@ -284,11 +331,20 @@ trait DFScalarVisitor:
     ``DFScalarVisitorRaises`` and use ``visit_scalar_raises`` instead.
     """
 
-    def on_int64(mut self, value: Int64): ...
-    def on_float64(mut self, value: Float64): ...
-    def on_bool(mut self, value: Bool): ...
-    def on_str(mut self, value: String): ...
-    def on_null(mut self): ...
+    def on_int64(mut self, value: Int64):
+        ...
+
+    def on_float64(mut self, value: Float64):
+        ...
+
+    def on_bool(mut self, value: Bool):
+        ...
+
+    def on_str(mut self, value: String):
+        ...
+
+    def on_null(mut self):
+        ...
 
 
 def visit_scalar[V: DFScalarVisitor](mut visitor: V, scalar: DFScalar):
@@ -320,14 +376,25 @@ trait DFScalarVisitorRaises:
     to ``visit_scalar_raises``.
     """
 
-    def on_int64(mut self, value: Int64) raises: ...
-    def on_float64(mut self, value: Float64) raises: ...
-    def on_bool(mut self, value: Bool) raises: ...
-    def on_str(mut self, value: String) raises: ...
-    def on_null(mut self) raises: ...
+    def on_int64(mut self, value: Int64) raises:
+        ...
+
+    def on_float64(mut self, value: Float64) raises:
+        ...
+
+    def on_bool(mut self, value: Bool) raises:
+        ...
+
+    def on_str(mut self, value: String) raises:
+        ...
+
+    def on_null(mut self) raises:
+        ...
 
 
-def visit_scalar_raises[V: DFScalarVisitorRaises](mut visitor: V, scalar: DFScalar) raises:
+def visit_scalar_raises[
+    V: DFScalarVisitorRaises
+](mut visitor: V, scalar: DFScalar) raises:
     """Raises-capable dispatch for visitors that may raise.
 
     Mirrors ``visit_scalar`` but each ``on_*`` call site is in a ``raises``
@@ -350,44 +417,85 @@ def visit_scalar_raises[V: DFScalarVisitorRaises](mut visitor: V, scalar: DFScal
 # Private visitor implementations used by Column methods
 # ------------------------------------------------------------------
 
+
 struct _LenVisitor(ColumnDataVisitor, Copyable, Movable):
     """Visitor that computes the length of the active ColumnData arm."""
+
     var result: Int
-    def __init__(out self): self.result = 0
-    def on_int64(mut self, data: List[Int64]): self.result = len(data)
-    def on_float64(mut self, data: List[Float64]): self.result = len(data)
-    def on_bool(mut self, data: List[Bool]): self.result = len(data)
-    def on_str(mut self, data: List[String]): self.result = len(data)
-    def on_obj(mut self, data: List[PythonObject]): self.result = len(data)
+
+    def __init__(out self):
+        self.result = 0
+
+    def on_int64(mut self, data: List[Int64]):
+        self.result = len(data)
+
+    def on_float64(mut self, data: List[Float64]):
+        self.result = len(data)
+
+    def on_bool(mut self, data: List[Bool]):
+        self.result = len(data)
+
+    def on_str(mut self, data: List[String]):
+        self.result = len(data)
+
+    def on_obj(mut self, data: List[PythonObject]):
+        self.result = len(data)
 
 
 struct _DtypeSniffVisitor(ColumnDataVisitor, Copyable, Movable):
     """Visitor that maps the active ColumnData arm to its BisonDtype."""
+
     var result: BisonDtype
+
     # object_ is the safe fallback: both List[String] and List[PythonObject]
     # map to object_.  The field is always overwritten by on_*.
-    def __init__(out self): self.result = object_
-    def on_int64(mut self, data: List[Int64]): self.result = int64
-    def on_float64(mut self, data: List[Float64]): self.result = float64
-    def on_bool(mut self, data: List[Bool]): self.result = bool_
-    def on_str(mut self, data: List[String]): self.result = object_
-    def on_obj(mut self, data: List[PythonObject]): self.result = object_
+    def __init__(out self):
+        self.result = object_
+
+    def on_int64(mut self, data: List[Int64]):
+        self.result = int64
+
+    def on_float64(mut self, data: List[Float64]):
+        self.result = float64
+
+    def on_bool(mut self, data: List[Bool]):
+        self.result = bool_
+
+    def on_str(mut self, data: List[String]):
+        self.result = object_
+
+    def on_obj(mut self, data: List[PythonObject]):
+        self.result = object_
 
 
 struct _CopyDataVisitor(ColumnDataVisitor, Copyable, Movable):
-    """Visitor that produces an independent copy of the active ColumnData arm."""
+    """Visitor that produces an independent copy of the active ColumnData arm.
+    """
+
     var result: ColumnData
+
     # Initialised with the fallback arm (List[PythonObject]) so that the field
     # is always valid.  on_* immediately replaces it with the copied data.
-    def __init__(out self): self.result = ColumnData(List[PythonObject]())
-    def on_int64(mut self, data: List[Int64]): self.result = ColumnData(data.copy())
-    def on_float64(mut self, data: List[Float64]): self.result = ColumnData(data.copy())
-    def on_bool(mut self, data: List[Bool]): self.result = ColumnData(data.copy())
-    def on_str(mut self, data: List[String]): self.result = ColumnData(data.copy())
-    def on_obj(mut self, data: List[PythonObject]): self.result = ColumnData(data.copy())
+    def __init__(out self):
+        self.result = ColumnData(List[PythonObject]())
+
+    def on_int64(mut self, data: List[Int64]):
+        self.result = ColumnData(data.copy())
+
+    def on_float64(mut self, data: List[Float64]):
+        self.result = ColumnData(data.copy())
+
+    def on_bool(mut self, data: List[Bool]):
+        self.result = ColumnData(data.copy())
+
+    def on_str(mut self, data: List[String]):
+        self.result = ColumnData(data.copy())
+
+    def on_obj(mut self, data: List[PythonObject]):
+        self.result = ColumnData(data.copy())
 
 
-struct _FillScalarVisitor(DFScalarVisitorRaises, Copyable, Movable):
+struct _FillScalarVisitor(Copyable, DFScalarVisitorRaises, Movable):
     """Visitor that builds a typed ColumnData of length *n* from a DFScalar.
 
     After visiting, construct the Column via
@@ -399,6 +507,7 @@ struct _FillScalarVisitor(DFScalarVisitorRaises, Copyable, Movable):
     (following _CopyDataVisitor), but it is always replaced by an ``on_*``
     call before the visitor result is consumed.
     """
+
     var _n: Int
     var _col_data: ColumnData
     var _dtype: BisonDtype
@@ -449,12 +558,17 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     provided ``py_none`` value.  The ``List[PythonObject]`` arm is assumed
     to carry its own ``None`` representations and is appended unconditionally.
     """
+
     var py_list: PythonObject
     var py_none: PythonObject
     var null_mask: List[Bool]
 
-    def __init__(out self, py_list: PythonObject, py_none: PythonObject,
-                null_mask: List[Bool]):
+    def __init__(
+        out self,
+        py_list: PythonObject,
+        py_none: PythonObject,
+        null_mask: List[Bool],
+    ):
         self.py_list = py_list
         self.py_none = py_none
         self.null_mask = null_mask.copy()
@@ -500,8 +614,10 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # Aggregation visitors (issue #81)
 # ------------------------------------------------------------------
 
+
 struct _SumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Accumulates element-wise sum into Float64, skipping masked nulls."""
+
     var result: Float64
     var null_mask: List[Bool]
 
@@ -540,6 +656,7 @@ struct _SumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _MinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Finds the minimum value as Float64, skipping masked nulls."""
+
     var result: Float64
     var found: Bool
     var null_mask: List[Bool]
@@ -588,6 +705,7 @@ struct _MinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _MaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Finds the maximum value as Float64, skipping masked nulls."""
+
     var result: Float64
     var found: Bool
     var null_mask: List[Bool]
@@ -636,6 +754,7 @@ struct _MaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Accumulates squared deviations from the mean for variance computation."""
+
     var total: Float64
     var mean: Float64
     var null_mask: List[Bool]
@@ -679,6 +798,7 @@ struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Counts unique non-null values across all supported column types."""
+
     var result: Int
     var null_mask: List[Bool]
 
@@ -727,7 +847,9 @@ struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 struct _QuantileCollectVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Collects non-null numeric values into a Float64 list for quantile computation."""
+    """Collects non-null numeric values into a Float64 list for quantile computation.
+    """
+
     var vals: List[Float64]
     var null_mask: List[Bool]
 
@@ -772,8 +894,10 @@ struct _QuantileCollectVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # When is_identity is True the method returns self.copy() instead.
 # ------------------------------------------------------------------
 
+
 struct _AbsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Element-wise absolute value; Bool arm is identity."""
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -828,6 +952,7 @@ struct _AbsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _RoundVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Rounds Float64 values; Int64 and Bool arms are identity."""
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -836,7 +961,9 @@ struct _RoundVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var is_identity: Bool
     var dtype_name: String
 
-    def __init__(out self, null_mask: List[Bool], decimals: Int, dtype_name: String):
+    def __init__(
+        out self, null_mask: List[Bool], decimals: Int, dtype_name: String
+    ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -881,6 +1008,7 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     Either bound may be ``None``, in which case no clipping is applied on
     that side.  This avoids the need for sentinel magic values such as ±1e308.
     """
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -889,8 +1017,13 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var upper: Optional[Float64]
     var dtype_name: String
 
-    def __init__(out self, null_mask: List[Bool], lower: Optional[Float64],
-                upper: Optional[Float64], dtype_name: String):
+    def __init__(
+        out self,
+        null_mask: List[Bool],
+        lower: Optional[Float64],
+        upper: Optional[Float64],
+        dtype_name: String,
+    ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -970,6 +1103,7 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     When ``other`` is provided, non-kept cells are filled with that scalar
     instead of null.
     """
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -979,9 +1113,14 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var keep_on_true: Bool
     var other: Optional[DFScalar]
 
-    def __init__(out self, self_null_mask: List[Bool], cond_data: List[Bool],
-                cond_null_mask: List[Bool], keep_on_true: Bool,
-                other: Optional[DFScalar] = None):
+    def __init__(
+        out self,
+        self_null_mask: List[Bool],
+        cond_data: List[Bool],
+        cond_null_mask: List[Bool],
+        keep_on_true: Bool,
+        other: Optional[DFScalar] = None,
+    ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -1000,15 +1139,20 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if has_other:
             var fv = self.other.value()
             if fv.isa[Int64]():
-                other_val = fv[Int64]; other_is_null = False
+                other_val = fv[Int64]
+                other_is_null = False
             elif fv.isa[Float64]():
-                other_val = Int64(Int(fv[Float64])); other_is_null = False
+                other_val = Int64(Int(fv[Float64]))
+                other_is_null = False
             elif fv.isa[Bool]():
-                other_val = Int64(1) if fv[Bool] else Int64(0); other_is_null = False
+                other_val = Int64(1) if fv[Bool] else Int64(0)
+                other_is_null = False
         var result = List[Int64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
-            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var cond_true = (
+                not has_cond_mask or not self.cond_null_mask[i]
+            ) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
             if keep:
                 result.append(data[i])
@@ -1034,15 +1178,20 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if has_other:
             var fv = self.other.value()
             if fv.isa[Float64]():
-                other_val = fv[Float64]; other_is_null = False
+                other_val = fv[Float64]
+                other_is_null = False
             elif fv.isa[Int64]():
-                other_val = Float64(fv[Int64]); other_is_null = False
+                other_val = Float64(fv[Int64])
+                other_is_null = False
             elif fv.isa[Bool]():
-                other_val = 1.0 if fv[Bool] else 0.0; other_is_null = False
+                other_val = 1.0 if fv[Bool] else 0.0
+                other_is_null = False
         var result = List[Float64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
-            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var cond_true = (
+                not has_cond_mask or not self.cond_null_mask[i]
+            ) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
             if keep:
                 result.append(data[i])
@@ -1067,13 +1216,17 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if has_other:
             var fv = self.other.value()
             if fv.isa[Bool]():
-                other_val = fv[Bool]; other_is_null = False
+                other_val = fv[Bool]
+                other_is_null = False
             elif fv.isa[Int64]():
-                other_val = fv[Int64] != 0; other_is_null = False
+                other_val = fv[Int64] != 0
+                other_is_null = False
         var result = List[Bool]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
-            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var cond_true = (
+                not has_cond_mask or not self.cond_null_mask[i]
+            ) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
             if keep:
                 result.append(data[i])
@@ -1098,11 +1251,14 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if has_other:
             var fv = self.other.value()
             if fv.isa[String]():
-                other_val = fv[String]; other_is_null = False
+                other_val = fv[String]
+                other_is_null = False
         var result = List[String]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
-            var cond_true = (not has_cond_mask or not self.cond_null_mask[i]) and self.cond_data[i]
+            var cond_true = (
+                not has_cond_mask or not self.cond_null_mask[i]
+            ) and self.cond_data[i]
             var keep = cond_true if self.keep_on_true else not cond_true
             if keep:
                 result.append(data[i])
@@ -1130,6 +1286,7 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     else take other (which may itself be null).
     Raises if the two ColumnData arms have different types.
     """
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -1137,8 +1294,12 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var other_data: ColumnData
     var other_null_mask: List[Bool]
 
-    def __init__(out self, self_null_mask: List[Bool], other_data: ColumnData,
-                other_null_mask: List[Bool]):
+    def __init__(
+        out self,
+        self_null_mask: List[Bool],
+        other_data: ColumnData,
+        other_null_mask: List[Bool],
+    ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -1267,6 +1428,7 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     coercion internally, so no ``isa`` chain is needed outside the visitor
     framework.  Used by ``Column._isin_scalars``.
     """
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -1291,7 +1453,9 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif self.scalars[k].isa[Float64]():
                 typed_vals.append(Int64(Int(self.scalars[k][Float64])))
             elif self.scalars[k].isa[Bool]():
-                typed_vals.append(Int64(1) if self.scalars[k][Bool] else Int64(0))
+                typed_vals.append(
+                    Int64(1) if self.scalars[k][Bool] else Int64(0)
+                )
         var result = List[Bool]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
@@ -1317,7 +1481,9 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif self.scalars[k].isa[Int64]():
                 typed_vals.append(Float64(self.scalars[k][Int64]))
             elif self.scalars[k].isa[Bool]():
-                typed_vals.append(Float64(1.0) if self.scalars[k][Bool] else Float64(0.0))
+                typed_vals.append(
+                    Float64(1.0) if self.scalars[k][Bool] else Float64(0.0)
+                )
         var result = List[Bool]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
@@ -1383,7 +1549,9 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Returns unique values in first-occurrence order; nulls appended once at end."""
+    """Returns unique values in first-occurrence order; nulls appended once at end.
+    """
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -1479,6 +1647,7 @@ struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Converts the active ColumnData arm to a target dtype."""
+
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -1490,8 +1659,15 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var target_dtype_name: String
     var source_dtype_name: String
 
-    def __init__(out self, null_mask: List[Bool], to_int: Bool, to_float: Bool,
-                to_bool: Bool, target_dtype_name: String, source_dtype_name: String):
+    def __init__(
+        out self,
+        null_mask: List[Bool],
+        to_int: Bool,
+        to_float: Bool,
+        to_bool: Bool,
+        target_dtype_name: String,
+        source_dtype_name: String,
+    ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -1531,7 +1707,11 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         elif self.to_int:
             self.is_identity = True
         else:
-            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Int64 source")
+            raise Error(
+                "astype: unsupported target dtype '"
+                + self.target_dtype_name
+                + "' for Int64 source"
+            )
 
     def on_float64(mut self, data: List[Float64]) raises:
         var has_mask = len(self.null_mask) > 0
@@ -1560,7 +1740,11 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         elif self.to_float:
             self.is_identity = True
         else:
-            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Float64 source")
+            raise Error(
+                "astype: unsupported target dtype '"
+                + self.target_dtype_name
+                + "' for Float64 source"
+            )
 
     def on_bool(mut self, data: List[Bool]) raises:
         var has_mask = len(self.null_mask) > 0
@@ -1590,21 +1774,35 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         elif self.to_bool:
             self.is_identity = True
         else:
-            raise Error("astype: unsupported target dtype '" + self.target_dtype_name + "' for Bool source")
+            raise Error(
+                "astype: unsupported target dtype '"
+                + self.target_dtype_name
+                + "' for Bool source"
+            )
 
     def on_str(mut self, data: List[String]) raises:
-        raise Error("astype: not supported for source dtype '" + self.source_dtype_name + "'")
+        raise Error(
+            "astype: not supported for source dtype '"
+            + self.source_dtype_name
+            + "'"
+        )
 
     def on_obj(mut self, data: List[PythonObject]) raises:
-        raise Error("astype: not supported for source dtype '" + self.source_dtype_name + "'")
+        raise Error(
+            "astype: not supported for source dtype '"
+            + self.source_dtype_name
+            + "'"
+        )
 
 
 # ------------------------------------------------------------------
 # Row-selection visitors (issue #161)
 # ------------------------------------------------------------------
 
+
 struct _SliceVisitor(ColumnDataVisitor, Copyable, Movable):
     """Extracts the subarray [start, end) from the active ColumnData arm."""
+
     var start: Int
     var end: Int
     var result: ColumnData
@@ -1647,6 +1845,7 @@ struct _SliceVisitor(ColumnDataVisitor, Copyable, Movable):
 
 struct _ConcatDataVisitor(ColumnDataVisitor, Copyable, Movable):
     """Appends *other* data onto the visited arm's list."""
+
     var other: ColumnData
     var result: ColumnData
 
@@ -1697,6 +1896,7 @@ struct _ConcatDataVisitor(ColumnDataVisitor, Copyable, Movable):
 
 struct _TakeVisitor(ColumnDataVisitor, Copyable, Movable):
     """Selects rows by arbitrary *indices* from the active ColumnData arm."""
+
     var indices: List[Int]
     var result: ColumnData
 
@@ -1737,6 +1937,7 @@ struct _TakeVisitor(ColumnDataVisitor, Copyable, Movable):
 
 struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
     """Like _TakeVisitor but index -1 emits a null placeholder row."""
+
     var indices: List[Int]
     var src_mask: List[Bool]
     var out_mask: List[Bool]
@@ -1757,7 +1958,9 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
-                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+                self.out_mask.append(
+                    len(self.src_mask) > i and self.src_mask[i]
+                )
         self.result = ColumnData(out^)
 
     def on_float64(mut self, data: List[Float64]):
@@ -1769,7 +1972,9 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
-                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+                self.out_mask.append(
+                    len(self.src_mask) > i and self.src_mask[i]
+                )
         self.result = ColumnData(out^)
 
     def on_bool(mut self, data: List[Bool]):
@@ -1781,7 +1986,9 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
-                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+                self.out_mask.append(
+                    len(self.src_mask) > i and self.src_mask[i]
+                )
         self.result = ColumnData(out^)
 
     def on_str(mut self, data: List[String]):
@@ -1793,7 +2000,9 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
-                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+                self.out_mask.append(
+                    len(self.src_mask) > i and self.src_mask[i]
+                )
         self.result = ColumnData(out^)
 
     def on_obj(mut self, data: List[PythonObject]):
@@ -1805,7 +2014,9 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
-                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+                self.out_mask.append(
+                    len(self.src_mask) > i and self.src_mask[i]
+                )
         self.result = ColumnData(out^)
 
 
@@ -1815,6 +2026,7 @@ struct _ValueCountsCountVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     Builds ``unique_keys`` (insertion-order list of string representations)
     and ``counts_dict`` (key → count).  Raises for String/PythonObject arms.
     """
+
     var has_mask: Bool
     var null_mask: List[Bool]
     var unique_keys: List[String]
@@ -1869,14 +2081,19 @@ struct _ValueCountsIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     Int64 columns produce a List[Int64] index; float64 and bool columns fall
     back to List[PythonObject] (float values cannot be stored in Index).
     """
+
     var sorted_order: List[Int]
     var unique_keys: List[String]
     var count_vals: List[Int]
     var result_idx: ColumnIndex
     var result_counts: List[Int64]
 
-    def __init__(out self, sorted_order: List[Int], unique_keys: List[String],
-                count_vals: List[Int]):
+    def __init__(
+        out self,
+        sorted_order: List[Int],
+        unique_keys: List[String],
+        count_vals: List[Int],
+    ):
         self.sorted_order = sorted_order.copy()
         self.unique_keys = unique_keys.copy()
         self.count_vals = count_vals.copy()
@@ -1920,6 +2137,7 @@ struct _ToFloat64Visitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     Raises for String and PythonObject arms (non-numeric).
     """
+
     var result: List[Float64]
 
     def __init__(out self):
@@ -1947,13 +2165,13 @@ struct _ToFloat64Visitor(ColumnDataVisitorRaises, Copyable, Movable):
 # ------------------------------------------------------------------
 # Compile-time operation selectors for Column._arith_op
 # ------------------------------------------------------------------
-comptime _ARITH_ADD      = 0
-comptime _ARITH_SUB      = 1
-comptime _ARITH_MUL      = 2
-comptime _ARITH_DIV      = 3
+comptime _ARITH_ADD = 0
+comptime _ARITH_SUB = 1
+comptime _ARITH_MUL = 2
+comptime _ARITH_DIV = 3
 comptime _ARITH_FLOORDIV = 4
-comptime _ARITH_MOD      = 5
-comptime _ARITH_POW      = 6
+comptime _ARITH_MOD = 5
+comptime _ARITH_POW = 6
 
 
 fn _int64_floordiv(a: Int64, b: Int64) -> Int64:
@@ -1971,7 +2189,8 @@ fn _int64_floordiv(a: Int64, b: Int64) -> Int64:
 
 
 fn _int64_mod(a: Int64, b: Int64) -> Int64:
-    """Integer modulo with Python semantics (result has the sign of the divisor)."""
+    """Integer modulo with Python semantics (result has the sign of the divisor).
+    """
     return a - _int64_floordiv(a, b) * b
 
 
@@ -2020,8 +2239,13 @@ struct _BinOpInputs(Movable):
     var has_a_mask: Bool
     var has_b_mask: Bool
 
-    def __init__(out self, var a: List[Float64], var b: List[Float64],
-                has_a_mask: Bool, has_b_mask: Bool):
+    def __init__(
+        out self,
+        var a: List[Float64],
+        var b: List[Float64],
+        has_a_mask: Bool,
+        has_b_mask: Bool,
+    ):
         self.a = a^
         self.b = b^
         self.has_a_mask = has_a_mask
@@ -2045,8 +2269,12 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, indices: List[Int], fill_value: Optional[DFScalar],
-                src_null_mask: List[Bool]):
+    def __init__(
+        out self,
+        indices: List[Int],
+        fill_value: Optional[DFScalar],
+        src_null_mask: List[Bool],
+    ):
         self.indices = indices.copy()
         self.fill_value = fill_value
         self.src_null_mask = src_null_mask.copy()
@@ -2060,11 +2288,14 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if self.fill_value:
             var fv = self.fill_value.value()
             if fv.isa[Int64]():
-                fill = fv[Int64]; is_null_fill = False
+                fill = fv[Int64]
+                is_null_fill = False
             elif fv.isa[Float64]():
-                fill = Int64(Int(fv[Float64])); is_null_fill = False
+                fill = Int64(Int(fv[Float64]))
+                is_null_fill = False
             elif fv.isa[Bool]():
-                fill = Int64(1) if fv[Bool] else Int64(0); is_null_fill = False
+                fill = Int64(1) if fv[Bool] else Int64(0)
+                is_null_fill = False
         var has_src_mask = len(self.src_null_mask) > 0
         var result = List[Int64]()
         for i in range(len(self.indices)):
@@ -2088,11 +2319,14 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if self.fill_value:
             var fv = self.fill_value.value()
             if fv.isa[Float64]():
-                fill = fv[Float64]; is_null_fill = False
+                fill = fv[Float64]
+                is_null_fill = False
             elif fv.isa[Int64]():
-                fill = Float64(fv[Int64]); is_null_fill = False
+                fill = Float64(fv[Int64])
+                is_null_fill = False
             elif fv.isa[Bool]():
-                fill = 1.0 if fv[Bool] else 0.0; is_null_fill = False
+                fill = 1.0 if fv[Bool] else 0.0
+                is_null_fill = False
         var has_src_mask = len(self.src_null_mask) > 0
         var result = List[Float64]()
         for i in range(len(self.indices)):
@@ -2116,9 +2350,11 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if self.fill_value:
             var fv = self.fill_value.value()
             if fv.isa[Bool]():
-                fill = fv[Bool]; is_null_fill = False
+                fill = fv[Bool]
+                is_null_fill = False
             elif fv.isa[Int64]():
-                fill = fv[Int64] != 0; is_null_fill = False
+                fill = fv[Int64] != 0
+                is_null_fill = False
         var has_src_mask = len(self.src_null_mask) > 0
         var result = List[Bool]()
         for i in range(len(self.indices)):
@@ -2142,7 +2378,8 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if self.fill_value:
             var fv = self.fill_value.value()
             if fv.isa[String]():
-                fill = fv[String]; is_null_fill = False
+                fill = fv[String]
+                is_null_fill = False
         var has_src_mask = len(self.src_null_mask) > 0
         var result = List[String]()
         for i in range(len(self.indices)):
@@ -2167,13 +2404,17 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if self.fill_value:
             var fv = self.fill_value.value()
             if fv.isa[String]():
-                fill = PythonObject(fv[String]); is_null_fill = False
+                fill = PythonObject(fv[String])
+                is_null_fill = False
             elif fv.isa[Int64]():
-                fill = PythonObject(Int(fv[Int64])); is_null_fill = False
+                fill = PythonObject(Int(fv[Int64]))
+                is_null_fill = False
             elif fv.isa[Float64]():
-                fill = PythonObject(fv[Float64]); is_null_fill = False
+                fill = PythonObject(fv[Float64])
+                is_null_fill = False
             elif fv.isa[Bool]():
-                fill = PythonObject(fv[Bool]); is_null_fill = False
+                fill = PythonObject(fv[Bool])
+                is_null_fill = False
         var has_src_mask = len(self.src_null_mask) > 0
         var result = List[PythonObject]()
         for i in range(len(self.indices)):
@@ -2196,12 +2437,14 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # Single-cell extraction visitors
 # ------------------------------------------------------------------
 
+
 struct _CellToPyObjVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Visitor that extracts one cell at *row* as a ``PythonObject``.
 
     Does not check the null mask — callers that need null handling must check
     before dispatching (see ``_col_cell_pyobj``).
     """
+
     var row: Int
     var result: PythonObject
 
@@ -2231,6 +2474,7 @@ struct _CellToStrVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     Does not check the null mask — callers that need null handling must check
     before dispatching (see ``_col_cell_str``).
     """
+
     var row: Int
     var result: String
 
@@ -2262,6 +2506,7 @@ struct _ScalarFromColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ``List[PythonObject]`` cells are stringified since ``DFScalar`` has no
     ``PythonObject`` arm.
     """
+
     var row: Int
     var result: DFScalar
 
@@ -2295,6 +2540,7 @@ struct _SetScalarInColMutVisitor(ColumnDataMutVisitorRaises, Copyable, Movable):
     this visitor.  Out-of-bounds access will raise at the list subscript site,
     which is the same observable behaviour as the previous copy-based approach.
     """
+
     var row: Int
     var value: DFScalar
 
@@ -2339,12 +2585,15 @@ struct _SetScalarInColMutVisitor(ColumnDataMutVisitorRaises, Copyable, Movable):
             raise Error("iat/at: cannot assign non-String to string column")
 
     def on_obj(mut self, mut data: List[PythonObject]) raises:
-        raise Error("iat/at: scalar write not supported for object/datetime columns")
+        raise Error(
+            "iat/at: scalar write not supported for object/datetime columns"
+        )
 
 
 # ------------------------------------------------------------------
 # Cumulative operation visitors
 # ------------------------------------------------------------------
+
 
 struct _CumSumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Visitor that computes the cumulative sum of the active ColumnData arm.
@@ -2353,6 +2602,7 @@ struct _CumSumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ``_build_result_col``.  Integer input produces an Int64 result; Float64
     and Bool input produce Float64.
     """
+
     var skipna: Bool
     var null_mask: List[Bool]
     var col_data: ColumnData
@@ -2451,6 +2701,7 @@ struct _CumProdVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ``_build_result_col``.  Integer input produces an Int64 result; Float64
     and Bool input produce Float64.
     """
+
     var skipna: Bool
     var null_mask: List[Bool]
     var col_data: ColumnData
@@ -2549,6 +2800,7 @@ struct _CumMinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ``_build_result_col``.  Integer input produces an Int64 result; Float64
     and Bool input produce Float64.
     """
+
     var skipna: Bool
     var null_mask: List[Bool]
     var col_data: ColumnData
@@ -2659,6 +2911,7 @@ struct _CumMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ``_build_result_col``.  Integer input produces an Int64 result; Float64
     and Bool input produce Float64.
     """
+
     var skipna: Bool
     var null_mask: List[Bool]
     var col_data: ColumnData
@@ -2766,6 +3019,7 @@ struct _CumMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # Index conversion visitor
 # ------------------------------------------------------------------
 
+
 struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Visitor that converts the active ColumnData arm to a ``ColumnIndex``.
 
@@ -2773,6 +3027,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     ColumnIndex; all other types → ``List[PythonObject]`` ColumnIndex,
     respecting the null mask.
     """
+
     var null_mask: List[Bool]
     var result: ColumnIndex
 
@@ -2849,23 +3104,31 @@ struct Column(Copyable, Movable, Sized):
 
     def __init__(out self):
         """Empty column with object dtype — used as stub placeholder."""
-        self.name  = ""
+        self.name = ""
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
         self._index_names = List[String]()
 
-    def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype):
-        self.name  = name
+    def __init__(
+        out self, name: String, var data: ColumnData, dtype: BisonDtype
+    ):
+        self.name = name
         self.dtype = dtype
         self._data = data^
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
         self._index_names = List[String]()
 
-    def __init__(out self, name: String, var data: ColumnData, dtype: BisonDtype, var index: ColumnIndex):
-        self.name  = name
+    def __init__(
+        out self,
+        name: String,
+        var data: ColumnData,
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self.name = name
         self.dtype = dtype
         self._data = data^
         self._index = index^
@@ -2880,7 +3143,7 @@ struct Column(Copyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def __init__(out self, *, copy: Self):
-        self.name  = copy.name
+        self.name = copy.name
         self.dtype = copy.dtype
         self._data = copy._data
         self._index = copy._index
@@ -2888,7 +3151,7 @@ struct Column(Copyable, Movable, Sized):
         self._index_names = copy._index_names.copy()
 
     def __init__(out self, *, deinit take: Self):
-        self.name  = take.name^
+        self.name = take.name^
         self.dtype = take.dtype^
         self._data = take._data^
         self._index = take._index^
@@ -2900,19 +3163,19 @@ struct Column(Copyable, Movable, Sized):
     # are responsible for checking the active arm before calling these.
     # ------------------------------------------------------------------
 
-    def _int64_data(ref self) -> ref [self._data] List[Int64]:
+    def _int64_data(ref self) -> ref[self._data] List[Int64]:
         return self._data[List[Int64]]
 
-    def _float64_data(ref self) -> ref [self._data] List[Float64]:
+    def _float64_data(ref self) -> ref[self._data] List[Float64]:
         return self._data[List[Float64]]
 
-    def _bool_data(ref self) -> ref [self._data] List[Bool]:
+    def _bool_data(ref self) -> ref[self._data] List[Bool]:
         return self._data[List[Bool]]
 
-    def _str_data(ref self) -> ref [self._data] List[String]:
+    def _str_data(ref self) -> ref[self._data] List[String]:
         return self._data[List[String]]
 
-    def _obj_data(ref self) -> ref [self._data] List[PythonObject]:
+    def _obj_data(ref self) -> ref[self._data] List[PythonObject]:
         return self._data[List[PythonObject]]
 
     # ------------------------------------------------------------------
@@ -2935,7 +3198,8 @@ struct Column(Copyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def _index_len(self) -> Int:
-        """Return the number of explicit index labels (0 = default RangeIndex)."""
+        """Return the number of explicit index labels (0 = default RangeIndex).
+        """
         if self._index.isa[Index]():
             return self._index[Index].__len__()
         elif self._index.isa[List[Int64]]():
@@ -2997,7 +3261,11 @@ struct Column(Copyable, Movable, Sized):
                 var j = i - 1
                 while j >= 0:
                     var prev = perm[j]
-                    var do_swap = idx[key] < idx[prev] if ascending else idx[key] > idx[prev]
+                    var do_swap = (
+                        idx[key]
+                        < idx[prev] if ascending else idx[key]
+                        > idx[prev]
+                    )
                     if not do_swap:
                         break
                     perm[j + 1] = prev
@@ -3010,7 +3278,11 @@ struct Column(Copyable, Movable, Sized):
                 var j = i - 1
                 while j >= 0:
                     var prev = perm[j]
-                    var do_swap = idx[key] < idx[prev] if ascending else idx[key] > idx[prev]
+                    var do_swap = (
+                        idx[key]
+                        < idx[prev] if ascending else idx[key]
+                        > idx[prev]
+                    )
                     if not do_swap:
                         break
                     perm[j + 1] = prev
@@ -3024,7 +3296,9 @@ struct Column(Copyable, Movable, Sized):
                 var j = i - 1
                 while j >= 0:
                     var prev = perm[j]
-                    var do_swap = Bool(idx[key] < idx[prev]) if ascending else Bool(idx[key] > idx[prev])
+                    var do_swap = Bool(
+                        idx[key] < idx[prev]
+                    ) if ascending else Bool(idx[key] > idx[prev])
                     if not do_swap:
                         break
                     perm[j + 1] = prev
@@ -3077,7 +3351,8 @@ struct Column(Copyable, Movable, Sized):
         return col^
 
     def take(self, indices: List[Int]) -> Column:
-        """Return a new Column with rows selected by *indices* (arbitrary order)."""
+        """Return a new Column with rows selected by *indices* (arbitrary order).
+        """
         var has_mask = len(self._null_mask) > 0
         var new_mask = List[Bool]()
         if has_mask:
@@ -3305,7 +3580,9 @@ struct Column(Copyable, Movable, Sized):
         var idx = ColumnIndex(Index(labels^))
         return Column(self.name, ColumnData(data^), float64, idx^)
 
-    def value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Column:
+    def value_counts(
+        self, normalize: Bool = False, sort: Bool = True
+    ) raises -> Column:
         """Return a Column of counts (or proportions) per unique value.
 
         The index holds the original values; the data holds the counts.
@@ -3322,7 +3599,9 @@ struct Column(Copyable, Movable, Sized):
         # Materialise per-key counts in insertion order.
         var count_vals = List[Int]()
         for i in range(n):
-            count_vals.append(count_visitor.counts_dict[count_visitor.unique_keys[i]])
+            count_vals.append(
+                count_visitor.counts_dict[count_visitor.unique_keys[i]]
+            )
 
         # Compute a sorted permutation (insertion sort, stable, count desc).
         var sorted_order = List[Int]()
@@ -3368,27 +3647,46 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         return visitor.result.copy()
 
-    def _build_result_col(self, var col_data: ColumnData, var result_mask: List[Bool], has_any_null: Bool) -> Column:
-        """Wrap a computed ColumnData into a Column, attaching mask only if needed."""
+    def _build_result_col(
+        self,
+        var col_data: ColumnData,
+        var result_mask: List[Bool],
+        has_any_null: Bool,
+    ) -> Column:
+        """Wrap a computed ColumnData into a Column, attaching mask only if needed.
+        """
         var dtype = Column._sniff_dtype(col_data)
         var col = Column(self.name, col_data^, dtype)
         if has_any_null:
             col._null_mask = result_mask^
         return col^
 
-    def _binary_op_prepare(self, op_name: String, other: Column) raises -> _BinOpInputs:
+    def _binary_op_prepare(
+        self, op_name: String, other: Column
+    ) raises -> _BinOpInputs:
         """Check lengths and build the shared Float64 input arrays and null-mask flags.
 
         Raises if ``self`` and ``other`` differ in length.  Called at the top
         of ``_arith_op`` and ``_cmp_op`` to eliminate repeated preamble code.
         """
         if len(self) != len(other):
-            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+            raise Error(
+                op_name
+                + ": length mismatch ("
+                + String(len(self))
+                + " vs "
+                + String(len(other))
+                + ")"
+            )
         var a = self._to_float64_list()
         var b = other._to_float64_list()
-        return _BinOpInputs(a^, b^, len(self._null_mask) > 0, len(other._null_mask) > 0)
+        return _BinOpInputs(
+            a^, b^, len(self._null_mask) > 0, len(other._null_mask) > 0
+        )
 
-    def _arith_op[op: Int](self, op_name: String, other: Column) raises -> Column:
+    def _arith_op[
+        op: Int
+    ](self, op_name: String, other: Column) raises -> Column:
         """Core element-wise binary arithmetic kernel.
 
         ``op`` is a compile-time constant (``_ARITH_*``) that selects the
@@ -3401,7 +3699,14 @@ struct Column(Copyable, Movable, Sized):
         behaviour.  True division always yields ``float64``.
         """
         if len(self) != len(other):
-            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+            raise Error(
+                op_name
+                + ": length mismatch ("
+                + String(len(self))
+                + " vs "
+                + String(len(other))
+                + ")"
+            )
 
         # Int64 fast path: int64 op int64 → int64 for all ops except true division.
         comptime if op != _ARITH_DIV:
@@ -3414,7 +3719,9 @@ struct Column(Copyable, Movable, Sized):
                 var result_mask = List[Bool]()
                 var has_any_null = False
                 for i in range(len(a)):
-                    var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+                    var is_null = (has_a_mask and self._null_mask[i]) or (
+                        has_b_mask and other._null_mask[i]
+                    )
                     if is_null:
                         result.append(Int64(0))
                         result_mask.append(True)
@@ -3437,7 +3744,9 @@ struct Column(Copyable, Movable, Sized):
                             v = Int64(0)  # unreachable
                         result.append(v)
                         result_mask.append(False)
-                return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+                return self._build_result_col(
+                    ColumnData(result^), result_mask^, has_any_null
+                )
 
         # Float64 path: used when either operand is float64/bool, or for true division.
         var inp = self._binary_op_prepare(op_name, other)
@@ -3446,7 +3755,9 @@ struct Column(Copyable, Movable, Sized):
         var has_any_null = False
         var nan = Float64(0) / Float64(0)
         for i in range(len(inp.a)):
-            var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
+            var is_null = (inp.has_a_mask and self._null_mask[i]) or (
+                inp.has_b_mask and other._null_mask[i]
+            )
             if is_null:
                 result.append(nan)
                 result_mask.append(True)
@@ -3471,7 +3782,9 @@ struct Column(Copyable, Movable, Sized):
                     v = Float64(0)  # unreachable: compile-time guard
                 result.append(v)
                 result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._build_result_col(
+            ColumnData(result^), result_mask^, has_any_null
+        )
 
     def _arith_add(self, other: Column) raises -> Column:
         return self._arith_op[_ARITH_ADD]("add", other)
@@ -3510,7 +3823,14 @@ struct Column(Copyable, Movable, Sized):
         values without round-tripping through Float64.
         """
         if len(self) != len(other):
-            raise Error(op_name + ": length mismatch (" + String(len(self)) + " vs " + String(len(other)) + ")")
+            raise Error(
+                op_name
+                + ": length mismatch ("
+                + String(len(self))
+                + " vs "
+                + String(len(other))
+                + ")"
+            )
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
@@ -3520,7 +3840,9 @@ struct Column(Copyable, Movable, Sized):
             ref da = self._data[List[Bool]]
             ref db = other._data[List[Bool]]
             for i in range(len(da)):
-                var is_null = (has_a_mask and self._null_mask[i]) or (has_b_mask and other._null_mask[i])
+                var is_null = (has_a_mask and self._null_mask[i]) or (
+                    has_b_mask and other._null_mask[i]
+                )
                 if is_null:
                     result.append(False)
                     result_mask.append(True)
@@ -3532,13 +3854,19 @@ struct Column(Copyable, Movable, Sized):
                     elif op == _CMP_NE:
                         v = da[i] != db[i]
                     elif op == _CMP_LT:
-                        v = (not da[i]) and db[i]  # False < True: False=0, True=1
+                        v = (not da[i]) and db[
+                            i
+                        ]  # False < True: False=0, True=1
                     elif op == _CMP_LE:
-                        v = (not da[i]) or db[i]   # False <= True, False <= False, True <= True
+                        v = (not da[i]) or db[
+                            i
+                        ]  # False <= True, False <= False, True <= True
                     elif op == _CMP_GT:
                         v = da[i] and (not db[i])  # True > False
                     elif op == _CMP_GE:
-                        v = da[i] or (not db[i])   # True >= False, False >= False, True >= True
+                        v = da[i] or (
+                            not db[i]
+                        )  # True >= False, False >= False, True >= True
                     else:
                         v = False  # unreachable: compile-time guard
                     result.append(v)
@@ -3546,7 +3874,9 @@ struct Column(Copyable, Movable, Sized):
         else:
             var inp = self._binary_op_prepare(op_name, other)
             for i in range(len(inp.a)):
-                var is_null = (inp.has_a_mask and self._null_mask[i]) or (inp.has_b_mask and other._null_mask[i])
+                var is_null = (inp.has_a_mask and self._null_mask[i]) or (
+                    inp.has_b_mask and other._null_mask[i]
+                )
                 if is_null:
                     result.append(False)
                     result_mask.append(True)
@@ -3569,7 +3899,9 @@ struct Column(Copyable, Movable, Sized):
                         v = False  # unreachable: compile-time guard
                     result.append(v)
                     result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._build_result_col(
+            ColumnData(result^), result_mask^, has_any_null
+        )
 
     def _cmp_eq(self, other: Column) raises -> Column:
         return self._cmp_op[_CMP_EQ]("eq", other)
@@ -3603,7 +3935,11 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         if visitor.is_identity:
             return self.copy()
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _round(self, decimals: Int = 0) raises -> Column:
         """Round Float64 values to ``decimals`` decimal places.
@@ -3619,18 +3955,30 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         if visitor.is_identity:
             return self.copy()
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
-    def _clip(self, lower: Optional[Float64], upper: Optional[Float64]) raises -> Column:
+    def _clip(
+        self, lower: Optional[Float64], upper: Optional[Float64]
+    ) raises -> Column:
         """Clamp values to [``lower``, ``upper``].
 
         Either bound may be ``None`` (no clipping on that side).  Supports
         Int64 and Float64 arms. Nulls propagate. Raises for String/Object
         columns.
         """
-        var visitor = _ClipVisitor(self._null_mask, lower, upper, self.dtype.name)
+        var visitor = _ClipVisitor(
+            self._null_mask, lower, upper, self.dtype.name
+        )
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _apply[F: FloatTransformFn](self) raises -> Column:
         """Apply a compile-time function element-wise over Float64 values.
@@ -3653,11 +4001,13 @@ struct Column(Copyable, Movable, Sized):
             else:
                 result.append(F(data[i]))
                 result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._build_result_col(
+            ColumnData(result^), result_mask^, has_any_null
+        )
 
-    def _isin_kernel[T: Comparable & Copyable & Movable](
-        self, d: List[T], values: List[T]
-    ) -> Column:
+    def _isin_kernel[
+        T: Comparable & Copyable & Movable
+    ](self, d: List[T], values: List[T]) -> Column:
         """Shared kernel for all _isin_* methods.
 
         Builds a Bool Column: True where element is in ``values``.
@@ -3680,7 +4030,9 @@ struct Column(Copyable, Movable, Sized):
                         break
                 result.append(found)
                 result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._build_result_col(
+            ColumnData(result^), result_mask^, has_any_null
+        )
 
     def _isin_int(self, values: List[Int64]) raises -> Column:
         """Bool Column: True where element is in ``values`` (Int64 columns only).
@@ -3688,7 +4040,9 @@ struct Column(Copyable, Movable, Sized):
         Nulls propagate as null.
         """
         if not self._data.isa[List[Int64]]():
-            raise Error("isin: column must be Int64 to match against List[Int64]")
+            raise Error(
+                "isin: column must be Int64 to match against List[Int64]"
+            )
         return self._isin_kernel(self._data[List[Int64]], values)
 
     def _isin_float(self, values: List[Float64]) raises -> Column:
@@ -3697,7 +4051,9 @@ struct Column(Copyable, Movable, Sized):
         Nulls propagate as null.
         """
         if not self._data.isa[List[Float64]]():
-            raise Error("isin: column must be Float64 to match against List[Float64]")
+            raise Error(
+                "isin: column must be Float64 to match against List[Float64]"
+            )
         return self._isin_kernel(self._data[List[Float64]], values)
 
     def _isin_str(self, values: List[String]) raises -> Column:
@@ -3706,7 +4062,9 @@ struct Column(Copyable, Movable, Sized):
         Nulls propagate as null.
         """
         if not self._data.isa[List[String]]():
-            raise Error("isin: column must be String to match against List[String]")
+            raise Error(
+                "isin: column must be String to match against List[String]"
+            )
         return self._isin_kernel(self._data[List[String]], values)
 
     def _isin_bool(self, values: List[Bool]) raises -> Column:
@@ -3727,7 +4085,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _IsInVisitor(self._null_mask, scalars)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _between(self, left: Float64, right: Float64) raises -> Column:
         """Bool Column: True where left <= element <= right.
@@ -3748,10 +4110,13 @@ struct Column(Copyable, Movable, Sized):
             else:
                 result.append(data[i] >= left and data[i] <= right)
                 result_mask.append(False)
-        return self._build_result_col(ColumnData(result^), result_mask^, has_any_null)
+        return self._build_result_col(
+            ColumnData(result^), result_mask^, has_any_null
+        )
 
-    def _where_mask[mode: Int](self, cond: Column,
-                              other: Optional[DFScalar] = None) raises -> Column:
+    def _where_mask[
+        mode: Int
+    ](self, cond: Column, other: Optional[DFScalar] = None) raises -> Column:
         """Shared kernel for ``_where`` (mode=1) and ``_mask`` (mode=0).
 
         mode=1: keep value where cond is True, replace otherwise.
@@ -3769,20 +4134,33 @@ struct Column(Copyable, Movable, Sized):
                 + String(len(cond))
                 + ")"
             )
-        var keep_on_true = (mode == 1)
+        var keep_on_true = mode == 1
         var visitor = _WhereMaskVisitor(
-            self._null_mask, cond._data[List[Bool]].copy(), cond._null_mask,
-            keep_on_true, other
+            self._null_mask,
+            cond._data[List[Bool]].copy(),
+            cond._null_mask,
+            keep_on_true,
+            other,
         )
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
-    def _where(self, cond: Column, other: Optional[DFScalar] = None) raises -> Column:
-        """Keep value where ``cond`` is True; replace with ``other`` (or null) otherwise."""
+    def _where(
+        self, cond: Column, other: Optional[DFScalar] = None
+    ) raises -> Column:
+        """Keep value where ``cond`` is True; replace with ``other`` (or null) otherwise.
+        """
         return self._where_mask[1](cond, other)
 
-    def _mask(self, cond: Column, other: Optional[DFScalar] = None) raises -> Column:
-        """Replace with ``other`` (or null) where ``cond`` is True; keep otherwise."""
+    def _mask(
+        self, cond: Column, other: Optional[DFScalar] = None
+    ) raises -> Column:
+        """Replace with ``other`` (or null) where ``cond`` is True; keep otherwise.
+        """
         return self._where_mask[0](cond, other)
 
     def _combine_first_col(self, other: Column) raises -> Column:
@@ -3799,9 +4177,15 @@ struct Column(Copyable, Movable, Sized):
                 + String(len(other))
                 + ")"
             )
-        var visitor = _CombineFirstVisitor(self._null_mask, other._data, other._null_mask)
+        var visitor = _CombineFirstVisitor(
+            self._null_mask, other._data, other._null_mask
+        )
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _unique(self) raises -> Column:
         """Return a Column of unique values, preserving first-occurrence order.
@@ -3812,7 +4196,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _UniqueVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _astype(self, target_dtype: BisonDtype) raises -> Column:
         """Convert Column to a different dtype.
@@ -3835,7 +4223,11 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         if visitor.is_identity:
             return self.copy()
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def _reset_index(self, drop: Bool = False) raises -> Column:
         """Return a copy of the Column with its index cleared.
@@ -3882,8 +4274,9 @@ struct Column(Copyable, Movable, Sized):
             result.append(py_list[i])
         return result^
 
-    def _reindex_rows(self, indices: List[Int],
-                     fill_value: Optional[DFScalar]) raises -> Column:
+    def _reindex_rows(
+        self, indices: List[Int], fill_value: Optional[DFScalar]
+    ) raises -> Column:
         """Return a new Column with rows selected or inserted according to *indices*.
 
         ``indices[i] >= 0``  → take that row from self.
@@ -3893,7 +4286,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _ReindexRowsVisitor(indices, fill_value, self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     # ------------------------------------------------------------------
     # Cumulative operations
@@ -3912,7 +4309,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _CumSumVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def cumprod(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative products, preserving dtype.
@@ -3925,7 +4326,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _CumProdVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def cummin(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative minimums, preserving dtype.
@@ -3938,7 +4343,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _CumMinVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     def cummax(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative maximums, preserving dtype.
@@ -3951,7 +4360,11 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _CumMaxVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return self._build_result_col(visitor.col_data.copy(), visitor.result_mask.copy(), visitor.has_any_null)
+        return self._build_result_col(
+            visitor.col_data.copy(),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
 
     # ------------------------------------------------------------------
     # Pandas interop
@@ -3984,10 +4397,14 @@ struct Column(Copyable, Movable, Sized):
                     int_idx.append(Int64(idx_start + i * idx_step))
                 bison_idx = ColumnIndex(int_idx^)
         elif (
-            idx_dtype == "int8"   or idx_dtype == "int16"  or
-            idx_dtype == "int32"  or idx_dtype == "int64"  or
-            idx_dtype == "uint8"  or idx_dtype == "uint16" or
-            idx_dtype == "uint32" or idx_dtype == "uint64"
+            idx_dtype == "int8"
+            or idx_dtype == "int16"
+            or idx_dtype == "int32"
+            or idx_dtype == "int64"
+            or idx_dtype == "uint8"
+            or idx_dtype == "uint16"
+            or idx_dtype == "uint32"
+            or idx_dtype == "uint64"
         ):
             var int_idx = List[Int64]()
             for i in range(n):
@@ -4014,10 +4431,14 @@ struct Column(Copyable, Movable, Sized):
 
         var bison_dtype: BisonDtype
         if (
-            dtype_str == "int8"   or dtype_str == "int16"  or
-            dtype_str == "int32"  or dtype_str == "int64"  or
-            dtype_str == "uint8"  or dtype_str == "uint16" or
-            dtype_str == "uint32" or dtype_str == "uint64"
+            dtype_str == "int8"
+            or dtype_str == "int16"
+            or dtype_str == "int32"
+            or dtype_str == "int64"
+            or dtype_str == "uint8"
+            or dtype_str == "uint16"
+            or dtype_str == "uint32"
+            or dtype_str == "uint64"
         ):
             bison_dtype = int64
         elif dtype_str == "float32" or dtype_str == "float64":
@@ -4044,13 +4465,15 @@ struct Column(Copyable, Movable, Sized):
         elif bison_dtype == float64:
             var data = List[Float64]()
             var struct_mod = Python.import_module("struct")
-            var pack_fmt = "d"   # pack as IEEE-754 double-precision float
-            var unpack_fmt = "q" # unpack as signed 64-bit integer (same bytes, avoids overflow in Int)
+            var pack_fmt = "d"  # pack as IEEE-754 double-precision float
+            var unpack_fmt = "q"  # unpack as signed 64-bit integer (same bytes, avoids overflow in Int)
             for i in range(n):
                 if null_mask[i]:
                     data.append(Float64(0))  # placeholder for null
                 else:
-                    var packed = struct_mod.unpack(unpack_fmt, struct_mod.pack(pack_fmt, py_list[i]))
+                    var packed = struct_mod.unpack(
+                        unpack_fmt, struct_mod.pack(pack_fmt, py_list[i])
+                    )
                     var bits = Int64(Int(py=packed[0]))
                     data.append(bitcast[DType.float64](bits))
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
@@ -4092,7 +4515,9 @@ struct Column(Copyable, Movable, Sized):
         return visitor.result
 
     @staticmethod
-    def _null_column(name: String, dtype: BisonDtype, n: Int, var index: ColumnIndex) raises -> Column:
+    def _null_column(
+        name: String, dtype: BisonDtype, n: Int, var index: ColumnIndex
+    ) raises -> Column:
         """Create an all-null Column of length *n* with the given *dtype*.
 
         The underlying storage uses the canonical Mojo type for *dtype*
@@ -4129,7 +4554,9 @@ struct Column(Copyable, Movable, Sized):
         return c^
 
     @staticmethod
-    def _fill_scalar(name: String, value: DFScalar, n: Int, index: ColumnIndex) raises -> Column:
+    def _fill_scalar(
+        name: String, value: DFScalar, n: Int, index: ColumnIndex
+    ) raises -> Column:
         """Create a Column of length *n* with every element equal to *value*.
 
         The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
@@ -4190,7 +4617,9 @@ struct Column(Copyable, Movable, Sized):
                 ref obj_idx = self._index[List[PythonObject]]
                 for i in range(n_idx):
                     _ = idx_py.append(obj_idx[i])
-            return pd.Series(py_list, name=self.name, dtype=dtype_name, index=idx_py)
+            return pd.Series(
+                py_list, name=self.name, dtype=dtype_name, index=idx_py
+            )
         return pd.Series(py_list, name=self.name, dtype=dtype_name)
 
 
@@ -4198,15 +4627,14 @@ struct Column(Copyable, Movable, Sized):
 # Cell-access helpers used by both dataframe.mojo and series.mojo
 # ------------------------------------------------------------------
 
+
 def _csv_quote_field(field: String, sep: String) -> String:
     """Return *field* quoted for CSV output if it contains *sep*, a
     newline, or a double-quote character; otherwise return *field* as-is.
     Double-quote characters inside the field are escaped by doubling them.
     """
     var needs_quote = (
-        field.find(sep) >= 0
-        or field.find("\n") >= 0
-        or field.find('"') >= 0
+        field.find(sep) >= 0 or field.find("\n") >= 0 or field.find('"') >= 0
     )
     if not needs_quote:
         return field

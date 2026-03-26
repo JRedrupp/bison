@@ -74,7 +74,9 @@ struct RangeIndex:
     var step: Int
     var name: String
 
-    def __init__(out self, stop: Int, start: Int = 0, step: Int = 1, name: String = ""):
+    def __init__(
+        out self, stop: Int, start: Int = 0, step: Int = 1, name: String = ""
+    ):
         self.start = start
         self.stop = stop
         self.step = step
@@ -90,9 +92,13 @@ struct RangeIndex:
 
     def __repr__(self) -> String:
         return (
-            "RangeIndex(start=" + String(self.start)
-            + ", stop=" + String(self.stop)
-            + ", step=" + String(self.step) + ")"
+            "RangeIndex(start="
+            + String(self.start)
+            + ", stop="
+            + String(self.stop)
+            + ", step="
+            + String(self.step)
+            + ")"
         )
 
 

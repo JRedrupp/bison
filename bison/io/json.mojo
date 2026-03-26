@@ -9,6 +9,7 @@ from ..dtypes import int64, float64, object_, bool_
 # Private helpers
 # ------------------------------------------------------------------
 
+
 def _json_py_type(val: PythonObject) raises -> String:
     """Return the Python class name of a JSON value."""
     return String(val.__class__.__name__)
@@ -170,6 +171,7 @@ def _json_records_to_df(
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 def read_json(
     path_or_buf: String,

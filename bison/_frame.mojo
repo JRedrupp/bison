@@ -1,11 +1,31 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
-from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string, datetime64_ns
+from .dtypes import (
+    BisonDtype,
+    object_,
+    bool_,
+    int64,
+    float64,
+    dtype_from_string,
+    datetime64_ns,
+)
 from .index import Index, ColumnIndex
-from .column import Column, ColumnData, DFScalar, SeriesScalar, _Null, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj, _scalar_from_col
+from .column import (
+    Column,
+    ColumnData,
+    DFScalar,
+    SeriesScalar,
+    _Null,
+    FloatTransformFn,
+    _csv_quote_field,
+    _col_cell_str,
+    _col_cell_pyobj,
+    _scalar_from_col,
+)
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
+
 
 struct Series(Copyable, Movable):
     """A one-dimensional labeled array, mirroring the pandas Series API."""
@@ -218,11 +238,15 @@ struct Series(Copyable, Movable):
         return self._col.nunique()
 
     def describe(self) raises -> Series:
-        """Return summary statistics as a Series (count, mean, std, min, quartiles, max)."""
+        """Return summary statistics as a Series (count, mean, std, min, quartiles, max).
+        """
         return Series(self._col.describe())
 
-    def value_counts(self, normalize: Bool = False, sort: Bool = True) raises -> Series:
-        """Return a Series with the count (or proportion) of each unique value."""
+    def value_counts(
+        self, normalize: Bool = False, sort: Bool = True
+    ) raises -> Series:
+        """Return a Series with the count (or proportion) of each unique value.
+        """
         return Series(self._col.value_counts(normalize, sort))
 
     def quantile(self, q: Float64 = 0.5, skipna: Bool = True) raises -> Float64:
@@ -300,7 +324,8 @@ struct Series(Copyable, Movable):
         return self.isna()
 
     def notna(self) raises -> Series:
-        """Return a boolean Series that is True where values are not null/NaN."""
+        """Return a boolean Series that is True where values are not null/NaN.
+        """
         var n = len(self._col)
         var has_mask = len(self._col._null_mask) > 0
         var result = List[Bool]()
@@ -315,7 +340,8 @@ struct Series(Copyable, Movable):
         return self.notna()
 
     def fillna(self, value: DFScalar) raises -> Series:
-        """Return a copy of the Series with null/NaN values replaced by *value*."""
+        """Return a copy of the Series with null/NaN values replaced by *value*.
+        """
         if value.is_null():
             raise Error("fillna: fill value cannot be null")
         var has_mask = len(self._col._null_mask) > 0
@@ -332,7 +358,9 @@ struct Series(Copyable, Movable):
             elif value.isa[Bool]():
                 fill_val = Int64(1) if value[Bool] else Int64(0)
             else:
-                raise Error("fillna: cannot fill Int64 column with String value")
+                raise Error(
+                    "fillna: cannot fill Int64 column with String value"
+                )
             var data = List[Int64]()
             ref d = self._col._data[List[Int64]]
             for i in range(n):
@@ -352,7 +380,9 @@ struct Series(Copyable, Movable):
             elif value.isa[Bool]():
                 fill_val = Float64(1.0) if value[Bool] else Float64(0.0)
             else:
-                raise Error("fillna: cannot fill Float64 column with String value")
+                raise Error(
+                    "fillna: cannot fill Float64 column with String value"
+                )
             var data = List[Float64]()
             ref d = self._col._data[List[Float64]]
             for i in range(n):
@@ -421,7 +451,8 @@ struct Series(Copyable, Movable):
         return Series(result_col^)
 
     def ffill(self) raises -> Series:
-        """Forward-fill: propagate the last non-null value forward over nulls."""
+        """Forward-fill: propagate the last non-null value forward over nulls.
+        """
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
             return Series(self._col.copy())
@@ -575,7 +606,8 @@ struct Series(Copyable, Movable):
             return Series(col^)
 
     def bfill(self) raises -> Series:
-        """Backward-fill: propagate the next non-null value backward over nulls."""
+        """Backward-fill: propagate the next non-null value backward over nulls.
+        """
         var has_mask = len(self._col._null_mask) > 0
         if not has_mask:
             return Series(self._col.copy())
@@ -762,7 +794,9 @@ struct Series(Copyable, Movable):
     # Sorting
     # ------------------------------------------------------------------
 
-    def _sort_perm(self, ascending: Bool, na_last: Bool = True) raises -> List[Int]:
+    def _sort_perm(
+        self, ascending: Bool, na_last: Bool = True
+    ) raises -> List[Int]:
         """Return an insertion-sort permutation over the column values.
 
         perm[i] = original index of the i-th element in sorted order.
@@ -903,7 +937,9 @@ struct Series(Copyable, Movable):
                 perm[j + 1] = key
         return perm^
 
-    def sort_values(self, ascending: Bool = True, na_position: String = "last") raises -> Series:
+    def sort_values(
+        self, ascending: Bool = True, na_position: String = "last"
+    ) raises -> Series:
         """Return a new Series sorted by value.
 
         Null elements are placed at the end when na_position is ``"last"``
@@ -977,7 +1013,9 @@ struct Series(Copyable, Movable):
             var result_data = List[Int64]()
             for i in range(n):
                 result_data.append(Int64(perm[i]))
-            var col = Column(self._col.name, ColumnData(result_data^), int64, idx^)
+            var col = Column(
+                self._col.name, ColumnData(result_data^), int64, idx^
+            )
             return Series(col^)
         # Build Float64 result: NaN wherever the sort permutation points to a
         # null element in the original (those positions are at the tail of perm).
@@ -991,12 +1029,15 @@ struct Series(Copyable, Movable):
             else:
                 result_data.append(Float64(perm[i]))
                 result_mask.append(False)
-        var col = Column(self._col.name, ColumnData(result_data^), float64, idx^)
+        var col = Column(
+            self._col.name, ColumnData(result_data^), float64, idx^
+        )
         col._null_mask = result_mask^
         return Series(col^)
 
     def rank(self) raises -> Series:
-        """Return 1-based float ranks (average method for ties, NaN for nulls)."""
+        """Return 1-based float ranks (average method for ties, NaN for nulls).
+        """
         var n = len(self._col)
         if n == 0:
             return Series(self._col.copy())
@@ -1087,11 +1128,13 @@ struct Series(Copyable, Movable):
     # ------------------------------------------------------------------
 
     def apply[F: FloatTransformFn](self) raises -> Series:
-        """Apply a compile-time function element-wise. Call as ``s.apply[my_fn]()``."""
+        """Apply a compile-time function element-wise. Call as ``s.apply[my_fn]()``.
+        """
         return Series(self._col._apply[F]())
 
     def map[F: FloatTransformFn](self) raises -> Series:
-        """Map a compile-time function element-wise. Call as ``s.map[my_fn]()``."""
+        """Map a compile-time function element-wise. Call as ``s.map[my_fn]()``.
+        """
         return Series(self._col._apply[F]())
 
     def astype(self, dtype: String) raises -> Series:
@@ -1108,7 +1151,9 @@ struct Series(Copyable, Movable):
         c.name = new_name
         return Series(c^)
 
-    def clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> Series:
+    def clip(
+        self, lower: Optional[Float64] = None, upper: Optional[Float64] = None
+    ) raises -> Series:
         return Series(self._col._clip(lower, upper))
 
     def abs(self) raises -> Series:
@@ -1135,10 +1180,14 @@ struct Series(Copyable, Movable):
     def between(self, left: Float64, right: Float64) raises -> Series:
         return Series(self._col._between(left, right))
 
-    def where(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+    def where(
+        self, cond: Series, other: Optional[DFScalar] = None
+    ) raises -> Series:
         return Series(self._col._where(cond._col, other))
 
-    def mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> Series:
+    def mask(
+        self, cond: Series, other: Optional[DFScalar] = None
+    ) raises -> Series:
         return Series(self._col._mask(cond._col, other))
 
     # ------------------------------------------------------------------
@@ -1276,7 +1325,12 @@ struct Series(Copyable, Movable):
         for i in range(n):
             var key = col._index_label(i) if has_index else String(i)
             var val = _col_cell_str(col, i)
-            result += _csv_quote_field(key, ",") + "," + _csv_quote_field(val, ",") + "\n"
+            result += (
+                _csv_quote_field(key, ",")
+                + ","
+                + _csv_quote_field(val, ",")
+                + "\n"
+            )
         if len(path) > 0:
             with open(path, "w") as f:
                 f.write(result)
@@ -1340,10 +1394,10 @@ struct Series(Copyable, Movable):
         return self._col.__len__()
 
 
-
 # ------------------------------------------------------------------
 # Shared string-list utilities
 # ------------------------------------------------------------------
+
 
 def _frame_cell_as_python(col: Column, row: Int) raises -> PythonObject:
     """Return the value at *row* in *col* as a PythonObject.
@@ -1397,7 +1451,8 @@ def _sort_col_names(names: List[String]) -> List[String]:
 
 
 struct DataFrame(Copyable, Movable):
-    """A two-dimensional labeled data structure, mirroring the pandas DataFrame API."""
+    """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
+    """
 
     var _cols: List[Column]
 
@@ -1413,7 +1468,8 @@ struct DataFrame(Copyable, Movable):
         self._cols = cols^
 
     def __init__(out self, pd_df: PythonObject) raises:
-        """Convenience constructor: wraps a pandas DataFrame via Column.from_pandas."""
+        """Convenience constructor: wraps a pandas DataFrame via Column.from_pandas.
+        """
         var pd_cols = pd_df.columns.tolist()
         var n = Int(pd_df.columns.__len__())
         self._cols = List[Column]()
@@ -1441,7 +1497,8 @@ struct DataFrame(Copyable, Movable):
 
     @staticmethod
     def from_dict(data: Dict[String, ColumnData]) raises -> DataFrame:
-        """Create DataFrame from a native dict mapping column names to column data."""
+        """Create DataFrame from a native dict mapping column names to column data.
+        """
         var cols = List[Column]()
         for entry in data.items():
             var col_data = entry.value
@@ -1454,7 +1511,8 @@ struct DataFrame(Copyable, Movable):
         records: List[Dict[String, DFScalar]],
         columns: Optional[List[String]] = None,
     ) raises -> DataFrame:
-        """Create DataFrame from a list of row dicts (row-to-column transposition)."""
+        """Create DataFrame from a list of row dicts (row-to-column transposition).
+        """
         if len(records) == 0:
             return DataFrame()
 
@@ -1667,7 +1725,8 @@ struct DataFrame(Copyable, Movable):
         return 2
 
     def dtypes(self) raises -> Series:
-        """Return a Series with the dtype of each column, indexed by column name."""
+        """Return a Series with the dtype of each column, indexed by column name.
+        """
         var n = len(self._cols)
         var dtype_names = List[String]()
         var idx = List[PythonObject]()
@@ -1723,7 +1782,9 @@ struct DataFrame(Copyable, Movable):
         print("dtypes: " + dtype_summary)
         var total_bytes = Int64(0)
         for i in range(ncols):
-            total_bytes += Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize)
+            total_bytes += Int64(
+                len(self._cols[i]) * self._cols[i].dtype.itemsize
+            )
         print("memory usage: " + String(total_bytes) + " bytes")
 
     def memory_usage(self, deep: Bool = False) raises -> Series:
@@ -1736,7 +1797,9 @@ struct DataFrame(Copyable, Movable):
         var values = List[Int64]()
         var idx = List[PythonObject]()
         for i in range(n):
-            values.append(Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize))
+            values.append(
+                Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize)
+            )
             idx.append(PythonObject(self._cols[i].name))
         var col_data = ColumnData(values^)
         var result_col = Column("", col_data^, int64, idx^)
@@ -1761,7 +1824,9 @@ struct DataFrame(Copyable, Movable):
                 return
         self._cols.append(new_col^)
 
-    def get(self, key: String, default: Optional[Series] = None) -> Optional[Series]:
+    def get(
+        self, key: String, default: Optional[Series] = None
+    ) -> Optional[Series]:
         for i in range(len(self._cols)):
             if self._cols[i].name == key:
                 return Series(self._cols[i].copy())
@@ -1874,7 +1939,9 @@ struct DataFrame(Copyable, Movable):
             var has_index = self._has_index()
             var keep_rows = List[Int]()
             for i in range(n_rows):
-                var label = self._cols[0]._index_label(i) if has_index else String(i)
+                var label = self._cols[0]._index_label(
+                    i
+                ) if has_index else String(i)
                 var keep = False
                 if items:
                     ref items_list = items.value()
@@ -2008,7 +2075,9 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", col_data^, dtype)
         return Series(result_col^)
 
-    def std(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
+    def std(
+        self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
+    ) raises -> Series:
         if axis != 0:
             _not_implemented("DataFrame.std")
         var values = List[Float64]()
@@ -2019,7 +2088,9 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", col_data^, dtype)
         return Series(result_col^)
 
-    def var(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
+    def var(
+        self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
+    ) raises -> Series:
         if axis != 0:
             _not_implemented("DataFrame.var")
         var values = List[Float64]()
@@ -2052,11 +2123,17 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", col_data^, dtype)
         return Series(result_col^)
 
-    def describe(self, include: Optional[List[String]] = None, exclude: Optional[List[String]] = None) raises -> DataFrame:
+    def describe(
+        self,
+        include: Optional[List[String]] = None,
+        exclude: Optional[List[String]] = None,
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.describe")
         return DataFrame()
 
-    def quantile(self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True) raises -> Series:
+    def quantile(
+        self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True
+    ) raises -> Series:
         if axis != 0:
             _not_implemented("DataFrame.quantile")
         var values = List[Float64]()
@@ -2105,7 +2182,9 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i].cummax(skipna))
         return DataFrame(result_cols^)
 
-    def sem(self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True) raises -> Series:
+    def sem(
+        self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
+    ) raises -> Series:
         _not_implemented("DataFrame.sem")
         return Series()
 
@@ -2125,7 +2204,9 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.idxmax")
         return Series()
 
-    def corr(self, method: String = "pearson", min_periods: Int = 1) raises -> DataFrame:
+    def corr(
+        self, method: String = "pearson", min_periods: Int = 1
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.corr")
         return DataFrame()
 
@@ -2168,8 +2249,10 @@ struct DataFrame(Copyable, Movable):
             return self.nunique()
         else:
             raise Error(
-                "DataFrame.agg: unsupported aggregation '" + func
-                + "'. Supported: sum, mean, median, min, max, std, var, count, nunique"
+                "DataFrame.agg: unsupported aggregation '"
+                + func
+                + "'. Supported: sum, mean, median, min, max, std, var, count,"
+                " nunique"
             )
 
     def aggregate(self, func: String, axis: Int = 0) raises -> Series:
@@ -2249,7 +2332,8 @@ struct DataFrame(Copyable, Movable):
         return self.isna()
 
     def notna(self) raises -> DataFrame:
-        """Return a boolean DataFrame that is True where values are not null/NaN."""
+        """Return a boolean DataFrame that is True where values are not null/NaN.
+        """
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             var s = Series(self._cols[i].copy())
@@ -2379,7 +2463,9 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(filled._col.copy())
         return DataFrame(result_cols^)
 
-    def interpolate(self, method: String = "linear", axis: Int = 0) raises -> DataFrame:
+    def interpolate(
+        self, method: String = "linear", axis: Int = 0
+    ) raises -> DataFrame:
         """Fill null values using linear interpolation (Float64 columns only).
 
         Non-numeric columns are returned unchanged.
@@ -2387,7 +2473,9 @@ struct DataFrame(Copyable, Movable):
         """
         if method != "linear":
             raise Error(
-                "DataFrame.interpolate: method='" + method + "' is not supported; only 'linear' is supported"
+                "DataFrame.interpolate: method='"
+                + method
+                + "' is not supported; only 'linear' is supported"
             )
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -2448,7 +2536,12 @@ struct DataFrame(Copyable, Movable):
     # Reshaping / sorting
     # ------------------------------------------------------------------
 
-    def sort_values(self, by: List[String], ascending: Bool = True, na_position: String = "last") raises -> DataFrame:
+    def sort_values(
+        self,
+        by: List[String],
+        ascending: Bool = True,
+        na_position: String = "last",
+    ) raises -> DataFrame:
         """Return a new DataFrame sorted by one or more columns.
 
         Rows are reordered so that the values in the first ``by`` column are
@@ -2462,7 +2555,12 @@ struct DataFrame(Copyable, Movable):
         asc.append(ascending)
         return self._sort_values_impl(by, asc, na_position)
 
-    def sort_values(self, by: List[String], ascending: List[Bool], na_position: String = "last") raises -> DataFrame:
+    def sort_values(
+        self,
+        by: List[String],
+        ascending: List[Bool],
+        na_position: String = "last",
+    ) raises -> DataFrame:
         """Return a new DataFrame sorted by one or more columns.
 
         ``ascending`` may be a list with one entry per key in ``by``,
@@ -2471,7 +2569,9 @@ struct DataFrame(Copyable, Movable):
         """
         return self._sort_values_impl(by, ascending, na_position)
 
-    def _sort_values_impl(self, by: List[String], ascending: List[Bool], na_position: String) raises -> DataFrame:
+    def _sort_values_impl(
+        self, by: List[String], ascending: List[Bool], na_position: String
+    ) raises -> DataFrame:
         var n_rows = self.shape()[0]
         if n_rows == 0 or len(by) == 0:
             return DataFrame(self._cols.copy())
@@ -2489,7 +2589,9 @@ struct DataFrame(Copyable, Movable):
         while k >= 0:
             var asc = ascending[k] if k < len(ascending) else True
             var key_col = self[by[k]]
-            var sub_perm = Series(key_col._col.take(perm))._sort_perm(asc, na_position == "last")
+            var sub_perm = Series(key_col._col.take(perm))._sort_perm(
+                asc, na_position == "last"
+            )
             var new_perm = List[Int]()
             for j in range(n_rows):
                 new_perm.append(perm[sub_perm[j]])
@@ -2513,7 +2615,9 @@ struct DataFrame(Copyable, Movable):
             new_cols.append(taken^)
         return DataFrame(new_cols^)
 
-    def sort_index(self, axis: Int = 0, ascending: Bool = True) raises -> DataFrame:
+    def sort_index(
+        self, axis: Int = 0, ascending: Bool = True
+    ) raises -> DataFrame:
         """Return a new DataFrame sorted by its index labels.
 
         ``axis=0`` (default) sorts by row index labels.  When the DataFrame has
@@ -2612,13 +2716,21 @@ struct DataFrame(Copyable, Movable):
                 var str_data = List[String]()
                 for i in range(n_idx):
                     str_data.append(str_idx[i])
-                new_cols.append(Column("index", ColumnData(str_data^), object_, empty_col_idx^))
+                new_cols.append(
+                    Column(
+                        "index", ColumnData(str_data^), object_, empty_col_idx^
+                    )
+                )
             elif self._cols[0]._index.isa[List[Int64]]():
                 ref int_idx = self._cols[0]._index[List[Int64]]
                 var int_data = List[Int64]()
                 for i in range(n_idx):
                     int_data.append(int_idx[i])
-                new_cols.append(Column("index", ColumnData(int_data^), int64, empty_col_idx^))
+                new_cols.append(
+                    Column(
+                        "index", ColumnData(int_data^), int64, empty_col_idx^
+                    )
+                )
             else:
                 ref obj_idx = self._cols[0]._index[List[PythonObject]]
                 ref idx_names = self._cols[0]._index_names
@@ -2630,14 +2742,23 @@ struct DataFrame(Copyable, Movable):
                         for i in range(n_idx):
                             level_data.append(obj_idx[i].__getitem__(k))
                         var empty2 = ColumnIndex(List[PythonObject]())
-                        new_cols.append(Column(idx_names[k], ColumnData(level_data^), object_, empty2^))
+                        new_cols.append(
+                            Column(
+                                idx_names[k],
+                                ColumnData(level_data^),
+                                object_,
+                                empty2^,
+                            )
+                        )
                 else:
                     # Single PythonObject index (e.g. float, datetime).
                     var obj_data = List[PythonObject]()
                     for i in range(n_idx):
                         obj_data.append(obj_idx[i])
                     var empty2 = ColumnIndex(List[PythonObject]())
-                    new_cols.append(Column("index", ColumnData(obj_data^), object_, empty2^))
+                    new_cols.append(
+                        Column("index", ColumnData(obj_data^), object_, empty2^)
+                    )
         for i in range(ncols):
             var c = self._cols[i].copy()
             c._index = ColumnIndex(List[PythonObject]())
@@ -2645,7 +2766,9 @@ struct DataFrame(Copyable, Movable):
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
-    def set_index(self, keys: List[String], drop: Bool = True) raises -> DataFrame:
+    def set_index(
+        self, keys: List[String], drop: Bool = True
+    ) raises -> DataFrame:
         """Promote one or more columns to the row index.
 
         When ``keys`` contains a single column name the index is stored as a
@@ -2727,7 +2850,11 @@ struct DataFrame(Copyable, Movable):
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
-    def rename(self, columns: Optional[Dict[String, String]] = None, index: Optional[Dict[String, String]] = None) raises -> DataFrame:
+    def rename(
+        self,
+        columns: Optional[Dict[String, String]] = None,
+        index: Optional[Dict[String, String]] = None,
+    ) raises -> DataFrame:
         """Rename column labels and/or row index labels.
 
         ``columns`` maps old column names to new ones; missing keys are left
@@ -2781,7 +2908,9 @@ struct DataFrame(Copyable, Movable):
             new_cols.append(c^)
         return DataFrame(new_cols^)
 
-    def rename_axis(self, mapper: Optional[String] = None, axis: Int = 0) raises -> DataFrame:
+    def rename_axis(
+        self, mapper: Optional[String] = None, axis: Int = 0
+    ) raises -> DataFrame:
         """Return a copy with the axis name set to *mapper*.
 
         Note: bison does not currently store axis names (the ``Index.name``
@@ -2791,7 +2920,12 @@ struct DataFrame(Copyable, Movable):
         """
         return self._deep_copy()
 
-    def reindex(self, labels: Optional[List[String]] = None, axis: Int = 0, fill_value: Optional[DFScalar] = None) raises -> DataFrame:
+    def reindex(
+        self,
+        labels: Optional[List[String]] = None,
+        axis: Int = 0,
+        fill_value: Optional[DFScalar] = None,
+    ) raises -> DataFrame:
         """Conform the DataFrame to a new set of labels along an axis.
 
         ``axis=1`` reorders/selects columns; missing columns are filled with
@@ -2835,13 +2969,17 @@ struct DataFrame(Copyable, Movable):
                 else:
                     # Insert a fill/null column.
                     if fill_value:
-                        var c = Column._fill_scalar(lbl, fill_value.value(), nrows, shared_idx)
+                        var c = Column._fill_scalar(
+                            lbl, fill_value.value(), nrows, shared_idx
+                        )
                         new_cols.append(c^)
                     else:
                         # Null column: infer dtype from existing columns so
                         # that a frame of all-int64 columns produces an int64
                         # null column rather than float64.
-                        var c = Column._null_column(lbl, inferred_dtype, nrows, shared_idx)
+                        var c = Column._null_column(
+                            lbl, inferred_dtype, nrows, shared_idx
+                        )
                         new_cols.append(c^)
             return DataFrame(new_cols^)
         else:
@@ -2853,7 +2991,9 @@ struct DataFrame(Copyable, Movable):
             # Build label → row-position map.
             var label_to_row = Dict[String, Int]()
             for i in range(nrows):
-                var key = self._cols[0]._index_label(i) if has_index else String(i)
+                var key = self._cols[0]._index_label(
+                    i
+                ) if has_index else String(i)
                 label_to_row[key] = i
             # Build the per-output-row index list (row_indices) and new _index.
             var row_indices = List[Int]()
@@ -2879,7 +3019,12 @@ struct DataFrame(Copyable, Movable):
                 new_cols.append(c^)
             return DataFrame(new_cols^)
 
-    def drop(self, labels: Optional[List[String]] = None, axis: Int = 0, columns: Optional[List[String]] = None) raises -> DataFrame:
+    def drop(
+        self,
+        labels: Optional[List[String]] = None,
+        axis: Int = 0,
+        columns: Optional[List[String]] = None,
+    ) raises -> DataFrame:
         """Drop columns (axis=1 / columns kwarg) or rows (axis=0) by label.
 
         Column drop: pass ``columns=[...]`` or ``axis=1`` with ``labels=[...]``.
@@ -2923,7 +3068,9 @@ struct DataFrame(Copyable, Movable):
                         found = True
                         break
                 if not found:
-                    raise Error("DataFrame.drop: column not found: " + drop_labels[i])
+                    raise Error(
+                        "DataFrame.drop: column not found: " + drop_labels[i]
+                    )
             # Collect surviving columns.
             var result_cols = List[Column]()
             for i in range(ncols):
@@ -2939,24 +3086,33 @@ struct DataFrame(Copyable, Movable):
                 drop_set[drop_labels[i]] = True
             var keep_indices = List[Int]()
             for i in range(nrows):
-                var key = self._cols[0]._index_label(i) if has_index else String(i)
+                var key = self._cols[0]._index_label(
+                    i
+                ) if has_index else String(i)
                 if key not in drop_set:
                     keep_indices.append(i)
             # Verify all requested labels were found.
             var found_set = Dict[String, Bool]()
             for i in range(nrows):
-                var key = self._cols[0]._index_label(i) if has_index else String(i)
+                var key = self._cols[0]._index_label(
+                    i
+                ) if has_index else String(i)
                 if key in drop_set:
                     found_set[key] = True
             for i in range(len(drop_labels)):
                 if drop_labels[i] not in found_set:
-                    raise Error("DataFrame.drop: index label not found: " + drop_labels[i])
+                    raise Error(
+                        "DataFrame.drop: index label not found: "
+                        + drop_labels[i]
+                    )
             var result_cols = List[Column]()
             for i in range(ncols):
                 result_cols.append(self._cols[i].take(keep_indices))
             return DataFrame(result_cols^)
 
-    def drop_duplicates(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> DataFrame:
+    def drop_duplicates(
+        self, subset: Optional[List[String]] = None, keep: String = "first"
+    ) raises -> DataFrame:
         """Return a DataFrame with duplicate rows removed.
 
         Delegates to ``duplicated`` to identify duplicates, then retains rows
@@ -2974,7 +3130,9 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i].take(keep_indices))
         return DataFrame(result_cols^)
 
-    def duplicated(self, subset: Optional[List[String]] = None, keep: String = "first") raises -> Series:
+    def duplicated(
+        self, subset: Optional[List[String]] = None, keep: String = "first"
+    ) raises -> Series:
         """Return a boolean Series indicating duplicate rows.
 
         Each row is fingerprinted by concatenating per-column cell values
@@ -3007,7 +3165,10 @@ struct DataFrame(Copyable, Movable):
                         found = True
                         break
                 if not found:
-                    raise Error("DataFrame.duplicated: column not found in subset: " + name)
+                    raise Error(
+                        "DataFrame.duplicated: column not found in subset: "
+                        + name
+                    )
         else:
             for j in range(ncols):
                 work_indices.append(j)
@@ -3051,12 +3212,16 @@ struct DataFrame(Copyable, Movable):
             for i in range(nrows):
                 result.append(counts[keys[i]] > 1)
         else:
-            raise Error("DataFrame.duplicated: keep must be 'first', 'last', or 'False'")
+            raise Error(
+                "DataFrame.duplicated: keep must be 'first', 'last', or 'False'"
+            )
 
         var col = Column("", ColumnData(result^), bool_)
         return Series(col^)
 
-    def pivot(self, index: String = "", columns: String = "", values: String = "") raises -> DataFrame:
+    def pivot(
+        self, index: String = "", columns: String = "", values: String = ""
+    ) raises -> DataFrame:
         """Reshape from long to wide format.
 
         Each unique value in *index* becomes a row, each unique value in
@@ -3125,8 +3290,13 @@ struct DataFrame(Copyable, Movable):
             var rk = seen_rows[_frame_cell_as_str(self._cols[idx_ci], r)]
             var ck = seen_cols[_frame_cell_as_str(self._cols[col_ci], r)]
             if filled[rk][ck]:
-                raise Error("DataFrame.pivot: duplicate entry for (" +
-                            row_keys[rk] + ", " + col_keys[ck] + ")")
+                raise Error(
+                    "DataFrame.pivot: duplicate entry for ("
+                    + row_keys[rk]
+                    + ", "
+                    + col_keys[ck]
+                    + ")"
+                )
             table[rk][ck] = _frame_cell_as_python(self._cols[val_ci], r)
             filled[rk][ck] = True
 
@@ -3155,11 +3325,23 @@ struct DataFrame(Copyable, Movable):
 
         return DataFrame(result_cols^)
 
-    def pivot_table(self, values: Optional[List[String]] = None, index: Optional[List[String]] = None, columns: Optional[List[String]] = None, aggfunc: String = "mean") raises -> DataFrame:
+    def pivot_table(
+        self,
+        values: Optional[List[String]] = None,
+        index: Optional[List[String]] = None,
+        columns: Optional[List[String]] = None,
+        aggfunc: String = "mean",
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.pivot_table")
         return DataFrame()
 
-    def melt(self, id_vars: Optional[List[String]] = None, value_vars: Optional[List[String]] = None, var_name: String = "variable", value_name: String = "value") raises -> DataFrame:
+    def melt(
+        self,
+        id_vars: Optional[List[String]] = None,
+        value_vars: Optional[List[String]] = None,
+        var_name: String = "variable",
+        value_name: String = "value",
+    ) raises -> DataFrame:
         """Unpivot a DataFrame from wide to long format.
 
         *id_vars*: columns to keep as identifier variables (repeated).
@@ -3200,7 +3382,9 @@ struct DataFrame(Copyable, Movable):
                     id_ci = j
                     break
             if id_ci == -1:
-                raise Error("DataFrame.melt: id column not found: " + id_names[k])
+                raise Error(
+                    "DataFrame.melt: id column not found: " + id_names[k]
+                )
             var indices = List[Int]()
             for _ in range(n_val):
                 for r in range(nrows):
@@ -3228,10 +3412,12 @@ struct DataFrame(Copyable, Movable):
                     val_ci = j
                     break
             if val_ci == -1:
-                raise Error("DataFrame.melt: value column not found: " + val_names[v])
+                raise Error(
+                    "DataFrame.melt: value column not found: " + val_names[v]
+                )
             ref vcol = self._cols[val_ci]
             for r in range(nrows):
-                var is_null = (len(vcol._null_mask) > 0 and vcol._null_mask[r])
+                var is_null = len(vcol._null_mask) > 0 and vcol._null_mask[r]
                 if is_null:
                     val_data.append(py_none)
                     val_null_mask.append(True)
@@ -3275,7 +3461,7 @@ struct DataFrame(Copyable, Movable):
                 row_label = PythonObject(r)
             for j in range(ncols):
                 ref col = self._cols[j]
-                var is_null = (len(col._null_mask) > 0 and col._null_mask[r])
+                var is_null = len(col._null_mask) > 0 and col._null_mask[r]
                 var tup_items = py.list()
                 _ = tup_items.append(row_label)
                 _ = tup_items.append(PythonObject(col.name))
@@ -3289,8 +3475,9 @@ struct DataFrame(Copyable, Movable):
                     null_mask.append(False)
                     val_data.append(_frame_cell_as_python(col, r))
 
-        var result_col = Column("", ColumnData(val_data^), object_,
-                                ColumnIndex(idx_objs^))
+        var result_col = Column(
+            "", ColumnData(val_data^), object_, ColumnIndex(idx_objs^)
+        )
         if any_null:
             result_col._null_mask = null_mask^
         return Series(result_col^)
@@ -3334,7 +3521,7 @@ struct DataFrame(Copyable, Movable):
             var any_null = False
             for j in range(ncols):
                 ref col = self._cols[j]
-                var is_null = (len(col._null_mask) > 0 and col._null_mask[r])
+                var is_null = len(col._null_mask) > 0 and col._null_mask[r]
                 if is_null:
                     data.append(py_none)
                     null_mask.append(True)
@@ -3355,7 +3542,9 @@ struct DataFrame(Copyable, Movable):
         """Transpose rows and columns (alias for ``transpose()``)."""
         return self.transpose()
 
-    def swaplevel(self, i: Int = -2, j: Int = -1, axis: Int = 0) raises -> DataFrame:
+    def swaplevel(
+        self, i: Int = -2, j: Int = -1, axis: Int = 0
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.swaplevel")
         return DataFrame()
 
@@ -3380,11 +3569,13 @@ struct DataFrame(Copyable, Movable):
 
         # First pass: build the expanded row indices and sub-indices.
         # For each original row r: if cell is list-like, expand; else keep once.
-        var src_indices = List[Int]()   # source row for each output row
-        var sub_indices = List[Int]()   # position within expanded cell (-1 = scalar)
+        var src_indices = List[Int]()  # source row for each output row
+        var sub_indices = List[
+            Int
+        ]()  # position within expanded cell (-1 = scalar)
         ref exp_col = self._cols[col_ci]
         for r in range(nrows):
-            var is_null = (len(exp_col._null_mask) > 0 and exp_col._null_mask[r])
+            var is_null = len(exp_col._null_mask) > 0 and exp_col._null_mask[r]
             if is_null:
                 src_indices.append(r)
                 sub_indices.append(-1)
@@ -3418,7 +3609,9 @@ struct DataFrame(Copyable, Movable):
                 for k in range(n_out):
                     var r = src_indices[k]
                     var sub = sub_indices[k]
-                    var is_null = (len(exp_col._null_mask) > 0 and exp_col._null_mask[r])
+                    var is_null = (
+                        len(exp_col._null_mask) > 0 and exp_col._null_mask[r]
+                    )
                     if is_null:
                         data.append(py_none)
                         null_mask.append(True)
@@ -3444,7 +3637,9 @@ struct DataFrame(Copyable, Movable):
 
         return DataFrame(result_cols^)
 
-    def clip(self, lower: Optional[Float64] = None, upper: Optional[Float64] = None) raises -> DataFrame:
+    def clip(
+        self, lower: Optional[Float64] = None, upper: Optional[Float64] = None
+    ) raises -> DataFrame:
         """Clamp numeric column values to [lower, upper].
 
         Either bound may be ``None`` (no clipping on that side).  Non-numeric
@@ -3477,7 +3672,8 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def _deep_copy(self) -> DataFrame:
-        """Return an independent column-wise copy of this DataFrame (internal helper)."""
+        """Return an independent column-wise copy of this DataFrame (internal helper).
+        """
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].copy())
@@ -3516,7 +3712,9 @@ struct DataFrame(Copyable, Movable):
         """
         for i in range(len(self._cols)):
             if self._cols[i].name == column:
-                raise Error("DataFrame.insert: column already exists: " + column)
+                raise Error(
+                    "DataFrame.insert: column already exists: " + column
+                )
         var nrows = self.shape()[0]
         var idx = ColumnIndex(List[PythonObject]())
         if len(self._cols) > 0:
@@ -3555,7 +3753,9 @@ struct DataFrame(Copyable, Movable):
         self._cols = new_cols^
         return result^
 
-    def where(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
+    def where(
+        self, cond: Series, other: Optional[DFScalar] = None
+    ) raises -> DataFrame:
         """Keep each element where *cond* is True; replace with *other* otherwise.
 
         When *other* is ``None`` (the default), non-matching cells become null.
@@ -3565,7 +3765,9 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i]._where(cond._col, other))
         return DataFrame(result_cols^)
 
-    def mask(self, cond: Series, other: Optional[DFScalar] = None) raises -> DataFrame:
+    def mask(
+        self, cond: Series, other: Optional[DFScalar] = None
+    ) raises -> DataFrame:
         """Replace each element with *other* where *cond* is True; keep otherwise.
 
         When *other* is ``None`` (the default), matching cells become null.
@@ -3591,7 +3793,9 @@ struct DataFrame(Copyable, Movable):
                 var false_data = List[Bool]()
                 for _ in range(nrows):
                     false_data.append(False)
-                result_cols.append(Column(col_name, ColumnData(false_data^), bool_))
+                result_cols.append(
+                    Column(col_name, ColumnData(false_data^), bool_)
+                )
             else:
                 var result_col = self._cols[i]._isin_scalars(values[col_name])
                 result_col.name = col_name
@@ -3612,7 +3816,9 @@ struct DataFrame(Copyable, Movable):
             var found = False
             for j in range(len(other._cols)):
                 if other._cols[j].name == self._cols[i].name:
-                    result_cols.append(self._cols[i]._combine_first_col(other._cols[j]))
+                    result_cols.append(
+                        self._cols[i]._combine_first_col(other._cols[j])
+                    )
                     found = True
                     break
             if not found:
@@ -3638,7 +3844,9 @@ struct DataFrame(Copyable, Movable):
         for j in range(len(other._cols)):
             for i in range(len(self._cols)):
                 if self._cols[i].name == other._cols[j].name:
-                    self._cols[i] = other._cols[j]._combine_first_col(self._cols[i])
+                    self._cols[i] = other._cols[j]._combine_first_col(
+                        self._cols[i]
+                    )
                     break
 
     # ------------------------------------------------------------------
@@ -3646,8 +3854,11 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _row_key_str(df: DataFrame, key_cols: List[String], row: Int) raises -> String:
-        """Serialise the key column values at *row* to a single String for hashing."""
+    def _row_key_str(
+        df: DataFrame, key_cols: List[String], row: Int
+    ) raises -> String:
+        """Serialise the key column values at *row* to a single String for hashing.
+        """
         var key = String()
         for k in range(len(key_cols)):
             if k > 0:
@@ -3773,7 +3984,10 @@ struct DataFrame(Copyable, Movable):
             var col = right._cols[j].take_with_nulls(out_right)
             var in_left = False
             for i in range(len(self._cols)):
-                if self._cols[i].name not in key_set and self._cols[i].name == right._cols[j].name:
+                if (
+                    self._cols[i].name not in key_set
+                    and self._cols[i].name == right._cols[j].name
+                ):
                     in_left = True
                     break
             if in_left:
@@ -3807,7 +4021,9 @@ struct DataFrame(Copyable, Movable):
                 overlap = True
                 break
         if overlap and lsuffix == "" and rsuffix == "":
-            raise Error("columns overlap but no suffix specified: use lsuffix/rsuffix")
+            raise Error(
+                "columns overlap but no suffix specified: use lsuffix/rsuffix"
+            )
 
         var n_left = self.shape()[0]
         var result_cols = List[Column]()
@@ -3828,7 +4044,9 @@ struct DataFrame(Copyable, Movable):
 
         return DataFrame(result_cols^)
 
-    def append(self, other: DataFrame, ignore_index: Bool = False) raises -> DataFrame:
+    def append(
+        self, other: DataFrame, ignore_index: Bool = False
+    ) raises -> DataFrame:
         if len(self._cols) != len(other._cols):
             raise Error("DataFrames have different number of columns")
         # Build name→index map for other.
@@ -3839,7 +4057,9 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             var name = self._cols[i].name
             if name not in other_idx:
-                raise Error("Column '" + name + "' not found in other DataFrame")
+                raise Error(
+                    "Column '" + name + "' not found in other DataFrame"
+                )
             var new_col = self._cols[i].concat(other._cols[other_idx[name]])
             result_cols.append(new_col^)
         # Both frames use default RangeIndex (empty ColumnIndex), so ignore_index
@@ -3865,7 +4085,9 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.resample")
         return DataFrame()
 
-    def rolling(self, window: Int, min_periods: Optional[Int] = None) raises -> DataFrame:
+    def rolling(
+        self, window: Int, min_periods: Optional[Int] = None
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.rolling")
         return DataFrame()
 
@@ -3873,7 +4095,9 @@ struct DataFrame(Copyable, Movable):
         _not_implemented("DataFrame.expanding")
         return DataFrame()
 
-    def ewm(self, com: Optional[Float64] = None, span: Optional[Float64] = None) raises -> DataFrame:
+    def ewm(
+        self, com: Optional[Float64] = None, span: Optional[Float64] = None
+    ) raises -> DataFrame:
         _not_implemented("DataFrame.ewm")
         return DataFrame()
 
@@ -3881,7 +4105,9 @@ struct DataFrame(Copyable, Movable):
     # IO
     # ------------------------------------------------------------------
 
-    def to_csv(self, path_or_buf: String = "", sep: String = ",", index: Bool = True) raises -> String:
+    def to_csv(
+        self, path_or_buf: String = "", sep: String = ",", index: Bool = True
+    ) raises -> String:
         """Serialize the DataFrame to a CSV-formatted string or file.
 
         Parameters
@@ -3898,7 +4124,9 @@ struct DataFrame(Copyable, Movable):
         # Header row
         var header_parts = List[String]()
         if index:
-            header_parts.append(String(""))  # pandas convention: index column has no header
+            header_parts.append(
+                String("")
+            )  # pandas convention: index column has no header
         for ci in range(ncols):
             header_parts.append(self._cols[ci].name)
         var hline = String()
@@ -3926,7 +4154,12 @@ struct DataFrame(Copyable, Movable):
             return String("")
         return result^
 
-    def to_parquet(self, path: String, engine: String = "auto", compression: String = "snappy") raises:
+    def to_parquet(
+        self,
+        path: String,
+        engine: String = "auto",
+        compression: String = "snappy",
+    ) raises:
         """Write the DataFrame to a Parquet file.
 
         Uses pandas interop: converts to a pandas DataFrame then calls
@@ -3942,7 +4175,9 @@ struct DataFrame(Copyable, Movable):
         var pd_df = self.to_pandas()
         pd_df.to_parquet(path, engine=engine, compression=compression)
 
-    def to_json(self, path_or_buf: String = "", orient: String = "") raises -> String:
+    def to_json(
+        self, path_or_buf: String = "", orient: String = ""
+    ) raises -> String:
         """Serialize the DataFrame to a JSON-formatted string or file.
 
         Parameters
@@ -3968,7 +4203,9 @@ struct DataFrame(Copyable, Movable):
             for ri in range(nrows):
                 var row = Python.evaluate("{}")
                 for ci in range(ncols):
-                    row[self._cols[ci].name] = _col_cell_pyobj(self._cols[ci], ri)
+                    row[self._cols[ci].name] = _col_cell_pyobj(
+                        self._cols[ci], ri
+                    )
                 py_obj.append(row)
 
         elif eff_orient == "split":
@@ -3996,7 +4233,9 @@ struct DataFrame(Copyable, Movable):
             for ri in range(nrows):
                 var row = Python.evaluate("{}")
                 for ci in range(ncols):
-                    row[self._cols[ci].name] = _col_cell_pyobj(self._cols[ci], ri)
+                    row[self._cols[ci].name] = _col_cell_pyobj(
+                        self._cols[ci], ri
+                    )
                 py_obj[String(ri)] = row
 
         elif eff_orient == "values":
@@ -4025,7 +4264,12 @@ struct DataFrame(Copyable, Movable):
             return String("")
         return result^
 
-    def to_excel(self, excel_writer: String, sheet_name: String = "Sheet1", index: Bool = True) raises:
+    def to_excel(
+        self,
+        excel_writer: String,
+        sheet_name: String = "Sheet1",
+        index: Bool = True,
+    ) raises:
         """Write the DataFrame to an Excel file.
 
         Uses pandas interop: converts to a pandas DataFrame then calls
@@ -4040,7 +4284,9 @@ struct DataFrame(Copyable, Movable):
         var pd_df = self.to_pandas()
         pd_df.to_excel(excel_writer, sheet_name=sheet_name, index=index)
 
-    def to_dict(self, orient: String = "dict") raises -> Dict[String, Dict[String, DFScalar]]:
+    def to_dict(
+        self, orient: String = "dict"
+    ) raises -> Dict[String, Dict[String, DFScalar]]:
         """Return the DataFrame as a nested ``Dict`` mapping column names to
         index-label → value dicts.
 
@@ -4070,7 +4316,9 @@ struct DataFrame(Copyable, Movable):
             result[col.name] = inner^
         return result^
 
-    def to_records(self, index: Bool = True) raises -> List[Dict[String, DFScalar]]:
+    def to_records(
+        self, index: Bool = True
+    ) raises -> List[Dict[String, DFScalar]]:
         """Return the DataFrame as a list of row dicts.
 
         Each dict maps column name to the cell value for that row.  When
@@ -4137,7 +4385,9 @@ struct DataFrame(Copyable, Movable):
                     row.append(col._data[List[Float64]][ri])
                 else:
                     row.append(
-                        Float64(1.0) if col._data[List[Bool]][ri] else Float64(0.0)
+                        Float64(1.0) if col._data[List[Bool]][ri] else Float64(
+                            0.0
+                        )
                     )
             result.append(row^)
         return result^
@@ -4223,7 +4473,9 @@ struct DataFrame(Copyable, Movable):
             "      <th></th>\n"
         )
         for ci in range(ncols):
-            result += "      <th>" + _html_escape(self._cols[ci].name) + "</th>\n"
+            result += (
+                "      <th>" + _html_escape(self._cols[ci].name) + "</th>\n"
+            )
         result += "    </tr>\n  </thead>\n  <tbody>\n"
 
         for ri in range(nrows):
@@ -4373,7 +4625,9 @@ struct DataFrame(Copyable, Movable):
             result.append(Series(row_col^))
         return result^
 
-    def itertuples(self, index: Bool = True, name: String = "Pandas") raises -> List[Series]:
+    def itertuples(
+        self, index: Bool = True, name: String = "Pandas"
+    ) raises -> List[Series]:
         """Return a list of row Series, one per row, optionally with the row index prepended.
 
         When *index* is ``True`` (default) the first element of each Series is
@@ -4400,7 +4654,6 @@ struct DataFrame(Copyable, Movable):
             )
             result.append(Series(row_col^))
         return result^
-
 
 
 struct DataFrameGroupBy:

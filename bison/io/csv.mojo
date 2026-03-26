@@ -10,6 +10,7 @@ from ..dtypes import int64, float64, object_
 # Private helpers
 # ------------------------------------------------------------------
 
+
 def _in_na_set(s: String, na_set: List[String]) -> Bool:
     """Return True if *s* matches any string in *na_set*."""
     for i in range(len(na_set)):
@@ -119,6 +120,7 @@ def _infer_and_build_column(
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 def read_csv(
     filepath: String,
@@ -296,7 +298,9 @@ def read_csv(
     # ------------------------------------------------------------------
     var cols = List[Column]()
     for oi in range(n_out):
-        var col = _infer_and_build_column(out_col_names[oi], raw_data[oi], na_set)
+        var col = _infer_and_build_column(
+            out_col_names[oi], raw_data[oi], na_set
+        )
         cols.append(col^)
 
     return DataFrame(cols^)

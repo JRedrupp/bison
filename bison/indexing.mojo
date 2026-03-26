@@ -1,6 +1,15 @@
 from std.python import PythonObject
 from std.memory import UnsafePointer
-from .column import Column, ColumnData, DFScalar, SeriesScalar, _scalar_from_col, _col_cell_pyobj, _SetScalarInColMutVisitor, visit_col_data_mut_raises
+from .column import (
+    Column,
+    ColumnData,
+    DFScalar,
+    SeriesScalar,
+    _scalar_from_col,
+    _col_cell_pyobj,
+    _SetScalarInColMutVisitor,
+    visit_col_data_mut_raises,
+)
 from .index import ColumnIndex
 from .dtypes import object_
 from .series import Series
@@ -10,6 +19,7 @@ from .dataframe import DataFrame
 # ------------------------------------------------------------------
 # Private helpers
 # ------------------------------------------------------------------
+
 
 def _df_col_index(df: DataFrame, name: String) raises -> Int:
     """Return the integer position of column *name* in *df*."""
@@ -31,16 +41,16 @@ def _parse_int_label(label: String) raises -> Int:
     var bytes = label.as_bytes()
     var start = 0
     var negative = False
-    if bytes[0] == UInt8(ord('-')):
+    if bytes[0] == UInt8(ord("-")):
         negative = True
         start = 1
-    elif bytes[0] == UInt8(ord('+')):
+    elif bytes[0] == UInt8(ord("+")):
         start = 1
     if start >= n:
         raise Error("loc: invalid row label: " + label)
     var result = 0
     for i in range(start, n):
-        var digit = Int(bytes[i]) - ord('0')
+        var digit = Int(bytes[i]) - ord("0")
         if digit < 0 or digit > 9:
             raise Error("loc: not an integer label: " + label)
         result = result * 10 + digit
@@ -75,8 +85,6 @@ def _df_row_index(df: DataFrame, label: String) raises -> Int:
     return row
 
 
-
-
 def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     """Write *value* into *col* at integer position *row*.
 
@@ -93,7 +101,9 @@ def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     visit_col_data_mut_raises(visitor, col._data)
 
 
-def _set_series_scalar_in_col(mut col: Column, row: Int, value: SeriesScalar) raises:
+def _set_series_scalar_in_col(
+    mut col: Column, row: Int, value: SeriesScalar
+) raises:
     """Write a ``SeriesScalar`` cell into *col* at position *row*.
 
     Behaves like ``_set_scalar_in_col`` but also handles the
@@ -140,6 +150,7 @@ def _row_as_series(df: DataFrame, row: Int) raises -> Series:
 # ------------------------------------------------------------------
 # Public indexer structs
 # ------------------------------------------------------------------
+
 
 struct LocIndexer[O: MutOrigin]:
     """Label-based row indexer (.loc).
@@ -309,7 +320,8 @@ struct IAtIndexer[O: MutOrigin]:
         return _scalar_from_col(df._cols[col], r)
 
     def __setitem__(self, row: Int, col: Int, value: DFScalar) raises:
-        """Set the scalar at integer row *row*, column position *col* to *value*."""
+        """Set the scalar at integer row *row*, column position *col* to *value*.
+        """
         ref df = self._df[]
         var nrows = df.shape()[0]
         var ncols = df.shape()[1]
