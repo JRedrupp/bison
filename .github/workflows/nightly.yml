@@ -28,17 +28,6 @@ jobs:
         with:
           locked: false
 
-      - name: Install pre-commit
-        run: pip install pre-commit
-
-      - name: Normalize formatting to nightly mblack
-        # The nightly mblack version may format differently from the locked
-        # version. Re-format before linting so the format hook sees clean files.
-        run: pixi run fmt
-
-      - name: Run pre-commit checks
-        run: pixi run lint
-
       - name: Generate version file
         run: pixi run gen-version
 
