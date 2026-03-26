@@ -30,6 +30,18 @@ def test_empty_true() raises:
     assert_true(s.empty())
 
 
+def test_dtype_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
+    assert_equal(s.dtype().name, "int64")
+
+
+def test_dtype_float64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0]"), dtype="float64"))
+    assert_equal(s.dtype().name, "float64")
+
+
 def test_shape() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4]")))

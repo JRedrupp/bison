@@ -65,9 +65,8 @@ struct Series(Copyable, Movable):
     def empty(self) -> Bool:
         return self._col.__len__() == 0
 
-    def dtype(self) raises -> BisonDtype:
-        _not_implemented("Series.dtype")
-        return object_
+    def dtype(self) -> BisonDtype:
+        return self._col.dtype
 
     # ------------------------------------------------------------------
     # Selection
