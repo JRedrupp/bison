@@ -162,5 +162,18 @@ def test_concat_keys_raises() raises:
     assert_true(raised)
 
 
+def test_append_dtype_mismatch_raises() raises:
+    """Appending a Float64 column onto an Int64 column must raise, not silently drop data."""
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1, 2]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.5, 2.5]}")))
+    var raised = False
+    try:
+        _ = df1.append(df2)
+    except e:
+        raised = "dtype mismatch" in String(e)
+    assert_true(raised)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
