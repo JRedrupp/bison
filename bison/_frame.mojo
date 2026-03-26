@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from ._errors import _not_implemented
-from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string
+from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string, datetime64_ns
 from .index import Index, ColumnIndex
 from .column import Column, ColumnData, DFScalar, SeriesScalar, _Null, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj, _scalar_from_col
 from .accessors.str_accessor import StringMethods
@@ -1323,8 +1323,12 @@ struct Series(Copyable, Movable):
         return StringMethods(data^, null_mask^, self._col.name)
 
     def dt(self) raises -> DatetimeMethods:
-        _not_implemented("Series.dt")
-        return DatetimeMethods()
+        if not self._col.dtype.name.startswith("datetime64"):
+            raise Error("Series.dt: accessor requires a datetime Series")
+        ref d = self._col._data[List[PythonObject]]
+        var data = d.copy()
+        var null_mask = self._col._null_mask.copy()
+        return DatetimeMethods(data^, null_mask^, self._col.name)
 
     # ------------------------------------------------------------------
     # Repr
