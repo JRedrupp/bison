@@ -4008,11 +4008,11 @@ struct DataFrame(Copyable, Movable):
         # Guard unsupported parameters so callers get a clear failure instead
         # of silently wrong data.
         if how != "left":
-            raise Error("join: unsupported how='" + how + "'")
+            _not_implemented("DataFrame.join", "how='" + how + "'")
         if on:
-            raise Error("join: 'on' parameter not yet supported")
+            _not_implemented("DataFrame.join", "'on' parameter")
         if sort:
-            raise Error("join: 'sort' parameter not yet supported")
+            _not_implemented("DataFrame.join", "'sort' parameter")
 
         # Build right column name set for overlap detection.
         var right_names = Dict[String, Bool]()

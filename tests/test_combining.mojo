@@ -122,7 +122,7 @@ def test_join_how_inner_raises() raises:
         _ = left.join(right, how="inner")
     except e:
         raised = True
-        assert_true("join: unsupported how=" in String(e))
+        assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with how='inner' should have raised")
 
@@ -136,7 +136,7 @@ def test_join_how_outer_raises() raises:
         _ = left.join(right, how="outer")
     except e:
         raised = True
-        assert_true("join: unsupported how=" in String(e))
+        assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with how='outer' should have raised")
 
@@ -150,7 +150,7 @@ def test_join_how_right_raises() raises:
         _ = left.join(right, how="right")
     except e:
         raised = True
-        assert_true("join: unsupported how=" in String(e))
+        assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with how='right' should have raised")
 
@@ -166,7 +166,7 @@ def test_join_on_raises() raises:
         _ = left.join(right, on=on^)
     except e:
         raised = True
-        assert_true("join: 'on' parameter not yet supported" in String(e))
+        assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with on= should have raised")
 
@@ -180,7 +180,7 @@ def test_join_sort_raises() raises:
         _ = left.join(right, sort=True)
     except e:
         raised = True
-        assert_true("join: 'sort' parameter not yet supported" in String(e))
+        assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with sort=True should have raised")
 
