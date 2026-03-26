@@ -16,7 +16,12 @@ struct StringMethods:
         self._null_mask = List[Bool]()
         self._name = ""
 
-    def __init__(out self, var data: List[String], var null_mask: List[Bool], name: String):
+    def __init__(
+        out self,
+        var data: List[String],
+        var null_mask: List[Bool],
+        name: String,
+    ):
         self._data = data^
         self._null_mask = null_mask^
         self._name = name
@@ -101,7 +106,9 @@ struct StringMethods:
     # Predicates
     # ------------------------------------------------------------------
 
-    def contains(self, pat: String, `case`: Bool = True, na: Bool = False) raises -> Column:
+    def contains(
+        self, pat: String, `case`: Bool = True, na: Bool = False
+    ) raises -> Column:
         var result = List[Bool]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -150,7 +157,9 @@ struct StringMethods:
     # Replace / split
     # ------------------------------------------------------------------
 
-    def replace(self, pat: String, repl: String, regex: Bool = True) raises -> Column:
+    def replace(
+        self, pat: String, repl: String, regex: Bool = True
+    ) raises -> Column:
         var result = List[String]()
         var re_mod = Python.import_module("re")
         for i in range(len(self._data)):
@@ -166,7 +175,9 @@ struct StringMethods:
         col._null_mask = self._null_mask.copy()
         return col^
 
-    def split(self, pat: String = " ", n: Int = -1, expand: Bool = False) raises -> List[List[String]]:
+    def split(
+        self, pat: String = " ", n: Int = -1, expand: Bool = False
+    ) raises -> List[List[String]]:
         """Split strings around given separator/delimiter.
 
         Returns a List[List[String]] where each inner list contains the split
@@ -178,11 +189,9 @@ struct StringMethods:
             if self._is_null(i):
                 result.append(List[String]())
             else:
-                var parts_raw = (
-                    self._data[i].split(pat, n)
-                    if n != -1
-                    else self._data[i].split(pat)
-                )
+                var parts_raw = self._data[i].split(
+                    pat, n
+                ) if n != -1 else self._data[i].split(pat)
                 var parts = List[String]()
                 for j in range(len(parts_raw)):
                     parts.append(String(parts_raw[j]))
@@ -272,7 +281,9 @@ struct StringMethods:
         col._null_mask = new_mask^
         return col^
 
-    def slice(self, start: Int = 0, stop: Int = -1, step: Int = 1) raises -> Column:
+    def slice(
+        self, start: Int = 0, stop: Int = -1, step: Int = 1
+    ) raises -> Column:
         var result = List[String]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):

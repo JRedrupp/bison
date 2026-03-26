@@ -15,7 +15,12 @@ struct DatetimeMethods:
         self._null_mask = List[Bool]()
         self._name = ""
 
-    def __init__(out self, var data: List[PythonObject], var null_mask: List[Bool], name: String):
+    def __init__(
+        out self,
+        var data: List[PythonObject],
+        var null_mask: List[Bool],
+        name: String,
+    ):
         self._data = data^
         self._null_mask = null_mask^
         self._name = name

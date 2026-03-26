@@ -10,6 +10,7 @@ from .._errors import _not_implemented
 # Private helpers
 # ------------------------------------------------------------------
 
+
 def _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
     """Return a Column of *n* null rows using *dtype* as the stored arm."""
     var mask = List[Bool]()
@@ -73,15 +74,19 @@ def _vstack(pieces: List[Column]) raises -> Column:
             need_mask = True
 
     # Determine the common typed arm (fall back to PythonObject on mismatch).
-    var is_int   = pieces[0]._data.isa[List[Int64]]()
+    var is_int = pieces[0]._data.isa[List[Int64]]()
     var is_float = pieces[0]._data.isa[List[Float64]]()
-    var is_bool  = pieces[0]._data.isa[List[Bool]]()
-    var is_str   = pieces[0]._data.isa[List[String]]()
+    var is_bool = pieces[0]._data.isa[List[Bool]]()
+    var is_str = pieces[0]._data.isa[List[String]]()
     for i in range(1, len(pieces)):
-        if is_int   and not pieces[i]._data.isa[List[Int64]]():   is_int   = False
-        if is_float and not pieces[i]._data.isa[List[Float64]](): is_float = False
-        if is_bool  and not pieces[i]._data.isa[List[Bool]]():    is_bool  = False
-        if is_str   and not pieces[i]._data.isa[List[String]]():  is_str   = False
+        if is_int and not pieces[i]._data.isa[List[Int64]]():
+            is_int = False
+        if is_float and not pieces[i]._data.isa[List[Float64]]():
+            is_float = False
+        if is_bool and not pieces[i]._data.isa[List[Bool]]():
+            is_bool = False
+        if is_str and not pieces[i]._data.isa[List[String]]():
+            is_str = False
 
     if is_int:
         var data = List[Int64]()
@@ -156,7 +161,9 @@ def _vstack(pieces: List[Column]) raises -> Column:
             var has_m = len(pieces[i]._null_mask) > 0
             if pieces[i]._data.isa[List[Int64]]():
                 for k in range(len(pieces[i]._data[List[Int64]])):
-                    data.append(py_builtins.int(Int(pieces[i]._data[List[Int64]][k])))
+                    data.append(
+                        py_builtins.int(Int(pieces[i]._data[List[Int64]][k]))
+                    )
                     if need_mask:
                         if has_m:
                             mask.append(pieces[i]._null_mask[k])
@@ -164,7 +171,9 @@ def _vstack(pieces: List[Column]) raises -> Column:
                             mask.append(False)
             elif pieces[i]._data.isa[List[Float64]]():
                 for k in range(len(pieces[i]._data[List[Float64]])):
-                    data.append(py_builtins.float(pieces[i]._data[List[Float64]][k]))
+                    data.append(
+                        py_builtins.float(pieces[i]._data[List[Float64]][k])
+                    )
                     if need_mask:
                         if has_m:
                             mask.append(pieces[i]._null_mask[k])
@@ -183,7 +192,9 @@ def _vstack(pieces: List[Column]) raises -> Column:
                             mask.append(False)
             elif pieces[i]._data.isa[List[String]]():
                 for k in range(len(pieces[i]._data[List[String]])):
-                    data.append(py_builtins.str(pieces[i]._data[List[String]][k]))
+                    data.append(
+                        py_builtins.str(pieces[i]._data[List[String]][k])
+                    )
                     if need_mask:
                         if has_m:
                             mask.append(pieces[i]._null_mask[k])
@@ -201,7 +212,6 @@ def _vstack(pieces: List[Column]) raises -> Column:
         if need_mask:
             col._null_mask = mask^
         return col^
-
 
 
 def _sort_result_cols(cols: List[Column]) raises -> List[Column]:
@@ -335,7 +345,9 @@ def _concat_axis1(
                 var src = dfs[i]._cols[j].copy()
                 src.name = col_name
                 pieces.append(src^)
-                pieces.append(_null_col(col_name, nrows - col_rows, dfs[i]._cols[j].dtype))
+                pieces.append(
+                    _null_col(col_name, nrows - col_rows, dfs[i]._cols[j].dtype)
+                )
                 result_cols.append(_vstack(pieces))
 
     if sort:
@@ -347,6 +359,7 @@ def _concat_axis1(
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 def concat(
     objs: List[DataFrame],
