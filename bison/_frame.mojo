@@ -1012,7 +1012,7 @@ struct Series(Copyable, Movable):
         # Prepare Float64 result; null slots are marked in rank_mask.
         var ranks = List[Float64]()
         var rank_mask = List[Bool]()
-        for i in range(n):
+        for _ in range(n):
             ranks.append(Float64(0))
             rank_mask.append(False)
         if has_mask:
@@ -1459,7 +1459,7 @@ struct DataFrame(Copyable, Movable):
             return DataFrame()
 
         # Determine column names
-        var col_names = List[String]()
+        var col_names: List[String]
         if columns:
             col_names = columns.value().copy()
         else:
@@ -1485,7 +1485,6 @@ struct DataFrame(Copyable, Movable):
             # across rows (e.g. first row Int64, second row Float64).
             var has_int = False
             var has_float = False
-            var has_bool = False
             var has_string = False
             var found = False
             for ri in range(len(records)):
@@ -1496,7 +1495,7 @@ struct DataFrame(Copyable, Movable):
                     elif v.isa[Float64]():
                         has_float = True
                     elif v.isa[Bool]():
-                        has_bool = True
+                        pass
                     elif v.isa[String]():
                         has_string = True
                     # _Null arm: contributes no type info, but row exists
@@ -3681,8 +3680,8 @@ struct DataFrame(Copyable, Movable):
         suffixes: Optional[List[String]] = None,
     ) raises -> DataFrame:
         # Determine key columns.
-        var lkeys = List[String]()
-        var rkeys = List[String]()
+        var lkeys: List[String]
+        var rkeys: List[String]
         if on:
             lkeys = on.value().copy()
             rkeys = on.value().copy()

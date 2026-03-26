@@ -20,7 +20,7 @@ gen-version   = "python scripts/gen_version.py"
 test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version"] }
 update-compat = "python scripts/update_compat.py"
 fmt           = "mojo format bison/"
-check         = "mojo build bison/"
+check         = "mojo package bison/ --Werror -o /tmp/bison.mojopkg"
 lint          = "pre-commit run --all-files"
 
 [environments]
