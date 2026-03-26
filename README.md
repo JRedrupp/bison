@@ -87,11 +87,11 @@ In CI it runs after the test suite and the result is committed back to the branc
 | GroupBy (DataFrame) | 16 | 1 |
 | GroupBy (Series) | 15 | 1 |
 | String accessor | 0 | 21 |
-| Datetime accessor | 17 | 1 |
+| Datetime accessor | 0 | 20 |
 | Index | 0 | 14 |
 | IO | 5 | 6 |
 | Reshape | 1 | 0 |
-| **Total** | **104** | **226** |
+| **Total** | **87** | **245** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations

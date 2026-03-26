@@ -1,5 +1,5 @@
 """Tests for .str string accessor methods and .dt accessor stubs."""
-from std.python import Python
+from std.python import Python, PythonObject
 from std.testing import assert_true, assert_false, assert_equal, TestSuite
 from bison import Series
 
@@ -180,28 +180,144 @@ def test_str_split() raises:
     assert_equal(len(result[1]), 2)
 
 
-def test_dt_year_stub() raises:
+def test_dt_year() raises:
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01', '2021-06-15']"))))
-    var raised = False
-    try:
-        var acc = s.dt()
-        _ = acc.year()
-    except:
-        raised = True
-    assert_true(raised)
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))))
+    var result = Series(s.dt().year())
+    assert_equal(result.iloc(0)[Int64], Int64(2020))
+    assert_equal(result.iloc(1)[Int64], Int64(2021))
 
 
-def test_dt_month_stub() raises:
+def test_dt_month() raises:
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01']"))))
-    var raised = False
-    try:
-        var acc = s.dt()
-        _ = acc.month()
-    except:
-        raised = True
-    assert_true(raised)
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))))
+    var result = Series(s.dt().month())
+    assert_equal(result.iloc(0)[Int64], Int64(1))
+    assert_equal(result.iloc(1)[Int64], Int64(6))
+
+
+def test_dt_day() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))))
+    var result = Series(s.dt().day())
+    assert_equal(result.iloc(0)[Int64], Int64(15))
+    assert_equal(result.iloc(1)[Int64], Int64(30))
+
+
+def test_dt_hour() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:00', '2021-06-30 23:00:00']"))))
+    var result = Series(s.dt().hour())
+    assert_equal(result.iloc(0)[Int64], Int64(8))
+    assert_equal(result.iloc(1)[Int64], Int64(23))
+
+
+def test_dt_minute() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:00', '2021-06-30 23:45:00']"))))
+    var result = Series(s.dt().minute())
+    assert_equal(result.iloc(0)[Int64], Int64(30))
+    assert_equal(result.iloc(1)[Int64], Int64(45))
+
+
+def test_dt_second() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:15', '2021-06-30 23:45:59']"))))
+    var result = Series(s.dt().second())
+    assert_equal(result.iloc(0)[Int64], Int64(15))
+    assert_equal(result.iloc(1)[Int64], Int64(59))
+
+
+def test_dt_dayofweek() raises:
+    var pd = Python.import_module("pandas")
+    # 2020-01-06 is Monday (0), 2020-01-12 is Sunday (6)
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-06', '2020-01-12']"))))
+    var result = Series(s.dt().dayofweek())
+    assert_equal(result.iloc(0)[Int64], Int64(0))
+    assert_equal(result.iloc(1)[Int64], Int64(6))
+
+
+def test_dt_dayofyear() raises:
+    var pd = Python.import_module("pandas")
+    # 2020-01-01 is day 1, 2020-12-31 is day 366 (2020 is a leap year)
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-01', '2020-12-31']"))))
+    var result = Series(s.dt().dayofyear())
+    assert_equal(result.iloc(0)[Int64], Int64(1))
+    assert_equal(result.iloc(1)[Int64], Int64(366))
+
+
+def test_dt_quarter() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2020-07-01']"))))
+    var result = Series(s.dt().quarter())
+    assert_equal(result.iloc(0)[Int64], Int64(1))
+    assert_equal(result.iloc(1)[Int64], Int64(3))
+
+
+def test_dt_date() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))))
+    var acc = s.dt()
+    var col = acc.date()
+    # date() returns a PythonObject column; verify against pandas
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))).dt.date
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_time() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:15', '2021-06-30 23:45:59']"))))
+    var acc = s.dt()
+    var col = acc.time()
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:15', '2021-06-30 23:45:59']"))).dt.time
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_floor() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:45:00']"))))
+    var col = s.dt().floor("h")
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:45:00']"))).dt.floor("h")
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_ceil() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:01:00']"))))
+    var col = s.dt().ceil("h")
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:01:00']"))).dt.ceil("h")
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_round() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:20:00', '2021-06-30 23:50:00']"))))
+    var col = s.dt().round("h")
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:20:00', '2021-06-30 23:50:00']"))).dt.round("h")
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_tz_localize() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']"))))
+    var col = s.dt().tz_localize("UTC")
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']"))).dt.tz_localize("UTC")
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+
+
+def test_dt_tz_convert() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']")).tz_localize("UTC")))
+    var col = s.dt().tz_convert("US/Eastern")
+    var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']")).tz_localize("UTC")).dt.tz_convert("US/Eastern")
+    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
 
 
 def main() raises:
