@@ -4005,6 +4005,15 @@ struct DataFrame(Copyable, Movable):
         rsuffix: String = "",
         sort: Bool = False,
     ) raises -> DataFrame:
+        # Guard unsupported parameters so callers get a clear failure instead
+        # of silently wrong data.
+        if how != "left":
+            raise Error("join: unsupported how='" + how + "'")
+        if on:
+            raise Error("join: 'on' parameter not yet supported")
+        if sort:
+            raise Error("join: 'sort' parameter not yet supported")
+
         # Build right column name set for overlap detection.
         var right_names = Dict[String, Bool]()
         for j in range(len(other._cols)):

@@ -113,5 +113,77 @@ def test_append_ignore_index() raises:
     assert_equal(col.iloc(1)[Int64], Int64(20))
 
 
+def test_join_how_inner_raises() raises:
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var raised = False
+    try:
+        _ = left.join(right, how="inner")
+    except e:
+        raised = True
+        assert_true("join: unsupported how=" in String(e))
+    if not raised:
+        raise Error("join with how='inner' should have raised")
+
+
+def test_join_how_outer_raises() raises:
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var raised = False
+    try:
+        _ = left.join(right, how="outer")
+    except e:
+        raised = True
+        assert_true("join: unsupported how=" in String(e))
+    if not raised:
+        raise Error("join with how='outer' should have raised")
+
+
+def test_join_how_right_raises() raises:
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var raised = False
+    try:
+        _ = left.join(right, how="right")
+    except e:
+        raised = True
+        assert_true("join: unsupported how=" in String(e))
+    if not raised:
+        raise Error("join with how='right' should have raised")
+
+
+def test_join_on_raises() raises:
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var on = List[String]()
+    on.append("a")
+    var raised = False
+    try:
+        _ = left.join(right, on=on^)
+    except e:
+        raised = True
+        assert_true("join: 'on' parameter not yet supported" in String(e))
+    if not raised:
+        raise Error("join with on= should have raised")
+
+
+def test_join_sort_raises() raises:
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var raised = False
+    try:
+        _ = left.join(right, sort=True)
+    except e:
+        raised = True
+        assert_true("join: 'sort' parameter not yet supported" in String(e))
+    if not raised:
+        raise Error("join with sort=True should have raised")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
