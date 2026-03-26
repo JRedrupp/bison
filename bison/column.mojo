@@ -1645,6 +1645,56 @@ struct _SliceVisitor(ColumnDataVisitor, Copyable, Movable):
         self.result = ColumnData(result^)
 
 
+struct _ConcatDataVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Appends *other* data onto the visited arm's list."""
+    var other: ColumnData
+    var result: ColumnData
+
+    def __init__(out self, other: ColumnData):
+        self.other = other
+        self.result = ColumnData(List[PythonObject]())
+
+    def on_int64(mut self, data: List[Int64]):
+        var out = data.copy()
+        if self.other.isa[List[Int64]]():
+            ref o = self.other[List[Int64]]
+            for i in range(len(o)):
+                out.append(o[i])
+        self.result = ColumnData(out^)
+
+    def on_float64(mut self, data: List[Float64]):
+        var out = data.copy()
+        if self.other.isa[List[Float64]]():
+            ref o = self.other[List[Float64]]
+            for i in range(len(o)):
+                out.append(o[i])
+        self.result = ColumnData(out^)
+
+    def on_bool(mut self, data: List[Bool]):
+        var out = data.copy()
+        if self.other.isa[List[Bool]]():
+            ref o = self.other[List[Bool]]
+            for i in range(len(o)):
+                out.append(o[i])
+        self.result = ColumnData(out^)
+
+    def on_str(mut self, data: List[String]):
+        var out = data.copy()
+        if self.other.isa[List[String]]():
+            ref o = self.other[List[String]]
+            for i in range(len(o)):
+                out.append(o[i])
+        self.result = ColumnData(out^)
+
+    def on_obj(mut self, data: List[PythonObject]):
+        var out = data.copy()
+        if self.other.isa[List[PythonObject]]():
+            ref o = self.other[List[PythonObject]]
+            for i in range(len(o)):
+                out.append(o[i])
+        self.result = ColumnData(out^)
+
+
 struct _TakeVisitor(ColumnDataVisitor, Copyable, Movable):
     """Selects rows by arbitrary *indices* from the active ColumnData arm."""
     var indices: List[Int]
@@ -1683,6 +1733,80 @@ struct _TakeVisitor(ColumnDataVisitor, Copyable, Movable):
         for k in range(len(self.indices)):
             result.append(data[self.indices[k]])
         self.result = ColumnData(result^)
+
+
+struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
+    """Like _TakeVisitor but index -1 emits a null placeholder row."""
+    var indices: List[Int]
+    var src_mask: List[Bool]
+    var out_mask: List[Bool]
+    var result: ColumnData
+
+    def __init__(out self, indices: List[Int], src_mask: List[Bool]):
+        self.indices = indices.copy()
+        self.src_mask = src_mask.copy()
+        self.out_mask = List[Bool]()
+        self.result = ColumnData(List[PythonObject]())
+
+    def on_int64(mut self, data: List[Int64]):
+        var out = List[Int64]()
+        for k in range(len(self.indices)):
+            var i = self.indices[k]
+            if i < 0:
+                out.append(Int64(0))
+                self.out_mask.append(True)
+            else:
+                out.append(data[i])
+                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+        self.result = ColumnData(out^)
+
+    def on_float64(mut self, data: List[Float64]):
+        var out = List[Float64]()
+        for k in range(len(self.indices)):
+            var i = self.indices[k]
+            if i < 0:
+                out.append(Float64(0) / Float64(0))
+                self.out_mask.append(True)
+            else:
+                out.append(data[i])
+                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+        self.result = ColumnData(out^)
+
+    def on_bool(mut self, data: List[Bool]):
+        var out = List[Bool]()
+        for k in range(len(self.indices)):
+            var i = self.indices[k]
+            if i < 0:
+                out.append(False)
+                self.out_mask.append(True)
+            else:
+                out.append(data[i])
+                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+        self.result = ColumnData(out^)
+
+    def on_str(mut self, data: List[String]):
+        var out = List[String]()
+        for k in range(len(self.indices)):
+            var i = self.indices[k]
+            if i < 0:
+                out.append("")
+                self.out_mask.append(True)
+            else:
+                out.append(data[i])
+                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+        self.result = ColumnData(out^)
+
+    def on_obj(mut self, data: List[PythonObject]):
+        var out = List[PythonObject]()
+        for k in range(len(self.indices)):
+            var i = self.indices[k]
+            if i < 0:
+                out.append(data[0] if len(data) > 0 else PythonObject(None))
+                self.out_mask.append(True)
+            else:
+                out.append(data[i])
+                self.out_mask.append(len(self.src_mask) > i and self.src_mask[i])
+        self.result = ColumnData(out^)
 
 
 struct _ValueCountsCountVisitor(ColumnDataVisitorRaises, Copyable, Movable):
@@ -2964,6 +3088,39 @@ struct Column(Copyable, Movable, Sized):
         var col = Column(self.name, visitor^.result, self.dtype)
         if len(new_mask) > 0:
             col._null_mask = new_mask^
+        return col^
+
+    def take_with_nulls(self, indices: List[Int]) -> Column:
+        """Like take() but index -1 inserts a null placeholder row."""
+        var visitor = _TakeWithNullsVisitor(indices, self._null_mask)
+        visit_col_data(visitor, self._data)
+        # Save out_mask before consuming visitor to avoid partial-move issues.
+        var out_mask = visitor.out_mask.copy()
+        var col = Column(self.name, visitor^.result, self.dtype)
+        var has_null = False
+        for k in range(len(out_mask)):
+            if out_mask[k]:
+                has_null = True
+                break
+        if has_null:
+            col._null_mask = out_mask^
+        return col^
+
+    def concat(self, other: Column) raises -> Column:
+        """Return a new Column with *other* appended row-wise."""
+        var visitor = _ConcatDataVisitor(other._data)
+        visit_col_data(visitor, self._data)
+        var col = Column(self.name, visitor^.result, self.dtype)
+        # Merge null masks only when at least one side has nulls
+        if len(self._null_mask) > 0 or len(other._null_mask) > 0:
+            var n_self = len(self)
+            var n_other = len(other)
+            var merged = List[Bool]()
+            for i in range(n_self):
+                merged.append(len(self._null_mask) > 0 and self._null_mask[i])
+            for i in range(n_other):
+                merged.append(len(other._null_mask) > 0 and other._null_mask[i])
+            col._null_mask = merged^
         return col^
 
     # ------------------------------------------------------------------
