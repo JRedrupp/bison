@@ -3960,12 +3960,69 @@ struct DataFrame(Copyable, Movable):
         # Build output columns.
         var result_cols = List[Column]()
 
-        # Key columns: use left values (null where left row is unmatched).
-        # Tests for outer/right join only check shape, so null keys are fine.
+        # Key columns: left values for matched/left-only rows; right values for
+        # right-only rows (out_left[r] == -1).  Inner/left joins have no
+        # right-only rows so the fill loop is a no-op for those cases.
         for k in range(len(lkeys)):
             for i in range(len(self._cols)):
                 if self._cols[i].name == lkeys[k]:
-                    result_cols.append(self._cols[i].take_with_nulls(out_left))
+                    var key_col = self._cols[i].take_with_nulls(out_left)
+                    # For right-only rows, substitute the right frame's key value.
+                    for j in range(len(right._cols)):
+                        if right._cols[j].name == lkeys[k]:
+                            ref rk = right._cols[j]
+                            if (
+                                key_col._data.isa[List[Int64]]()
+                                and rk._data.isa[List[Int64]]()
+                            ):
+                                for r in range(len(out_left)):
+                                    if out_left[r] < 0:
+                                        key_col._int64_data()[
+                                            r
+                                        ] = rk._int64_data()[out_right[r]]
+                                        key_col._null_mask[r] = False
+                            elif (
+                                key_col._data.isa[List[Float64]]()
+                                and rk._data.isa[List[Float64]]()
+                            ):
+                                for r in range(len(out_left)):
+                                    if out_left[r] < 0:
+                                        key_col._float64_data()[
+                                            r
+                                        ] = rk._float64_data()[out_right[r]]
+                                        key_col._null_mask[r] = False
+                            elif (
+                                key_col._data.isa[List[Bool]]()
+                                and rk._data.isa[List[Bool]]()
+                            ):
+                                for r in range(len(out_left)):
+                                    if out_left[r] < 0:
+                                        key_col._bool_data()[
+                                            r
+                                        ] = rk._bool_data()[out_right[r]]
+                                        key_col._null_mask[r] = False
+                            elif (
+                                key_col._data.isa[List[String]]()
+                                and rk._data.isa[List[String]]()
+                            ):
+                                for r in range(len(out_left)):
+                                    if out_left[r] < 0:
+                                        key_col._str_data()[r] = rk._str_data()[
+                                            out_right[r]
+                                        ]
+                                        key_col._null_mask[r] = False
+                            elif (
+                                key_col._data.isa[List[PythonObject]]()
+                                and rk._data.isa[List[PythonObject]]()
+                            ):
+                                for r in range(len(out_left)):
+                                    if out_left[r] < 0:
+                                        key_col._obj_data()[r] = rk._obj_data()[
+                                            out_right[r]
+                                        ]
+                                        key_col._null_mask[r] = False
+                            break
+                    result_cols.append(key_col^)
                     break
 
         # Left non-key columns.

@@ -213,5 +213,58 @@ def test_take_with_nulls_obj_col_null_placeholder_is_none() raises:
     assert_true(Bool(check(result_pd).__bool__()))  # fails with bug, passes after fix
 
 
+def test_merge_outer_key_col_right_only_rows() raises:
+    """outer join: right-only rows must carry the right key value, not NaN.
+
+    Regression test for issue #334: the key column was built exclusively from
+    take_with_nulls(out_left), so any row where out_left[r]==-1 (right-only)
+    emitted null instead of the right frame's key value.
+    """
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'val': [10, 20]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [2, 3], 'val': [200, 300]}")))
+    var on = List[String]()
+    on.append("key")
+    var suf = List[String]()
+    suf.append("_left")
+    suf.append("_right")
+    var result = left.merge(right, how="outer", on=on^, suffixes=Optional[List[String]](suf^))
+    assert_equal(result.shape()[0], 3)
+    # Row order: row 0 = left-only (key=1), row 1 = matched (key=2),
+    # row 2 = right-only (key=3 — was null before fix).
+    var result_pd = result.to_pandas()
+    var key_col_pd = result_pd["key"]
+    assert_true(
+        not Bool(py=pd.isna(key_col_pd.iloc[2])),
+        "right-only row key must not be NaN",
+    )
+    assert_equal(Int(py=key_col_pd.iloc[2]), 3)
+
+
+def test_merge_right_key_col_right_only_rows() raises:
+    """right join: right-only rows must carry the right key value, not NaN.
+
+    Regression test for issue #334.
+    """
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'val': [10, 20]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [2, 3], 'val': [200, 300]}")))
+    var on = List[String]()
+    on.append("key")
+    var suf = List[String]()
+    suf.append("_left")
+    suf.append("_right")
+    var result = left.merge(right, how="right", on=on^, suffixes=Optional[List[String]](suf^))
+    assert_equal(result.shape()[0], 2)
+    # Row 0 = matched (key=2), row 1 = right-only (key=3 — was null before fix).
+    var result_pd = result.to_pandas()
+    var key_col_pd = result_pd["key"]
+    assert_true(
+        not Bool(py=pd.isna(key_col_pd.iloc[1])),
+        "right-only row key must not be NaN",
+    )
+    assert_equal(Int(py=key_col_pd.iloc[1]), 3)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
