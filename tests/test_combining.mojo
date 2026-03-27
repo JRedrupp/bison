@@ -1,5 +1,5 @@
 """Tests for DataFrame combining methods: merge, join, append."""
-from std.python import Python
+from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
 from bison import DataFrame
 
@@ -183,6 +183,34 @@ def test_join_sort_raises() raises:
         assert_true("not implemented" in String(e))
     if not raised:
         raise Error("join with sort=True should have raised")
+
+
+def test_take_with_nulls_obj_col_null_placeholder_is_none() raises:
+    """take_with_nulls on a PythonObject column must emit None (not data[0])
+    as the null placeholder for unmatched rows.  Regression test for #331."""
+    var pd = Python.import_module("pandas")
+    # Build a right frame whose 'tag' column is object-dtype so bison stores
+    # it as List[PythonObject].  Only key=1 is present on the right side.
+    var make_right = Python.evaluate(
+        "lambda pd: pd.DataFrame({'key': [1], 'tag': pd.Series([99], dtype=object)})"
+    )
+    var right_pd = make_right(pd)
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'a': [10, 20]}")))
+    var right = DataFrame(right_pd)
+    var on = List[String]()
+    on.append("key")
+    var result = left.merge(right, how="left", on=on^)
+    # Row 0 (key=1): matched — tag should be 99, not null.
+    # Row 1 (key=2): unmatched — tag should be null, NOT 99 (which is data[0]).
+    assert_equal(result.shape()[0], 2)
+    # to_pandas() for List[PythonObject] columns passes raw data unconditionally
+    # (no null-mask override).  With the bug, data[0]=99 is the placeholder so
+    # the round-trip exposes it as 99 instead of NaN.
+    var result_pd = result.to_pandas()
+    var check = Python.evaluate(
+        "lambda df: __import__('pandas').isna(df['tag'].iloc[1])"
+    )
+    assert_true(Bool(check(result_pd).__bool__()))  # fails with bug, passes after fix
 
 
 def main() raises:

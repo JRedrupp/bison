@@ -2015,7 +2015,7 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
         for k in range(len(self.indices)):
             var i = self.indices[k]
             if i < 0:
-                out.append(data[0] if len(data) > 0 else PythonObject(None))
+                out.append(PythonObject(None))
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
