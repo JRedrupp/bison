@@ -1947,12 +1947,14 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
     var src_mask: List[Bool]
     var out_mask: List[Bool]
     var result: ColumnData
+    var py_none: PythonObject
 
-    def __init__(out self, indices: List[Int], src_mask: List[Bool]):
+    def __init__(out self, indices: List[Int], src_mask: List[Bool]) raises:
         self.indices = indices.copy()
         self.src_mask = src_mask.copy()
         self.out_mask = List[Bool]()
         self.result = ColumnData(List[PythonObject]())
+        self.py_none = Python.evaluate("None")
 
     def on_int64(mut self, data: List[Int64]):
         var out = List[Int64]()
@@ -2015,7 +2017,7 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
         for k in range(len(self.indices)):
             var i = self.indices[k]
             if i < 0:
-                out.append(data[0] if len(data) > 0 else PythonObject(None))
+                out.append(self.py_none)
                 self.out_mask.append(True)
             else:
                 out.append(data[i])
@@ -3370,7 +3372,7 @@ struct Column(Copyable, Movable, Sized):
             col._null_mask = new_mask^
         return col^
 
-    def take_with_nulls(self, indices: List[Int]) -> Column:
+    def take_with_nulls(self, indices: List[Int]) raises -> Column:
         """Like take() but index -1 inserts a null placeholder row."""
         var visitor = _TakeWithNullsVisitor(indices, self._null_mask)
         visit_col_data(visitor, self._data)

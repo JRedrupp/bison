@@ -185,5 +185,24 @@ def test_join_sort_raises() raises:
         raise Error("join with sort=True should have raised")
 
 
+def test_merge_outer_obj_dtype_null_placeholder() raises:
+    """Regression test for issue #331: on_obj null placeholder must be None, not data[0]."""
+    var pd = Python.import_module("pandas")
+    # 'val' column is object dtype (mixed/string values); outer join produces unmatched rows.
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'val': ['a', 'b']}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [2, 3], 'extra': ['x', 'y']}")))
+    var on = List[String]()
+    on.append("key")
+    var result = left.merge(right, how="outer", on=on^)
+    # key=1 row: right side unmatched — 'extra' should be null, not 'x'
+    # key=3 row: left side unmatched — 'val' should be null, not 'a'
+    assert_equal(result.shape()[0], 3)
+    var pd_result = result.to_pandas()
+    # The 'val' null for key=3 must be pd.NA/NaN, not the string 'a'
+    assert_true(Bool(py=pd.isna(pd_result.loc[2, "val"])))
+    # The 'extra' null for key=1 must be pd.NA/NaN, not the string 'x'
+    assert_true(Bool(py=pd.isna(pd_result.loc[0, "extra"])))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
