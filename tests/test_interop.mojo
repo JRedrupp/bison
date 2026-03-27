@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, TestSuite
-from bison import DataFrame, Series, Column, ColumnData, int64
+from bison import DataFrame, Series, Column, ColumnData, int64, object_
 
 
 def test_df_from_pandas_preserves_shape() raises:
@@ -198,6 +198,32 @@ def test_int_column_direct_null_mask_to_pandas() raises:
     assert_equal(Int(py=back[0]), 10)
     assert_equal(Int(py=back[2]), 30)
     assert_true(Bool(py=pd.isna(back[1])), "position 1 should be NA")
+
+
+def test_obj_column_with_null_mask_to_pandas() raises:
+    """List[PythonObject] Column with a null mask must emit NaN at masked positions.
+
+    Regression test for issue #344: _ToPandasVisitor.on_obj previously ignored
+    the null_mask and appended raw data[i] unconditionally, so a non-None value
+    stored at a masked position would reach to_pandas() instead of NaN.
+    """
+    var pd = Python.import_module("pandas")
+    # Build a List[PythonObject] column manually with a non-None value at
+    # position 1, but mark position 1 as null in the mask.
+    var raw = List[PythonObject]()
+    raw.append(Python.evaluate("'apple'"))
+    raw.append(Python.evaluate("'should-be-null'"))  # stored value, must be masked
+    raw.append(Python.evaluate("'cherry'"))
+    var col = Column("fruit", ColumnData(raw^), object_)
+    var mask = List[Bool]()
+    mask.append(False)
+    mask.append(True)   # null — must appear as NaN in pandas output
+    mask.append(False)
+    col._null_mask = mask^
+    var back = col.to_pandas()
+    assert_equal(String(py=back[0]), "apple")
+    assert_true(Bool(py=pd.isna(back[1])), "masked position must be NaN, not the stored value")
+    assert_equal(String(py=back[2]), "cherry")
 
 
 def main() raises:

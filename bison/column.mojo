@@ -555,8 +555,7 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     ``py_list`` must already be a Python list object; elements are appended
     in order.  Null entries (``null_mask[i] == True``) are appended as the
-    provided ``py_none`` value.  The ``List[PythonObject]`` arm is assumed
-    to carry its own ``None`` representations and is appended unconditionally.
+    provided ``py_none`` value for all arms, including ``List[PythonObject]``.
     """
 
     var py_list: PythonObject
@@ -606,8 +605,12 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 _ = self.py_list.append(data[i])
 
     def on_obj(mut self, data: List[PythonObject]) raises:
+        var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
-            _ = self.py_list.append(data[i])
+            if has_mask and self.null_mask[i]:
+                _ = self.py_list.append(self.py_none)
+            else:
+                _ = self.py_list.append(data[i])
 
 
 # ------------------------------------------------------------------
