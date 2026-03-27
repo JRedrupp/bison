@@ -12,7 +12,7 @@ repos:
       - id: no-bare-raise-stubs
         name: "no bare raise Error() stubs (use _not_implemented)"
         language: pygrep
-        entry: 'raise Error\([^)]*not.yet.implemented[^)]*\)'
+        entry: 'raise Error\([^)]*not.yet.(implemented|supported)[^)]*\)'
         files: ^bison/.*\.mojo$
         types: [file]
       - id: mojo-format

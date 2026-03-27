@@ -4005,6 +4005,15 @@ struct DataFrame(Copyable, Movable):
         rsuffix: String = "",
         sort: Bool = False,
     ) raises -> DataFrame:
+        # Guard unsupported parameters so callers get a clear failure instead
+        # of silently wrong data.
+        if how != "left":
+            _not_implemented("DataFrame.join", "how='" + how + "'")
+        if on:
+            _not_implemented("DataFrame.join", "'on' parameter")
+        if sort:
+            _not_implemented("DataFrame.join", "'sort' parameter")
+
         # Build right column name set for overlap detection.
         var right_names = Dict[String, Bool]()
         for j in range(len(other._cols)):
