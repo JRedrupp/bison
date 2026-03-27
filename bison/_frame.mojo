@@ -3855,28 +3855,32 @@ struct DataFrame(Copyable, Movable):
 
     @staticmethod
     def _row_key_str(
-        df: DataFrame, key_cols: List[String], row: Int
+        df: DataFrame,
+        key_cols: List[String],
+        row: Int,
+        col_idx: Dict[String, Int],
     ) raises -> String:
         """Serialise the key column values at *row* to a single String for hashing.
+
+        *col_idx* must be a pre-built name→column-index map for *df* so that
+        each key lookup is O(1) rather than O(n_cols).
         """
         var key = String()
         for k in range(len(key_cols)):
             if k > 0:
                 key += "|"
-            for i in range(len(df._cols)):
-                if df._cols[i].name == key_cols[k]:
-                    ref col_data = df._cols[i]._data
-                    if col_data.isa[List[Int64]]():
-                        key += String(Int(col_data[List[Int64]][row]))
-                    elif col_data.isa[List[Float64]]():
-                        key += String(col_data[List[Float64]][row])
-                    elif col_data.isa[List[Bool]]():
-                        key += "1" if col_data[List[Bool]][row] else "0"
-                    elif col_data.isa[List[String]]():
-                        key += col_data[List[String]][row]
-                    else:
-                        key += String(col_data[List[PythonObject]][row])
-                    break
+            var i = col_idx[key_cols[k]]
+            ref col_data = df._cols[i]._data
+            if col_data.isa[List[Int64]]():
+                key += String(Int(col_data[List[Int64]][row]))
+            elif col_data.isa[List[Float64]]():
+                key += String(col_data[List[Float64]][row])
+            elif col_data.isa[List[Bool]]():
+                key += "1" if col_data[List[Bool]][row] else "0"
+            elif col_data.isa[List[String]]():
+                key += col_data[List[String]][row]
+            else:
+                key += String(col_data[List[PythonObject]][row])
         return key
 
     def merge(
@@ -3911,11 +3915,19 @@ struct DataFrame(Copyable, Movable):
             lsuf = suffixes.value()[0]
             rsuf = suffixes.value()[1]
 
+        # Build name→index maps once so key serialisation is O(1) per lookup.
+        var right_col_idx = Dict[String, Int]()
+        for i in range(len(right._cols)):
+            right_col_idx[right._cols[i].name] = i
+        var left_col_idx = Dict[String, Int]()
+        for i in range(len(self._cols)):
+            left_col_idx[self._cols[i].name] = i
+
         # Build right hash map: key_str → list of right row indices.
         var right_map = Dict[String, List[Int]]()
         var n_right = right.shape()[0]
         for i in range(n_right):
-            var k = DataFrame._row_key_str(right, rkeys, i)
+            var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
             if k not in right_map:
                 right_map[k] = List[Int]()
             right_map[k].append(i)
@@ -3929,7 +3941,7 @@ struct DataFrame(Copyable, Movable):
             right_matched.append(False)
 
         for i in range(n_left):
-            var k = DataFrame._row_key_str(self, lkeys, i)
+            var k = DataFrame._row_key_str(self, lkeys, i, left_col_idx)
             if k in right_map:
                 ref matches = right_map[k]
                 for m in range(len(matches)):
