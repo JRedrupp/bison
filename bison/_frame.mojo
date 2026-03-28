@@ -1393,6 +1393,15 @@ struct Series(Copyable, Movable):
     def __len__(self) -> Int:
         return self._col.__len__()
 
+    def groupby(
+        self,
+        by: List[String],
+        as_index: Bool = True,
+        sort: Bool = True,
+        dropna: Bool = True,
+    ) raises -> SeriesGroupBy:
+        return SeriesGroupBy(self, by, as_index, sort, dropna)
+
 
 # ------------------------------------------------------------------
 # Shared string-list utilities
@@ -4163,8 +4172,9 @@ struct DataFrame(Copyable, Movable):
         sort: Bool = True,
         dropna: Bool = True,
     ) raises -> DataFrameGroupBy:
-        _not_implemented("DataFrame.groupby")
-        return DataFrameGroupBy()
+        # axis is accepted for API compatibility but ignored (deprecated in
+        # pandas 2.0 for groupby).
+        return DataFrameGroupBy(self, by, as_index, sort, dropna)
 
     def resample(self, rule: String, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.resample")
@@ -4744,144 +4754,179 @@ struct DataFrame(Copyable, Movable):
 struct DataFrameGroupBy:
     """GroupBy object returned by DataFrame.groupby().
 
-    Stub-only type — all methods raise 'not implemented' until a native
-    implementation is added.  No backing state is held at this stage.
+    Delegates all aggregation to the underlying pandas GroupBy object via
+    to_pandas() / from_pandas() round-trips, consistent with eval/query.
     """
 
-    def __init__(out self):
-        pass
+    var _df: DataFrame
+    var _by: List[String]
+    var _as_index: Bool
+    var _sort: Bool
+    var _dropna: Bool
 
-    def agg(self, func: String) raises -> Series:
-        _not_implemented("DataFrameGroupBy.agg")
-        return Series()
+    def __init__(
+        out self,
+        df: DataFrame,
+        by: List[String],
+        as_index: Bool,
+        sort: Bool,
+        dropna: Bool,
+    ):
+        self._df = df.copy()
+        self._by = by.copy()
+        self._as_index = as_index
+        self._sort = sort
+        self._dropna = dropna
 
-    def aggregate(self, func: String) raises -> Series:
-        _not_implemented("DataFrameGroupBy.aggregate")
-        return Series()
+    def _pd_groupby(self) raises -> PythonObject:
+        """Return the pandas GroupBy object for this group configuration."""
+        var pd_df = self._df.to_pandas()
+        var py_by = Python.evaluate("[]")
+        for i in range(len(self._by)):
+            _ = py_by.append(self._by[i])
+        return pd_df.groupby(
+            py_by,
+            as_index=self._as_index,
+            sort=self._sort,
+            dropna=self._dropna,
+        )
 
-    def transform(self, func: String) raises -> Series:
-        _not_implemented("DataFrameGroupBy.transform")
-        return Series()
+    def agg(self, func: String) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().agg(func))
 
-    def apply(self, func: String) raises -> Series:
-        _not_implemented("DataFrameGroupBy.apply")
-        return Series()
+    def aggregate(self, func: String) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().aggregate(func))
 
-    def sum(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.sum")
-        return Series()
+    def transform(self, func: String) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().transform(func))
 
-    def mean(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.mean")
-        return Series()
+    def apply(self, func: String) raises -> DataFrame:
+        return DataFrame.from_pandas(
+            self._pd_groupby().apply(Python.evaluate(func))
+        )
 
-    def min(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.min")
-        return Series()
+    def sum(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().sum())
 
-    def max(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.max")
-        return Series()
+    def mean(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().mean())
 
-    def count(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.count")
-        return Series()
+    def min(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().min())
 
-    def nunique(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.nunique")
-        return Series()
+    def max(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().max())
 
-    def first(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.first")
-        return Series()
+    def count(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().count())
 
-    def last(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.last")
-        return Series()
+    def nunique(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().nunique())
+
+    def first(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().first())
+
+    def last(self) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().last())
 
     def size(self) raises -> Series:
-        _not_implemented("DataFrameGroupBy.size")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().size())
 
-    def std(self, ddof: Int = 1) raises -> Series:
-        _not_implemented("DataFrameGroupBy.std")
-        return Series()
+    def std(self, ddof: Int = 1) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().std(ddof))
 
-    def var(self, ddof: Int = 1) raises -> Series:
-        _not_implemented("DataFrameGroupBy.var")
-        return Series()
+    def var(self, ddof: Int = 1) raises -> DataFrame:
+        return DataFrame.from_pandas(self._pd_groupby().var(ddof))
 
-    def filter(self, func: String) raises -> Series:
-        _not_implemented("DataFrameGroupBy.filter")
-        return Series()
+    def filter(self, func: String) raises -> DataFrame:
+        return DataFrame.from_pandas(
+            self._pd_groupby().filter(Python.evaluate(func))
+        )
 
 
 struct SeriesGroupBy:
     """GroupBy object returned by Series.groupby().
 
-    Stub-only type — all methods raise 'not implemented' until a native
-    implementation is added.  No backing state is held at this stage.
+    Delegates all aggregation to the underlying pandas GroupBy object via
+    to_pandas() / from_pandas() round-trips, consistent with eval/query.
     """
 
-    def __init__(out self):
-        pass
+    var _series: Series
+    var _by: List[String]
+    var _as_index: Bool
+    var _sort: Bool
+    var _dropna: Bool
+
+    def __init__(
+        out self,
+        series: Series,
+        by: List[String],
+        as_index: Bool,
+        sort: Bool,
+        dropna: Bool,
+    ):
+        self._series = series.copy()
+        self._by = by.copy()
+        self._as_index = as_index
+        self._sort = sort
+        self._dropna = dropna
+
+    def _pd_groupby(self) raises -> PythonObject:
+        """Return the pandas GroupBy object for this group configuration."""
+        var pd_s = self._series.to_pandas()
+        var py_by = Python.evaluate("[]")
+        for i in range(len(self._by)):
+            _ = py_by.append(self._by[i])
+        return pd_s.groupby(
+            py_by,
+            as_index=self._as_index,
+            sort=self._sort,
+            dropna=self._dropna,
+        )
 
     def agg(self, func: String) raises -> Series:
-        _not_implemented("SeriesGroupBy.agg")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().agg(func))
 
     def aggregate(self, func: String) raises -> Series:
-        _not_implemented("SeriesGroupBy.aggregate")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().aggregate(func))
 
     def transform(self, func: String) raises -> Series:
-        _not_implemented("SeriesGroupBy.transform")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().transform(func))
 
     def apply(self, func: String) raises -> Series:
-        _not_implemented("SeriesGroupBy.apply")
-        return Series()
+        return Series.from_pandas(
+            self._pd_groupby().apply(Python.evaluate(func))
+        )
 
     def sum(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.sum")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().sum())
 
     def mean(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.mean")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().mean())
 
     def min(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.min")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().min())
 
     def max(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.max")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().max())
 
     def count(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.count")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().count())
 
     def nunique(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.nunique")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().nunique())
 
     def first(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.first")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().first())
 
     def last(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.last")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().last())
 
     def size(self) raises -> Series:
-        _not_implemented("SeriesGroupBy.size")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().size())
 
     def std(self, ddof: Int = 1) raises -> Series:
-        _not_implemented("SeriesGroupBy.std")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().std(ddof))
 
     def var(self, ddof: Int = 1) raises -> Series:
-        _not_implemented("SeriesGroupBy.var")
-        return Series()
+        return Series.from_pandas(self._pd_groupby().var(ddof))
