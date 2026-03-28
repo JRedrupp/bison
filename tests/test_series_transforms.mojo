@@ -4,6 +4,16 @@ from std.testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import Series
 
 
+def _double(v: Float64) -> Float64:
+    return v * 2.0
+
+def _identity(v: Float64) -> Float64:
+    return v
+
+def _negate(v: Float64) -> Float64:
+    return -v
+
+
 def test_copy() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
@@ -136,15 +146,6 @@ def test_clip_upper_only() raises:
     assert_true(r.iloc(1)[Float64] == 5.0)
     assert_true(r.iloc(2)[Float64] == 7.0)
 
-
-def _double(v: Float64) -> Float64:
-    return v * 2.0
-
-def _identity(v: Float64) -> Float64:
-    return v
-
-def _negate(v: Float64) -> Float64:
-    return -v
 
 def test_apply() raises:
     var pd = Python.import_module("pandas")
