@@ -1,31 +1,246 @@
-"""Tests that groupby stubs raise 'not implemented'."""
-from std.python import Python
-from std.testing import assert_true, TestSuite
-from bison import DataFrame, DataFrameGroupBy
+"""Tests for DataFrame.groupby(), DataFrameGroupBy, and SeriesGroupBy."""
+from std.python import Python, PythonObject
+from std.testing import TestSuite
+from bison import DataFrame, Series
 
 
-def test_groupby_stub() raises:
+def _make_pd_df() raises -> PythonObject:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'grp': ['a', 'a', 'b'], 'val': [1, 2, 3]}")))
-    var raised = False
-    try:
-        var by = List[String]()
-        by.append("grp")
-        _ = df.groupby(by^)
-    except:
-        raised = True
-    assert_true(raised)
+    return pd.DataFrame(
+        Python.evaluate(
+            "{'grp': ['a', 'a', 'b', 'b'], 'val': [1, 2, 3, 4],"
+            " 'x': [10.0, 20.0, 30.0, 40.0]}"
+        )
+    )
 
 
-def test_groupby_sum_stub() raises:
-    """DataFrameGroupBy.sum is also a stub."""
-    var gb = DataFrameGroupBy()
-    var raised = False
-    try:
-        _ = gb.sum()
-    except:
-        raised = True
-    assert_true(raised)
+# ------------------------------------------------------------------
+# DataFrameGroupBy tests
+# ------------------------------------------------------------------
+
+
+def test_dataframegroupby_sum() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").sum())
+
+
+def test_dataframegroupby_mean() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).mean().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").mean())
+
+
+def test_dataframegroupby_min() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).min().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").min())
+
+
+def test_dataframegroupby_max() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).max().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").max())
+
+
+def test_dataframegroupby_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).count().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").count())
+
+
+def test_dataframegroupby_nunique() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).nunique().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").nunique())
+
+
+def test_dataframegroupby_first() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).first().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").first())
+
+
+def test_dataframegroupby_last() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).last().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").last())
+
+
+def test_dataframegroupby_size() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).size().to_pandas()
+    # check_names=False: Series.from_pandas converts None name to "None" string
+    testing.assert_series_equal(
+        result, pd_df.groupby("grp").size(), check_names=False
+    )
+
+
+def test_dataframegroupby_std() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).std().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").std())
+
+
+def test_dataframegroupby_var() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).var().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").var())
+
+
+def test_dataframegroupby_agg() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).agg("sum").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").agg("sum"))
+
+
+def test_dataframegroupby_transform() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("sum").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"))
+
+
+# ------------------------------------------------------------------
+# SeriesGroupBy tests
+# ------------------------------------------------------------------
+# Series.groupby takes element-wise group labels as the `by` list.
+# We pass ["a","a","b","b"] as raw labels and compare against the same
+# labels in Python to avoid index-name discrepancies from named grouping.
+
+
+def _pd_labels() raises -> PythonObject:
+    return Python.evaluate("['a', 'a', 'b', 'b']")
+
+
+def _mojo_labels() -> List[String]:
+    var by = List[String]()
+    by.append("a")
+    by.append("a")
+    by.append("b")
+    by.append("b")
+    return by^
+
+
+def test_seriesgroupby_sum() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).sum().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).sum(), check_names=False
+    )
+
+
+def test_seriesgroupby_mean() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).mean().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).mean(), check_names=False
+    )
+
+
+def test_seriesgroupby_min() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).min().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).min(), check_names=False
+    )
+
+
+def test_seriesgroupby_max() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).max().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).max(), check_names=False
+    )
+
+
+def test_seriesgroupby_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).count().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).count(), check_names=False
+    )
+
+
+def test_seriesgroupby_size() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).size().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).size(), check_names=False
+    )
+
+
+def test_seriesgroupby_agg() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).agg("sum").to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).agg("sum"), check_names=False
+    )
 
 
 def main() raises:
