@@ -448,13 +448,37 @@ def test_set_index_null_key() raises:
 # rename_axis
 # ------------------------------------------------------------------
 
-def test_rename_axis_is_copy() raises:
+def test_rename_axis_sets_name() raises:
+    """rename_axis stores the name and round-trips through to_pandas."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var r = df.rename_axis(mapper=Optional[String]("rows"))
     assert_equal(r.shape()[0], 2)
     assert_equal(r.shape()[1], 2)
     assert_true(r["a"].iloc(0)[Int64] == 1)
+    # The index name must be visible in the round-tripped pandas DataFrame.
+    var pd_r = r.to_pandas()
+    assert_equal(String(pd_r.index.name), "rows")
+
+
+def test_rename_axis_none_clears_name() raises:
+    """Passing mapper=None clears a previously set axis name."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var named = df.rename_axis(mapper=Optional[String]("idx"))
+    var cleared = named.rename_axis()
+    var pd_c = cleared.to_pandas()
+    assert_true(pd_c.index.name.__class__.__name__ == "NoneType")
+
+
+def test_rename_axis_roundtrip_from_pandas() raises:
+    """Index name is preserved when building a DataFrame from a named-index pandas DF."""
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [10, 20]}"))
+    _ = pd_df.__setattr__("index", pd_df.index.rename("my_index"))
+    var df = DataFrame(pd_df)
+    var pd_r = df.to_pandas()
+    assert_equal(String(pd_r.index.name), "my_index")
 
 
 # ------------------------------------------------------------------

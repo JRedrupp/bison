@@ -2911,14 +2911,21 @@ struct DataFrame(Copyable, Movable):
     def rename_axis(
         self, mapper: Optional[String] = None, axis: Int = 0
     ) raises -> DataFrame:
-        """Return a copy with the axis name set to *mapper*.
+        """Return a copy with the row-index name set to *mapper*.
 
-        Note: bison does not currently store axis names (the ``Index.name``
-        field is not wired into ``Column._index`` storage).  This method
-        returns a deep copy and silently ignores *mapper*.  The limitation is
-        tracked in SESSION.md as a tech-debt item.
+        ``axis=0`` (default) sets the row-index name on every column.
+        ``axis=1`` sets the column-axis name (stored as a DataFrame-level
+        attribute; no-op for now since bison does not yet expose column-axis
+        names).  Passing ``mapper=None`` clears the current name.
         """
-        return self._deep_copy()
+        var result = self._deep_copy()
+        if axis == 0:
+            var new_name = String("")
+            if mapper:
+                new_name = mapper.value()
+            for i in range(len(result._cols)):
+                result._cols[i]._index_name = new_name
+        return result^
 
     def reindex(
         self,
