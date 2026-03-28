@@ -1,7 +1,7 @@
 """Tests for Series output and serialization methods."""
-from std.python import Python, PythonObject
+from std.python import Python
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import Series, SeriesScalar, DFScalar, FloatTransformFn, DataFrame
+from bison import Series
 
 
 def test_to_list_int() raises:
