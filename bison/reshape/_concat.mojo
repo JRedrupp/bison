@@ -55,6 +55,44 @@ def _dtype_for(dfs: List[DataFrame], col_name: String) -> BisonDtype:
     return object_
 
 
+def _common_dtype(pieces: List[Column]) -> Optional[BisonDtype]:
+    """Return the shared dtype if all pieces use the same typed data arm.
+
+    Returns ``None`` when pieces are heterogeneous so callers know to fall
+    back to ``List[PythonObject]`` (object dtype) storage.  Returns the
+    common :class:`BisonDtype` otherwise:
+
+    * ``int64``   — every piece holds ``List[Int64]``
+    * ``float64`` — every piece holds ``List[Float64]``
+    * ``bool_``   — every piece holds ``List[Bool]``
+    * ``object_`` — every piece holds ``List[String]``
+    """
+    if len(pieces) == 0:
+        return None
+    var is_int = pieces[0]._data.isa[List[Int64]]()
+    var is_float = pieces[0]._data.isa[List[Float64]]()
+    var is_bool = pieces[0]._data.isa[List[Bool]]()
+    var is_str = pieces[0]._data.isa[List[String]]()
+    for i in range(1, len(pieces)):
+        if is_int and not pieces[i]._data.isa[List[Int64]]():
+            is_int = False
+        if is_float and not pieces[i]._data.isa[List[Float64]]():
+            is_float = False
+        if is_bool and not pieces[i]._data.isa[List[Bool]]():
+            is_bool = False
+        if is_str and not pieces[i]._data.isa[List[String]]():
+            is_str = False
+    if is_int:
+        return int64
+    if is_float:
+        return float64
+    if is_bool:
+        return bool_
+    if is_str:
+        return object_
+    return None
+
+
 def _vstack(pieces: List[Column]) raises -> Column:
     """Vertically stack a list of same-named Columns row-wise.
 
@@ -74,21 +112,9 @@ def _vstack(pieces: List[Column]) raises -> Column:
             need_mask = True
 
     # Determine the common typed arm (fall back to PythonObject on mismatch).
-    var is_int = pieces[0]._data.isa[List[Int64]]()
-    var is_float = pieces[0]._data.isa[List[Float64]]()
-    var is_bool = pieces[0]._data.isa[List[Bool]]()
-    var is_str = pieces[0]._data.isa[List[String]]()
-    for i in range(1, len(pieces)):
-        if is_int and not pieces[i]._data.isa[List[Int64]]():
-            is_int = False
-        if is_float and not pieces[i]._data.isa[List[Float64]]():
-            is_float = False
-        if is_bool and not pieces[i]._data.isa[List[Bool]]():
-            is_bool = False
-        if is_str and not pieces[i]._data.isa[List[String]]():
-            is_str = False
+    var common = _common_dtype(pieces)
 
-    if is_int:
+    if common and common.value() == int64:
         var data = List[Int64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
@@ -104,7 +130,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
         if need_mask:
             col._null_mask = mask^
         return col^
-    elif is_float:
+    elif common and common.value() == float64:
         var data = List[Float64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
@@ -120,7 +146,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
         if need_mask:
             col._null_mask = mask^
         return col^
-    elif is_bool:
+    elif common and common.value() == bool_:
         var data = List[Bool]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
@@ -136,7 +162,8 @@ def _vstack(pieces: List[Column]) raises -> Column:
         if need_mask:
             col._null_mask = mask^
         return col^
-    elif is_str:
+    elif common and common.value() == object_:
+        # All pieces hold List[String]; keep the string arm intact.
         var data = List[String]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
