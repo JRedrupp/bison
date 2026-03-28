@@ -2237,9 +2237,8 @@ comptime FloatTransformFn = def(Float64) -> Float64
 
 # ------------------------------------------------------------------
 # Shared preamble holder for binary element-wise operations.
-# Returned by Column._binary_op_prepare; avoids duplicating the
-# length check, float64 conversion, and null-mask detection across
-# _arith_op and _cmp_op.
+# Returned by Column._binary_op_prepare_unchecked; avoids duplicating the
+# float64 conversion and null-mask detection across _arith_op and _cmp_op.
 # ------------------------------------------------------------------
 struct _BinOpInputs(Movable):
     var a: List[Float64]
@@ -3669,23 +3668,16 @@ struct Column(Copyable, Movable, Sized):
             col._null_mask = result_mask^
         return col^
 
-    def _binary_op_prepare(
-        self, op_name: String, other: Column
+    def _binary_op_prepare_unchecked(
+        self, other: Column
     ) raises -> _BinOpInputs:
-        """Check lengths and build the shared Float64 input arrays and null-mask flags.
+        """Build the shared Float64 input arrays and null-mask flags.
 
-        Raises if ``self`` and ``other`` differ in length.  Called at the top
-        of ``_arith_op`` and ``_cmp_op`` to eliminate repeated preamble code.
+        Precondition: ``len(self) == len(other)``.  Both ``_arith_op`` and
+        ``_cmp_op`` enforce this invariant with an explicit length check before
+        calling this helper.  Violating the precondition leads to an
+        out-of-bounds access in the caller's loop.
         """
-        if len(self) != len(other):
-            raise Error(
-                op_name
-                + ": length mismatch ("
-                + String(len(self))
-                + " vs "
-                + String(len(other))
-                + ")"
-            )
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         return _BinOpInputs(
@@ -3757,7 +3749,7 @@ struct Column(Copyable, Movable, Sized):
                 )
 
         # Float64 path: used when either operand is float64/bool, or for true division.
-        var inp = self._binary_op_prepare(op_name, other)
+        var inp = self._binary_op_prepare_unchecked(other)
         var result = List[Float64]()
         var result_mask = List[Bool]()
         var has_any_null = False
@@ -3880,7 +3872,7 @@ struct Column(Copyable, Movable, Sized):
                     result.append(v)
                     result_mask.append(False)
         else:
-            var inp = self._binary_op_prepare(op_name, other)
+            var inp = self._binary_op_prepare_unchecked(other)
             for i in range(len(inp.a)):
                 var is_null = (inp.has_a_mask and self._null_mask[i]) or (
                     inp.has_b_mask and other._null_mask[i]
