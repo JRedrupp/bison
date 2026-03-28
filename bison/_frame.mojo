@@ -1376,7 +1376,7 @@ struct Series(Copyable, Movable):
         return StringMethods(data^, null_mask^, self._col.name)
 
     def dt(self) raises -> DatetimeMethods:
-        if not self._col.dtype.name.startswith("datetime64"):
+        if self._col.dtype != datetime64_ns:
             raise Error("Series.dt: accessor requires a datetime Series")
         ref d = self._col._data[List[PythonObject]]
         var data = d.copy()
