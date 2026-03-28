@@ -3104,6 +3104,10 @@ struct Column(Copyable, Movable, Sized):
     # Level names for a multi-key index set via DataFrame.set_index.
     # Empty when the index is a single-key or default RangeIndex.
     var _index_names: List[String]
+    # The axis/index name (pandas index.name).  Empty string = no name.
+    # Set by from_pandas and written back in to_pandas.  Also updated by
+    # DataFrame.rename_axis / Series.rename_axis.
+    var _index_name: String
 
     # ------------------------------------------------------------------
     # Constructors
@@ -3117,6 +3121,7 @@ struct Column(Copyable, Movable, Sized):
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
         self._index_names = List[String]()
+        self._index_name = String("")
 
     def __init__(
         out self, name: String, var data: ColumnData, dtype: BisonDtype
@@ -3127,6 +3132,7 @@ struct Column(Copyable, Movable, Sized):
         self._index = ColumnIndex(List[PythonObject]())
         self._null_mask = List[Bool]()
         self._index_names = List[String]()
+        self._index_name = String("")
 
     def __init__(
         out self,
@@ -3141,6 +3147,7 @@ struct Column(Copyable, Movable, Sized):
         self._index = index^
         self._null_mask = List[Bool]()
         self._index_names = List[String]()
+        self._index_name = String("")
 
     # ------------------------------------------------------------------
     # Traits
@@ -3156,6 +3163,7 @@ struct Column(Copyable, Movable, Sized):
         self._index = copy._index
         self._null_mask = copy._null_mask.copy()
         self._index_names = copy._index_names.copy()
+        self._index_name = copy._index_name
 
     def __init__(out self, *, deinit take: Self):
         self.name = take.name^
@@ -3164,6 +3172,7 @@ struct Column(Copyable, Movable, Sized):
         self._index = take._index^
         self._null_mask = take._null_mask^
         self._index_names = take._index_names^
+        self._index_name = take._index_name^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
@@ -3198,6 +3207,7 @@ struct Column(Copyable, Movable, Sized):
         var col = Column(self.name, visitor^.result, self.dtype, idx^)
         col._null_mask = mask^
         col._index_names = self._index_names.copy()
+        col._index_name = self._index_name
         return col^
 
     # ------------------------------------------------------------------
@@ -4429,6 +4439,12 @@ struct Column(Copyable, Movable, Sized):
         for i in range(n):
             null_mask.append(Bool(null_list[i].__bool__()))
 
+        # Capture the pandas index name (may be None).
+        var idx_name = String("")
+        var raw_idx_name = pd_idx.name
+        if raw_idx_name.__class__.__name__ != "NoneType":
+            idx_name = String(raw_idx_name)
+
         var bison_dtype: BisonDtype
         if (
             dtype_str == "int8"
@@ -4461,6 +4477,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(Int64(Int(py=py_list[i])))
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
+            col._index_name = idx_name
             return col^
         elif bison_dtype == float64:
             var data = List[Float64]()
@@ -4478,6 +4495,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(bitcast[DType.float64](bits))
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
+            col._index_name = idx_name
             return col^
         elif bison_dtype == bool_:
             var data = List[Bool]()
@@ -4488,6 +4506,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(Bool(py_list[i].__bool__()))
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
+            col._index_name = idx_name
             return col^
         elif dtype_str == "string":
             var data = List[String]()
@@ -4498,6 +4517,7 @@ struct Column(Copyable, Movable, Sized):
                     data.append(String(py_list[i]))
             var col = Column(name, ColumnData(data^), object_, bison_idx^)
             col._null_mask = null_mask.copy()
+            col._index_name = idx_name
             return col^
         else:
             var data = List[PythonObject]()
@@ -4505,6 +4525,7 @@ struct Column(Copyable, Movable, Sized):
                 data.append(py_list[i])
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask^
+            col._index_name = idx_name
             return col^
 
     @staticmethod
@@ -4603,6 +4624,7 @@ struct Column(Copyable, Movable, Sized):
                 else:  # uint64
                     dtype_name = "UInt64"
         var n_idx = self._index_len()
+        var pd_index: PythonObject
         if n_idx > 0:
             var idx_py = Python.evaluate("[]")
             if self._index.isa[Index]():
@@ -4617,10 +4639,17 @@ struct Column(Copyable, Movable, Sized):
                 ref obj_idx = self._index[List[PythonObject]]
                 for i in range(n_idx):
                     _ = idx_py.append(obj_idx[i])
-            return pd.Series(
-                py_list, name=self.name, dtype=dtype_name, index=idx_py
-            )
-        return pd.Series(py_list, name=self.name, dtype=dtype_name)
+            if self._index_name:
+                pd_index = pd.Index(idx_py, name=self._index_name)
+            else:
+                pd_index = idx_py
+        elif self._index_name:
+            pd_index = pd.RangeIndex(self.__len__(), name=self._index_name)
+        else:
+            return pd.Series(py_list, name=self.name, dtype=dtype_name)
+        return pd.Series(
+            py_list, name=self.name, dtype=dtype_name, index=pd_index
+        )
 
 
 # ------------------------------------------------------------------
