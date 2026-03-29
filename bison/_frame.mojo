@@ -5137,7 +5137,18 @@ struct DataFrameGroupBy:
     def transform(self, func: String) raises -> DataFrame:
         if len(self._by) != 1 or not self._as_index:
             return DataFrame.from_pandas(self._pd_groupby().transform(func))
-        if func != "sum" and func != "mean" and func != "min" and func != "max":
+        if (
+            func != "sum"
+            and func != "mean"
+            and func != "min"
+            and func != "max"
+            and func != "std"
+            and func != "var"
+            and func != "count"
+            and func != "size"
+            and func != "first"
+            and func != "last"
+        ):
             return DataFrame.from_pandas(self._pd_groupby().transform(func))
         if len(self._df._cols) == 0:
             return DataFrame()
@@ -5154,13 +5165,58 @@ struct DataFrameGroupBy:
             ref indices = self._group_map[key]
             for k in range(len(indices)):
                 row_key[indices[k]] = key
-        # For each numeric column, broadcast the group aggregate to every row.
+        # Dtype-preserving broadcast for first/last.
+        if func == "first" or func == "last":
+            var want_first = func == "first"
+            var result_cols = List[Column]()
+            for i in range(len(self._df._cols)):
+                ref col = self._df._cols[i]
+                if col.name in skip:
+                    continue
+                var has_mask = len(col._null_mask) > 0
+                var key_to_idx = Dict[String, Int]()
+                for j in range(len(self._group_keys)):
+                    var key = self._group_keys[j]
+                    ref indices = self._group_map[key]
+                    var found = -1
+                    var start = 0 if want_first else len(indices) - 1
+                    var stop = len(indices) if want_first else -1
+                    var step = 1 if want_first else -1
+                    var ii = start
+                    while ii != stop:
+                        if not has_mask or not col._null_mask[indices[ii]]:
+                            found = indices[ii]
+                            break
+                        ii += step
+                    key_to_idx[key] = found
+                var selected = List[Int]()
+                for r in range(n_rows):
+                    if row_key[r] != "":
+                        selected.append(key_to_idx[row_key[r]])
+                    else:
+                        # Row was excluded by dropna — emit null.
+                        selected.append(-1)
+                var result_col = col.take_with_nulls(selected)
+                result_col.name = col.name
+                result_cols.append(result_col^)
+            return DataFrame(result_cols^)
+        # Float64-returning scalar-broadcast functions.
+        var needs_numeric = (
+            func == "sum"
+            or func == "mean"
+            or func == "min"
+            or func == "max"
+            or func == "std"
+            or func == "var"
+        )
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
             if col.name in skip:
                 continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
+            if needs_numeric and not (
+                col.dtype.is_integer() or col.dtype.is_float()
+            ):
                 continue
             var key_to_val = Dict[String, Float64]()
             for j in range(len(self._group_keys)):
@@ -5172,8 +5228,16 @@ struct DataFrameGroupBy:
                     key_to_val[key] = sub.mean()
                 elif func == "min":
                     key_to_val[key] = sub.min()
-                else:
+                elif func == "max":
                     key_to_val[key] = sub.max()
+                elif func == "std":
+                    key_to_val[key] = sub.std()
+                elif func == "var":
+                    key_to_val[key] = sub.var()
+                elif func == "count":
+                    key_to_val[key] = Float64(sub.count())
+                else:  # size
+                    key_to_val[key] = Float64(len(self._group_map[key]))
             var nan = Float64(0) / Float64(0)
             var vals = List[Float64]()
             var null_mask = List[Bool]()
