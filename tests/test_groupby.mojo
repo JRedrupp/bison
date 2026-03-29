@@ -178,8 +178,9 @@ def test_seriesgroupby_sum() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).sum().to_pandas()
+    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).sum(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).sum(), check_dtype=False
     )
 
 
@@ -189,7 +190,7 @@ def test_seriesgroupby_mean() raises:
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).mean().to_pandas()
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).mean(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).mean()
     )
 
 
@@ -198,8 +199,9 @@ def test_seriesgroupby_min() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).min().to_pandas()
+    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).min(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).min(), check_dtype=False
     )
 
 
@@ -208,8 +210,9 @@ def test_seriesgroupby_max() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).max().to_pandas()
+    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).max(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).max(), check_dtype=False
     )
 
 
@@ -219,7 +222,7 @@ def test_seriesgroupby_count() raises:
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).count().to_pandas()
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).count(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).count()
     )
 
 
@@ -229,7 +232,7 @@ def test_seriesgroupby_size() raises:
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).size().to_pandas()
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).size(), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).size()
     )
 
 
@@ -238,8 +241,74 @@ def test_seriesgroupby_agg() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).agg("sum").to_pandas()
+    # check_dtype=False: dispatches to sum() which returns Float64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).agg("sum"), check_names=False
+        result, pd_df["val"].groupby(_pd_labels()).agg("sum"), check_dtype=False
+    )
+
+
+def test_seriesgroupby_nunique() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).nunique().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).nunique()
+    )
+
+
+def test_seriesgroupby_std() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).std().to_pandas()
+    # check_dtype=False: native returns Float64; pandas returns Float64 too,
+    # but check_dtype ensures no accidental int comparison
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).std(), check_dtype=False
+    )
+
+
+def test_seriesgroupby_var() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).var().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).var(), check_dtype=False
+    )
+
+
+def test_seriesgroupby_first() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).first().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).first()
+    )
+
+
+def test_seriesgroupby_last() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).last().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df["val"].groupby(_pd_labels()).last()
+    )
+
+
+def test_seriesgroupby_transform() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("sum").to_pandas()
+    # check_dtype=False: native returns Float64; pandas returns Int64
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("sum"),
+        check_dtype=False,
     )
 
 
