@@ -156,6 +156,25 @@ def test_dataframegroupby_transform() raises:
     testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"), check_dtype=False)
 
 
+def test_dataframegroupby_transform_dropna() raises:
+    """transform() with dropna=True must not raise when key column has nulls."""
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    # Build a DataFrame with one null in the groupby key column.
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': ['a', None, 'b', 'b'], 'val': [1.0, 2.0, 3.0, 4.0]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    # dropna=True (the default) — the null-keyed row should become NaN in the output.
+    var result = df.groupby(by).transform("sum").to_pandas()
+    var expected = pd_df.groupby("grp", dropna=True).transform("sum")
+    testing.assert_frame_equal(result, expected, check_dtype=False)
+
+
 # ------------------------------------------------------------------
 # SeriesGroupBy tests
 # ------------------------------------------------------------------
