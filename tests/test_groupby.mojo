@@ -335,5 +335,113 @@ def test_seriesgroupby_transform() raises:
     )
 
 
+def test_seriesgroupby_transform_mean() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("mean").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("mean"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_min() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("min").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("min"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_max() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("max").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("max"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_std() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("std").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("std"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_var() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("var").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("var"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("count").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("count"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_size() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("size").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("size"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_first() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("first").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("first"),
+        check_dtype=False,
+    )
+
+
+def test_seriesgroupby_transform_last() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var s = Series(pd_df["val"], "val")
+    var result = s.groupby(_mojo_labels()).transform("last").to_pandas()
+    testing.assert_series_equal(
+        result,
+        pd_df["val"].groupby(_pd_labels()).transform("last"),
+        check_dtype=False,
+    )
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
