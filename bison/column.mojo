@@ -2231,6 +2231,148 @@ comptime _CMP_LE = 3
 comptime _CMP_GT = 4
 comptime _CMP_GE = 5
 
+
+# ------------------------------------------------------------------
+# Comparison visitor — dispatches on self's ColumnData arm and stores
+# the RHS column's data to handle the Bool-Bool fast path internally.
+# ------------------------------------------------------------------
+
+
+struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
+    """Element-wise comparison visitor for ``Column._cmp_op``.
+
+    At construction time the RHS column's data is split into two pre-computed
+    forms: ``other_bool`` (populated when the RHS holds Bool data) and
+    ``other_float`` (a Float64 projection populated for all other numeric
+    arms).  This avoids a repeated ``_ToFloat64Visitor`` call per dispatch
+    and eliminates the need for a live ``ColumnData`` reference inside the
+    visitor.  ``on_bool`` uses the Bool-Bool fast path when ``other_is_bool``
+    is set; all other numeric arms delegate to ``_run_float64``.  String and
+    object arms raise.
+
+    ``op`` is one of the ``_CMP_*`` compile-time constants; ``comptime if``
+    folds the branch at compile time so each specialisation is a tight loop.
+    """
+
+    var self_null_mask: List[Bool]
+    var other_null_mask: List[Bool]
+    var other_bool: List[Bool]  # Bool RHS data; non-empty iff other_is_bool
+    var other_float: List[
+        Float64
+    ]  # Float64 RHS data; non-empty iff not other_is_bool
+    var other_is_bool: Bool
+    var result: List[Bool]
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, self_null_mask: List[Bool], other: Column) raises:
+        self.self_null_mask = self_null_mask.copy()
+        self.other_null_mask = other._null_mask.copy()
+        self.result = List[Bool]()
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        if other._data.isa[List[Bool]]():
+            self.other_is_bool = True
+            self.other_bool = other._data[List[Bool]].copy()
+            self.other_float = List[Float64]()
+        else:
+            self.other_is_bool = False
+            self.other_bool = List[Bool]()
+            var f64_v = _ToFloat64Visitor()
+            visit_col_data_raises(f64_v, other._data)
+            self.other_float = f64_v.result.copy()
+
+    def _run_float64(mut self, a: List[Float64]):
+        """Inner loop: compare ``a`` against ``other_float`` with null propagation.
+        """
+        var has_a_mask = len(self.self_null_mask) > 0
+        var has_b_mask = len(self.other_null_mask) > 0
+        for i in range(len(a)):
+            var is_null = (has_a_mask and self.self_null_mask[i]) or (
+                has_b_mask and self.other_null_mask[i]
+            )
+            if is_null:
+                self.result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v: Bool
+                comptime if Self.op == _CMP_EQ:
+                    v = a[i] == self.other_float[i]
+                elif Self.op == _CMP_NE:
+                    v = a[i] != self.other_float[i]
+                elif Self.op == _CMP_LT:
+                    v = a[i] < self.other_float[i]
+                elif Self.op == _CMP_LE:
+                    v = a[i] <= self.other_float[i]
+                elif Self.op == _CMP_GT:
+                    v = a[i] > self.other_float[i]
+                elif Self.op == _CMP_GE:
+                    v = a[i] >= self.other_float[i]
+                else:
+                    v = False  # unreachable: compile-time guard
+                self.result.append(v)
+                self.result_mask.append(False)
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var a = List[Float64]()
+        for i in range(len(data)):
+            a.append(Float64(data[i]))
+        self._run_float64(a)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self._run_float64(data)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        # `data` is guaranteed to be List[Bool] by the visitor dispatch.
+        # The isa check below resolves only the RHS arm.
+        var has_a_mask = len(self.self_null_mask) > 0
+        var has_b_mask = len(self.other_null_mask) > 0
+        if self.other_is_bool:
+            # Bool-Bool fast path: compare directly without a Float64 round-trip.
+            ref db = self.other_bool
+            for i in range(len(data)):
+                var is_null = (has_a_mask and self.self_null_mask[i]) or (
+                    has_b_mask and self.other_null_mask[i]
+                )
+                if is_null:
+                    self.result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    var v: Bool
+                    comptime if Self.op == _CMP_EQ:
+                        v = data[i] == db[i]
+                    elif Self.op == _CMP_NE:
+                        v = data[i] != db[i]
+                    elif Self.op == _CMP_LT:
+                        v = (not data[i]) and db[i]  # False < True
+                    elif Self.op == _CMP_LE:
+                        v = (not data[i]) or db[i]  # False <= True, F<=F, T<=T
+                    elif Self.op == _CMP_GT:
+                        v = data[i] and (not db[i])  # True > False
+                    elif Self.op == _CMP_GE:
+                        v = data[i] or (not db[i])  # True >= False, F>=F, T>=T
+                    else:
+                        v = False  # unreachable: compile-time guard
+                    self.result.append(v)
+                    self.result_mask.append(False)
+        else:
+            # Mixed Bool/numeric: convert self Bool to Float64 then use general path.
+            var a = List[Float64]()
+            for i in range(len(data)):
+                a.append(1.0 if data[i] else 0.0)
+            self._run_float64(a)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cmp: comparison not supported for string column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error(
+            "cmp: comparison not supported for object/datetime column type"
+        )
+
+
 # Compile-time function type for element-wise Float64 transforms (_apply kernel)
 comptime FloatTransformFn = def(Float64) -> Float64
 
@@ -3824,13 +3966,11 @@ struct Column(Copyable, Movable, Sized):
     def _cmp_op[op: Int](self, op_name: String, other: Column) raises -> Column:
         """Core element-wise binary comparison kernel.
 
-        ``op`` is a compile-time constant (``_CMP_*``) that selects the
-        operation; ``comptime if`` folds the branch at compile time so each
-        specialisation compiles to a tight scalar loop with no runtime dispatch.
-        Null propagation: if either input element is null, the result is null.
-
-        When both columns are Bool, comparison is performed directly on Bool
-        values without round-tripping through Float64.
+        Dispatches through ``_CmpOpVisitor[op]`` which handles all
+        ``ColumnData`` arms internally — no raw ``isa`` checks at this call
+        site.  ``op`` is a compile-time constant (``_CMP_*``) that selects
+        the operation.  Null propagation: if either element is null, the
+        result element is null.
         """
         if len(self) != len(other):
             raise Error(
@@ -3841,76 +3981,12 @@ struct Column(Copyable, Movable, Sized):
                 + String(len(other))
                 + ")"
             )
-        var result = List[Bool]()
-        var result_mask = List[Bool]()
-        var has_any_null = False
-        var has_a_mask = len(self._null_mask) > 0
-        var has_b_mask = len(other._null_mask) > 0
-        if self._data.isa[List[Bool]]() and other._data.isa[List[Bool]]():
-            ref da = self._data[List[Bool]]
-            ref db = other._data[List[Bool]]
-            for i in range(len(da)):
-                var is_null = (has_a_mask and self._null_mask[i]) or (
-                    has_b_mask and other._null_mask[i]
-                )
-                if is_null:
-                    result.append(False)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    var v: Bool
-                    comptime if op == _CMP_EQ:
-                        v = da[i] == db[i]
-                    elif op == _CMP_NE:
-                        v = da[i] != db[i]
-                    elif op == _CMP_LT:
-                        v = (not da[i]) and db[
-                            i
-                        ]  # False < True: False=0, True=1
-                    elif op == _CMP_LE:
-                        v = (not da[i]) or db[
-                            i
-                        ]  # False <= True, False <= False, True <= True
-                    elif op == _CMP_GT:
-                        v = da[i] and (not db[i])  # True > False
-                    elif op == _CMP_GE:
-                        v = da[i] or (
-                            not db[i]
-                        )  # True >= False, False >= False, True >= True
-                    else:
-                        v = False  # unreachable: compile-time guard
-                    result.append(v)
-                    result_mask.append(False)
-        else:
-            var inp = self._binary_op_prepare_unchecked(other)
-            for i in range(len(inp.a)):
-                var is_null = (inp.has_a_mask and self._null_mask[i]) or (
-                    inp.has_b_mask and other._null_mask[i]
-                )
-                if is_null:
-                    result.append(False)
-                    result_mask.append(True)
-                    has_any_null = True
-                else:
-                    var v: Bool
-                    comptime if op == _CMP_EQ:
-                        v = inp.a[i] == inp.b[i]
-                    elif op == _CMP_NE:
-                        v = inp.a[i] != inp.b[i]
-                    elif op == _CMP_LT:
-                        v = inp.a[i] < inp.b[i]
-                    elif op == _CMP_LE:
-                        v = inp.a[i] <= inp.b[i]
-                    elif op == _CMP_GT:
-                        v = inp.a[i] > inp.b[i]
-                    elif op == _CMP_GE:
-                        v = inp.a[i] >= inp.b[i]
-                    else:
-                        v = False  # unreachable: compile-time guard
-                    result.append(v)
-                    result_mask.append(False)
+        var visitor = _CmpOpVisitor[op](self._null_mask, other)
+        visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
-            ColumnData(result^), result_mask^, has_any_null
+            ColumnData(visitor.result.copy()),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
         )
 
     def _cmp_eq(self, other: Column) raises -> Column:
