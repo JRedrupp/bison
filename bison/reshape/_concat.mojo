@@ -46,12 +46,54 @@ def _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
         return col^
 
 
-def _dtype_for(dfs: List[DataFrame], col_name: String) -> BisonDtype:
-    """Return the dtype of *col_name* from the first DataFrame that has it."""
+def _promote_dtype(a: BisonDtype, b: BisonDtype) raises -> BisonDtype:
+    """Return the common promoted dtype for *a* and *b*.
+
+    Promotion rules (matches pandas scalar casting):
+
+    * Same dtype → same dtype
+    * int64 + float64 → float64
+    * bool_ + int64  → int64
+    * bool_ + float64 → float64
+
+    Raises ``Error`` for all other combinations (e.g. int64 vs string).
+    """
+    if a == b:
+        return a
+    if (a == int64 and b == float64) or (a == float64 and b == int64):
+        return float64
+    if (a == bool_ and b == int64) or (a == int64 and b == bool_):
+        return int64
+    if (a == bool_ and b == float64) or (a == float64 and b == bool_):
+        return float64
+    raise Error(
+        "concat: dtype mismatch for column: cannot combine '"
+        + a.name
+        + "' and '"
+        + b.name
+        + "'"
+    )
+
+
+def _dtype_for(dfs: List[DataFrame], col_name: String) raises -> BisonDtype:
+    """Return the promoted dtype for *col_name* across all DataFrames.
+
+    Scans every frame that contains *col_name* and promotes across all of them
+    using :func:`_promote_dtype`.  Raises if two frames carry the column with
+    incompatible dtypes (e.g. ``int64`` vs ``object_``).  Returns ``object_``
+    if no frame has the column.
+    """
+    var result: Optional[BisonDtype] = None
     for i in range(len(dfs)):
         for j in range(len(dfs[i]._cols)):
             if dfs[i]._cols[j].name == col_name:
-                return dfs[i]._cols[j].dtype
+                var dt = dfs[i]._cols[j].dtype
+                if result:
+                    result = _promote_dtype(result.value(), dt)
+                else:
+                    result = dt
+    if result:
+        return result.value()
     return object_
 
 
@@ -312,7 +354,11 @@ def _concat_axis0(
             var found = False
             for j in range(len(dfs[i]._cols)):
                 if dfs[i]._cols[j].name == col_name:
-                    pieces.append(dfs[i]._cols[j].copy())
+                    var piece = dfs[i]._cols[j].copy()
+                    # Cast to promoted dtype if this frame's column differs.
+                    if piece.dtype != dtype:
+                        piece = piece._astype(dtype)
+                    pieces.append(piece^)
                     found = True
             if not found:
                 pieces.append(_null_col(col_name, nrows, dtype))
