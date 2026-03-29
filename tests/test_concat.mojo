@@ -1,7 +1,7 @@
 """Tests for bison.concat."""
 from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
-from bison import DataFrame, concat
+from bison import DataFrame, concat, int64, float64
 
 
 def test_concat_empty_list() raises:
@@ -173,6 +173,71 @@ def test_append_dtype_mismatch_raises() raises:
     except e:
         raised = "dtype mismatch" in String(e)
     assert_true(raised)
+
+
+def test_concat_dtype_promotion_int_float() raises:
+    """Concatenating int64 and float64 columns with the same name must promote to float64."""
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1, 2]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1.5, 2.5]}")))
+    var s1 = df1["x"]
+    var s2 = df2["x"]
+    assert_true(s1.dtype() == int64)
+    assert_true(s2.dtype() == float64)
+    var dfs = List[DataFrame]()
+    dfs.append(df1^)
+    dfs.append(df2^)
+    var result = concat(dfs)
+    assert_equal(result.shape()[0], 4)
+    # All four values should be accessible as Float64.
+    var s = result["x"]
+    assert_equal(s.iloc(0)[Float64], Float64(1.0))
+    assert_equal(s.iloc(1)[Float64], Float64(2.0))
+    assert_equal(s.iloc(2)[Float64], Float64(1.5))
+    assert_equal(s.iloc(3)[Float64], Float64(2.5))
+
+
+def test_concat_dtype_mismatch_raises() raises:
+    """Concatenating incompatible column dtypes (int64 vs string) must raise."""
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(
+        pd.DataFrame(Python.evaluate("{'x': [1, 2]}"))
+    )
+    var df2 = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'x': ['a', 'b']}"), dtype="object"
+        )
+    )
+    var dfs = List[DataFrame]()
+    dfs.append(df1^)
+    dfs.append(df2^)
+    var raised = False
+    try:
+        _ = concat(dfs)
+    except e:
+        raised = "dtype mismatch" in String(e)
+    assert_true(raised)
+
+
+def test_concat_dtype_promotion_outer_join() raises:
+    """When frames have different column sets, null pads use the promoted dtype."""
+    var pd = Python.import_module("pandas")
+    # df1 has x as int64, df2 has x as float64 and y as int64
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1]}")))
+    var df2 = DataFrame(
+        pd.DataFrame(Python.evaluate("{'x': [2.5], 'y': [10]}"))
+    )
+    var dfs = List[DataFrame]()
+    dfs.append(df1^)
+    dfs.append(df2^)
+    var result = concat(dfs, join="outer")
+    # x must be float64 across both rows
+    var s_x = result["x"]
+    assert_equal(s_x.iloc(0)[Float64], Float64(1.0))
+    assert_equal(s_x.iloc(1)[Float64], Float64(2.5))
+    # y is only present in df2, so it must be int64 (no promotion needed)
+    var s_y = result["y"]
+    assert_equal(s_y.iloc(1)[Int64], Int64(10))
 
 
 def main() raises:
