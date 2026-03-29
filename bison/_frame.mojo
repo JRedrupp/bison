@@ -4948,49 +4948,200 @@ struct SeriesGroupBy:
             dropna=self._dropna,
         )
 
+    def sum(self) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).sum()
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
+    def mean(self) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).mean()
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
+    def min(self) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).min()
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
+    def max(self) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).max()
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
+    def count(self) raises -> Series:
+        var result_vals = List[Int64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                Int64(self._series._col.take(self._group_map[key]).count())
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+        )
+
+    def nunique(self) raises -> Series:
+        var result_vals = List[Int64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                Int64(self._series._col.take(self._group_map[key]).nunique())
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+        )
+
+    def first(self) raises -> Series:
+        var selected = List[Int]()
+        ref col = self._series._col
+        var has_mask = len(col._null_mask) > 0
+        for i in range(len(self._group_keys)):
+            ref indices = self._group_map[self._group_keys[i]]
+            var found = -1
+            for j in range(len(indices)):
+                if not has_mask or not col._null_mask[indices[j]]:
+                    found = indices[j]
+                    break
+            selected.append(found)
+        var result_col = col.take_with_nulls(selected)
+        result_col.name = self._series.name
+        result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(result_col^)
+
+    def last(self) raises -> Series:
+        var selected = List[Int]()
+        ref col = self._series._col
+        var has_mask = len(col._null_mask) > 0
+        for i in range(len(self._group_keys)):
+            ref indices = self._group_map[self._group_keys[i]]
+            var found = -1
+            for j in range(len(indices) - 1, -1, -1):
+                if not has_mask or not col._null_mask[indices[j]]:
+                    found = indices[j]
+                    break
+            selected.append(found)
+        var result_col = col.take_with_nulls(selected)
+        result_col.name = self._series.name
+        result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(result_col^)
+
+    def size(self) raises -> Series:
+        var result_vals = List[Int64]()
+        for i in range(len(self._group_keys)):
+            result_vals.append(Int64(len(self._group_map[self._group_keys[i]])))
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+        )
+
+    def std(self, ddof: Int = 1) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).std(ddof)
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
+    def var(self, ddof: Int = 1) raises -> Series:
+        var result_vals = List[Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            result_vals.append(
+                self._series._col.take(self._group_map[key]).var(ddof)
+            )
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        return Series(
+            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
+        )
+
     def agg(self, func: String) raises -> Series:
+        if func == "sum":
+            return self.sum()
+        if func == "mean":
+            return self.mean()
+        if func == "min":
+            return self.min()
+        if func == "max":
+            return self.max()
+        if func == "count":
+            return self.count()
+        if func == "nunique":
+            return self.nunique()
+        if func == "first":
+            return self.first()
+        if func == "last":
+            return self.last()
+        if func == "size":
+            return self.size()
+        if func == "std":
+            return self.std()
+        if func == "var":
+            return self.var()
         return Series.from_pandas(self._pd_groupby().agg(func))
 
     def aggregate(self, func: String) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().aggregate(func))
+        return self.agg(func)
 
     def transform(self, func: String) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().transform(func))
+        var key_to_agg = Dict[String, Float64]()
+        for i in range(len(self._group_keys)):
+            var key = self._group_keys[i]
+            var sub = self._series._col.take(self._group_map[key])
+            if func == "sum":
+                key_to_agg[key] = sub.sum()
+            elif func == "mean":
+                key_to_agg[key] = sub.mean()
+            elif func == "min":
+                key_to_agg[key] = sub.min()
+            elif func == "max":
+                key_to_agg[key] = sub.max()
+            else:
+                return Series.from_pandas(self._pd_groupby().transform(func))
+        var n = len(self._series._col)
+        var result_vals = List[Float64]()
+        for i in range(n):
+            result_vals.append(key_to_agg[self._by[i]])
+        var result_col = Column(
+            self._series.name, ColumnData(result_vals^), float64
+        )
+        result_col._index = self._series._col._index
+        result_col._index_name = self._series._col._index_name
+        return Series(result_col^)
 
     def apply(self, func: String) raises -> Series:
         return Series.from_pandas(
             self._pd_groupby().apply(Python.evaluate(func))
         )
-
-    def sum(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().sum())
-
-    def mean(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().mean())
-
-    def min(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().min())
-
-    def max(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().max())
-
-    def count(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().count())
-
-    def nunique(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().nunique())
-
-    def first(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().first())
-
-    def last(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().last())
-
-    def size(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().size())
-
-    def std(self, ddof: Int = 1) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().std(ddof))
-
-    def var(self, ddof: Int = 1) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().var(ddof))
