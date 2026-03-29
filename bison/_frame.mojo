@@ -54,7 +54,8 @@ struct Series(Copyable, Movable):
             col_name = name
         else:
             var raw_name = pd_s.name
-            if Bool(raw_name == Python.evaluate("None")):
+            var _is_none = Python.evaluate("lambda x: x is None")
+            if Bool(_is_none(raw_name)):
                 col_name = ""
             else:
                 col_name = String(raw_name)
@@ -73,7 +74,8 @@ struct Series(Copyable, Movable):
     def from_pandas(pd_s: PythonObject) raises -> Series:
         var raw_name = pd_s.name
         var col_name: String
-        if Bool(raw_name == Python.evaluate("None")):
+        var _is_none = Python.evaluate("lambda x: x is None")
+        if Bool(_is_none(raw_name)):
             col_name = ""
         else:
             col_name = String(raw_name)
