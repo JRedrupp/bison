@@ -106,9 +106,8 @@ def test_dataframegroupby_size() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).size().to_pandas()
-    # check_names=False: Series.from_pandas converts None name to "None" string
     testing.assert_series_equal(
-        result, pd_df.groupby("grp").size(), check_names=False
+        result, pd_df.groupby("grp").size()
     )
 
 
