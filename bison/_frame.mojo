@@ -5411,30 +5411,91 @@ struct SeriesGroupBy:
         return self.agg(func)
 
     def transform(self, func: String) raises -> Series:
-        var key_to_agg = Dict[String, Float64]()
-        for i in range(len(self._group_keys)):
-            var key = self._group_keys[i]
-            var sub = self._series._col.take(self._group_map[key])
-            if func == "sum":
-                key_to_agg[key] = sub.sum()
-            elif func == "mean":
-                key_to_agg[key] = sub.mean()
-            elif func == "min":
-                key_to_agg[key] = sub.min()
-            elif func == "max":
-                key_to_agg[key] = sub.max()
-            else:
-                return Series.from_pandas(self._pd_groupby().transform(func))
-        var n = len(self._series._col)
-        var result_vals = List[Float64]()
-        for i in range(n):
-            result_vals.append(key_to_agg[self._by[i]])
-        var result_col = Column(
-            self._series.name, ColumnData(result_vals^), float64
-        )
-        result_col._index = self._series._col._index
-        result_col._index_name = self._series._col._index_name
-        return Series(result_col^)
+        # Float64-returning scalar-broadcast functions
+        if (
+            func == "sum"
+            or func == "mean"
+            or func == "min"
+            or func == "max"
+            or func == "std"
+            or func == "var"
+        ):
+            var key_to_agg = Dict[String, Float64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                var sub = self._series._col.take(self._group_map[key])
+                if func == "sum":
+                    key_to_agg[key] = sub.sum()
+                elif func == "mean":
+                    key_to_agg[key] = sub.mean()
+                elif func == "min":
+                    key_to_agg[key] = sub.min()
+                elif func == "max":
+                    key_to_agg[key] = sub.max()
+                elif func == "std":
+                    key_to_agg[key] = sub.std()
+                elif func == "var":
+                    key_to_agg[key] = sub.var()
+            var n = len(self._series._col)
+            var result_vals = List[Float64]()
+            for i in range(n):
+                result_vals.append(key_to_agg[self._by[i]])
+            var result_col = Column(
+                self._series.name, ColumnData(result_vals^), float64
+            )
+            result_col._index = self._series._col._index
+            result_col._index_name = self._series._col._index_name
+            return Series(result_col^)
+        # Int64-returning scalar-broadcast functions
+        if func == "count" or func == "size":
+            var key_to_agg = Dict[String, Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                if func == "count":
+                    var sub = self._series._col.take(self._group_map[key])
+                    key_to_agg[key] = Int64(sub.count())
+                else:
+                    key_to_agg[key] = Int64(len(self._group_map[key]))
+            var n = len(self._series._col)
+            var result_vals = List[Int64]()
+            for i in range(n):
+                result_vals.append(key_to_agg[self._by[i]])
+            var result_col = Column(
+                self._series.name, ColumnData(result_vals^), int64
+            )
+            result_col._index = self._series._col._index
+            result_col._index_name = self._series._col._index_name
+            return Series(result_col^)
+        # Dtype-preserving broadcast functions (first/last)
+        if func == "first" or func == "last":
+            ref col = self._series._col
+            var has_mask = len(col._null_mask) > 0
+            var want_first = func == "first"
+            var key_to_idx = Dict[String, Int]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                ref indices = self._group_map[key]
+                var found = -1
+                var start = 0 if want_first else len(indices) - 1
+                var stop = len(indices) if want_first else -1
+                var step = 1 if want_first else -1
+                var j = start
+                while j != stop:
+                    if not has_mask or not col._null_mask[indices[j]]:
+                        found = indices[j]
+                        break
+                    j += step
+                key_to_idx[key] = found
+            var n = len(col)
+            var selected = List[Int]()
+            for i in range(n):
+                selected.append(key_to_idx[self._by[i]])
+            var result_col = col.take_with_nulls(selected)
+            result_col.name = self._series.name
+            result_col._index = col._index
+            result_col._index_name = col._index_name
+            return Series(result_col^)
+        return Series.from_pandas(self._pd_groupby().transform(func))
 
     def apply(self, func: String) raises -> Series:
         return Series.from_pandas(
