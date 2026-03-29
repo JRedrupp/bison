@@ -4700,6 +4700,11 @@ struct Column(Copyable, Movable, Sized):
                 else:  # uint64
                     dtype_name = "UInt64"
         var n_idx = self._index_len()
+        var pd_name: PythonObject
+        if self.name == "":
+            pd_name = Python.evaluate("None")
+        else:
+            pd_name = PythonObject(self.name)
         var pd_index: PythonObject
         if n_idx > 0:
             var idx_py = Python.evaluate("[]")
@@ -4722,9 +4727,9 @@ struct Column(Copyable, Movable, Sized):
         elif self._index_name:
             pd_index = pd.RangeIndex(self.__len__(), name=self._index_name)
         else:
-            return pd.Series(py_list, name=self.name, dtype=dtype_name)
+            return pd.Series(py_list, name=pd_name, dtype=dtype_name)
         return pd.Series(
-            py_list, name=self.name, dtype=dtype_name, index=pd_index
+            py_list, name=pd_name, dtype=dtype_name, index=pd_index
         )
 
 
