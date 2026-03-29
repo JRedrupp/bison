@@ -205,16 +205,6 @@ def test_dataframegroupby_transform_count() raises:
     testing.assert_frame_equal(result, pd_df.groupby("grp").transform("count"), check_dtype=False)
 
 
-def test_dataframegroupby_transform_size() raises:
-    var testing = Python.import_module("pandas.testing")
-    var pd_df = _make_pd_df()
-    var df = DataFrame(pd_df)
-    var by = List[String]()
-    by.append("grp")
-    var result = df.groupby(by).transform("size").to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("size"), check_dtype=False)
-
-
 def test_dataframegroupby_transform_first() raises:
     var testing = Python.import_module("pandas.testing")
     var pd_df = _make_pd_df()

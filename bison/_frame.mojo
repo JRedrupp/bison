@@ -5145,7 +5145,6 @@ struct DataFrameGroupBy:
             and func != "std"
             and func != "var"
             and func != "count"
-            and func != "size"
             and func != "first"
             and func != "last"
         ):
@@ -5236,8 +5235,7 @@ struct DataFrameGroupBy:
                     key_to_val[key] = sub.var()
                 elif func == "count":
                     key_to_val[key] = Float64(sub.count())
-                else:  # size
-                    key_to_val[key] = Float64(len(self._group_map[key]))
+                # No else needed: first/last are handled in the separate branch above.
             var nan = Float64(0) / Float64(0)
             var vals = List[Float64]()
             var null_mask = List[Bool]()
