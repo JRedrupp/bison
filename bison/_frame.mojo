@@ -5174,10 +5174,23 @@ struct DataFrameGroupBy:
                     key_to_val[key] = sub.min()
                 else:
                     key_to_val[key] = sub.max()
+            var nan = Float64(0) / Float64(0)
             var vals = List[Float64]()
+            var null_mask = List[Bool]()
+            var any_null = False
             for r in range(n_rows):
-                vals.append(key_to_val[row_key[r]])
-            result_cols.append(Column(col.name, ColumnData(vals^), float64))
+                if row_key[r] != "":
+                    vals.append(key_to_val[row_key[r]])
+                    null_mask.append(False)
+                else:
+                    # Row was excluded by dropna — emit NaN.
+                    vals.append(nan)
+                    null_mask.append(True)
+                    any_null = True
+            var result_col = Column(col.name, ColumnData(vals^), float64)
+            if any_null:
+                result_col._null_mask = null_mask^
+            result_cols.append(result_col^)
         return DataFrame(result_cols^)
 
     def apply(self, func: String) raises -> DataFrame:
