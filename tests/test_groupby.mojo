@@ -175,6 +175,56 @@ def test_dataframegroupby_transform_dropna() raises:
     testing.assert_frame_equal(result, expected, check_dtype=False)
 
 
+def test_dataframegroupby_transform_std() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("std").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("std"), check_dtype=False)
+
+
+def test_dataframegroupby_transform_var() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("var").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("var"), check_dtype=False)
+
+
+def test_dataframegroupby_transform_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("count").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("count"), check_dtype=False)
+
+
+def test_dataframegroupby_transform_first() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("first").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("first"), check_dtype=False)
+
+
+def test_dataframegroupby_transform_last() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).transform("last").to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("last"), check_dtype=False)
+
+
 # ------------------------------------------------------------------
 # SeriesGroupBy tests
 # ------------------------------------------------------------------
