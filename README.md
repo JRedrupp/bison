@@ -84,14 +84,14 @@ In CI it runs after the test suite and the result is committed back to the branc
 |----------|-------|-------------|
 | DataFrame | 38 | 98 |
 | Series | 10 | 88 |
-| GroupBy (DataFrame) | 0 | 18 |
+| GroupBy (DataFrame) | 0 | 20 |
 | GroupBy (Series) | 0 | 17 |
 | String accessor | 0 | 21 |
 | Datetime accessor | 0 | 20 |
 | Index | 0 | 14 |
 | IO | 5 | 6 |
 | Reshape | 1 | 1 |
-| **Total** | **54** | **283** |
+| **Total** | **54** | **285** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations

@@ -4854,52 +4854,336 @@ struct DataFrameGroupBy:
             dropna=self._dropna,
         )
 
+    def _make_result_col(
+        self, name: String, var vals: List[Float64]
+    ) raises -> Column:
+        """Build a float64 result Column with group keys as index."""
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        var col = Column(name, ColumnData(vals^), float64, idx^)
+        col._index_name = self._by[0]
+        return col^
+
+    def _make_result_col_int64(
+        self, name: String, var vals: List[Int64]
+    ) raises -> Column:
+        """Build an int64 result Column with group keys as index."""
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        var col = Column(name, ColumnData(vals^), int64, idx^)
+        col._index_name = self._by[0]
+        return col^
+
+    def sum(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().sum())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).sum()
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def mean(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().mean())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).mean()
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def min(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().min())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).min()
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def max(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().max())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).max()
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def std(self, ddof: Int = 1) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().std(ddof))
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).std(ddof)
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def var(self, ddof: Int = 1) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().var(ddof))
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var vals = List[Float64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    col.take(self._group_map[self._group_keys[j]]).var(ddof)
+                )
+            result_cols.append(self._make_result_col(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def count(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().count())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            var vals = List[Int64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    Int64(
+                        col.take(self._group_map[self._group_keys[j]]).count()
+                    )
+                )
+            result_cols.append(self._make_result_col_int64(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def nunique(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().nunique())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            var vals = List[Int64]()
+            for j in range(len(self._group_keys)):
+                vals.append(
+                    Int64(
+                        col.take(self._group_map[self._group_keys[j]]).nunique()
+                    )
+                )
+            result_cols.append(self._make_result_col_int64(col.name, vals^))
+        return DataFrame(result_cols^)
+
+    def first(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().first())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            var selected = List[Int]()
+            var has_mask = len(col._null_mask) > 0
+            for j in range(len(self._group_keys)):
+                ref indices = self._group_map[self._group_keys[j]]
+                var found = -1
+                for k in range(len(indices)):
+                    if not has_mask or not col._null_mask[indices[k]]:
+                        found = indices[k]
+                        break
+                selected.append(found)
+            var result_col = col.take_with_nulls(selected)
+            result_col.name = col.name
+            result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+            result_col._index_name = self._by[0]
+            result_cols.append(result_col^)
+        return DataFrame(result_cols^)
+
+    def last(self) raises -> DataFrame:
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().last())
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            var selected = List[Int]()
+            var has_mask = len(col._null_mask) > 0
+            for j in range(len(self._group_keys)):
+                ref indices = self._group_map[self._group_keys[j]]
+                var found = -1
+                for k in range(len(indices) - 1, -1, -1):
+                    if not has_mask or not col._null_mask[indices[k]]:
+                        found = indices[k]
+                        break
+                selected.append(found)
+            var result_col = col.take_with_nulls(selected)
+            result_col.name = col.name
+            result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+            result_col._index_name = self._by[0]
+            result_cols.append(result_col^)
+        return DataFrame(result_cols^)
+
+    def size(self) raises -> Series:
+        if len(self._by) != 1 or not self._as_index:
+            return Series.from_pandas(self._pd_groupby().size())
+        var vals = List[Int64]()
+        for i in range(len(self._group_keys)):
+            vals.append(Int64(len(self._group_map[self._group_keys[i]])))
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        # pandas groupby().size() returns a Series with name=None; "" maps to None
+        var col = Column("", ColumnData(vals^), int64, idx^)
+        col._index_name = self._by[0]
+        return Series(col^)
+
     def agg(self, func: String) raises -> DataFrame:
+        if func == "sum":
+            return self.sum()
+        if func == "mean":
+            return self.mean()
+        if func == "min":
+            return self.min()
+        if func == "max":
+            return self.max()
+        if func == "count":
+            return self.count()
+        if func == "nunique":
+            return self.nunique()
+        if func == "first":
+            return self.first()
+        if func == "last":
+            return self.last()
+        if func == "std":
+            return self.std()
+        if func == "var":
+            return self.var()
         return DataFrame.from_pandas(self._pd_groupby().agg(func))
 
     def aggregate(self, func: String) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().aggregate(func))
+        return self.agg(func)
 
     def transform(self, func: String) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().transform(func))
+        if len(self._by) != 1 or not self._as_index:
+            return DataFrame.from_pandas(self._pd_groupby().transform(func))
+        if func != "sum" and func != "mean" and func != "min" and func != "max":
+            return DataFrame.from_pandas(self._pd_groupby().transform(func))
+        if len(self._df._cols) == 0:
+            return DataFrame()
+        var skip = Dict[String, Bool]()
+        for i in range(len(self._by)):
+            skip[self._by[i]] = True
+        # Build row → group_key mapping by inverting _group_map.
+        var n_rows = len(self._df._cols[0])
+        var row_key = List[String]()
+        for _ in range(n_rows):
+            row_key.append(String(""))
+        for j in range(len(self._group_keys)):
+            var key = self._group_keys[j]
+            ref indices = self._group_map[key]
+            for k in range(len(indices)):
+                row_key[indices[k]] = key
+        # For each numeric column, broadcast the group aggregate to every row.
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if col.name in skip:
+                continue
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            var key_to_val = Dict[String, Float64]()
+            for j in range(len(self._group_keys)):
+                var key = self._group_keys[j]
+                var sub = col.take(self._group_map[key])
+                if func == "sum":
+                    key_to_val[key] = sub.sum()
+                elif func == "mean":
+                    key_to_val[key] = sub.mean()
+                elif func == "min":
+                    key_to_val[key] = sub.min()
+                else:
+                    key_to_val[key] = sub.max()
+            var vals = List[Float64]()
+            for r in range(n_rows):
+                vals.append(key_to_val[row_key[r]])
+            result_cols.append(Column(col.name, ColumnData(vals^), float64))
+        return DataFrame(result_cols^)
 
     def apply(self, func: String) raises -> DataFrame:
         return DataFrame.from_pandas(
             self._pd_groupby().apply(Python.evaluate(func))
         )
-
-    def sum(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().sum())
-
-    def mean(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().mean())
-
-    def min(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().min())
-
-    def max(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().max())
-
-    def count(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().count())
-
-    def nunique(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().nunique())
-
-    def first(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().first())
-
-    def last(self) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().last())
-
-    def size(self) raises -> Series:
-        return Series.from_pandas(self._pd_groupby().size())
-
-    def std(self, ddof: Int = 1) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().std(ddof))
-
-    def var(self, ddof: Int = 1) raises -> DataFrame:
-        return DataFrame.from_pandas(self._pd_groupby().var(ddof))
 
     def filter(self, func: String) raises -> DataFrame:
         return DataFrame.from_pandas(

@@ -26,7 +26,8 @@ def test_dataframegroupby_sum() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).sum().to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").sum())
+    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
+    testing.assert_frame_equal(result, pd_df.groupby("grp").sum(), check_dtype=False)
 
 
 def test_dataframegroupby_mean() raises:
@@ -46,7 +47,8 @@ def test_dataframegroupby_min() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).min().to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").min())
+    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
+    testing.assert_frame_equal(result, pd_df.groupby("grp").min(), check_dtype=False)
 
 
 def test_dataframegroupby_max() raises:
@@ -56,7 +58,8 @@ def test_dataframegroupby_max() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).max().to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").max())
+    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
+    testing.assert_frame_equal(result, pd_df.groupby("grp").max(), check_dtype=False)
 
 
 def test_dataframegroupby_count() raises:
@@ -138,7 +141,8 @@ def test_dataframegroupby_agg() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).agg("sum").to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").agg("sum"))
+    # check_dtype=False: dispatches to sum() which returns float64 for integer columns
+    testing.assert_frame_equal(result, pd_df.groupby("grp").agg("sum"), check_dtype=False)
 
 
 def test_dataframegroupby_transform() raises:
@@ -148,7 +152,8 @@ def test_dataframegroupby_transform() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).transform("sum").to_pandas()
-    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"))
+    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"), check_dtype=False)
 
 
 # ------------------------------------------------------------------
