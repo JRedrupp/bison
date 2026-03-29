@@ -102,13 +102,41 @@ def test_csv_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
-def test_read_parquet_stub() raises:
+def test_read_parquet_missing_file() raises:
+    """Read_parquet raises when the file does not exist."""
     var raised = False
     try:
-        _ = read_parquet("/tmp/nonexistent.parquet")
+        _ = read_parquet("/tmp/bison_nonexistent_file.parquet")
     except:
         raised = True
     assert_true(raised)
+
+
+def test_parquet_roundtrip() raises:
+    """Write a DataFrame to Parquet and read it back (skipped when pyarrow is absent)."""
+    var pyarrow_available = False
+    try:
+        _ = Python.import_module("pyarrow")
+        pyarrow_available = True
+    except:
+        pass
+    if not pyarrow_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    )
+    df.to_parquet(path)
+
+    var df2 = read_parquet(path)
+    var shape = df2.shape()
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    assert_equal(df2.columns()[0], "a")
+    assert_equal(df2.columns()[1], "b")
 
 
 def test_read_json_records() raises:
