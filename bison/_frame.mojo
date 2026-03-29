@@ -1,5 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
+from std.builtin.sort import sort as _sort_list
 from ._errors import _not_implemented
 from .dtypes import (
     BisonDtype,
@@ -4751,6 +4752,50 @@ struct DataFrame(Copyable, Movable):
         return result^
 
 
+def _groupby_indices(
+    df: DataFrame,
+    by: List[String],
+    sort_keys: Bool,
+    dropna: Bool,
+    mut group_map: Dict[String, List[Int]],
+    mut group_keys: List[String],
+) raises:
+    """Build key→row-index mapping for a DataFrame groupby.
+
+    Populates *group_map* (key→row-index list) and *group_keys* (ordered key
+    list) in place.  Uses DataFrame._row_key_str for key serialisation, the
+    same approach as merge.  When dropna=True, rows where any key column is
+    null are excluded.  When sort_keys=True, group_keys is sorted
+    lexicographically on return.
+    """
+    var col_idx = Dict[String, Int]()
+    for i in range(len(df._cols)):
+        col_idx[df._cols[i].name] = i
+
+    var n_rows = df.shape()[0]
+
+    for i in range(n_rows):
+        if dropna:
+            var skip = False
+            for j in range(len(by)):
+                var ci = col_idx[by[j]]
+                ref col = df._cols[ci]
+                if len(col._null_mask) > 0 and col._null_mask[i]:
+                    skip = True
+                    break
+            if skip:
+                continue
+
+        var k = DataFrame._row_key_str(df, by, i, col_idx)
+        if k not in group_map:
+            group_keys.append(k)
+            group_map[k] = List[Int]()
+        group_map[k].append(i)
+
+    if sort_keys:
+        _sort_list(group_keys)
+
+
 struct DataFrameGroupBy:
     """GroupBy object returned by DataFrame.groupby().
 
@@ -4763,6 +4808,8 @@ struct DataFrameGroupBy:
     var _as_index: Bool
     var _sort: Bool
     var _dropna: Bool
+    var _group_map: Dict[String, List[Int]]
+    var _group_keys: List[String]
 
     def __init__(
         out self,
@@ -4771,12 +4818,17 @@ struct DataFrameGroupBy:
         as_index: Bool,
         sort: Bool,
         dropna: Bool,
-    ):
+    ) raises:
         self._df = df.copy()
         self._by = by.copy()
         self._as_index = as_index
         self._sort = sort
         self._dropna = dropna
+        self._group_map = Dict[String, List[Int]]()
+        self._group_keys = List[String]()
+        _groupby_indices(
+            df, by, sort, dropna, self._group_map, self._group_keys
+        )
 
     def _pd_groupby(self) raises -> PythonObject:
         """Return the pandas GroupBy object for this group configuration."""
@@ -4856,6 +4908,8 @@ struct SeriesGroupBy:
     var _as_index: Bool
     var _sort: Bool
     var _dropna: Bool
+    var _group_map: Dict[String, List[Int]]
+    var _group_keys: List[String]
 
     def __init__(
         out self,
@@ -4864,12 +4918,22 @@ struct SeriesGroupBy:
         as_index: Bool,
         sort: Bool,
         dropna: Bool,
-    ):
+    ) raises:
         self._series = series.copy()
         self._by = by.copy()
         self._as_index = as_index
         self._sort = sort
         self._dropna = dropna
+        self._group_map = Dict[String, List[Int]]()
+        self._group_keys = List[String]()
+        for i in range(len(by)):
+            var k = by[i]
+            if k not in self._group_map:
+                self._group_keys.append(k)
+                self._group_map[k] = List[Int]()
+            self._group_map[k].append(i)
+        if sort:
+            _sort_list(self._group_keys)
 
     def _pd_groupby(self) raises -> PythonObject:
         """Return the pandas GroupBy object for this group configuration."""
