@@ -102,13 +102,41 @@ def test_csv_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
-def test_read_parquet_stub() raises:
+def test_read_parquet_missing_file() raises:
+    """Read_parquet raises when the file does not exist."""
     var raised = False
     try:
-        _ = read_parquet("/tmp/nonexistent.parquet")
+        _ = read_parquet("/tmp/bison_nonexistent_file.parquet")
     except:
         raised = True
     assert_true(raised)
+
+
+def test_parquet_roundtrip() raises:
+    """Write a DataFrame to Parquet and read it back (skipped when pyarrow is absent)."""
+    var pyarrow_available = False
+    try:
+        _ = Python.import_module("pyarrow")
+        pyarrow_available = True
+    except:
+        pass
+    if not pyarrow_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    )
+    df.to_parquet(path)
+
+    var df2 = read_parquet(path)
+    var shape = df2.shape()
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    assert_equal(df2.columns()[0], "a")
+    assert_equal(df2.columns()[1], "b")
 
 
 def test_read_json_records() raises:
@@ -464,5 +492,41 @@ def test_null_roundtrip_records() raises:
     assert_true(not isna_b.iloc(2)[Bool])
 
 
+def _preload_arrow_rtld_deepbind() raises:
+    """Pre-load Arrow shared libraries with RTLD_DEEPBIND before any pyarrow import.
+
+    Nightly Mojo 26.3.0+ introduced libKGENCompilerRTShared.so, which exports
+    the same OpenTelemetry symbol names as Arrow's bundled OpenTelemetry
+    (e.g. RuntimeContext::GetStorage). Without RTLD_DEEPBIND the dynamic
+    linker resolves Arrow's OTel symbols to Mojo's copies, causing a SIGSEGV
+    inside GetRuntimeContextStorage() on the first parquet read. Loading the
+    Arrow libraries with RTLD_DEEPBIND first ensures each library resolves its
+    own OpenTelemetry symbols independently.
+
+    This is a no-op on stable Mojo (no symbol conflict) and on platforms that
+    do not have the Arrow libraries installed.
+    """
+    try:
+        var ctypes = Python.import_module("ctypes")
+        var util = Python.import_module("ctypes.util")
+        # RTLD_DEEPBIND = 0x8 (Linux) — resolve symbols within the library
+        # before searching the global symbol table.
+        # RTLD_DEEPBIND = 0x8 (Linux/glibc); ctypes.RTLD_DEEPBIND was removed
+        # in Python 3.14 so we use the raw integer constant directly.
+        var RTLD_DEEPBIND = 8
+        var arrow = util.find_library("arrow")
+        if arrow.__bool__():
+            _ = ctypes.CDLL(arrow, RTLD_DEEPBIND)
+        var arrow_dataset = util.find_library("arrow_dataset")
+        if arrow_dataset.__bool__():
+            _ = ctypes.CDLL(arrow_dataset, RTLD_DEEPBIND)
+        var arrow_acero = util.find_library("arrow_acero")
+        if arrow_acero.__bool__():
+            _ = ctypes.CDLL(arrow_acero, RTLD_DEEPBIND)
+    except:
+        pass  # not on Linux or Arrow not installed; skip silently
+
+
 def main() raises:
+    _preload_arrow_rtld_deepbind()
     TestSuite.discover_tests[__functions_in_module()]().run()

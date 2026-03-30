@@ -2182,7 +2182,7 @@ comptime _ARITH_MOD = 5
 comptime _ARITH_POW = 6
 
 
-fn _int64_floordiv(a: Int64, b: Int64) -> Int64:
+def _int64_floordiv(a: Int64, b: Int64) -> Int64:
     """Integer floor division with Python semantics (rounds toward −∞).
 
     C-style truncating division (``/``) rounds toward zero; when the operands
@@ -2196,13 +2196,13 @@ fn _int64_floordiv(a: Int64, b: Int64) -> Int64:
     return q
 
 
-fn _int64_mod(a: Int64, b: Int64) -> Int64:
+def _int64_mod(a: Int64, b: Int64) -> Int64:
     """Integer modulo with Python semantics (result has the sign of the divisor).
     """
     return a - _int64_floordiv(a, b) * b
 
 
-fn _int64_pow(base: Int64, exp: Int64) -> Int64:
+def _int64_pow(base: Int64, exp: Int64) -> Int64:
     """Integer exponentiation by squaring.
 
     Negative exponents yield 0 for ``|base| > 1``, matching numpy's int64
