@@ -1,6 +1,5 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
-from .._errors import _not_implemented
 from ..dataframe import DataFrame
 from ..column import Column, ColumnData
 from ..dtypes import int64, float64, object_
@@ -304,16 +303,3 @@ def read_csv(
         cols.append(col^)
 
     return DataFrame(cols^)
-
-
-def to_csv(
-    df: PythonObject,
-    path_or_buf: String = "",
-    sep: String = ",",
-    index: Bool = True,
-    header: Bool = True,
-    encoding: String = "utf-8",
-) raises -> String:
-    """Write a DataFrame to CSV. STUB (use DataFrame.to_csv instead)."""
-    _not_implemented("DataFrame.to_csv")
-    return String("")
