@@ -17,14 +17,3 @@ def read_excel(
     """Read an Excel file into a DataFrame. STUB."""
     _not_implemented("read_excel")
     return DataFrame(PythonObject(None))
-
-
-def to_excel(
-    df: PythonObject,
-    excel_writer: String,
-    sheet_name: String = "Sheet1",
-    index: Bool = True,
-    header: Bool = True,
-) raises:
-    """Write a DataFrame to an Excel file. STUB."""
-    _not_implemented("DataFrame.to_excel")

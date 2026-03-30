@@ -38,24 +38,3 @@ def read_parquet(
     else:
         pd_df = pd.read_parquet(path, engine=engine)
     return DataFrame.from_pandas(pd_df)
-
-
-def to_parquet(
-    df: PythonObject,
-    path: String,
-    engine: String = "auto",
-    compression: String = "snappy",
-    index: Bool = True,
-) raises:
-    """Write a pandas DataFrame to a Parquet file.
-
-    Parameters
-    ----------
-    df          : A pandas DataFrame (``PythonObject``).
-    path        : Destination file path.
-    engine      : Parquet library to use (``"auto"``, ``"pyarrow"``,
-                  ``"fastparquet"``).  Passed directly to pandas.
-    compression : Compression codec (default ``"snappy"``).
-    index       : Whether to write the row index (default ``True``).
-    """
-    df.to_parquet(path, engine=engine, compression=compression, index=index)
