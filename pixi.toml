@@ -25,6 +25,7 @@ update-compat = "python scripts/update_compat.py"
 fmt           = "mojo format bison/"
 check         = "mojo package bison/ --Werror -o /tmp/bison.mojopkg"
 lint          = "pre-commit run --all-files"
+bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version"] }
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
