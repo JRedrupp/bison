@@ -4885,12 +4885,22 @@ struct DataFrameGroupBy:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).sum()
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
+            if col.dtype.is_integer():
+                var vals = List[Int64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(
+                            self._group_map[self._group_keys[j]]
+                        ).sum_int64()
+                    )
+                result_cols.append(self._make_result_col_int64(col.name, vals^))
+            else:
+                var vals = List[Float64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(self._group_map[self._group_keys[j]]).sum()
+                    )
+                result_cols.append(self._make_result_col(col.name, vals^))
         return DataFrame(result_cols^)
 
     def mean(self) raises -> DataFrame:
@@ -4927,12 +4937,22 @@ struct DataFrameGroupBy:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).min()
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
+            if col.dtype.is_integer():
+                var vals = List[Int64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(
+                            self._group_map[self._group_keys[j]]
+                        ).min_int64()
+                    )
+                result_cols.append(self._make_result_col_int64(col.name, vals^))
+            else:
+                var vals = List[Float64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(self._group_map[self._group_keys[j]]).min()
+                    )
+                result_cols.append(self._make_result_col(col.name, vals^))
         return DataFrame(result_cols^)
 
     def max(self) raises -> DataFrame:
@@ -4948,12 +4968,22 @@ struct DataFrameGroupBy:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).max()
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
+            if col.dtype.is_integer():
+                var vals = List[Int64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(
+                            self._group_map[self._group_keys[j]]
+                        ).max_int64()
+                    )
+                result_cols.append(self._make_result_col_int64(col.name, vals^))
+            else:
+                var vals = List[Float64]()
+                for j in range(len(self._group_keys)):
+                    vals.append(
+                        col.take(self._group_map[self._group_keys[j]]).max()
+                    )
+                result_cols.append(self._make_result_col(col.name, vals^))
         return DataFrame(result_cols^)
 
     def std(self, ddof: Int = 1) raises -> DataFrame:
@@ -5199,7 +5229,13 @@ struct DataFrameGroupBy:
                 result_col.name = col.name
                 result_cols.append(result_col^)
             return DataFrame(result_cols^)
-        # Float64-returning scalar-broadcast functions.
+        # Detect whether any row has no group key (dropna null-key row).
+        var any_null_row = False
+        for r in range(n_rows):
+            if row_key[r] == "":
+                any_null_row = True
+                break
+        # Scalar-broadcast functions (float64 or int64-preserving).
         var needs_numeric = (
             func == "sum"
             or func == "mean"
@@ -5208,6 +5244,7 @@ struct DataFrameGroupBy:
             or func == "std"
             or func == "var"
         )
+        var int_preserving = func == "sum" or func == "min" or func == "max"
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
@@ -5216,6 +5253,25 @@ struct DataFrameGroupBy:
             if needs_numeric and not (
                 col.dtype.is_integer() or col.dtype.is_float()
             ):
+                continue
+            # Integer-preserving path: only when no null rows can arise.
+            if int_preserving and col.dtype.is_integer() and not any_null_row:
+                var key_to_int = Dict[String, Int64]()
+                for j in range(len(self._group_keys)):
+                    var key = self._group_keys[j]
+                    var sub = col.take(self._group_map[key])
+                    if func == "sum":
+                        key_to_int[key] = sub.sum_int64()
+                    elif func == "min":
+                        key_to_int[key] = sub.min_int64()
+                    else:  # max
+                        key_to_int[key] = sub.max_int64()
+                var int_vals = List[Int64]()
+                for r in range(n_rows):
+                    int_vals.append(key_to_int[row_key[r]])
+                result_cols.append(
+                    Column(col.name, ColumnData(int_vals^), int64)
+                )
                 continue
             var key_to_val = Dict[String, Float64]()
             for j in range(len(self._group_keys)):
@@ -5319,13 +5375,23 @@ struct SeriesGroupBy:
         )
 
     def sum(self) raises -> Series:
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        if self._series._col.dtype.is_integer():
+            var result_vals = List[Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                result_vals.append(
+                    self._series._col.take(self._group_map[key]).sum_int64()
+                )
+            return Series(
+                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+            )
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).sum()
             )
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
         return Series(
             Column(self._series.name, ColumnData(result_vals^), float64, idx^)
         )
@@ -5343,25 +5409,45 @@ struct SeriesGroupBy:
         )
 
     def min(self) raises -> Series:
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        if self._series._col.dtype.is_integer():
+            var result_vals = List[Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                result_vals.append(
+                    self._series._col.take(self._group_map[key]).min_int64()
+                )
+            return Series(
+                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+            )
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).min()
             )
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
         return Series(
             Column(self._series.name, ColumnData(result_vals^), float64, idx^)
         )
 
     def max(self) raises -> Series:
+        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        if self._series._col.dtype.is_integer():
+            var result_vals = List[Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                result_vals.append(
+                    self._series._col.take(self._group_map[key]).max_int64()
+                )
+            return Series(
+                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
+            )
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).max()
             )
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
         return Series(
             Column(self._series.name, ColumnData(result_vals^), float64, idx^)
         )
@@ -5486,6 +5572,29 @@ struct SeriesGroupBy:
         return self.agg(func)
 
     def transform(self, func: String) raises -> Series:
+        # Integer-preserving scalar-broadcast path for sum / min / max.
+        var int_preserving = func == "sum" or func == "min" or func == "max"
+        if int_preserving and self._series._col.dtype.is_integer():
+            var key_to_int = Dict[String, Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                var sub = self._series._col.take(self._group_map[key])
+                if func == "sum":
+                    key_to_int[key] = sub.sum_int64()
+                elif func == "min":
+                    key_to_int[key] = sub.min_int64()
+                else:  # max
+                    key_to_int[key] = sub.max_int64()
+            var n = len(self._series._col)
+            var int_vals = List[Int64]()
+            for i in range(n):
+                int_vals.append(key_to_int[self._by[i]])
+            var result_col = Column(
+                self._series.name, ColumnData(int_vals^), int64
+            )
+            result_col._index = self._series._col._index
+            result_col._index_name = self._series._col._index_name
+            return Series(result_col^)
         # Float64-returning scalar-broadcast functions
         if (
             func == "sum"

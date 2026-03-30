@@ -26,8 +26,7 @@ def test_dataframegroupby_sum() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).sum().to_pandas()
-    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
-    testing.assert_frame_equal(result, pd_df.groupby("grp").sum(), check_dtype=False)
+    testing.assert_frame_equal(result, pd_df.groupby("grp").sum())
 
 
 def test_dataframegroupby_mean() raises:
@@ -47,8 +46,7 @@ def test_dataframegroupby_min() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).min().to_pandas()
-    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
-    testing.assert_frame_equal(result, pd_df.groupby("grp").min(), check_dtype=False)
+    testing.assert_frame_equal(result, pd_df.groupby("grp").min())
 
 
 def test_dataframegroupby_max() raises:
@@ -58,8 +56,7 @@ def test_dataframegroupby_max() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).max().to_pandas()
-    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
-    testing.assert_frame_equal(result, pd_df.groupby("grp").max(), check_dtype=False)
+    testing.assert_frame_equal(result, pd_df.groupby("grp").max())
 
 
 def test_dataframegroupby_count() raises:
@@ -141,8 +138,7 @@ def test_dataframegroupby_agg() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).agg("sum").to_pandas()
-    # check_dtype=False: dispatches to sum() which returns float64 for integer columns
-    testing.assert_frame_equal(result, pd_df.groupby("grp").agg("sum"), check_dtype=False)
+    testing.assert_frame_equal(result, pd_df.groupby("grp").agg("sum"))
 
 
 def test_dataframegroupby_transform() raises:
@@ -152,8 +148,7 @@ def test_dataframegroupby_transform() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).transform("sum").to_pandas()
-    # check_dtype=False: native returns float64; pandas returns int64 for integer columns
-    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"), check_dtype=False)
+    testing.assert_frame_equal(result, pd_df.groupby("grp").transform("sum"))
 
 
 def test_dataframegroupby_transform_dropna() raises:
@@ -251,9 +246,8 @@ def test_seriesgroupby_sum() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).sum().to_pandas()
-    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).sum(), check_dtype=False
+        result, pd_df["val"].groupby(_pd_labels()).sum()
     )
 
 
@@ -272,9 +266,8 @@ def test_seriesgroupby_min() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).min().to_pandas()
-    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).min(), check_dtype=False
+        result, pd_df["val"].groupby(_pd_labels()).min()
     )
 
 
@@ -283,9 +276,8 @@ def test_seriesgroupby_max() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).max().to_pandas()
-    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).max(), check_dtype=False
+        result, pd_df["val"].groupby(_pd_labels()).max()
     )
 
 
@@ -314,9 +306,8 @@ def test_seriesgroupby_agg() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).agg("sum").to_pandas()
-    # check_dtype=False: dispatches to sum() which returns Float64
     testing.assert_series_equal(
-        result, pd_df["val"].groupby(_pd_labels()).agg("sum"), check_dtype=False
+        result, pd_df["val"].groupby(_pd_labels()).agg("sum")
     )
 
 
@@ -377,11 +368,9 @@ def test_seriesgroupby_transform() raises:
     var pd_df = _make_pd_df()
     var s = Series(pd_df["val"], "val")
     var result = s.groupby(_mojo_labels()).transform("sum").to_pandas()
-    # check_dtype=False: native returns Float64; pandas returns Int64
     testing.assert_series_equal(
         result,
         pd_df["val"].groupby(_pd_labels()).transform("sum"),
-        check_dtype=False,
     )
 
 
@@ -405,7 +394,6 @@ def test_seriesgroupby_transform_min() raises:
     testing.assert_series_equal(
         result,
         pd_df["val"].groupby(_pd_labels()).transform("min"),
-        check_dtype=False,
     )
 
 
@@ -417,7 +405,6 @@ def test_seriesgroupby_transform_max() raises:
     testing.assert_series_equal(
         result,
         pd_df["val"].groupby(_pd_labels()).transform("max"),
-        check_dtype=False,
     )
 
 

@@ -3642,6 +3642,45 @@ struct Column(Copyable, Movable, Sized):
             return zero / zero
         return visitor.result
 
+    def sum_int64(self) raises -> Int64:
+        """Return the sum of an Int64 column as Int64, skipping nulls."""
+        ref data = self._int64_data()
+        var has_mask = len(self._null_mask) > 0
+        var result = Int64(0)
+        for i in range(len(data)):
+            if has_mask and self._null_mask[i]:
+                continue
+            result += data[i]
+        return result
+
+    def min_int64(self) raises -> Int64:
+        """Return the minimum of an Int64 column as Int64, skipping nulls."""
+        ref data = self._int64_data()
+        var has_mask = len(self._null_mask) > 0
+        var found = False
+        var result = Int64(0)
+        for i in range(len(data)):
+            if has_mask and self._null_mask[i]:
+                continue
+            if not found or data[i] < result:
+                result = data[i]
+                found = True
+        return result
+
+    def max_int64(self) raises -> Int64:
+        """Return the maximum of an Int64 column as Int64, skipping nulls."""
+        ref data = self._int64_data()
+        var has_mask = len(self._null_mask) > 0
+        var found = False
+        var result = Int64(0)
+        for i in range(len(data)):
+            if has_mask and self._null_mask[i]:
+                continue
+            if not found or data[i] > result:
+                result = data[i]
+                found = True
+        return result
+
     def var(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         """Return the variance with Bessel correction (ddof=1 by default).
 
