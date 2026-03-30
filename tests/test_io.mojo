@@ -219,13 +219,41 @@ def test_json_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
-def test_read_excel_stub() raises:
+def test_read_excel_missing_file() raises:
+    """read_excel raises when the file does not exist."""
     var raised = False
     try:
-        _ = read_excel("/tmp/nonexistent.xlsx")
+        _ = read_excel("/tmp/bison_nonexistent_file.xlsx")
     except:
         raised = True
     assert_true(raised)
+
+
+def test_excel_roundtrip() raises:
+    """Write a DataFrame to Excel and read it back (skipped when openpyxl is absent)."""
+    var openpyxl_available = False
+    try:
+        _ = Python.import_module("openpyxl")
+        openpyxl_available = True
+    except:
+        pass
+    if not openpyxl_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".xlsx"))
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    )
+    df.to_excel(path, index=False)
+
+    var df2 = read_excel(path)
+    var shape = df2.shape()
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    assert_equal(df2.columns()[0], "a")
+    assert_equal(df2.columns()[1], "b")
 
 
 def test_to_parquet_writes_file() raises:
