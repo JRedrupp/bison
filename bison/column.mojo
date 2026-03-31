@@ -3418,7 +3418,7 @@ struct Column(Copyable, Movable, Sized):
             return ColumnIndex(objs^)
 
     def _sort_perm_by_index(self, ascending: Bool) raises -> List[Int]:
-        """Return an insertion-sort permutation over the current index labels.
+        """Return a stable merge-sort permutation over the current index labels.
 
         The result ``perm[i]`` is the original row position of the *i*-th row
         in sorted order.  The four index arms (string, int64, float64,
@@ -3431,71 +3431,159 @@ struct Column(Copyable, Movable, Sized):
             perm.append(i)
         if self._index.isa[Index]():
             ref idx = self._index[Index]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap = (
-                        idx[key]
-                        < idx[prev] if ascending else idx[key]
-                        > idx[prev]
-                    )
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var take_right = (
+                            idx[rv]
+                            < idx[lv] if ascending else idx[rv]
+                            > idx[lv]
+                        )
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         elif self._index.isa[List[Int64]]():
             ref idx = self._index[List[Int64]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap = (
-                        idx[key]
-                        < idx[prev] if ascending else idx[key]
-                        > idx[prev]
-                    )
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var take_right = (
+                            idx[rv]
+                            < idx[lv] if ascending else idx[rv]
+                            > idx[lv]
+                        )
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         elif self._index.isa[List[Float64]]():
             ref idx = self._index[List[Float64]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap = (
-                        idx[key]
-                        < idx[prev] if ascending else idx[key]
-                        > idx[prev]
-                    )
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var take_right = (
+                            idx[rv]
+                            < idx[lv] if ascending else idx[rv]
+                            > idx[lv]
+                        )
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         else:
             # PythonObject fallback: use Python comparison.
             ref idx = self._index[List[PythonObject]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var do_swap = Bool(
-                        idx[key] < idx[prev]
-                    ) if ascending else Bool(idx[key] > idx[prev])
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var take_right = Bool(
+                            idx[rv] < idx[lv]
+                        ) if ascending else Bool(idx[rv] > idx[lv])
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         return perm^
 
     # ------------------------------------------------------------------
