@@ -25,7 +25,7 @@ def test_series_from_pandas_preserves_name() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"), name="score")
     var s = Series.from_pandas(pd_s)
-    assert_equal(s.name, "score")
+    assert_equal(s.name.value(), "score")
     assert_equal(s.__len__(), 3)
 
 

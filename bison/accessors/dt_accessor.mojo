@@ -1,4 +1,5 @@
 from std.python import Python, PythonObject
+from std.collections import Optional
 from ..column import Column, ColumnData
 from ..dtypes import int64, object_, datetime64_ns
 
@@ -8,18 +9,18 @@ struct DatetimeMethods:
 
     var _data: List[PythonObject]
     var _null_mask: List[Bool]
-    var _name: String
+    var _name: Optional[String]
 
     def __init__(out self):
         self._data = List[PythonObject]()
         self._null_mask = List[Bool]()
-        self._name = ""
+        self._name = None
 
     def __init__(
         out self,
         var data: List[PythonObject],
         var null_mask: List[Bool],
-        name: String,
+        name: Optional[String],
     ):
         self._data = data^
         self._null_mask = null_mask^

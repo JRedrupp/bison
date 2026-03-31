@@ -141,9 +141,9 @@ def _row_as_series(df: DataFrame, row: Int) raises -> Series:
     var data = List[PythonObject]()
     var index = List[PythonObject]()
     for ci in range(ncols):
-        index.append(PythonObject(df._cols[ci].name))
+        index.append(PythonObject(df._cols[ci].name.value()))
         data.append(_col_cell_pyobj(df._cols[ci], row))
-    var result_col = Column("", ColumnData(data^), object_, index^)
+    var result_col = Column(None, ColumnData(data^), object_, index^)
     return Series(result_col^)
 
 

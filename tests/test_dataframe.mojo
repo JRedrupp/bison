@@ -435,8 +435,8 @@ def test_items_names() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1], 'y': [2]}")))
     var cols = df.items()
-    assert_equal(cols[0].name, "x")
-    assert_equal(cols[1].name, "y")
+    assert_equal(cols[0].name.value(), "x")
+    assert_equal(cols[1].name.value(), "y")
 
 
 def test_items_values() raises:
@@ -484,7 +484,7 @@ def test_itertuples_name() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var tuples = df.itertuples(index=True, name="Row")
-    assert_equal(tuples[0].name, "Row")
+    assert_equal(tuples[0].name.value(), "Row")
 
 
 def test_from_records_basic() raises:

@@ -1,4 +1,5 @@
 from std.python import Python, PythonObject
+from std.collections import Optional
 from .._errors import _not_implemented
 from ..column import Column, ColumnData
 from ..dtypes import BisonDtype, object_, bool_, int64
@@ -9,18 +10,18 @@ struct StringMethods:
 
     var _data: List[String]
     var _null_mask: List[Bool]
-    var _name: String
+    var _name: Optional[String]
 
     def __init__(out self):
         self._data = List[String]()
         self._null_mask = List[Bool]()
-        self._name = ""
+        self._name = None
 
     def __init__(
         out self,
         var data: List[String],
         var null_mask: List[Bool],
-        name: String,
+        name: Optional[String],
     ):
         self._data = data^
         self._null_mask = null_mask^
