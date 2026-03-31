@@ -13,9 +13,8 @@ Usage::
 """
 
 from benchmarks._bench_utils import BenchResult, print_json
-from bison import DataFrame, DFScalar, ILocIndexer, read_csv
+from bison import DataFrame, DFScalar, read_csv
 from std.math import sqrt
-from std.memory import UnsafePointer
 from std.python import Python, PythonObject
 from std.time import perf_counter_ns
 
@@ -212,15 +211,13 @@ fn main() raises:
         )
 
     # ------------------------------------------------------------------
-    # iloc_row  (single integer-position row access;
-    #            loc-slice is not yet supported natively)
+    # iloc_row  (single integer-position row access via df.iloc())
     # ------------------------------------------------------------------
     skipped = False
     try:
-        var iloc = ILocIndexer(UnsafePointer(to=df))
         var t0 = perf_counter_ns()
         for _ in range(FAST_ITERS):
-            _ = iloc[0]
+            _ = df.iloc()[0]
         bison_ms = _elapsed_ms(t0, FAST_ITERS)
     except e:
         if "not implemented" in String(e):
@@ -233,6 +230,28 @@ fn main() raises:
     else:
         results.append(
             BenchResult("iloc_row", bison_ms, pandas_ms, FAST_ITERS)
+        )
+
+    # ------------------------------------------------------------------
+    # loc_slice  (slice of 100 rows via df.loc(); matches issue #390)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(FAST_ITERS):
+            _ = df.loc()[0:100]
+        bison_ms = _elapsed_ms(t0, FAST_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df.loc[0:100]", g, FAST_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("loc_slice"))
+    else:
+        results.append(
+            BenchResult("loc_slice", bison_ms, pandas_ms, FAST_ITERS)
         )
 
     # ------------------------------------------------------------------
