@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.utils import Variant
 from std.memory import bitcast
-from std.collections import Dict, Set
+from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor
 from .index import Index, ColumnIndex
 from .dtypes import (
@@ -3238,7 +3238,7 @@ struct Column(Copyable, Movable, Sized):
     marks a null/NaN element.  An empty mask means no nulls are present.
     """
 
-    var name: String
+    var name: Optional[String]
     var dtype: BisonDtype
     var _data: ColumnData
     var _index: ColumnIndex
@@ -3257,7 +3257,7 @@ struct Column(Copyable, Movable, Sized):
 
     def __init__(out self):
         """Empty column with object dtype — used as stub placeholder."""
-        self.name = ""
+        self.name = None
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
         self._index = ColumnIndex(List[PythonObject]())
@@ -3266,7 +3266,10 @@ struct Column(Copyable, Movable, Sized):
         self._index_name = String("")
 
     def __init__(
-        out self, name: String, var data: ColumnData, dtype: BisonDtype
+        out self,
+        name: Optional[String],
+        var data: ColumnData,
+        dtype: BisonDtype,
     ):
         self.name = name
         self.dtype = dtype
@@ -3278,7 +3281,7 @@ struct Column(Copyable, Movable, Sized):
 
     def __init__(
         out self,
-        name: String,
+        name: Optional[String],
         var data: ColumnData,
         dtype: BisonDtype,
         var index: ColumnIndex,
@@ -4496,7 +4499,9 @@ struct Column(Copyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def from_pandas(pd_series: PythonObject, name: String) raises -> Column:
+    def from_pandas(
+        pd_series: PythonObject, name: Optional[String]
+    ) raises -> Column:
         """Build a Column by copying values from a pandas Series."""
         var dtype_str = String(pd_series.dtype)
         var n = Int(pd_series.__len__())
@@ -4652,7 +4657,10 @@ struct Column(Copyable, Movable, Sized):
 
     @staticmethod
     def _null_column(
-        name: String, dtype: BisonDtype, n: Int, var index: ColumnIndex
+        name: Optional[String],
+        dtype: BisonDtype,
+        n: Int,
+        var index: ColumnIndex,
     ) raises -> Column:
         """Create an all-null Column of length *n* with the given *dtype*.
 
@@ -4691,7 +4699,7 @@ struct Column(Copyable, Movable, Sized):
 
     @staticmethod
     def _fill_scalar(
-        name: String, value: DFScalar, n: Int, index: ColumnIndex
+        name: Optional[String], value: DFScalar, n: Int, index: ColumnIndex
     ) raises -> Column:
         """Create a Column of length *n* with every element equal to *value*.
 
@@ -4740,10 +4748,10 @@ struct Column(Copyable, Movable, Sized):
                     dtype_name = "UInt64"
         var n_idx = self._index_len()
         var pd_name: PythonObject
-        if self.name == "":
+        if not self.name:
             pd_name = Python.evaluate("None")
         else:
-            pd_name = PythonObject(self.name)
+            pd_name = PythonObject(self.name.value())
         var pd_index: PythonObject
         if n_idx > 0:
             var idx_py = Python.evaluate("[]")

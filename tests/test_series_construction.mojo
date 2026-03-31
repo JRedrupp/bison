@@ -8,8 +8,25 @@ def test_from_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"), name="vals")
     var s = Series.from_pandas(pd_s)
-    assert_equal(s.name, "vals")
+    assert_equal(s.name.value(), "vals")
     assert_equal(s.__len__(), 3)
+
+
+def test_unnamed_series_name_is_none() raises:
+    """Unnamed pandas Series (name=None) should produce Series.name == None."""
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"))
+    var s = Series.from_pandas(pd_s)
+    assert_false(s.name.__bool__())
+
+
+def test_named_empty_string_series() raises:
+    """A Series explicitly named '' must be distinguishable from an unnamed one."""
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(Python.evaluate("[1, 2, 3]"), name="")
+    var s = Series.from_pandas(pd_s)
+    assert_true(s.name.__bool__())
+    assert_equal(s.name.value(), "")
 
 
 def test_size() raises:

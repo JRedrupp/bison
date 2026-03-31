@@ -11,7 +11,9 @@ from .._errors import _not_implemented
 # ------------------------------------------------------------------
 
 
-def _null_col(name: String, n: Int, dtype: BisonDtype) raises -> Column:
+def _null_col(
+    name: Optional[String], n: Int, dtype: BisonDtype
+) raises -> Column:
     """Return a Column of *n* null rows using *dtype* as the stored arm."""
     var mask = List[Bool]()
     for _ in range(n):
@@ -342,7 +344,7 @@ def _sort_result_cols(cols: List[Column]) raises -> List[Column]:
     for i in range(n):
         var min_idx = i
         for j in range(i + 1, n):
-            if cols[order[j]].name < cols[order[min_idx]].name:
+            if cols[order[j]].name.value() < cols[order[min_idx]].name.value():
                 min_idx = j
         if min_idx != i:
             var tmp = order[i]
@@ -367,7 +369,7 @@ def _concat_axis0(
         # Intersection: only columns that appear in ALL DataFrames.
         if len(dfs) > 0:
             for j in range(len(dfs[0]._cols)):
-                col_names.append(dfs[0]._cols[j].name)
+                col_names.append(dfs[0]._cols[j].name.value())
             for i in range(1, len(dfs)):
                 var keep = List[String]()
                 for k in range(len(col_names)):
@@ -382,7 +384,7 @@ def _concat_axis0(
         # Outer (default): union of all column names, first-seen order.
         for i in range(len(dfs)):
             for j in range(len(dfs[i]._cols)):
-                var name = dfs[i]._cols[j].name
+                var name = dfs[i]._cols[j].name.value()
                 var seen = False
                 for k in range(len(col_names)):
                     if col_names[k] == name:
@@ -446,7 +448,7 @@ def _concat_axis1(
     var col_idx = 0
     for i in range(len(dfs)):
         for j in range(len(dfs[i]._cols)):
-            var col_name: String
+            var col_name: Optional[String]
             if ignore_index:
                 col_name = String(col_idx)
             else:

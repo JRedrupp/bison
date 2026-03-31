@@ -32,7 +32,7 @@ struct Series(Copyable, Movable):
     """A one-dimensional labeled array, mirroring the pandas Series API."""
 
     var _col: Column
-    var name: String
+    var name: Optional[String]
 
     # ------------------------------------------------------------------
     # Construction
@@ -41,22 +41,24 @@ struct Series(Copyable, Movable):
     def __init__(out self):
         """Empty Series — used as stub return placeholder."""
         self._col = Column()
-        self.name = ""
+        self.name = None
 
     def __init__(out self, var col: Column):
         self.name = col.name
         self._col = col^
 
-    def __init__(out self, pd_s: PythonObject, name: String = "") raises:
+    def __init__(
+        out self, pd_s: PythonObject, name: Optional[String] = None
+    ) raises:
         """Convenience constructor: wraps a pandas Series."""
-        var col_name: String
-        if name != "":
+        var col_name: Optional[String]
+        if name:
             col_name = name
         else:
             var raw_name = pd_s.name
             var _is_none = Python.evaluate("lambda x: x is None")
             if Bool(_is_none(raw_name)):
-                col_name = ""
+                col_name = None
             else:
                 col_name = String(raw_name)
         self._col = Column.from_pandas(pd_s, col_name)
@@ -73,10 +75,10 @@ struct Series(Copyable, Movable):
     @staticmethod
     def from_pandas(pd_s: PythonObject) raises -> Series:
         var raw_name = pd_s.name
-        var col_name: String
+        var col_name: Optional[String]
         var _is_none = Python.evaluate("lambda x: x is None")
         if Bool(_is_none(raw_name)):
-            col_name = ""
+            col_name = None
         else:
             col_name = String(raw_name)
         return Series(Column.from_pandas(pd_s, col_name))
@@ -1284,12 +1286,12 @@ struct Series(Copyable, Movable):
             raise Error("Series.to_numpy: non-numeric dtype is not supported")
         return result^
 
-    def to_frame(self, name: String = "") raises -> DataFrame:
+    def to_frame(self, name: Optional[String] = None) raises -> DataFrame:
         """Convert the Series to a single-column DataFrame.
 
         Parameters
         ----------
-        name : Column name in the resulting DataFrame.  When empty the
+        name : Column name in the resulting DataFrame.  When None (default) the
                Series' own name is used.
 
         Returns
@@ -1297,7 +1299,7 @@ struct Series(Copyable, Movable):
         DataFrame
             A native bison ``DataFrame`` with one column.
         """
-        var col_name = name if name != "" else self.name
+        var col_name = name if name else self.name
         var col = Column(copy=self._col)
         col.name = col_name
         var cols = List[Column]()
@@ -1513,7 +1515,7 @@ struct DataFrame(Copyable, Movable):
         var dict_ = Python.evaluate("{}")
         for i in range(self._cols.__len__()):
             var pd_series = self._cols[i].to_pandas()
-            dict_[self._cols[i].name] = pd_series
+            dict_[self._cols[i].name.value()] = pd_series
         return pd.DataFrame(dict_)
 
     @staticmethod
@@ -1739,7 +1741,7 @@ struct DataFrame(Copyable, Movable):
     def columns(self) -> List[String]:
         var result = List[String]()
         for i in range(self._cols.__len__()):
-            result.append(self._cols[i].name)
+            result.append(self._cols[i].name.value())
         return result^
 
     def ndim(self) -> Int:
@@ -1753,9 +1755,9 @@ struct DataFrame(Copyable, Movable):
         var idx = List[PythonObject]()
         for i in range(n):
             dtype_names.append(self._cols[i].dtype.name)
-            idx.append(PythonObject(self._cols[i].name))
+            idx.append(PythonObject(self._cols[i].name.value()))
         var col_data = ColumnData(dtype_names^)
-        var result_col = Column("", col_data^, object_, idx^)
+        var result_col = Column(None, col_data^, object_, idx^)
         return Series(result_col^)
 
     def info(self) raises:
@@ -1780,7 +1782,7 @@ struct DataFrame(Copyable, Movable):
                 " "
                 + String(i)
                 + "   "
-                + self._cols[i].name
+                + self._cols[i].name.value()
                 + "   "
                 + String(non_null)
                 + " non-null   "
@@ -1821,9 +1823,9 @@ struct DataFrame(Copyable, Movable):
             values.append(
                 Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize)
             )
-            idx.append(PythonObject(self._cols[i].name))
+            idx.append(PythonObject(self._cols[i].name.value()))
         var col_data = ColumnData(values^)
-        var result_col = Column("", col_data^, int64, idx^)
+        var result_col = Column(None, col_data^, int64, idx^)
         return Series(result_col^)
 
     # ------------------------------------------------------------------
@@ -1985,7 +1987,7 @@ struct DataFrame(Copyable, Movable):
             return DataFrame(result_cols^)
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            var col_name = self._cols[i].name
+            var col_name = self._cols[i].name.value()
             var keep = False
             if items:
                 ref items_list = items.value()
@@ -2049,7 +2051,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].sum(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
@@ -2060,7 +2062,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].mean(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
@@ -2071,7 +2073,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].median(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
@@ -2082,7 +2084,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].min(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
@@ -2093,7 +2095,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].max(skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def std(
@@ -2106,7 +2108,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].std(ddof, skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def var(
@@ -2119,7 +2121,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].var(ddof, skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def count(self, axis: Int = 0) raises -> Series:
@@ -2130,7 +2132,7 @@ struct DataFrame(Copyable, Movable):
             values.append(Float64(self._cols[i].count()))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def nunique(self, axis: Int = 0) raises -> Series:
@@ -2141,7 +2143,7 @@ struct DataFrame(Copyable, Movable):
             values.append(Float64(self._cols[i].nunique()))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def describe(
@@ -2162,7 +2164,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].quantile(q, skipna))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column("", col_data^, dtype)
+        var result_col = Column(None, col_data^, dtype)
         return Series(result_col^)
 
     def abs(self) raises -> DataFrame:
@@ -2661,15 +2663,15 @@ struct DataFrame(Copyable, Movable):
                 perm.append(i)
             for i in range(1, n_cols):
                 var key = perm[i]
-                var key_name = self._cols[key].name
+                var key_name = self._cols[key].name.value()
                 var j = i - 1
                 while j >= 0:
                     var prev = perm[j]
                     var do_swap: Bool
                     if ascending:
-                        do_swap = self._cols[prev].name > key_name
+                        do_swap = self._cols[prev].name.value() > key_name
                     else:
-                        do_swap = self._cols[prev].name < key_name
+                        do_swap = self._cols[prev].name.value() < key_name
                     if not do_swap:
                         break
                     perm[j + 1] = prev
@@ -2887,8 +2889,8 @@ struct DataFrame(Copyable, Movable):
             var c = self._cols[i].copy()
             if columns:
                 ref col_map = columns.value()
-                if c.name in col_map:
-                    c.name = col_map[c.name]
+                if c.name.value() in col_map:
+                    c.name = col_map[c.name.value()]
             if index and c._index_len() > 0:
                 ref idx_map = index.value()
                 # Rename only supports string index arms natively.  For
@@ -2973,7 +2975,7 @@ struct DataFrame(Copyable, Movable):
             # Build a name→col_index lookup.
             var col_map = Dict[String, Int]()
             for i in range(ncols):
-                col_map[self._cols[i].name] = i
+                col_map[self._cols[i].name.value()] = i
             # Determine the shared index for the result.
             var shared_idx = ColumnIndex(List[PythonObject]())
             if ncols > 0:
@@ -3102,7 +3104,7 @@ struct DataFrame(Copyable, Movable):
             # Collect surviving columns.
             var result_cols = List[Column]()
             for i in range(ncols):
-                if self._cols[i].name not in drop_set:
+                if self._cols[i].name.value() not in drop_set:
                     result_cols.append(self._cols[i].copy())
             return DataFrame(result_cols^)
         else:
@@ -3244,7 +3246,7 @@ struct DataFrame(Copyable, Movable):
                 "DataFrame.duplicated: keep must be 'first', 'last', or 'False'"
             )
 
-        var col = Column("", ColumnData(result^), bool_)
+        var col = Column(None, ColumnData(result^), bool_)
         return Series(col^)
 
     def pivot(
@@ -3397,7 +3399,7 @@ struct DataFrame(Copyable, Movable):
                         in_id = True
                         break
                 if not in_id:
-                    val_names.append(self._cols[j].name)
+                    val_names.append(self._cols[j].name.value())
 
         var n_val = len(val_names)
         var result_cols = List[Column]()
@@ -3492,7 +3494,7 @@ struct DataFrame(Copyable, Movable):
                 var is_null = len(col._null_mask) > 0 and col._null_mask[r]
                 var tup_items = py.list()
                 _ = tup_items.append(row_label)
-                _ = tup_items.append(PythonObject(col.name))
+                _ = tup_items.append(PythonObject(col.name.value()))
                 var tup = py.tuple(tup_items)
                 idx_objs.append(tup)
                 if is_null:
@@ -3532,7 +3534,7 @@ struct DataFrame(Copyable, Movable):
         # Index shared by all result columns: the original column names.
         var orig_col_names = List[String]()
         for j in range(ncols):
-            orig_col_names.append(self._cols[j].name)
+            orig_col_names.append(self._cols[j].name.value())
         var shared_idx = ColumnIndex(Index(orig_col_names^))
 
         var result_cols = List[Column]()
@@ -3815,7 +3817,7 @@ struct DataFrame(Copyable, Movable):
         var nrows = self.shape()[0]
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            var col_name = self._cols[i].name
+            var col_name = self._cols[i].name.value()
             if col_name not in values:
                 # All-False Bool column for columns not in the dict.
                 var false_data = List[Bool]()
@@ -3946,10 +3948,10 @@ struct DataFrame(Copyable, Movable):
         # Build name→index maps once so key serialisation is O(1) per lookup.
         var right_col_idx = Dict[String, Int]()
         for i in range(len(right._cols)):
-            right_col_idx[right._cols[i].name] = i
+            right_col_idx[right._cols[i].name.value()] = i
         var left_col_idx = Dict[String, Int]()
         for i in range(len(self._cols)):
-            left_col_idx[self._cols[i].name] = i
+            left_col_idx[self._cols[i].name.value()] = i
 
         # Build right hash map: key_str → list of right row indices.
         var right_map = Dict[String, List[Int]]()
@@ -3994,8 +3996,8 @@ struct DataFrame(Copyable, Movable):
         # Right non-key column names (for overlap detection with left).
         var right_nonkey_names = Dict[String, Bool]()
         for j in range(len(right._cols)):
-            if right._cols[j].name not in key_set:
-                right_nonkey_names[right._cols[j].name] = True
+            if right._cols[j].name.value() not in key_set:
+                right_nonkey_names[right._cols[j].name.value()] = True
 
         # Build output columns.
         var result_cols = List[Column]()
@@ -4067,28 +4069,28 @@ struct DataFrame(Copyable, Movable):
 
         # Left non-key columns.
         for i in range(len(self._cols)):
-            if self._cols[i].name in key_set:
+            if self._cols[i].name.value() in key_set:
                 continue
             var col = self._cols[i].take_with_nulls(out_left)
-            if col.name in right_nonkey_names:
-                col.name = col.name + lsuf
+            if col.name.value() in right_nonkey_names:
+                col.name = col.name.value() + lsuf
             result_cols.append(col^)
 
         # Right non-key columns.
         for j in range(len(right._cols)):
-            if right._cols[j].name in key_set:
+            if right._cols[j].name.value() in key_set:
                 continue
             var col = right._cols[j].take_with_nulls(out_right)
             var in_left = False
             for i in range(len(self._cols)):
                 if (
-                    self._cols[i].name not in key_set
+                    self._cols[i].name.value() not in key_set
                     and self._cols[i].name == right._cols[j].name
                 ):
                     in_left = True
                     break
             if in_left:
-                col.name = col.name + rsuf
+                col.name = col.name.value() + rsuf
             result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -4114,16 +4116,16 @@ struct DataFrame(Copyable, Movable):
         # Build right column name set for overlap detection.
         var right_names = Dict[String, Bool]()
         for j in range(len(other._cols)):
-            right_names[other._cols[j].name] = True
+            right_names[other._cols[j].name.value()] = True
 
         var left_names = Dict[String, Bool]()
         for i in range(len(self._cols)):
-            left_names[self._cols[i].name] = True
+            left_names[self._cols[i].name.value()] = True
 
         # Detect overlap.
         var overlap = False
         for i in range(len(self._cols)):
-            if self._cols[i].name in right_names:
+            if self._cols[i].name.value() in right_names:
                 overlap = True
                 break
         if overlap and lsuffix == "" and rsuffix == "":
@@ -4137,15 +4139,15 @@ struct DataFrame(Copyable, Movable):
         # Left columns — rename if overlap.
         for i in range(len(self._cols)):
             var col = self._cols[i].copy()
-            if col.name in right_names:
-                col.name = col.name + lsuffix
+            if col.name.value() in right_names:
+                col.name = col.name.value() + lsuffix
             result_cols.append(col^)
 
         # Right columns — positional alignment, rename if overlap.
         for j in range(len(other._cols)):
             var col = other._cols[j].slice(0, n_left)
-            if col.name in left_names:
-                col.name = col.name + rsuffix
+            if col.name.value() in left_names:
+                col.name = col.name.value() + rsuffix
             result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -4158,10 +4160,10 @@ struct DataFrame(Copyable, Movable):
         # Build name→index map for other.
         var other_idx = Dict[String, Int]()
         for j in range(len(other._cols)):
-            other_idx[other._cols[j].name] = j
+            other_idx[other._cols[j].name.value()] = j
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            var name = self._cols[i].name
+            var name = self._cols[i].name.value()
             if name not in other_idx:
                 raise Error(
                     "Column '" + name + "' not found in other DataFrame"
@@ -4235,7 +4237,7 @@ struct DataFrame(Copyable, Movable):
                 String("")
             )  # pandas convention: index column has no header
         for ci in range(ncols):
-            header_parts.append(self._cols[ci].name)
+            header_parts.append(self._cols[ci].name.value())
         var hline = String()
         for i in range(len(header_parts)):
             if i > 0:
@@ -4310,7 +4312,7 @@ struct DataFrame(Copyable, Movable):
             for ri in range(nrows):
                 var row = Python.evaluate("{}")
                 for ci in range(ncols):
-                    row[self._cols[ci].name] = _col_cell_pyobj(
+                    row[self._cols[ci].name.value()] = _col_cell_pyobj(
                         self._cols[ci], ri
                     )
                 py_obj.append(row)
@@ -4320,7 +4322,7 @@ struct DataFrame(Copyable, Movable):
             py_obj = Python.evaluate("{}")
             var cols_list = Python.evaluate("[]")
             for ci in range(ncols):
-                cols_list.append(self._cols[ci].name)
+                cols_list.append(self._cols[ci].name.value())
             py_obj["columns"] = cols_list
             var idx_list = Python.evaluate("[]")
             for ri in range(nrows):
@@ -4340,7 +4342,7 @@ struct DataFrame(Copyable, Movable):
             for ri in range(nrows):
                 var row = Python.evaluate("{}")
                 for ci in range(ncols):
-                    row[self._cols[ci].name] = _col_cell_pyobj(
+                    row[self._cols[ci].name.value()] = _col_cell_pyobj(
                         self._cols[ci], ri
                     )
                 py_obj[String(ri)] = row
@@ -4361,7 +4363,7 @@ struct DataFrame(Copyable, Movable):
                 var col_dict = Python.evaluate("{}")
                 for ri in range(nrows):
                     col_dict[String(ri)] = _col_cell_pyobj(self._cols[ci], ri)
-                py_obj[self._cols[ci].name] = col_dict
+                py_obj[self._cols[ci].name.value()] = col_dict
 
         var result = String(json_mod.dumps(py_obj))
 
@@ -4420,7 +4422,7 @@ struct DataFrame(Copyable, Movable):
             for i in range(nrows):
                 var key = col._index_label(i) if has_index else String(i)
                 inner[key] = _scalar_from_col(col, i)
-            result[col.name] = inner^
+            result[col.name.value()] = inner^
         return result^
 
     def to_records(
@@ -4453,7 +4455,7 @@ struct DataFrame(Copyable, Movable):
                 row["index"] = DFScalar(Int64(ri))
             for ci in range(ncols):
                 ref col = self._cols[ci]
-                row[col.name] = _scalar_from_col(col, ri)
+                row[col.name.value()] = _scalar_from_col(col, ri)
             result.append(row^)
         return result^
 
@@ -4475,7 +4477,7 @@ struct DataFrame(Copyable, Movable):
             ):
                 raise Error(
                     "DataFrame.to_numpy: column '"
-                    + col.name
+                    + col.name.value()
                     + "' has non-numeric dtype"
                 )
         var result = List[List[Float64]]()
@@ -4523,7 +4525,7 @@ struct DataFrame(Copyable, Movable):
         # Compute per-column display widths.
         var widths = List[Int]()
         for ci in range(ncols):
-            var w = len(self._cols[ci].name)
+            var w = len(self._cols[ci].name.value())
             for ri in range(nrows):
                 var s = _col_cell_str(self._cols[ci], ri)
                 if len(s) > w:
@@ -4537,7 +4539,7 @@ struct DataFrame(Copyable, Movable):
             line += " "
         for ci in range(ncols):
             line += "  "
-            var name = self._cols[ci].name
+            var name = self._cols[ci].name.value()
             var pad = widths[ci] - len(name)
             for _ in range(pad):
                 line += " "
@@ -4581,7 +4583,9 @@ struct DataFrame(Copyable, Movable):
         )
         for ci in range(ncols):
             result += (
-                "      <th>" + _html_escape(self._cols[ci].name) + "</th>\n"
+                "      <th>"
+                + _html_escape(self._cols[ci].name.value())
+                + "</th>\n"
             )
         result += "    </tr>\n  </thead>\n  <tbody>\n"
 
@@ -4618,7 +4622,7 @@ struct DataFrame(Copyable, Movable):
         # Per-column widths (at least as wide as the header).
         var widths = List[Int]()
         for ci in range(ncols):
-            var w = len(self._cols[ci].name)
+            var w = len(self._cols[ci].name.value())
             for ri in range(nrows):
                 var s = _col_cell_str(self._cols[ci], ri)
                 if len(s) > w:
@@ -4634,7 +4638,7 @@ struct DataFrame(Copyable, Movable):
         result += " |"
         for ci in range(ncols):
             result += " "
-            var name = self._cols[ci].name
+            var name = self._cols[ci].name.value()
             result += name
             var col_pad = widths[ci] - len(name)
             for _ in range(col_pad):
@@ -4720,7 +4724,7 @@ struct DataFrame(Copyable, Movable):
         var result = List[Series]()
         var col_idx = List[PythonObject]()
         for j in range(ncols):
-            col_idx.append(PythonObject(self._cols[j].name))
+            col_idx.append(PythonObject(self._cols[j].name.value()))
         for i in range(nrows):
             var row_data = List[PythonObject]()
             for j in range(ncols):
@@ -4748,7 +4752,7 @@ struct DataFrame(Copyable, Movable):
         if index:
             col_idx.append(PythonObject("Index"))
         for j in range(ncols):
-            col_idx.append(PythonObject(self._cols[j].name))
+            col_idx.append(PythonObject(self._cols[j].name.value()))
         for i in range(nrows):
             var row_data = List[PythonObject]()
             if index:
@@ -4781,7 +4785,7 @@ def _groupby_indices(
     """
     var col_idx = Dict[String, Int]()
     for i in range(len(df._cols)):
-        col_idx[df._cols[i].name] = i
+        col_idx[df._cols[i].name.value()] = i
 
     var n_rows = df.shape()[0]
 
@@ -4855,7 +4859,7 @@ struct DataFrameGroupBy:
         )
 
     def _make_result_col(
-        self, name: String, var vals: List[Float64]
+        self, name: Optional[String], var vals: List[Float64]
     ) raises -> Column:
         """Build a float64 result Column with group keys as index."""
         var idx = ColumnIndex(Index(self._group_keys.copy()))
@@ -4864,7 +4868,7 @@ struct DataFrameGroupBy:
         return col^
 
     def _make_result_col_int64(
-        self, name: String, var vals: List[Int64]
+        self, name: Optional[String], var vals: List[Int64]
     ) raises -> Column:
         """Build an int64 result Column with group keys as index."""
         var idx = ColumnIndex(Index(self._group_keys.copy()))
@@ -4881,7 +4885,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -4912,7 +4916,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -4933,7 +4937,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -4964,7 +4968,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -4995,7 +4999,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -5016,7 +5020,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
@@ -5037,7 +5041,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             var vals = List[Int64]()
             for j in range(len(self._group_keys)):
@@ -5058,7 +5062,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             var vals = List[Int64]()
             for j in range(len(self._group_keys)):
@@ -5079,7 +5083,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             var selected = List[Int]()
             var has_mask = len(col._null_mask) > 0
@@ -5107,7 +5111,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             var selected = List[Int]()
             var has_mask = len(col._null_mask) > 0
@@ -5133,8 +5137,8 @@ struct DataFrameGroupBy:
         for i in range(len(self._group_keys)):
             vals.append(Int64(len(self._group_map[self._group_keys[i]])))
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        # pandas groupby().size() returns a Series with name=None; "" maps to None
-        var col = Column("", ColumnData(vals^), int64, idx^)
+        # pandas groupby().size() returns a Series with name=None
+        var col = Column(None, ColumnData(vals^), int64, idx^)
         col._index_name = self._by[0]
         return Series(col^)
 
@@ -5200,7 +5204,7 @@ struct DataFrameGroupBy:
             var result_cols = List[Column]()
             for i in range(len(self._df._cols)):
                 ref col = self._df._cols[i]
-                if col.name in skip:
+                if col.name.value() in skip:
                     continue
                 var has_mask = len(col._null_mask) > 0
                 var key_to_idx = Dict[String, Int]()
@@ -5248,7 +5252,7 @@ struct DataFrameGroupBy:
         var result_cols = List[Column]()
         for i in range(len(self._df._cols)):
             ref col = self._df._cols[i]
-            if col.name in skip:
+            if col.name.value() in skip:
                 continue
             if needs_numeric and not (
                 col.dtype.is_integer() or col.dtype.is_float()
