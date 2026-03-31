@@ -8,3 +8,4 @@ SESSION.md
 .test-bin/
 dist/
 .test-pass-count
+results/
