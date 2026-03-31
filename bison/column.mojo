@@ -3191,9 +3191,16 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = ColumnIndex(result^)
 
     def on_float64(mut self, data: List[Float64]) raises:
+        # Null positions become NaN so that a float64 index preserves null
+        # semantics (consistent with how pandas represents NaN in a Float64Index).
+        var has_mask = len(self.null_mask) > 0
+        var nan = Float64(0) / Float64(0)
         var result = List[Float64]()
         for i in range(len(data)):
-            result.append(data[i])
+            if has_mask and self.null_mask[i]:
+                result.append(nan)
+            else:
+                result.append(data[i])
         self.result = ColumnIndex(result^)
 
     def on_bool(mut self, data: List[Bool]) raises:
