@@ -5,7 +5,7 @@ from ..dataframe import DataFrame
 
 def read_excel(
     io: String,
-    sheet_name: Int = 0,
+    sheet_name: Optional[PythonObject] = None,
     header: Int = 0,
     index_col: Optional[PythonObject] = None,
     usecols: Optional[PythonObject] = None,
@@ -22,8 +22,11 @@ def read_excel(
     Parameters
     ----------
     io         : Path to the Excel file.
-    sheet_name : Sheet index (0-based int).  Default ``0`` reads the first
-                 sheet.
+    sheet_name : Sheet to read.  Accepts an ``int`` (0-based index), a
+                 ``str`` (sheet name), a list of either, or ``None`` (to
+                 use the pandas default, which is the first sheet).
+                 Default ``None`` reads the first sheet (index 0),
+                 matching the pandas default behaviour.
     header     : Row number to use as column names (0-based).
     index_col  : Column(s) to use as the row index.  ``None`` uses the
                  default integer index.
@@ -34,6 +37,9 @@ def read_excel(
     """
     var pd = Python.import_module("pandas")
     var py_none = Python.evaluate("None")
+    var resolved_sheet_name: PythonObject = PythonObject(
+        0
+    ) if not sheet_name else sheet_name.value()
     var _header: PythonObject = py_none if header == -1 else PythonObject(
         header
     )
@@ -44,7 +50,7 @@ def read_excel(
     var _nrows = nrows.value() if nrows else py_none
     var pd_df = pd.read_excel(
         io,
-        sheet_name=sheet_name,
+        sheet_name=resolved_sheet_name,
         header=_header,
         index_col=_index_col,
         usecols=_usecols,
