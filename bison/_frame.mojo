@@ -1413,8 +1413,9 @@ struct Series(Copyable, Movable):
         as_index: Bool = True,
         sort: Bool = True,
         dropna: Bool = True,
+        by_null_mask: List[Bool] = List[Bool](),
     ) raises -> SeriesGroupBy:
-        return SeriesGroupBy(self, by, as_index, sort, dropna)
+        return SeriesGroupBy(self, by, as_index, sort, dropna, by_null_mask)
 
 
 # ------------------------------------------------------------------
@@ -5335,6 +5336,7 @@ struct SeriesGroupBy:
 
     var _series: Series
     var _by: List[String]
+    var _by_null_mask: List[Bool]
     var _as_index: Bool
     var _sort: Bool
     var _dropna: Bool
@@ -5348,15 +5350,28 @@ struct SeriesGroupBy:
         as_index: Bool,
         sort: Bool,
         dropna: Bool,
+        by_null_mask: List[Bool] = List[Bool](),
     ) raises:
         self._series = series.copy()
         self._by = by.copy()
+        self._by_null_mask = by_null_mask.copy()
         self._as_index = as_index
         self._sort = sort
         self._dropna = dropna
         self._group_map = Dict[String, List[Int]]()
         self._group_keys = List[String]()
+        var has_null_mask = len(by_null_mask) > 0
         for i in range(len(by)):
+            if has_null_mask and by_null_mask[i]:
+                # Null label: skip when dropna=True; include as "" group when dropna=False.
+                if dropna:
+                    continue
+                var null_key = String("")
+                if null_key not in self._group_map:
+                    self._group_keys.append(null_key)
+                    self._group_map[null_key] = List[Int]()
+                self._group_map[null_key].append(i)
+                continue
             var k = by[i]
             if k not in self._group_map:
                 self._group_keys.append(k)
@@ -5576,9 +5591,32 @@ struct SeriesGroupBy:
         return self.agg(func)
 
     def transform(self, func: String) raises -> Series:
+        var n = len(self._series._col)
+        var has_null_mask = len(self._by_null_mask) > 0
+        var nan = Float64(0) / Float64(0)
+        # Detect whether any row is null-labelled and excluded by dropna.
+        var any_excluded_row = False
+        if has_null_mask and self._dropna:
+            for i in range(n):
+                if self._by_null_mask[i]:
+                    any_excluded_row = True
+                    break
+        # Build row → group_key mapping by inverting _group_map.
+        var row_key = List[String]()
+        for _ in range(n):
+            row_key.append(String(""))
+        for j in range(len(self._group_keys)):
+            var key = self._group_keys[j]
+            ref indices = self._group_map[key]
+            for k in range(len(indices)):
+                row_key[indices[k]] = key
         # Integer-preserving scalar-broadcast path for sum / min / max.
         var int_preserving = func == "sum" or func == "min" or func == "max"
-        if int_preserving and self._series._col.dtype.is_integer():
+        if (
+            int_preserving
+            and self._series._col.dtype.is_integer()
+            and not any_excluded_row
+        ):
             var key_to_int = Dict[String, Int64]()
             for i in range(len(self._group_keys)):
                 var key = self._group_keys[i]
@@ -5589,10 +5627,9 @@ struct SeriesGroupBy:
                     key_to_int[key] = sub.min_int64()
                 else:  # max
                     key_to_int[key] = sub.max_int64()
-            var n = len(self._series._col)
             var int_vals = List[Int64]()
             for i in range(n):
-                int_vals.append(key_to_int[self._by[i]])
+                int_vals.append(key_to_int[row_key[i]])
             var result_col = Column(
                 self._series.name, ColumnData(int_vals^), int64
             )
@@ -5624,13 +5661,22 @@ struct SeriesGroupBy:
                     key_to_agg[key] = sub.std()
                 elif func == "var":
                     key_to_agg[key] = sub.var()
-            var n = len(self._series._col)
             var result_vals = List[Float64]()
+            var null_mask = List[Bool]()
+            var any_null = False
             for i in range(n):
-                result_vals.append(key_to_agg[self._by[i]])
+                if has_null_mask and self._by_null_mask[i] and self._dropna:
+                    result_vals.append(nan)
+                    null_mask.append(True)
+                    any_null = True
+                else:
+                    result_vals.append(key_to_agg[row_key[i]])
+                    null_mask.append(False)
             var result_col = Column(
                 self._series.name, ColumnData(result_vals^), float64
             )
+            if any_null:
+                result_col._null_mask = null_mask^
             result_col._index = self._series._col._index
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
@@ -5644,10 +5690,26 @@ struct SeriesGroupBy:
                     key_to_agg[key] = Int64(sub.count())
                 else:
                     key_to_agg[key] = Int64(len(self._group_map[key]))
-            var n = len(self._series._col)
+            if any_excluded_row:
+                var result_vals = List[Float64]()
+                var null_mask = List[Bool]()
+                for i in range(n):
+                    if self._by_null_mask[i] and self._dropna:
+                        result_vals.append(nan)
+                        null_mask.append(True)
+                    else:
+                        result_vals.append(Float64(key_to_agg[row_key[i]]))
+                        null_mask.append(False)
+                var result_col = Column(
+                    self._series.name, ColumnData(result_vals^), float64
+                )
+                result_col._null_mask = null_mask^
+                result_col._index = self._series._col._index
+                result_col._index_name = self._series._col._index_name
+                return Series(result_col^)
             var result_vals = List[Int64]()
             for i in range(n):
-                result_vals.append(key_to_agg[self._by[i]])
+                result_vals.append(key_to_agg[row_key[i]])
             var result_col = Column(
                 self._series.name, ColumnData(result_vals^), int64
             )
@@ -5674,10 +5736,12 @@ struct SeriesGroupBy:
                         break
                     j += step
                 key_to_idx[key] = found
-            var n = len(col)
             var selected = List[Int]()
             for i in range(n):
-                selected.append(key_to_idx[self._by[i]])
+                if has_null_mask and self._by_null_mask[i] and self._dropna:
+                    selected.append(-1)
+                else:
+                    selected.append(key_to_idx[row_key[i]])
             var result_col = col.take_with_nulls(selected)
             result_col.name = self._series.name
             result_col._index = col._index
