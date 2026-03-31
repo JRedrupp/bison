@@ -3191,14 +3191,16 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = ColumnIndex(result^)
 
     def on_float64(mut self, data: List[Float64]) raises:
+        # Null positions become NaN so that a float64 index preserves null
+        # semantics (consistent with how pandas represents NaN in a Float64Index).
         var has_mask = len(self.null_mask) > 0
-        var py_none = Python.evaluate("None")
-        var result = List[PythonObject]()
+        var nan = Float64(0) / Float64(0)
+        var result = List[Float64]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
-                result.append(py_none)
+                result.append(nan)
             else:
-                result.append(PythonObject(data[i]))
+                result.append(data[i])
         self.result = ColumnIndex(result^)
 
     def on_bool(mut self, data: List[Bool]) raises:
@@ -3366,6 +3368,8 @@ struct Column(Copyable, Movable, Sized):
             return self._index[Index].__len__()
         elif self._index.isa[List[Int64]]():
             return len(self._index[List[Int64]])
+        elif self._index.isa[List[Float64]]():
+            return len(self._index[List[Float64]])
         else:
             return len(self._index[List[PythonObject]])
 
@@ -3375,13 +3379,15 @@ struct Column(Copyable, Movable, Sized):
             return self._index[Index][i]
         elif self._index.isa[List[Int64]]():
             return String(Int(self._index[List[Int64]][i]))
+        elif self._index.isa[List[Float64]]():
+            return String(self._index[List[Float64]][i])
         else:
             return String(self._index[List[PythonObject]][i])
 
     def _index_reorder(self, perm: List[Int]) -> ColumnIndex:
         """Return a new ColumnIndex with labels reordered by *perm*.
 
-        The three arms must be handled separately because each builds a
+        The four arms must be handled separately because each builds a
         different concrete List type; a single generic loop is not possible
         in Mojo without full parametric polymorphism over the element type.
         """
@@ -3398,6 +3404,12 @@ struct Column(Copyable, Movable, Sized):
             for k in range(n):
                 ints.append(old[perm[k]])
             return ColumnIndex(ints^)
+        elif self._index.isa[List[Float64]]():
+            ref old = self._index[List[Float64]]
+            var floats = List[Float64]()
+            for k in range(n):
+                floats.append(old[perm[k]])
+            return ColumnIndex(floats^)
         else:
             ref old = self._index[List[PythonObject]]
             var objs = List[PythonObject]()
@@ -3409,8 +3421,9 @@ struct Column(Copyable, Movable, Sized):
         """Return an insertion-sort permutation over the current index labels.
 
         The result ``perm[i]`` is the original row position of the *i*-th row
-        in sorted order.  The three index arms (string, int64, PythonObject)
-        are dispatched once so callers don't need to repeat the branching.
+        in sorted order.  The four index arms (string, int64, float64,
+        PythonObject) are dispatched once so callers don't need to repeat
+        the branching.
         """
         var n = self._index_len()
         var perm = List[Int]()
@@ -3435,6 +3448,23 @@ struct Column(Copyable, Movable, Sized):
                 perm[j + 1] = key
         elif self._index.isa[List[Int64]]():
             ref idx = self._index[List[Int64]]
+            for i in range(1, n):
+                var key = perm[i]
+                var j = i - 1
+                while j >= 0:
+                    var prev = perm[j]
+                    var do_swap = (
+                        idx[key]
+                        < idx[prev] if ascending else idx[key]
+                        > idx[prev]
+                    )
+                    if not do_swap:
+                        break
+                    perm[j + 1] = prev
+                    j -= 1
+                perm[j + 1] = key
+        elif self._index.isa[List[Float64]]():
+            ref idx = self._index[List[Float64]]
             for i in range(1, n):
                 var key = perm[i]
                 var j = i - 1
@@ -4540,6 +4570,18 @@ struct Column(Copyable, Movable, Sized):
             for i in range(n):
                 int_idx.append(Int64(Int(py=py_index[i])))
             bison_idx = ColumnIndex(int_idx^)
+        elif idx_dtype == "float32" or idx_dtype == "float64":
+            var struct_mod = Python.import_module("struct")
+            var pack_fmt = "d"
+            var unpack_fmt = "q"
+            var flt_idx = List[Float64]()
+            for i in range(n):
+                var packed = struct_mod.unpack(
+                    unpack_fmt, struct_mod.pack(pack_fmt, py_index[i])
+                )
+                var bits = Int64(Int(py=packed[0]))
+                flt_idx.append(bitcast[DType.float64](bits))
+            bison_idx = ColumnIndex(flt_idx^)
         elif idx_dtype == "object" and idx_class == "Index":
             # Treat as a string index (most common object-dtype index).
             var str_idx = List[String]()
@@ -4763,6 +4805,10 @@ struct Column(Copyable, Movable, Sized):
                 ref int_idx = self._index[List[Int64]]
                 for i in range(n_idx):
                     _ = idx_py.append(PythonObject(Int(int_idx[i])))
+            elif self._index.isa[List[Float64]]():
+                ref flt_idx = self._index[List[Float64]]
+                for i in range(n_idx):
+                    _ = idx_py.append(PythonObject(flt_idx[i]))
             else:
                 ref obj_idx = self._index[List[PythonObject]]
                 for i in range(n_idx):

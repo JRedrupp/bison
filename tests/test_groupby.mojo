@@ -505,7 +505,7 @@ def test_dataframegroupby_float_key_natural_sort() raises:
     """Groupby with Float64 key column must order groups numerically, not lexicographically.
 
     Keys 1.5, 2.0, 10.5: lex sort produces "1.5","10.5","2.0"; natural gives 1.5,2.0,10.5.
-    Uses reset_index to compare only the value order (Float64 index stays as String in bison).
+    The result index must be a float64 pandas Index, matching the pandas reference exactly.
     """
     var testing = Python.import_module("pandas.testing")
     var pd = Python.import_module("pandas")
@@ -519,12 +519,9 @@ def test_dataframegroupby_float_key_natural_sort() raises:
     var by = List[String]()
     by.append("grp")
     var result = df.groupby(by).sum().to_pandas()
-    # reset_index(drop=True) strips the group-key index so only the aggregated
-    # value order is compared; this catches the lex-vs-natural sort bug without
-    # requiring bison to emit a Float64 ColumnIndex (not yet supported).
     testing.assert_frame_equal(
-        result.reset_index(drop=True),
-        pd_df.groupby("grp").sum().reset_index(drop=True),
+        result,
+        pd_df.groupby("grp").sum(),
     )
 
 

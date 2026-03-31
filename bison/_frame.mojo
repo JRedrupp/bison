@@ -4904,6 +4904,8 @@ struct DataFrameGroupBy:
 
         For a single Int64 key column the index is ``List[Int64]`` so that
         ``to_pandas()`` emits an integer pandas Index instead of a string one.
+        For a single Float64 key column the index is ``List[Float64]`` so that
+        ``to_pandas()`` emits a float64 pandas Index instead of a string one.
         All other cases fall back to a string ``Index``.
         """
         if len(self._by) == 1:
@@ -4918,6 +4920,12 @@ struct DataFrameGroupBy:
                 for i in range(len(self._group_keys)):
                     int_keys.append(d[self._group_map[self._group_keys[i]][0]])
                 return ColumnIndex(int_keys^)
+            elif ci >= 0 and self._df._cols[ci]._data.isa[List[Float64]]():
+                ref d = self._df._cols[ci]._data[List[Float64]]
+                var flt_keys = List[Float64]()
+                for i in range(len(self._group_keys)):
+                    flt_keys.append(d[self._group_map[self._group_keys[i]][0]])
+                return ColumnIndex(flt_keys^)
         return ColumnIndex(Index(self._group_keys.copy()))
 
     def _make_result_col(

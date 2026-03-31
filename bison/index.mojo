@@ -104,10 +104,13 @@ struct RangeIndex:
 
 # ColumnIndex is the native row-index storage type for Column.
 #
-# Three active arms:
+# Four active arms:
 #   Index (List[String])  — string labels (most common case)
 #   List[Int64]           — integer labels
+#   List[Float64]         — float labels (e.g. groupby on a float key column)
 #   List[PythonObject]    — fallback for DatetimeIndex, MultiIndex, etc.
 #                           An *empty* List[PythonObject] means "no explicit
 #                           index" (i.e. a default RangeIndex).
-comptime ColumnIndex = Variant[Index, List[Int64], List[PythonObject]]
+comptime ColumnIndex = Variant[
+    Index, List[Int64], List[Float64], List[PythonObject]
+]
