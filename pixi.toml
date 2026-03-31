@@ -26,6 +26,7 @@ fmt           = "mojo format bison/"
 check         = "mojo package bison/ --Werror -o /tmp/bison.mojopkg"
 lint          = "pre-commit run --all-files"
 bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version"] }
+gen-report    = "python scripts/generate_report.py"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }

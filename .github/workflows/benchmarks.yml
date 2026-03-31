@@ -1,0 +1,49 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bench:
+    name: bench
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          locked: true
+
+      - name: Generate version file
+        run: pixi run gen-version
+
+      - name: Run benchmarks
+        continue-on-error: true
+        run: pixi run bench
+
+      - name: Checkout gh-pages into docs/
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          path: docs
+
+      - name: Generate report
+        run: pixi run gen-report
+
+      - name: Push updated dashboard data
+        working-directory: docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || git commit -m "perf: update benchmark data [skip ci]"
+          git push origin gh-pages
