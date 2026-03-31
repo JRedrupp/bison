@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bison performance vs pandas</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f6f8fa;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --text-muted: #656d76;
+      --green-bg: #dafbe1;
+      --green-text: #1a7f37;
+      --yellow-bg: #fff8c5;
+      --yellow-text: #9a6700;
+      --red-bg: #ffebe9;
+      --red-text: #cf222e;
+      --parity-line: rgba(100, 100, 100, 0.5);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --bg-alt: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --text-muted: #8b949e;
+        --green-bg: #0f2b14;
+        --green-text: #3fb950;
+        --yellow-bg: #2d2200;
+        --yellow-text: #d29922;
+        --red-bg: #2b0d0d;
+        --red-text: #f85149;
+        --parity-line: rgba(180, 180, 180, 0.4);
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    #subtitle {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    section { margin-bottom: 2.5rem; }
+
+    /* Summary table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-alt);
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) td { background: var(--bg-alt); }
+
+    td.skipped { color: var(--text-muted); font-style: italic; }
+
+    .ratio-fast { background: var(--green-bg); color: var(--green-text); font-weight: 600; }
+    .ratio-slow { background: var(--red-bg);  color: var(--red-text);  font-weight: 600; }
+    .ratio-mid  { background: var(--yellow-bg); color: var(--yellow-text); font-weight: 600; }
+
+    .trend-up   { color: var(--green-text); font-weight: 600; }
+    .trend-down { color: var(--red-text);   font-weight: 600; }
+    .trend-flat { color: var(--text-muted); }
+
+    /* Chart */
+    #chart-wrapper {
+      position: relative;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    /* Toggles */
+    #op-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-alt);
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-btn .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .toggle-btn.hidden-op {
+      opacity: 0.4;
+    }
+
+    #no-data {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      padding: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>bison performance vs pandas</h1>
+  <p id="subtitle">Loading...</p>
+
+  <div id="no-data" style="display:none">
+    No benchmark data found. Run <code>pixi run bench &amp;&amp; pixi run gen-report</code> to generate data.
+  </div>
+
+  <div id="content" style="display:none">
+    <section>
+      <h2>Latest run</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th>bison (ms)</th>
+            <th>pandas (ms)</th>
+            <th>Ratio</th>
+            <th>Trend</th>
+          </tr>
+        </thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Ratio over time (bison / pandas)</h2>
+      <div id="op-toggles"></div>
+      <div id="chart-wrapper">
+        <canvas id="ratio-chart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // Colour palette — 10 distinct colours readable on both light and dark
+    // ---------------------------------------------------------------------------
+    const PALETTE = [
+      "#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed",
+      "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5",
+    ];
+
+    // ---------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------
+    function fmt(v, digits = 3) {
+      return v == null ? "\u2014" : v.toFixed(digits);
+    }
+
+    function ratioClass(ratio) {
+      if (ratio == null) return "";
+      if (ratio < 1.0) return "ratio-fast";
+      if (ratio > 1.5) return "ratio-slow";
+      return "ratio-mid";
+    }
+
+    function trendArrow(latestRatio, oldRatio) {
+      if (latestRatio == null || oldRatio == null) return { text: "\u2014", cls: "trend-flat" };
+      const delta = latestRatio - oldRatio;
+      if (delta < -0.05) return { text: "\u2191", cls: "trend-up" };   // improved
+      if (delta >  0.05) return { text: "\u2193", cls: "trend-down" }; // degraded
+      return { text: "\u2192", cls: "trend-flat" };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Main
+    // ---------------------------------------------------------------------------
+    fetch("data.json")
+      .then(r => r.json())
+      .then(data => render(data))
+      .catch(() => {
+        document.getElementById("subtitle").textContent = "Could not load data.json.";
+        document.getElementById("no-data").style.display = "";
+      });
+
+    function render(data) {
+      const runs = data.runs || [];
+      const ops  = data.operations || [];
+
+      if (runs.length === 0) {
+        document.getElementById("subtitle").textContent = "No runs recorded yet.";
+        document.getElementById("no-data").style.display = "";
+        return;
+      }
+
+      document.getElementById("content").style.display = "";
+
+      // Runs are stored newest-first; latest is index 0
+      const latest = runs[0];
+      const ts = latest.timestamp
+        ? new Date(latest.timestamp).toUTCString()
+        : "unknown";
+      document.getElementById("subtitle").textContent =
+        `Last updated: ${ts} \u2014 commit ${latest.short_commit} (${latest.ref})`;
+
+      // ------------------------------------------------------------------
+      // Summary table
+      // ------------------------------------------------------------------
+      // For trend: find a run ~10 commits back
+      const oldRun = runs.length > 10 ? runs[10] : runs[runs.length - 1];
+
+      const tbody = document.getElementById("summary-body");
+      for (const op of ops) {
+        const res = latest.results[op];
+        const oldRes = oldRun.results ? oldRun.results[op] : null;
+        const tr = document.createElement("tr");
+
+        if (!res || res.bison_ms == null) {
+          tr.innerHTML = `
+            <td>${op}</td>
+            <td class="skipped" colspan="4">skipped (not implemented)</td>`;
+        } else {
+          const { text: arrow, cls: arrowCls } = trendArrow(
+            res.ratio,
+            oldRes ? oldRes.ratio : null
+          );
+          tr.innerHTML = `
+            <td>${op}</td>
+            <td>${fmt(res.bison_ms)}</td>
+            <td>${fmt(res.pandas_ms)}</td>
+            <td class="${ratioClass(res.ratio)}">${fmt(res.ratio, 2)}x</td>
+            <td class="${arrowCls}">${arrow}</td>`;
+        }
+        tbody.appendChild(tr);
+      }
+
+      // ------------------------------------------------------------------
+      // Chart \u2014 ratio over time
+      // ------------------------------------------------------------------
+      // X-axis: oldest \u2192 newest (reverse the newest-first array)
+      const chronological = [...runs].reverse();
+      const labels = chronological.map(r => r.short_commit);
+
+      const datasets = ops.map((op, i) => ({
+        label: op,
+        data: chronological.map(r => {
+          const res = r.results ? r.results[op] : null;
+          return res ? res.ratio : null;
+        }),
+        borderColor: PALETTE[i % PALETTE.length],
+        backgroundColor: PALETTE[i % PALETTE.length] + "33",
+        borderWidth: 2,
+        pointRadius: chronological.length > 30 ? 2 : 4,
+        pointHoverRadius: 5,
+        tension: 0.2,
+        spanGaps: true,
+      }));
+
+      // Operation toggle buttons
+      const togglesEl = document.getElementById("op-toggles");
+      const chart = buildChart(labels, datasets, chronological);
+
+      datasets.forEach((ds, i) => {
+        const btn = document.createElement("button");
+        btn.className = "toggle-btn";
+        btn.innerHTML = `<span class="swatch" style="background:${PALETTE[i % PALETTE.length]}"></span>${ops[i]}`;
+        btn.addEventListener("click", () => {
+          const meta = chart.getDatasetMeta(i);
+          meta.hidden = !meta.hidden;
+          btn.classList.toggle("hidden-op", meta.hidden);
+          chart.update();
+        });
+        togglesEl.appendChild(btn);
+      });
+    }
+
+    function buildChart(labels, datasets, chronological) {
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const gridColor  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      const labelColor = isDark ? "#8b949e" : "#656d76";
+
+      return new Chart(document.getElementById("ratio-chart"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0].dataIndex;
+                  const r = chronological[idx];
+                  return `${r.short_commit}  ${r.timestamp ? r.timestamp.slice(0, 10) : ""}`;
+                },
+                label: (item) => {
+                  const v = item.raw;
+                  if (v == null) return `${item.dataset.label}: skipped`;
+                  return `${item.dataset.label}: ${v.toFixed(3)}x`;
+                },
+              },
+            },
+            annotation: { /* parity line drawn via afterDraw plugin below */ },
+          },
+          scales: {
+            x: {
+              ticks: { color: labelColor, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 },
+              grid:  { color: gridColor },
+            },
+            y: {
+              title: { display: true, text: "ratio (bison / pandas)", color: labelColor },
+              ticks: { color: labelColor },
+              grid:  { color: gridColor },
+              min: 0,
+            },
+          },
+        },
+        plugins: [{
+          // Draw a dashed parity line at y = 1.0
+          id: "parityLine",
+          afterDraw(chart) {
+            const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+            const yPx = y.getPixelForValue(1.0);
+            if (yPx < chart.chartArea.top || yPx > chart.chartArea.bottom) return;
+            ctx.save();
+            ctx.strokeStyle = "rgba(128,128,128,0.55)";
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(left, yPx);
+            ctx.lineTo(right, yPx);
+            ctx.stroke();
+            ctx.restore();
+          },
+        }],
+      });
+    }
+  </script>
+</body>
+</html>
