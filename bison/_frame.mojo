@@ -811,7 +811,7 @@ struct Series(Copyable, Movable):
     def _sort_perm(
         self, ascending: Bool, na_last: Bool = True
     ) raises -> List[Int]:
-        """Return an insertion-sort permutation over the column values.
+        """Return a stable merge-sort permutation over the column values.
 
         perm[i] = original index of the i-th element in sorted order.
         When na_last is True (default), null elements are placed at the end.
@@ -826,129 +826,239 @@ struct Series(Copyable, Movable):
         var has_mask = len(self._col._null_mask) > 0
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var key_null = has_mask and self._col._null_mask[key]
-                    var prev_null = has_mask and self._col._null_mask[prev]
-                    var do_swap: Bool
-                    if key_null and prev_null:
-                        do_swap = False
-                    elif key_null:
-                        do_swap = not na_last
-                    elif prev_null:
-                        do_swap = na_last
-                    elif ascending:
-                        do_swap = d[key] < d[prev]
-                    else:
-                        do_swap = d[key] > d[prev]
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var lnull = has_mask and self._col._null_mask[lv]
+                        var rnull = has_mask and self._col._null_mask[rv]
+                        var take_right: Bool
+                        if lnull and rnull:
+                            take_right = False
+                        elif lnull:
+                            take_right = na_last
+                        elif rnull:
+                            take_right = not na_last
+                        elif ascending:
+                            take_right = d[rv] < d[lv]
+                        else:
+                            take_right = d[rv] > d[lv]
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         elif self._col._data.isa[List[Float64]]():
             ref d = self._col._data[List[Float64]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var key_null = has_mask and self._col._null_mask[key]
-                    var prev_null = has_mask and self._col._null_mask[prev]
-                    var do_swap: Bool
-                    if key_null and prev_null:
-                        do_swap = False
-                    elif key_null:
-                        do_swap = not na_last
-                    elif prev_null:
-                        do_swap = na_last
-                    elif ascending:
-                        do_swap = d[key] < d[prev]
-                    else:
-                        do_swap = d[key] > d[prev]
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var lnull = has_mask and self._col._null_mask[lv]
+                        var rnull = has_mask and self._col._null_mask[rv]
+                        var take_right: Bool
+                        if lnull and rnull:
+                            take_right = False
+                        elif lnull:
+                            take_right = na_last
+                        elif rnull:
+                            take_right = not na_last
+                        elif ascending:
+                            take_right = d[rv] < d[lv]
+                        else:
+                            take_right = d[rv] > d[lv]
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         elif self._col._data.isa[List[Bool]]():
             ref d = self._col._data[List[Bool]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var key_null = has_mask and self._col._null_mask[key]
-                    var prev_null = has_mask and self._col._null_mask[prev]
-                    var do_swap: Bool
-                    if key_null and prev_null:
-                        do_swap = False
-                    elif key_null:
-                        do_swap = not na_last
-                    elif prev_null:
-                        do_swap = na_last
-                    elif ascending:
-                        do_swap = (not d[key]) and d[prev]  # False < True
-                    else:
-                        do_swap = d[key] and (not d[prev])  # True > False
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var lnull = has_mask and self._col._null_mask[lv]
+                        var rnull = has_mask and self._col._null_mask[rv]
+                        var take_right: Bool
+                        if lnull and rnull:
+                            take_right = False
+                        elif lnull:
+                            take_right = na_last
+                        elif rnull:
+                            take_right = not na_last
+                        elif ascending:
+                            take_right = (not d[rv]) and d[lv]  # False < True
+                        else:
+                            take_right = d[rv] and (not d[lv])  # True > False
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         elif self._col._data.isa[List[String]]():
             ref d = self._col._data[List[String]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var key_null = has_mask and self._col._null_mask[key]
-                    var prev_null = has_mask and self._col._null_mask[prev]
-                    var do_swap: Bool
-                    if key_null and prev_null:
-                        do_swap = False
-                    elif key_null:
-                        do_swap = not na_last
-                    elif prev_null:
-                        do_swap = na_last
-                    elif ascending:
-                        do_swap = d[key] < d[prev]
-                    else:
-                        do_swap = d[key] > d[prev]
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var lnull = has_mask and self._col._null_mask[lv]
+                        var rnull = has_mask and self._col._null_mask[rv]
+                        var take_right: Bool
+                        if lnull and rnull:
+                            take_right = False
+                        elif lnull:
+                            take_right = na_last
+                        elif rnull:
+                            take_right = not na_last
+                        elif ascending:
+                            take_right = d[rv] < d[lv]
+                        else:
+                            take_right = d[rv] > d[lv]
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         else:
             ref d = self._col._data[List[PythonObject]]
-            for i in range(1, n):
-                var key = perm[i]
-                var j = i - 1
-                while j >= 0:
-                    var prev = perm[j]
-                    var key_null = has_mask and self._col._null_mask[key]
-                    var prev_null = has_mask and self._col._null_mask[prev]
-                    var do_swap: Bool
-                    if key_null and prev_null:
-                        do_swap = False
-                    elif key_null:
-                        do_swap = not na_last
-                    elif prev_null:
-                        do_swap = na_last
-                    elif ascending:
-                        do_swap = Bool(d[key] < d[prev])
-                    else:
-                        do_swap = Bool(d[key] > d[prev])
-                    if not do_swap:
+            var width = 1
+            while width < n:
+                var lo = 0
+                while lo < n:
+                    var mid_idx = lo + width
+                    if mid_idx >= n:
                         break
-                    perm[j + 1] = prev
-                    j -= 1
-                perm[j + 1] = key
+                    var hi = lo + 2 * width
+                    if hi > n:
+                        hi = n
+                    var buf = List[Int]()
+                    var li = lo
+                    var ri = mid_idx
+                    while li < mid_idx and ri < hi:
+                        var lv = perm[li]
+                        var rv = perm[ri]
+                        var lnull = has_mask and self._col._null_mask[lv]
+                        var rnull = has_mask and self._col._null_mask[rv]
+                        var take_right: Bool
+                        if lnull and rnull:
+                            take_right = False
+                        elif lnull:
+                            take_right = not na_last
+                        elif rnull:
+                            take_right = na_last
+                        elif ascending:
+                            take_right = Bool(d[rv] < d[lv])
+                        else:
+                            take_right = Bool(d[rv] > d[lv])
+                        if take_right:
+                            buf.append(rv)
+                            ri += 1
+                        else:
+                            buf.append(lv)
+                            li += 1
+                    while li < mid_idx:
+                        buf.append(perm[li])
+                        li += 1
+                    while ri < hi:
+                        buf.append(perm[ri])
+                        ri += 1
+                    for k in range(len(buf)):
+                        perm[lo + k] = buf[k]
+                    lo += 2 * width
+                width *= 2
         return perm^
 
     def sort_values(
