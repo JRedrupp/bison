@@ -1,4 +1,80 @@
 {
-  "runs": [],
-  "operations": []
+  "runs": [
+    {
+      "commit": "d0840f5443a8c07c0a0d3cb25cd64d78aa4b30b1",
+      "short_commit": "d0840f5",
+      "timestamp": "2026-03-31T23:52:22Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.24055735,
+          "pandas_ms": 0.09265714999997954,
+          "ratio": 2.596209250986601
+        },
+        "series_mean": {
+          "bison_ms": 0.28124290999999996,
+          "pandas_ms": 0.12462546999998382,
+          "ratio": 2.2567049095183873
+        },
+        "groupby_sum": {
+          "bison_ms": 25.4908405,
+          "pandas_ms": 4.4316785999996,
+          "ratio": 5.751960555082289
+        },
+        "query_filter": {
+          "bison_ms": 400.9005006666667,
+          "pandas_ms": 1.2089133333338016,
+          "ratio": 331.6205468270497
+        },
+        "iloc_row": {
+          "bison_ms": 0.00114555,
+          "pandas_ms": 0.03967098999993368,
+          "ratio": 0.028876264494581933
+        },
+        "loc_slice": {
+          "bison_ms": 0.01007128,
+          "pandas_ms": 0.030533049999945657,
+          "ratio": 0.32984847566875647
+        },
+        "sort_values": {
+          "bison_ms": 45.19878666666666,
+          "pandas_ms": 5.949752666666086,
+          "ratio": 7.596750520386518
+        },
+        "merge": {
+          "bison_ms": 12.043986333333335,
+          "pandas_ms": 1.9457083333331109,
+          "ratio": 6.190026596998374
+        },
+        "fillna": {
+          "bison_ms": 0.13963472,
+          "pandas_ms": 0.07357165000001942,
+          "ratio": 1.8979419382325005
+        },
+        "series_apply": {
+          "bison_ms": 0.44687391,
+          "pandas_ms": 0.22201538999993886,
+          "ratio": 2.012806004124863
+        },
+        "csv_roundtrip": {
+          "bison_ms": 515.479639,
+          "pandas_ms": 339.26636920000135,
+          "ratio": 1.51939504117521
+        }
+      }
+    }
+  ],
+  "operations": [
+    "series_sum",
+    "series_mean",
+    "groupby_sum",
+    "query_filter",
+    "iloc_row",
+    "loc_slice",
+    "sort_values",
+    "merge",
+    "fillna",
+    "series_apply",
+    "csv_roundtrip"
+  ]
 }
