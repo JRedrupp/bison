@@ -1,5 +1,5 @@
 """Tests for DataFrame IO (read and write methods)."""
-from std.python import Python
+from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, TestSuite
 from bison import read_csv, read_parquet, read_json, read_excel, DataFrame, DFScalar
 
@@ -281,6 +281,34 @@ def test_read_excel_no_header() raises:
     assert_equal(cols[0], "0")
     assert_equal(cols[1], "1")
     assert_equal(cols[2], "2")
+
+
+def test_read_excel_sheet_name_string() raises:
+    """read_excel accepts a string sheet_name (e.g. 'Sales')."""
+    var openpyxl_available = False
+    try:
+        _ = Python.import_module("openpyxl")
+        openpyxl_available = True
+    except:
+        pass
+    if not openpyxl_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".xlsx"))
+    # Write a file with a named sheet using pandas ExcelWriter.
+    var writer = pd.ExcelWriter(path, engine="openpyxl")
+    var py_df = pd.DataFrame(Python.evaluate("{'a': [7, 8, 9], 'b': [10, 11, 12]}"))
+    py_df.to_excel(writer, sheet_name="Sales", index=False)
+    writer.close()
+
+    var df = read_excel(path, sheet_name=PythonObject("Sales"))
+    var shape = df.shape()
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    assert_equal(df.columns()[0], "a")
+    assert_equal(df.columns()[1], "b")
 
 
 def test_to_parquet_writes_file() raises:
