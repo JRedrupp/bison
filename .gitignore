@@ -9,3 +9,4 @@ SESSION.md
 dist/
 .test-pass-count
 results/
+docs/data.json
