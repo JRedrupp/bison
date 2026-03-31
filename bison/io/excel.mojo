@@ -34,6 +34,9 @@ def read_excel(
     """
     var pd = Python.import_module("pandas")
     var py_none = Python.evaluate("None")
+    var _header: PythonObject = py_none if header == -1 else PythonObject(
+        header
+    )
     var _index_col = index_col.value() if index_col else py_none
     var _usecols = usecols.value() if usecols else py_none
     var _dtype = dtype.value() if dtype else py_none
@@ -42,7 +45,7 @@ def read_excel(
     var pd_df = pd.read_excel(
         io,
         sheet_name=sheet_name,
-        header=header,
+        header=_header,
         index_col=_index_col,
         usecols=_usecols,
         dtype=_dtype,

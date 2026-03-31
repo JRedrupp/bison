@@ -256,6 +256,33 @@ def test_excel_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
 
+def test_read_excel_no_header() raises:
+    """With header=-1 there is no header row; columns are auto-numbered as strings."""
+    var openpyxl_available = False
+    try:
+        _ = Python.import_module("openpyxl")
+        openpyxl_available = True
+    except:
+        pass
+    if not openpyxl_available:
+        return
+
+    var pd = Python.import_module("pandas")
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".xlsx"))
+    # Write a headerless sheet: first row is data, not column names.
+    var py_df = pd.DataFrame(Python.evaluate("[[1, 2, 3], [4, 5, 6]]"))
+    py_df.to_excel(path, index=False, header=False)
+
+    var df = read_excel(path, header=-1)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 3)
+    var cols = df.columns()
+    assert_equal(cols[0], "0")
+    assert_equal(cols[1], "1")
+    assert_equal(cols[2], "2")
+
+
 def test_to_parquet_writes_file() raises:
     """Write a DataFrame to Parquet and verify the file exists (skipped when pyarrow is absent)."""
     var pyarrow_available = False
