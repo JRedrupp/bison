@@ -480,5 +480,53 @@ def test_seriesgroupby_transform_last() raises:
     )
 
 
+def test_dataframegroupby_int_key_natural_sort() raises:
+    """Groupby with Int64 key column must order groups numerically, not lexicographically.
+
+    Keys 1, 2, 10: lex sort produces "1","10","2"; natural sort produces 1,2,10.
+    The bug is visible because iloc[1].val would be 300 (group 10) under lex order
+    but 60 (group 2) under natural order.
+    """
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': [10, 1, 2, 10, 1, 2], 'val': [100, 10, 20, 200, 30, 40]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby("grp").sum())
+
+
+def test_dataframegroupby_float_key_natural_sort() raises:
+    """Groupby with Float64 key column must order groups numerically, not lexicographically.
+
+    Keys 1.5, 2.0, 10.5: lex sort produces "1.5","10.5","2.0"; natural gives 1.5,2.0,10.5.
+    Uses reset_index to compare only the value order (Float64 index stays as String in bison).
+    """
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': [10.5, 1.5, 2.0, 10.5, 1.5, 2.0],"
+            " 'val': [100.0, 10.0, 20.0, 200.0, 30.0, 40.0]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    # reset_index(drop=True) strips the group-key index so only the aggregated
+    # value order is compared; this catches the lex-vs-natural sort bug without
+    # requiring bison to emit a Float64 ColumnIndex (not yet supported).
+    testing.assert_frame_equal(
+        result.reset_index(drop=True),
+        pd_df.groupby("grp").sum().reset_index(drop=True),
+    )
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

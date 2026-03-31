@@ -4808,7 +4808,47 @@ def _groupby_indices(
         group_map[k].append(i)
 
     if sort_keys:
-        _sort_list(group_keys)
+        var n_groups = len(group_keys)
+        if n_groups > 1:
+            if len(by) == 1:
+                # Single-column groupby: sort by the typed column value so that
+                # numeric keys (e.g. 1, 2, 10) are ordered naturally rather than
+                # lexicographically ("1", "10", "2").
+                var ci = col_idx[by[0]]
+                ref col_data = df._cols[ci]._data
+                if col_data.isa[List[Int64]]():
+                    ref d = col_data[List[Int64]]
+                    # Insertion sort over group_keys using Int64 typed comparison.
+                    for i in range(1, n_groups):
+                        var key_i = group_keys[i]
+                        var val_i = d[group_map[key_i][0]]
+                        var j = i - 1
+                        while j >= 0:
+                            var gk_j = group_keys[j]
+                            if d[group_map[gk_j][0]] <= val_i:
+                                break
+                            group_keys[j + 1] = gk_j
+                            j -= 1
+                        group_keys[j + 1] = key_i
+                elif col_data.isa[List[Float64]]():
+                    ref d = col_data[List[Float64]]
+                    # Insertion sort over group_keys using Float64 typed comparison.
+                    for i in range(1, n_groups):
+                        var key_i = group_keys[i]
+                        var val_i = d[group_map[key_i][0]]
+                        var j = i - 1
+                        while j >= 0:
+                            var gk_j = group_keys[j]
+                            if d[group_map[gk_j][0]] <= val_i:
+                                break
+                            group_keys[j + 1] = gk_j
+                            j -= 1
+                        group_keys[j + 1] = key_i
+                else:
+                    _sort_list(group_keys)
+            else:
+                # Multi-column groupby: fall back to lexicographic sort for now.
+                _sort_list(group_keys)
 
 
 struct DataFrameGroupBy:
@@ -4858,11 +4898,32 @@ struct DataFrameGroupBy:
             dropna=self._dropna,
         )
 
+    def _build_group_index(self) raises -> ColumnIndex:
+        """Return a properly typed ColumnIndex for the group keys.
+
+        For a single Int64 key column the index is ``List[Int64]`` so that
+        ``to_pandas()`` emits an integer pandas Index instead of a string one.
+        All other cases fall back to a string ``Index``.
+        """
+        if len(self._by) == 1:
+            var ci = -1
+            for i in range(len(self._df._cols)):
+                if self._df._cols[i].name.value() == self._by[0]:
+                    ci = i
+                    break
+            if ci >= 0 and self._df._cols[ci]._data.isa[List[Int64]]():
+                ref d = self._df._cols[ci]._data[List[Int64]]
+                var int_keys = List[Int64]()
+                for i in range(len(self._group_keys)):
+                    int_keys.append(d[self._group_map[self._group_keys[i]][0]])
+                return ColumnIndex(int_keys^)
+        return ColumnIndex(Index(self._group_keys.copy()))
+
     def _make_result_col(
         self, name: Optional[String], var vals: List[Float64]
     ) raises -> Column:
         """Build a float64 result Column with group keys as index."""
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        var idx = self._build_group_index()
         var col = Column(name, ColumnData(vals^), float64, idx^)
         col._index_name = self._by[0]
         return col^
@@ -4871,7 +4932,7 @@ struct DataFrameGroupBy:
         self, name: Optional[String], var vals: List[Int64]
     ) raises -> Column:
         """Build an int64 result Column with group keys as index."""
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        var idx = self._build_group_index()
         var col = Column(name, ColumnData(vals^), int64, idx^)
         col._index_name = self._by[0]
         return col^
@@ -5097,7 +5158,7 @@ struct DataFrameGroupBy:
                 selected.append(found)
             var result_col = col.take_with_nulls(selected)
             result_col.name = col.name
-            result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+            result_col._index = self._build_group_index()
             result_col._index_name = self._by[0]
             result_cols.append(result_col^)
         return DataFrame(result_cols^)
@@ -5125,7 +5186,7 @@ struct DataFrameGroupBy:
                 selected.append(found)
             var result_col = col.take_with_nulls(selected)
             result_col.name = col.name
-            result_col._index = ColumnIndex(Index(self._group_keys.copy()))
+            result_col._index = self._build_group_index()
             result_col._index_name = self._by[0]
             result_cols.append(result_col^)
         return DataFrame(result_cols^)
@@ -5136,7 +5197,7 @@ struct DataFrameGroupBy:
         var vals = List[Int64]()
         for i in range(len(self._group_keys)):
             vals.append(Int64(len(self._group_map[self._group_keys[i]])))
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
+        var idx = self._build_group_index()
         # pandas groupby().size() returns a Series with name=None
         var col = Column(None, ColumnData(vals^), int64, idx^)
         col._index_name = self._by[0]
