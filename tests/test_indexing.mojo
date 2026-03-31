@@ -173,7 +173,7 @@ def test_at_setitem_string_index() raises:
 
 
 # ------------------------------------------------------------------
-# ILocIndexer – integer-position row access
+# ILocIndexer – integer-position row access (via UnsafePointer)
 # ------------------------------------------------------------------
 
 def test_iloc_getitem_returns_series() raises:
@@ -245,7 +245,7 @@ def test_iloc_setitem_wrong_size_raises() raises:
 
 
 # ------------------------------------------------------------------
-# LocIndexer – label-based row access
+# LocIndexer – label-based row access (via UnsafePointer)
 # ------------------------------------------------------------------
 
 def test_loc_getitem_default_int_index() raises:
@@ -306,6 +306,117 @@ def test_loc_setitem_wrong_size_raises() raises:
     except:
         raised = True
     assert_true(raised)
+
+
+# ------------------------------------------------------------------
+# df.iloc property – integer-position row access
+# ------------------------------------------------------------------
+
+def test_df_iloc_property_single_row() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30], 'b': [40, 50, 60]}")))
+    var row = df.iloc()[0]
+    assert_equal(row.size(), 2)
+    assert_true(row.iloc(0)[PythonObject].__int__() == 10)
+    assert_true(row.iloc(1)[PythonObject].__int__() == 40)
+
+
+def test_df_iloc_property_negative_index() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var last = df.iloc()[-1]
+    assert_true(last.iloc(0)[PythonObject].__int__() == 3)
+
+
+def test_df_iloc_property_slice() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
+    var sliced = df.iloc()[1:4]
+    assert_equal(sliced.shape()[0], 3)
+    assert_true(sliced["a"].iloc(0)[Int64] == 2)
+    assert_true(sliced["a"].iloc(1)[Int64] == 3)
+    assert_true(sliced["a"].iloc(2)[Int64] == 4)
+
+
+def test_df_iloc_property_slice_from_start() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
+    var sliced = df.iloc()[:2]
+    assert_equal(sliced.shape()[0], 2)
+    assert_true(sliced["a"].iloc(0)[Int64] == 10)
+    assert_true(sliced["a"].iloc(1)[Int64] == 20)
+
+
+def test_df_iloc_property_slice_to_end() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30]}")))
+    var sliced = df.iloc()[1:]
+    assert_equal(sliced.shape()[0], 2)
+    assert_true(sliced["a"].iloc(0)[Int64] == 20)
+    assert_true(sliced["a"].iloc(1)[Int64] == 30)
+
+
+def test_df_iloc_property_slice_full() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var sliced = df.iloc()[:]
+    assert_equal(sliced.shape()[0], 3)
+
+
+def test_df_iloc_property_out_of_bounds_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var raised = False
+    try:
+        _ = df.iloc()[99]
+    except:
+        raised = True
+    assert_true(raised)
+
+
+# ------------------------------------------------------------------
+# df.loc property – label-based row access
+# ------------------------------------------------------------------
+
+def test_df_loc_property_default_int_index() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
+    var row0 = df.loc()["0"]
+    assert_equal(row0.size(), 2)
+    assert_true(row0.iloc(0)[PythonObject].__int__() == 10)
+    assert_true(row0.iloc(1)[PythonObject].__int__() == 30)
+
+
+def test_df_loc_property_string_index() raises:
+    var pd = Python.import_module("pandas")
+    var py_df = pd.DataFrame(
+        Python.evaluate("{'val': [100, 200, 300]}"),
+        index=Python.evaluate("['x', 'y', 'z']"),
+    )
+    var df = DataFrame(py_df)
+    var ry = df.loc()["y"]
+    assert_true(ry.iloc(0)[PythonObject].__int__() == 200)
+
+
+def test_df_loc_property_missing_label_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var raised = False
+    try:
+        _ = df.loc()["99"]
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_df_loc_property_slice_default_index() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20, 30, 40, 50]}")))
+    # Slice [1:3] selects rows at positions 1 and 2 (end is exclusive).
+    var sliced = df.loc()[1:3]
+    assert_equal(sliced.shape()[0], 2)
+    assert_true(sliced["a"].iloc(0)[Int64] == 20)
+    assert_true(sliced["a"].iloc(1)[Int64] == 30)
 
 
 def main() raises:
