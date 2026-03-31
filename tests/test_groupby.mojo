@@ -528,5 +528,55 @@ def test_dataframegroupby_float_key_natural_sort() raises:
     )
 
 
+def test_seriesgroupby_dropna_sum() raises:
+    """Dropna=True must exclude null-labelled rows from all groups."""
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    # Series with 4 rows; row 1 has a null label.
+    var pd_s = pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0]"), name="val")
+    var s = Series(pd_s, "val")
+    var by = List[String]()
+    by.append("a")
+    by.append("a")  # string value is ignored because null_mask marks this row as null
+    by.append("b")
+    by.append("b")
+    var null_mask = List[Bool]()
+    null_mask.append(False)
+    null_mask.append(True)  # row 1 is null-labelled
+    null_mask.append(False)
+    null_mask.append(False)
+    # dropna=True (the default): null-labelled row should be excluded.
+    var result = s.groupby(by, dropna=True, by_null_mask=null_mask).sum()
+    var result_pd = result.to_pandas()
+    var py_labels = Python.evaluate("['a', None, 'b', 'b']")
+    var expected = pd_s.groupby(py_labels, dropna=True).sum()
+    testing.assert_series_equal(result_pd, expected)
+
+
+def test_seriesgroupby_dropna_transform_sum() raises:
+    """Transform('sum') with dropna=True must emit NaN for null-labelled rows."""
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0]"), name="val")
+    var s = Series(pd_s, "val")
+    var by = List[String]()
+    by.append("a")
+    by.append("a")
+    by.append("b")
+    by.append("b")
+    var null_mask = List[Bool]()
+    null_mask.append(False)
+    null_mask.append(True)
+    null_mask.append(False)
+    null_mask.append(False)
+    var result = s.groupby(by, dropna=True, by_null_mask=null_mask).transform(
+        "sum"
+    )
+    var result_pd = result.to_pandas()
+    var py_labels = Python.evaluate("['a', None, 'b', 'b']")
+    var expected = pd_s.groupby(py_labels, dropna=True).transform("sum")
+    testing.assert_series_equal(result_pd, expected, check_dtype=False)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
