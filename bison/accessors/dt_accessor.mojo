@@ -37,7 +37,13 @@ struct DatetimeMethods:
     # Integer properties
     # ------------------------------------------------------------------
 
-    def year(self) raises -> Column:
+    def _int_prop[attr: StringLiteral](self) raises -> Column:
+        """Extract an integer attribute from each Timestamp in `_data`.
+
+        `attr` is a compile-time `StringLiteral` (e.g. `"year"`, `"month"`).
+        `PythonObject.__getattr__` resolves the attribute name at the Python
+        level without requiring a runtime call to Python's `getattr()`.
+        """
         var result = List[Int64]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -45,123 +51,38 @@ struct DatetimeMethods:
                 result.append(Int64(0))
                 new_mask.append(True)
             else:
-                result.append(Int64(Int(py=self._data[i].year)))
+                result.append(Int64(Int(py=self._data[i].__getattr__(attr))))
                 new_mask.append(False)
         var col = Column(self._name, ColumnData(result^), int64)
         col._null_mask = new_mask^
         return col^
+
+    def year(self) raises -> Column:
+        return self._int_prop["year"]()
 
     def month(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].month)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["month"]()
 
     def day(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].day)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["day"]()
 
     def hour(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].hour)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["hour"]()
 
     def minute(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].minute)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["minute"]()
 
     def second(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].second)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["second"]()
 
     def dayofweek(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].dayofweek)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["dayofweek"]()
 
     def dayofyear(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].dayofyear)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["dayofyear"]()
 
     def quarter(self) raises -> Column:
-        var result = List[Int64]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(Int64(0))
-                new_mask.append(True)
-            else:
-                result.append(Int64(Int(py=self._data[i].quarter)))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
-        col._null_mask = new_mask^
-        return col^
+        return self._int_prop["quarter"]()
 
     # ------------------------------------------------------------------
     # Object-returning properties

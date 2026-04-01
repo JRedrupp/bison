@@ -4915,6 +4915,52 @@ struct Column(Copyable, Movable, Sized):
         )
 
     # ------------------------------------------------------------------
+    # Time-series transforms
+    # ------------------------------------------------------------------
+
+    def shift(self, periods: Int = 1) raises -> Column:
+        """Return a Column with values shifted by *periods* positions.
+
+        Positive *periods* lags the series (first *periods* rows become null);
+        negative *periods* leads (last *|periods|* rows become null).
+        Supports all column types: integer, float, bool, string, and object.
+        """
+        var n = len(self)
+        var indices = List[Int]()
+        if periods >= 0:
+            var shift_count = periods if periods <= n else n
+            for _ in range(shift_count):
+                indices.append(-1)
+            for i in range(n - shift_count):
+                indices.append(i)
+        else:
+            var shift_count = -periods if -periods <= n else n
+            for i in range(shift_count, n):
+                indices.append(i)
+            for _ in range(shift_count):
+                indices.append(-1)
+        return self._reindex_rows(indices, Optional[DFScalar](None))
+
+    def diff(self, periods: Int = 1) raises -> Column:
+        """Return the first discrete difference along the column.
+
+        ``result[i] = self[i] - self[i - periods]``.
+        Exposed positions (the first *periods* rows for positive *periods*,
+        or the last *|periods|* rows for negative *periods*) are null.
+        Raises for non-numeric column types.
+        """
+        return self._arith_sub(self.shift(periods))
+
+    def pct_change(self, periods: Int = 1) raises -> Column:
+        """Return the percentage change between elements *periods* apart.
+
+        ``result[i] = (self[i] - self[i - periods]) / self[i - periods]``.
+        Exposed positions are null.
+        Raises for non-numeric column types.
+        """
+        return self.diff(periods)._arith_div(self.shift(periods))
+
+    # ------------------------------------------------------------------
     # Cumulative operations
     # ------------------------------------------------------------------
 

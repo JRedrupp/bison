@@ -324,16 +324,28 @@ struct Series(Copyable, Movable):
         return self._col.cov(other._col, ddof)
 
     def shift(self, periods: Int = 1) raises -> Series:
-        _not_implemented("Series.shift")
-        return Series()
+        """Return a Series with values shifted by *periods* positions.
+
+        Positive *periods* lags the series (first *periods* rows become null);
+        negative *periods* leads (last *|periods|* rows become null).
+        """
+        return Series(self._col.shift(periods))
 
     def diff(self, periods: Int = 1) raises -> Series:
-        _not_implemented("Series.diff")
-        return Series()
+        """Return the first discrete difference of the Series.
+
+        ``result[i] = self[i] - self[i - periods]``.
+        Raises for non-numeric Series.
+        """
+        return Series(self._col.diff(periods))
 
     def pct_change(self, periods: Int = 1) raises -> Series:
-        _not_implemented("Series.pct_change")
-        return Series()
+        """Return the percentage change between elements *periods* apart.
+
+        ``result[i] = (self[i] - self[i - periods]) / self[i - periods]``.
+        Raises for non-numeric Series.
+        """
+        return Series(self._col.pct_change(periods))
 
     # ------------------------------------------------------------------
     # Missing data
