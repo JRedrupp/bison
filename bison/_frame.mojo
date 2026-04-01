@@ -379,7 +379,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index
+        var idx = self._col._index.copy()
         if self._col._data.isa[List[Int64]]():
             var fill_val: Int64
             if value.isa[Int64]():
@@ -488,7 +488,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index
+        var idx = self._col._index.copy()
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
             var data = List[Int64]()
@@ -643,7 +643,7 @@ struct Series(Copyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var n = len(self._col)
-        var idx = self._col._index
+        var idx = self._col._index.copy()
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
             var rev_data = List[Int64]()
@@ -843,6 +843,8 @@ struct Series(Copyable, Movable):
         var has_mask = len(self._col._null_mask) > 0
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -853,7 +855,7 @@ struct Series(Copyable, Movable):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -873,23 +875,28 @@ struct Series(Copyable, Movable):
                         else:
                             take_right = d[rv] > d[lv]
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         elif self._col._data.isa[List[Float64]]():
             ref d = self._col._data[List[Float64]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -900,7 +907,7 @@ struct Series(Copyable, Movable):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -920,23 +927,28 @@ struct Series(Copyable, Movable):
                         else:
                             take_right = d[rv] > d[lv]
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         elif self._col._data.isa[List[Bool]]():
             ref d = self._col._data[List[Bool]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -947,7 +959,7 @@ struct Series(Copyable, Movable):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -967,23 +979,28 @@ struct Series(Copyable, Movable):
                         else:
                             take_right = d[rv] and (not d[lv])  # True > False
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         elif self._col._data.isa[List[String]]():
             ref d = self._col._data[List[String]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -994,7 +1011,7 @@ struct Series(Copyable, Movable):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -1014,23 +1031,28 @@ struct Series(Copyable, Movable):
                         else:
                             take_right = d[rv] > d[lv]
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         else:
             ref d = self._col._data[List[PythonObject]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -1041,7 +1063,7 @@ struct Series(Copyable, Movable):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -1061,19 +1083,22 @@ struct Series(Copyable, Movable):
                         else:
                             take_right = Bool(d[rv] > d[lv])
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         return perm^
@@ -1149,7 +1174,7 @@ struct Series(Copyable, Movable):
                 if self._col._null_mask[i]:
                     has_any_null = True
                     break
-        var idx = self._col._index
+        var idx = self._col._index.copy()
         if not has_any_null:
             var result_data = List[Int64]()
             for i in range(n):
@@ -1257,7 +1282,7 @@ struct Series(Copyable, Movable):
                 for k in range(i, j + 1):
                     ranks[perm[k]] = avg_rank
                 i = j + 1
-        var idx = self._col._index
+        var idx = self._col._index.copy()
         var col = Column(self._col.name, ColumnData(ranks^), float64, idx^)
         # n_non_null < n iff there are nulls — no need to re-scan the mask.
         if n_non_null < n:
@@ -1652,7 +1677,7 @@ struct DataFrame(Copyable, Movable):
         """
         var cols = List[Column]()
         for entry in data.items():
-            var col_data = entry.value
+            var col_data = entry.value.copy()
             var dtype = Column._sniff_dtype(col_data)
             cols.append(Column(entry.key, col_data^, dtype))
         return DataFrame(cols^)
@@ -2702,7 +2727,9 @@ struct DataFrame(Copyable, Movable):
                             new_mask[k] = False
                     seg_start = j
             var col_data = ColumnData(data^)
-            var new_col = Column(col.name, col_data^, col.dtype, col._index)
+            var new_col = Column(
+                col.name, col_data^, col.dtype, col._index.copy()
+            )
             result_cols.append(new_col^)
         return DataFrame(result_cols^)
 
@@ -2785,7 +2812,7 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             var taken = self._cols[i].take(perm)
             if has_index:
-                taken._index = new_idx
+                taken._index = new_idx.copy()
             new_cols.append(taken^)
         return DataFrame(new_cols^)
 
@@ -2859,7 +2886,7 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             var taken = self._cols[i].take(perm)
             if has_index:
-                taken._index = new_idx
+                taken._index = new_idx.copy()
             new_cols.append(taken^)
         return DataFrame(new_cols^)
 
@@ -2978,7 +3005,7 @@ struct DataFrame(Copyable, Movable):
                 if drop and i == key_col_idx:
                     continue
                 var c = self._cols[i].copy()
-                c._index = new_idx
+                c._index = new_idx.copy()
                 c._index_names = List[String]()
                 new_cols.append(c^)
             return DataFrame(new_cols^)
@@ -3019,7 +3046,7 @@ struct DataFrame(Copyable, Movable):
             if drop and i in key_col_set:
                 continue
             var c = self._cols[i].copy()
-            c._index = new_idx
+            c._index = new_idx.copy()
             c._index_names = keys.copy()
             new_cols.append(c^)
         return DataFrame(new_cols^)
@@ -3130,7 +3157,7 @@ struct DataFrame(Copyable, Movable):
             # Determine the shared index for the result.
             var shared_idx = ColumnIndex(List[PythonObject]())
             if ncols > 0:
-                shared_idx = self._cols[0]._index
+                shared_idx = self._cols[0]._index.copy()
             # Infer a common dtype from existing columns for null-fill.
             # If all columns share the same dtype, use it; otherwise fall back
             # to float64 (the widest numeric type).
@@ -3151,7 +3178,7 @@ struct DataFrame(Copyable, Movable):
                     # Insert a fill/null column.
                     if fill_value:
                         var c = Column._fill_scalar(
-                            lbl, fill_value.value(), nrows, shared_idx
+                            lbl, fill_value.value(), nrows, shared_idx.copy()
                         )
                         new_cols.append(c^)
                     else:
@@ -3159,7 +3186,7 @@ struct DataFrame(Copyable, Movable):
                         # that a frame of all-int64 columns produces an int64
                         # null column rather than float64.
                         var c = Column._null_column(
-                            lbl, inferred_dtype, nrows, shared_idx
+                            lbl, inferred_dtype, nrows, shared_idx.copy()
                         )
                         new_cols.append(c^)
             return DataFrame(new_cols^)
@@ -3196,7 +3223,7 @@ struct DataFrame(Copyable, Movable):
             var new_cols = List[Column]()
             for i in range(ncols):
                 var c = self._cols[i]._reindex_rows(row_indices, fill_value)
-                c._index = new_col_idx
+                c._index = new_col_idx.copy()
                 new_cols.append(c^)
             return DataFrame(new_cols^)
 
@@ -3499,7 +3526,7 @@ struct DataFrame(Copyable, Movable):
                     data.append(table[rk][ck])
                     null_mask.append(False)
             var col = Column(col_keys[ck], ColumnData(data^), object_)
-            col._index = result_idx
+            col._index = result_idx.copy()
             if any_null:
                 col._null_mask = null_mask^
             result_cols.append(col^)
@@ -3712,7 +3739,7 @@ struct DataFrame(Copyable, Movable):
                     data.append(_frame_cell_as_python(col, r))
 
             var new_col = Column(col_name, ColumnData(data^), object_)
-            new_col._index = shared_idx
+            new_col._index = shared_idx.copy()
             if any_null:
                 new_col._null_mask = null_mask^
             result_cols.append(new_col^)
@@ -3899,7 +3926,7 @@ struct DataFrame(Copyable, Movable):
         var nrows = self.shape()[0]
         var idx = ColumnIndex(List[PythonObject]())
         if len(self._cols) > 0:
-            idx = self._cols[0]._index
+            idx = self._cols[0]._index.copy()
         var new_col = Column._fill_scalar(column, value, nrows, idx)
         var insert_at = loc
         if insert_at < 0:
@@ -5852,7 +5879,7 @@ struct SeriesGroupBy:
             var result_col = Column(
                 self._series.name, ColumnData(int_vals^), int64
             )
-            result_col._index = self._series._col._index
+            result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
         # Float64-returning scalar-broadcast functions
@@ -5896,7 +5923,7 @@ struct SeriesGroupBy:
             )
             if any_null:
                 result_col._null_mask = null_mask^
-            result_col._index = self._series._col._index
+            result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
         # Int64-returning scalar-broadcast functions
@@ -5923,7 +5950,7 @@ struct SeriesGroupBy:
                     self._series.name, ColumnData(result_vals^), float64
                 )
                 result_col._null_mask = null_mask^
-                result_col._index = self._series._col._index
+                result_col._index = self._series._col._index.copy()
                 result_col._index_name = self._series._col._index_name
                 return Series(result_col^)
             var result_vals = List[Int64]()
@@ -5932,7 +5959,7 @@ struct SeriesGroupBy:
             var result_col = Column(
                 self._series.name, ColumnData(result_vals^), int64
             )
-            result_col._index = self._series._col._index
+            result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
         # Dtype-preserving broadcast functions (first/last)
@@ -5963,7 +5990,7 @@ struct SeriesGroupBy:
                     selected.append(key_to_idx[row_key[i]])
             var result_col = col.take_with_nulls(selected)
             result_col.name = self._series.name
-            result_col._index = col._index
+            result_col._index = col._index.copy()
             result_col._index_name = col._index_name
             return Series(result_col^)
         return Series.from_pandas(self._pd_groupby().transform(func))
