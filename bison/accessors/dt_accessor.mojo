@@ -120,7 +120,15 @@ struct DatetimeMethods:
     # Timezone / rounding — return datetime columns
     # ------------------------------------------------------------------
 
-    def tz_localize(self, tz: String) raises -> Column:
+    def _apply_ts_method[
+        method: StringLiteral
+    ](self, arg: String) raises -> Column:
+        """Apply a single-arg Timestamp method to each element, returning a datetime64_ns Column.
+
+        `method` is a compile-time ``StringLiteral`` (e.g. ``"floor"``,
+        ``"tz_localize"``).  ``PythonObject.__getattr__`` resolves the method
+        name at the Python level without a runtime ``getattr()`` call.
+        """
         var result = List[PythonObject]()
         var new_mask = List[Bool]()
         for i in range(len(self._data)):
@@ -128,64 +136,23 @@ struct DatetimeMethods:
                 result.append(PythonObject(None))
                 new_mask.append(True)
             else:
-                result.append(self._data[i].tz_localize(tz))
+                result.append(self._data[i].__getattr__(method)(arg))
                 new_mask.append(False)
         var col = Column(self._name, ColumnData(result^), datetime64_ns)
         col._null_mask = new_mask^
         return col^
+
+    def tz_localize(self, tz: String) raises -> Column:
+        return self._apply_ts_method["tz_localize"](tz)
 
     def tz_convert(self, tz: String) raises -> Column:
-        var result = List[PythonObject]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(PythonObject(None))
-                new_mask.append(True)
-            else:
-                result.append(self._data[i].tz_convert(tz))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), datetime64_ns)
-        col._null_mask = new_mask^
-        return col^
+        return self._apply_ts_method["tz_convert"](tz)
 
     def floor(self, freq: String) raises -> Column:
-        var result = List[PythonObject]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(PythonObject(None))
-                new_mask.append(True)
-            else:
-                result.append(self._data[i].floor(freq))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), datetime64_ns)
-        col._null_mask = new_mask^
-        return col^
+        return self._apply_ts_method["floor"](freq)
 
     def ceil(self, freq: String) raises -> Column:
-        var result = List[PythonObject]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(PythonObject(None))
-                new_mask.append(True)
-            else:
-                result.append(self._data[i].ceil(freq))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), datetime64_ns)
-        col._null_mask = new_mask^
-        return col^
+        return self._apply_ts_method["ceil"](freq)
 
     def round(self, freq: String) raises -> Column:
-        var result = List[PythonObject]()
-        var new_mask = List[Bool]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(PythonObject(None))
-                new_mask.append(True)
-            else:
-                result.append(self._data[i].round(freq))
-                new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), datetime64_ns)
-        col._null_mask = new_mask^
-        return col^
+        return self._apply_ts_method["round"](freq)
