@@ -1,6 +1,6 @@
 """Tests aggregation methods."""
 from std.python import Python
-from std.testing import assert_true, TestSuite
+from std.testing import assert_equal, assert_true, TestSuite
 from std.math import isnan
 from bison import DataFrame, Series
 
@@ -627,13 +627,9 @@ def test_df_cummax_axis1_raises() raises:
 def test_series_sem_raises() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var raised = False
-    try:
-        _ = s.sem()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.sem should have raised")
+    var result = s.sem()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")).sem()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
 def test_df_sem_raises() raises:
@@ -655,13 +651,9 @@ def test_df_sem_raises() raises:
 def test_series_skew_raises() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var raised = False
-    try:
-        _ = s.skew()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.skew should have raised")
+    var result = s.skew()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")).skew()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
 def test_df_skew_raises() raises:
@@ -682,14 +674,10 @@ def test_df_skew_raises() raises:
 
 def test_series_kurt_raises() raises:
     var pd = Python.import_module("pandas")
-    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var raised = False
-    try:
-        _ = s.kurt()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.kurt should have raised")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var result = s.kurt()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")).kurt()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
 def test_df_kurt_raises() raises:
@@ -711,25 +699,15 @@ def test_df_kurt_raises() raises:
 def test_series_idxmin_raises() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
-    var raised = False
-    try:
-        _ = s.idxmin()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.idxmin should have raised")
+    var result = s.idxmin()
+    assert_equal(result, 1)
 
 
 def test_series_idxmax_raises() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 2.0]")))
-    var raised = False
-    try:
-        _ = s.idxmax()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.idxmax should have raised")
+    var result = s.idxmax()
+    assert_equal(result, 0)
 
 
 def test_df_idxmin_raises() raises:
@@ -764,26 +742,17 @@ def test_series_corr_raises() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
-    var raised = False
-    try:
-        _ = s1.corr(s2)
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.corr should have raised")
+    var result = s1.corr(s2)
+    assert_true(result > 1.0 - 1e-9 and result < 1.0 + 1e-9)
 
 
 def test_series_cov_raises() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
     var s2 = Series(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))
-    var raised = False
-    try:
-        _ = s1.cov(s2)
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.cov should have raised")
+    var result = s1.cov(s2)
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")).cov(pd.Series(Python.evaluate("[4.0, 5.0, 6.0]")))))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
 def test_df_corr_raises() raises:

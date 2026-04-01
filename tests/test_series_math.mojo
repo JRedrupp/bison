@@ -547,5 +547,121 @@ def test_bool_ge() raises:
     assert_true(Bool(rp.iloc[3]) == True)
 
 
+def test_sem() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]")))
+    var result = s.sem()
+    var expected = Float64(String(pd.Series(Python.evaluate("[2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]")).sem()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_sem_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0, 5.0]")))
+    var result = s.sem()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, None, 3.0, 5.0]")).sem()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_skew() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 100.0]")))
+    var result = s.skew()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 100.0]")).skew()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_skew_symmetric() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var result = s.skew()
+    assert_true(result > -1e-9 and result < 1e-9)
+
+
+def test_kurt() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 100.0]")))
+    var result = s.kurt()
+    var expected = Float64(String(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 100.0]")).kurt()))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_idxmin() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 4.0, 1.5, 9.0]")))
+    var result = s.idxmin()
+    assert_equal(result, 1)
+
+
+def test_idxmin_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[None, 1.0, 4.0, 0.5, 9.0]")))
+    var result = s.idxmin()
+    assert_equal(result, 3)
+
+
+def test_idxmax() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[3.0, 1.0, 4.0, 1.5, 9.0]")))
+    var result = s.idxmax()
+    assert_equal(result, 4)
+
+
+def test_idxmax_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[None, 1.0, 4.0, 0.5, 9.0]")))
+    var result = s.idxmax()
+    assert_equal(result, 4)
+
+
+def test_corr() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[5.0, 4.0, 3.0, 2.0, 1.0]")))
+    var result = s1.corr(s2)
+    assert_true(result > -1.0 - 1e-9 and result < -1.0 + 1e-9)
+
+
+def test_corr_identical() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var result = s1.corr(s2)
+    assert_true(result > 1.0 - 1e-9 and result < 1.0 + 1e-9)
+
+
+def test_corr_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, None, 3.0, 4.0, 5.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[5.0, 4.0, 3.0, None, 1.0]")))
+    var result = s1.corr(s2)
+    var ps1 = pd.Series(Python.evaluate("[1.0, None, 3.0, 4.0, 5.0]"))
+    var ps2 = pd.Series(Python.evaluate("[5.0, 4.0, 3.0, None, 1.0]"))
+    var expected = Float64(String(ps1.corr(ps2)))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_cov() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[5.0, 4.0, 3.0, 2.0, 1.0]")))
+    var result = s1.cov(s2)
+    var ps1 = pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 4.0, 5.0]"))
+    var ps2 = pd.Series(Python.evaluate("[5.0, 4.0, 3.0, 2.0, 1.0]"))
+    var expected = Float64(String(ps1.cov(ps2)))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
+def test_cov_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1.0, None, 3.0, 4.0, 5.0]")))
+    var s2 = Series(pd.Series(Python.evaluate("[5.0, 4.0, 3.0, None, 1.0]")))
+    var result = s1.cov(s2)
+    var ps1 = pd.Series(Python.evaluate("[1.0, None, 3.0, 4.0, 5.0]"))
+    var ps2 = pd.Series(Python.evaluate("[5.0, 4.0, 3.0, None, 1.0]"))
+    var expected = Float64(String(ps1.cov(ps2)))
+    assert_true(result > expected - 1e-9 and result < expected + 1e-9)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

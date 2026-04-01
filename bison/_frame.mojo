@@ -1,6 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
 from std.builtin.sort import sort as _sort_list
+from std.math import sqrt
 from std.memory import UnsafePointer
 from ._errors import _not_implemented
 from .dtypes import (
@@ -282,32 +283,45 @@ struct Series(Copyable, Movable):
         return Series(self._col.cummax(skipna))
 
     def sem(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
-        _not_implemented("Series.sem")
-        return 0.0
+        var n = self._col.count() if skipna else len(self._col)
+        if n == 0:
+            var zero = Float64(0)
+            return zero / zero
+        return self._col.std(ddof, skipna) / sqrt(Float64(n))
 
     def skew(self, skipna: Bool = True) raises -> Float64:
-        _not_implemented("Series.skew")
-        return 0.0
+        return self._col.skew(skipna)
 
     def kurt(self, skipna: Bool = True) raises -> Float64:
-        _not_implemented("Series.kurt")
-        return 0.0
+        return self._col.kurt(skipna)
 
     def idxmin(self, skipna: Bool = True) raises -> Int:
-        _not_implemented("Series.idxmin")
-        return 0
+        var pos = self._col.argmin(skipna)
+        if pos == -1:
+            raise Error("idxmin: empty or all-null Series")
+        var idx_len = self._col._index_len()
+        if idx_len == 0:
+            return pos
+        if self._col._index.isa[List[Int64]]():
+            return Int(self._col._index[List[Int64]][pos])
+        raise Error("idxmin: index labels are not integer-typed")
 
     def idxmax(self, skipna: Bool = True) raises -> Int:
-        _not_implemented("Series.idxmax")
-        return 0
+        var pos = self._col.argmax(skipna)
+        if pos == -1:
+            raise Error("idxmax: empty or all-null Series")
+        var idx_len = self._col._index_len()
+        if idx_len == 0:
+            return pos
+        if self._col._index.isa[List[Int64]]():
+            return Int(self._col._index[List[Int64]][pos])
+        raise Error("idxmax: index labels are not integer-typed")
 
     def corr(self, other: Series) raises -> Float64:
-        _not_implemented("Series.corr")
-        return 0.0
+        return self._col.corr(other._col)
 
     def cov(self, other: Series, ddof: Int = 1) raises -> Float64:
-        _not_implemented("Series.cov")
-        return 0.0
+        return self._col.cov(other._col, ddof)
 
     def shift(self, periods: Int = 1) raises -> Series:
         _not_implemented("Series.shift")
