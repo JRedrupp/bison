@@ -144,22 +144,20 @@ def test_concat_three_dfs() raises:
     assert_equal(s.iloc(2)[Int64], Int64(3))
 
 
-def test_concat_keys_raises() raises:
+def test_concat_keys() raises:
     var pd = Python.import_module("pandas")
-    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
-    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2]}")))
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3, 4]}")))
     var dfs = List[DataFrame]()
     dfs.append(df1^)
     dfs.append(df2^)
-    var raised = False
-    try:
-        var keys = List[String]()
-        keys.append("k1")
-        keys.append("k2")
-        _ = concat(dfs, keys=Optional[List[String]](keys^))
-    except:
-        raised = True
-    assert_true(raised)
+    var keys = List[String]()
+    keys.append("x")
+    keys.append("y")
+    var result = concat(dfs, keys=Optional[List[String]](keys^))
+    # MultiIndex concatenation produces 4 rows (2 rows × 2 inputs) with 1 data column.
+    assert_equal(result.shape()[0], 4)
+    assert_equal(result.shape()[1], 1)
 
 
 def test_append_dtype_mismatch_raises() raises:
