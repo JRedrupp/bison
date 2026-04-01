@@ -2357,8 +2357,24 @@ struct DataFrame(Copyable, Movable):
         include: Optional[List[String]] = None,
         exclude: Optional[List[String]] = None,
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.describe")
-        return DataFrame()
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var dt = self._cols[i].dtype
+            if not (dt.is_integer() or dt.is_float()):
+                continue
+            var values = List[Float64]()
+            values.append(Float64(self._cols[i].count()))
+            values.append(self._cols[i].mean(True))
+            values.append(self._cols[i].std(1, True))
+            values.append(self._cols[i].min(True))
+            values.append(self._cols[i].quantile(0.25, True))
+            values.append(self._cols[i].quantile(0.5, True))
+            values.append(self._cols[i].quantile(0.75, True))
+            values.append(self._cols[i].max(True))
+            var col_data = ColumnData(values^)
+            var col_dtype = Column._sniff_dtype(col_data)
+            result_cols.append(Column(self._cols[i].name, col_data^, col_dtype))
+        return DataFrame(result_cols^)
 
     def quantile(
         self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True
@@ -2414,34 +2430,120 @@ struct DataFrame(Copyable, Movable):
     def sem(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
     ) raises -> Series:
-        _not_implemented("DataFrame.sem")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.sem")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            var n = self._cols[i].count() if skipna else len(self._cols[i])
+            if n == 0:
+                var zero = Float64(0)
+                values.append(zero / zero)
+            else:
+                values.append(
+                    self._cols[i].std(ddof, skipna) / sqrt(Float64(n))
+                )
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column(None, col_data^, dtype)
+        return Series(result_col^)
 
     def skew(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.skew")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.skew")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].skew(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column(None, col_data^, dtype)
+        return Series(result_col^)
 
     def kurt(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.kurt")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.kurt")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            values.append(self._cols[i].kurt(skipna))
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column(None, col_data^, dtype)
+        return Series(result_col^)
 
     def idxmin(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.idxmin")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.idxmin")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            var pos = self._cols[i].argmin(skipna)
+            if pos == -1:
+                var zero = Float64(0)
+                values.append(zero / zero)
+            else:
+                var idx_len = self._cols[i]._index_len()
+                if idx_len == 0:
+                    values.append(Float64(pos))
+                elif self._cols[i]._index.isa[List[Int64]]():
+                    values.append(
+                        Float64(Int(self._cols[i]._index[List[Int64]][pos]))
+                    )
+                else:
+                    _not_implemented("DataFrame.idxmin with non-integer index")
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column(None, col_data^, dtype)
+        return Series(result_col^)
 
     def idxmax(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        _not_implemented("DataFrame.idxmax")
-        return Series()
+        if axis != 0:
+            _not_implemented("DataFrame.idxmax")
+        var values = List[Float64]()
+        for i in range(len(self._cols)):
+            var pos = self._cols[i].argmax(skipna)
+            if pos == -1:
+                var zero = Float64(0)
+                values.append(zero / zero)
+            else:
+                var idx_len = self._cols[i]._index_len()
+                if idx_len == 0:
+                    values.append(Float64(pos))
+                elif self._cols[i]._index.isa[List[Int64]]():
+                    values.append(
+                        Float64(Int(self._cols[i]._index[List[Int64]][pos]))
+                    )
+                else:
+                    _not_implemented("DataFrame.idxmax with non-integer index")
+        var col_data = ColumnData(values^)
+        var dtype = Column._sniff_dtype(col_data)
+        var result_col = Column(None, col_data^, dtype)
+        return Series(result_col^)
 
     def corr(
         self, method: String = "pearson", min_periods: Int = 1
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.corr")
-        return DataFrame()
+        if method != "pearson":
+            _not_implemented("DataFrame.corr with non-pearson method")
+        var n = len(self._cols)
+        var result_cols = List[Column]()
+        for j in range(n):
+            var values = List[Float64]()
+            for i in range(n):
+                values.append(self._cols[i].corr(self._cols[j]))
+            var col_data = ColumnData(values^)
+            var dtype = Column._sniff_dtype(col_data)
+            result_cols.append(Column(self._cols[j].name, col_data^, dtype))
+        return DataFrame(result_cols^)
 
     def cov(self, min_periods: Int = 1, ddof: Int = 1) raises -> DataFrame:
-        _not_implemented("DataFrame.cov")
-        return DataFrame()
+        var n = len(self._cols)
+        var result_cols = List[Column]()
+        for j in range(n):
+            var values = List[Float64]()
+            for i in range(n):
+                values.append(self._cols[i].cov(self._cols[j], ddof))
+            var col_data = ColumnData(values^)
+            var dtype = Column._sniff_dtype(col_data)
+            result_cols.append(Column(self._cols[j].name, col_data^, dtype))
+        return DataFrame(result_cols^)
 
     def shift(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
         _not_implemented("DataFrame.shift")

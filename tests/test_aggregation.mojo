@@ -261,19 +261,8 @@ def test_df_median() raises:
 
 
 # ---------------------------------------------------------------------------
-# describe (still a stub)
+# describe — implemented; real test is in the describe section below
 # ---------------------------------------------------------------------------
-
-def test_df_describe_stub() raises:
-    var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
-    var raised = False
-    try:
-        _ = df.describe()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.describe should have raised")
 
 
 # ---------------------------------------------------------------------------
@@ -621,7 +610,7 @@ def test_df_cummax_axis1_raises() raises:
 
 
 # ---------------------------------------------------------------------------
-# sem — stub
+# sem
 # ---------------------------------------------------------------------------
 
 def test_series_sem_raises() raises:
@@ -632,20 +621,24 @@ def test_series_sem_raises() raises:
     assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
-def test_df_sem_raises() raises:
+def test_df_sem() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
-    var raised = False
-    try:
-        _ = df.sem()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.sem should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.sem().to_pandas()
+    var expected_pd = pd_df.sem()
+    assert_true(
+        abs(Float64(String(result_pd.iloc[0])) - Float64(String(expected_pd.iloc[0]))) < 1e-9
+    )
+    assert_true(
+        abs(Float64(String(result_pd.iloc[1])) - Float64(String(expected_pd.iloc[1]))) < 1e-9
+    )
 
 
 # ---------------------------------------------------------------------------
-# skew — stub
+# skew
 # ---------------------------------------------------------------------------
 
 def test_series_skew_raises() raises:
@@ -656,20 +649,24 @@ def test_series_skew_raises() raises:
     assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
-def test_df_skew_raises() raises:
+def test_df_skew() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
-    var raised = False
-    try:
-        _ = df.skew()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.skew should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [1.0, 3.0, 2.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.skew().to_pandas()
+    var expected_pd = pd_df.skew()
+    assert_true(
+        abs(Float64(String(result_pd.iloc[0])) - Float64(String(expected_pd.iloc[0]))) < 1e-9
+    )
+    assert_true(
+        abs(Float64(String(result_pd.iloc[1])) - Float64(String(expected_pd.iloc[1]))) < 1e-9
+    )
 
 
 # ---------------------------------------------------------------------------
-# kurt — stub
+# kurt
 # ---------------------------------------------------------------------------
 
 def test_series_kurt_raises() raises:
@@ -680,20 +677,24 @@ def test_series_kurt_raises() raises:
     assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
-def test_df_kurt_raises() raises:
+def test_df_kurt() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
-    var raised = False
-    try:
-        _ = df.kurt()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.kurt should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0, 4.0, 5.0], 'b': [2.0, 4.0, 6.0, 8.0, 10.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.kurt().to_pandas()
+    var expected_pd = pd_df.kurt()
+    assert_true(
+        abs(Float64(String(result_pd.iloc[0])) - Float64(String(expected_pd.iloc[0]))) < 1e-9
+    )
+    assert_true(
+        abs(Float64(String(result_pd.iloc[1])) - Float64(String(expected_pd.iloc[1]))) < 1e-9
+    )
 
 
 # ---------------------------------------------------------------------------
-# idxmin / idxmax — stubs
+# idxmin / idxmax
 # ---------------------------------------------------------------------------
 
 def test_series_idxmin_raises() raises:
@@ -710,32 +711,32 @@ def test_series_idxmax_raises() raises:
     assert_equal(result, 0)
 
 
-def test_df_idxmin_raises() raises:
+def test_df_idxmin() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0]}")))
-    var raised = False
-    try:
-        _ = df.idxmin()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.idxmin should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [3.0, 1.0, 2.0], 'b': [10.0, 20.0, 5.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.idxmin().to_pandas()
+    # column 'a' min is at index 1; column 'b' min is at index 2
+    assert_true(Float64(String(result_pd.iloc[0])) == 1.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 2.0)
 
 
-def test_df_idxmax_raises() raises:
+def test_df_idxmax() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0, 2.0]}")))
-    var raised = False
-    try:
-        _ = df.idxmax()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.idxmax should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [3.0, 1.0, 2.0], 'b': [10.0, 20.0, 5.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.idxmax().to_pandas()
+    # column 'a' max is at index 0; column 'b' max is at index 1
+    assert_true(Float64(String(result_pd.iloc[0])) == 0.0)
+    assert_true(Float64(String(result_pd.iloc[1])) == 1.0)
 
 
 # ---------------------------------------------------------------------------
-# corr / cov — stubs
+# corr / cov
 # ---------------------------------------------------------------------------
 
 def test_series_corr_raises() raises:
@@ -755,28 +756,61 @@ def test_series_cov_raises() raises:
     assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
-def test_df_corr_raises() raises:
+def test_df_corr() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
-    var raised = False
-    try:
-        _ = df.corr()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.corr should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.corr()
+    var expected_pd = pd_df.corr()
+    # diagonal should be 1.0; off-diagonal should match pandas
+    var aa = Float64(String(result["a"].to_pandas().iloc[0]))
+    var bb = Float64(String(result["b"].to_pandas().iloc[1]))
+    assert_true(abs(aa - 1.0) < 1e-9)
+    assert_true(abs(bb - 1.0) < 1e-9)
+    var ab = Float64(String(result["b"].to_pandas().iloc[0]))
+    var expected_ab = Float64(String(expected_pd["b"].iloc[0]))
+    assert_true(abs(ab - expected_ab) < 1e-9)
 
 
-def test_df_cov_raises() raises:
+def test_df_cov() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
-    var raised = False
-    try:
-        _ = df.cov()
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.cov should have raised")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.cov()
+    var expected_pd = pd_df.cov()
+    # diagonal should match variance; off-diagonal should match pandas
+    var aa = Float64(String(result["a"].to_pandas().iloc[0]))
+    var expected_aa = Float64(String(expected_pd["a"].iloc[0]))
+    assert_true(abs(aa - expected_aa) < 1e-9)
+    var ab = Float64(String(result["b"].to_pandas().iloc[0]))
+    var expected_ab = Float64(String(expected_pd["b"].iloc[0]))
+    assert_true(abs(ab - expected_ab) < 1e-9)
+
+
+# ---------------------------------------------------------------------------
+# describe
+# ---------------------------------------------------------------------------
+
+def test_df_describe() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0, 4.0], 'b': [10.0, 20.0, 30.0, 40.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.describe()
+    var expected_pd = pd_df.describe()
+    # result has 8 rows: count(0), mean(1), std(2), min(3), 25%(4), 50%(5), 75%(6), max(7)
+    var a_col = result["a"].to_pandas()
+    assert_true(Float64(String(a_col.iloc[0])) == 4.0)  # count
+    assert_true(abs(Float64(String(a_col.iloc[1])) - 2.5) < 1e-9)  # mean
+    assert_true(Float64(String(a_col.iloc[7])) == 4.0)  # max
+    var b_col = result["b"].to_pandas()
+    assert_true(Float64(String(b_col.iloc[0])) == 4.0)  # count
+    assert_true(Float64(String(b_col.iloc[7])) == 40.0)  # max
 
 
 def main() raises:
