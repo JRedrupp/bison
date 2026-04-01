@@ -48,6 +48,16 @@ def _null_col(
         return col^
 
 
+def _build_key_col(keys: List[String], counts: List[Int]) raises -> Column:
+    """Build a string Column named '__key__' repeating keys[i] counts[i] times.
+    """
+    var data = List[String]()
+    for i in range(len(keys)):
+        for _ in range(counts[i]):
+            data.append(keys[i])
+    return Column(Optional[String]("__key__"), ColumnData(data^), object_)
+
+
 def _promote_dtype(a: BisonDtype, b: BisonDtype) raises -> BisonDtype:
     """Return the common promoted dtype for *a* and *b*.
 
@@ -509,8 +519,11 @@ def concat(
         When ``True``, reset the output index (axis=0) or column labels
         (axis=1) to a default integer range.
     keys : Optional[List[String]]
-        Hierarchical index keys — not yet implemented natively; raises if
-        provided.
+        When provided, a ``"__key__"`` string column is prepended to the
+        result (position 0).  For axis=0 each row is labelled with the key
+        of its source DataFrame; for axis=1 each original column is labelled
+        with the key of its source DataFrame.  ``len(keys)`` must equal
+        ``len(objs)``.
     sort : Bool
         When ``True``, sort the non-concatenation axis labels alphabetically.
     """
@@ -518,8 +531,37 @@ def concat(
         return DataFrame()
 
     if keys:
-        _not_implemented("concat")
+        if len(keys.value()) != len(objs):
+            raise Error(
+                "concat: len(keys) = "
+                + String(len(keys.value()))
+                + " but len(objs) = "
+                + String(len(objs))
+            )
 
     if axis == 1:
-        return _concat_axis1(objs, join, ignore_index, sort)
-    return _concat_axis0(objs, join, ignore_index, sort)
+        var result = _concat_axis1(objs, join, ignore_index, sort)
+        if keys:
+            var counts = List[Int]()
+            for i in range(len(objs)):
+                counts.append(len(objs[i]._cols))
+            var key_col = _build_key_col(keys.value(), counts)
+            var new_cols = List[Column]()
+            new_cols.append(key_col^)
+            for i in range(len(result._cols)):
+                new_cols.append(result._cols[i].copy())
+            result._cols = new_cols^
+        return result^
+
+    var result = _concat_axis0(objs, join, ignore_index, sort)
+    if keys:
+        var counts = List[Int]()
+        for i in range(len(objs)):
+            counts.append(objs[i].shape()[0])
+        var key_col = _build_key_col(keys.value(), counts)
+        var new_cols = List[Column]()
+        new_cols.append(key_col^)
+        for i in range(len(result._cols)):
+            new_cols.append(result._cols[i].copy())
+        result._cols = new_cols^
+    return result^
