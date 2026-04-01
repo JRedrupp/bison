@@ -5076,6 +5076,13 @@ struct DataFrameGroupBy:
             dropna=self._dropna,
         )
 
+    def _col_name_index(self) -> Dict[String, Int]:
+        """Return a name → column-position map for self._df (O(n_cols))."""
+        var m = Dict[String, Int]()
+        for i in range(len(self._df._cols)):
+            m[self._df._cols[i].name.value()] = i
+        return m^
+
     def _build_group_index(self) raises -> ColumnIndex:
         """Return a properly typed ColumnIndex for the group keys.
 
@@ -5084,11 +5091,8 @@ struct DataFrameGroupBy:
                     to_pandas() converts to pd.MultiIndex.from_tuples().
         """
         if len(self._by) == 1:
-            var ci = -1
-            for i in range(len(self._df._cols)):
-                if self._df._cols[i].name.value() == self._by[0]:
-                    ci = i
-                    break
+            var col_idx = self._col_name_index()
+            var ci = col_idx.get(self._by[0], -1)
             if ci >= 0 and self._df._cols[ci]._data.isa[List[Int64]]():
                 ref d = self._df._cols[ci]._data[List[Int64]]
                 var int_keys = List[Int64]()
@@ -5104,13 +5108,11 @@ struct DataFrameGroupBy:
             return ColumnIndex(Index(self._group_keys.copy()))
         # Multi-key: build a List[PythonObject] of Python tuples, one per group.
         var builtins = Python.import_module("builtins")
-        # Locate key columns once.
+        # Build name→index map once (O(n_cols)), then resolve key positions.
+        var col_idx = self._col_name_index()
         var key_col_indices = List[Int]()
         for k in range(len(self._by)):
-            for i in range(len(self._df._cols)):
-                if self._df._cols[i].name.value() == self._by[k]:
-                    key_col_indices.append(i)
-                    break
+            key_col_indices.append(col_idx.get(self._by[k], -1))
         var multi_idx = List[PythonObject]()
         for j in range(len(self._group_keys)):
             var first_row = self._group_map[self._group_keys[j]][0]
@@ -5170,11 +5172,8 @@ struct DataFrameGroupBy:
         column in the aggregation result instead of the row index.
         """
         var key_name = self._by[key_idx]
-        var ci = -1
-        for i in range(len(self._df._cols)):
-            if self._df._cols[i].name.value() == key_name:
-                ci = i
-                break
+        var col_idx = self._col_name_index()
+        var ci = col_idx.get(key_name, -1)
         if ci < 0:
             raise Error(
                 "DataFrameGroupBy._make_key_col: column not found: " + key_name
