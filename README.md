@@ -90,8 +90,8 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Datetime accessor | 0 | 20 |
 | Index | 0 | 14 |
 | IO | 0 | 8 |
-| Reshape | 1 | 1 |
-| **Total** | **38** | **306** |
+| Reshape | 0 | 2 |
+| **Total** | **37** | **307** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations
