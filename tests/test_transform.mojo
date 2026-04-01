@@ -5,19 +5,16 @@ from bison import DataFrame, Series
 
 
 # ---------------------------------------------------------------------------
-# shift — stub
+# shift — implemented
 # ---------------------------------------------------------------------------
 
-def test_series_shift_raises() raises:
+def test_series_shift() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var raised = False
-    try:
-        _ = s.shift()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.shift should have raised")
+    var r = s.shift()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 2.0)
 
 
 def test_df_shift_raises() raises:
@@ -33,19 +30,16 @@ def test_df_shift_raises() raises:
 
 
 # ---------------------------------------------------------------------------
-# diff — stub
+# diff — implemented
 # ---------------------------------------------------------------------------
 
-def test_series_diff_raises() raises:
+def test_series_diff() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
-    var raised = False
-    try:
-        _ = s.diff()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.diff should have raised")
+    var r = s.diff()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 1.0)
 
 
 def test_df_diff_raises() raises:
@@ -61,19 +55,16 @@ def test_df_diff_raises() raises:
 
 
 # ---------------------------------------------------------------------------
-# pct_change — stub
+# pct_change — implemented
 # ---------------------------------------------------------------------------
 
-def test_series_pct_change_raises() raises:
+def test_series_pct_change() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 4.0]")))
-    var raised = False
-    try:
-        _ = s.pct_change()
-    except:
-        raised = True
-    if not raised:
-        raise Error("Series.pct_change should have raised")
+    var r = s.pct_change()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 1.0)
 
 
 def test_df_pct_change_raises() raises:

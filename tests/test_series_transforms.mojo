@@ -504,5 +504,172 @@ def test_rank_with_null() raises:
     assert_true(r.iloc(2)[Float64] == 1.0)
 
 
+# ------------------------------------------------------------------
+# shift
+# ------------------------------------------------------------------
+
+
+def test_shift_int_positive() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4]"), dtype="int64"))
+    var r = s.shift(1)
+    # First element is null; remaining are lagged by 1.
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Int64] == 1)
+    assert_true(r.iloc(2)[Int64] == 2)
+    assert_true(r.iloc(3)[Int64] == 3)
+
+
+def test_shift_float_positive() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var r = s.shift(2)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.iloc(2)[Float64] == 1.0)
+
+
+def test_shift_negative() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4]"), dtype="int64"))
+    var r = s.shift(-1)
+    # Last element is null; values are led by 1.
+    assert_true(r.iloc(0)[Int64] == 2)
+    assert_true(r.iloc(1)[Int64] == 3)
+    assert_true(r.iloc(2)[Int64] == 4)
+    assert_true(r.isna().iloc(3)[Bool])
+
+
+def test_shift_zero() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[10, 20, 30]"), dtype="int64"))
+    var r = s.shift(0)
+    assert_true(r.iloc(0)[Int64] == 10)
+    assert_true(r.iloc(1)[Int64] == 20)
+    assert_true(r.iloc(2)[Int64] == 30)
+
+
+def test_shift_null_propagation() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var r = s.shift(1)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.isna().iloc(2)[Bool])
+
+
+def test_shift_periods_ge_length() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
+    var r = s.shift(5)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.isna().iloc(2)[Bool])
+
+
+def test_shift_string() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate('["a", "b", "c"]'), dtype="string"))
+    var r = s.shift(1)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[String] == "a")
+    assert_true(r.iloc(2)[String] == "b")
+
+
+# ------------------------------------------------------------------
+# diff
+# ------------------------------------------------------------------
+
+
+def test_diff_int_default() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 3, 6, 10]"), dtype="int64"))
+    var r = s.diff()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Int64] == 2)
+    assert_true(r.iloc(2)[Int64] == 3)
+    assert_true(r.iloc(3)[Int64] == 4)
+
+
+def test_diff_float_default() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 3.0, 6.0]")))
+    var r = s.diff()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+
+
+def test_diff_periods_2() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 5, 9]"), dtype="int64"))
+    var r = s.diff(2)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.iloc(2)[Int64] == 4)
+    assert_true(r.iloc(3)[Int64] == 7)
+
+
+def test_diff_negative_periods() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 3, 6, 10]"), dtype="int64"))
+    var r = s.diff(-1)
+    assert_true(r.iloc(0)[Int64] == -2)
+    assert_true(r.iloc(1)[Int64] == -3)
+    assert_true(r.iloc(2)[Int64] == -4)
+    assert_true(r.isna().iloc(3)[Bool])
+
+
+def test_diff_null_propagation() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 5.0]")))
+    var r = s.diff()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.isna().iloc(2)[Bool])
+
+
+# ------------------------------------------------------------------
+# pct_change
+# ------------------------------------------------------------------
+
+
+def test_pct_change_int_default() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[100, 110, 121]"), dtype="int64"))
+    var r = s.pct_change()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 0.1)
+    assert_true(r.iloc(2)[Float64] == 0.1)
+
+
+def test_pct_change_float_default() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[2.0, 4.0, 8.0]")))
+    var r = s.pct_change()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 1.0)
+
+
+def test_pct_change_periods_2() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0, 6.0]")))
+    var r = s.pct_change(2)
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.iloc(2)[Float64] == 2.0)
+    assert_true(r.iloc(3)[Float64] == 2.0)
+
+
+def test_pct_change_null_propagation() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, None, 3.0]")))
+    var r = s.pct_change()
+    assert_true(r.isna().iloc(0)[Bool])
+    assert_true(r.isna().iloc(1)[Bool])
+    assert_true(r.isna().iloc(2)[Bool])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
