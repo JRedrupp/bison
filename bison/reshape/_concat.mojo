@@ -509,8 +509,11 @@ def concat(
         When ``True``, reset the output index (axis=0) or column labels
         (axis=1) to a default integer range.
     keys : Optional[List[String]]
-        Hierarchical index keys — not yet implemented natively; raises if
-        provided.
+        When provided, creates a hierarchical (MultiIndex) index labelling
+        each input object with the corresponding key.  Implemented by
+        delegating to ``pandas.concat`` and converting the result back via
+        :meth:`DataFrame.from_pandas`, because native MultiIndex is not yet
+        supported.
     sort : Bool
         When ``True``, sort the non-concatenation axis labels alphabetically.
     """
@@ -518,7 +521,22 @@ def concat(
         return DataFrame()
 
     if keys:
-        _not_implemented("concat")
+        var pd = Python.import_module("pandas")
+        var pd_objs = Python.evaluate("[]")
+        for i in range(len(objs)):
+            _ = pd_objs.append(objs[i].to_pandas())
+        var py_keys = Python.evaluate("[]")
+        for i in range(len(keys.value())):
+            _ = py_keys.append(keys.value()[i])
+        var result = pd.concat(
+            pd_objs,
+            keys=py_keys,
+            axis=axis,
+            join=join,
+            ignore_index=ignore_index,
+            sort=sort,
+        )
+        return DataFrame.from_pandas(result)
 
     if axis == 1:
         return _concat_axis1(objs, join, ignore_index, sort)
