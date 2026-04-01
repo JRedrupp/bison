@@ -799,6 +799,173 @@ struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("var: non-numeric column type")
 
 
+struct _MomentVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Accumulates sum of (x - mean)^k, skipping null values.
+
+    Used to compute higher-order central moments for skewness (k=3) and
+    excess kurtosis (k=4) calculations.
+    """
+
+    var total: Float64
+    var mean: Float64
+    var k: Int
+    var null_mask: List[Bool]
+
+    def __init__(out self, mean: Float64, k: Int, null_mask: List[Bool]):
+        self.total = Float64(0)
+        self.mean = mean
+        self.k = k
+        self.null_mask = null_mask.copy()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var diff = Float64(data[i]) - self.mean
+            var p = diff
+            for _ in range(self.k - 1):
+                p *= diff
+            self.total += p
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var diff = data[i] - self.mean
+            var p = diff
+            for _ in range(self.k - 1):
+                p *= diff
+            self.total += p
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            var diff = v - self.mean
+            var p = diff
+            for _ in range(self.k - 1):
+                p *= diff
+            self.total += p
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("skew/kurt: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("skew/kurt: non-numeric column type")
+
+
+struct _ArgMinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Finds the positional index of the minimum value, skipping null values."""
+
+    var result: Int
+    var found: Bool
+    var min_val: Float64
+    var null_mask: List[Bool]
+
+    def __init__(out self, null_mask: List[Bool]):
+        self.result = 0
+        self.found = False
+        self.min_val = Float64(0)
+        self.null_mask = null_mask.copy()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(data[i])
+            if not self.found or v < self.min_val:
+                self.min_val = v
+                self.result = i
+                self.found = True
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = data[i]
+            if not self.found or v < self.min_val:
+                self.min_val = v
+                self.result = i
+                self.found = True
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            if not self.found or v < self.min_val:
+                self.min_val = v
+                self.result = i
+                self.found = True
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("idxmin: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("idxmin: non-numeric column type")
+
+
+struct _ArgMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Finds the positional index of the maximum value, skipping null values."""
+
+    var result: Int
+    var found: Bool
+    var max_val: Float64
+    var null_mask: List[Bool]
+
+    def __init__(out self, null_mask: List[Bool]):
+        self.result = 0
+        self.found = False
+        self.max_val = Float64(0)
+        self.null_mask = null_mask.copy()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(data[i])
+            if not self.found or v > self.max_val:
+                self.max_val = v
+                self.result = i
+                self.found = True
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = data[i]
+            if not self.found or v > self.max_val:
+                self.max_val = v
+                self.result = i
+                self.found = True
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_mask = len(self.null_mask) > 0
+        for i in range(len(data)):
+            if has_mask and self.null_mask[i]:
+                continue
+            var v = Float64(1.0) if data[i] else Float64(0.0)
+            if not self.found or v > self.max_val:
+                self.max_val = v
+                self.result = i
+                self.found = True
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("idxmax: non-numeric column type")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("idxmax: non-numeric column type")
+
+
 struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Counts unique non-null values across all supported column types."""
 
@@ -3820,6 +3987,195 @@ struct Column(Copyable, Movable, Sized):
     def std(self, ddof: Int = 1, skipna: Bool = True) raises -> Float64:
         """Return the standard deviation (square root of variance)."""
         return sqrt(self.var(ddof, skipna))
+
+    def skew(self, skipna: Bool = True) raises -> Float64:
+        """Return the adjusted Fisher-Pearson standardised skewness coefficient.
+
+        Formula: ``n / ((n-1) * (n-2)) * sum((x-mean)^3) / std^3``.
+        Returns NaN when n < 3 or std == 0.
+        """
+        var n = self.count() if skipna else len(self)
+        if n < 3:
+            var zero = Float64(0)
+            return zero / zero
+        var m = self.mean(skipna)
+        var s = self.std(1, skipna)
+        if s == 0.0:
+            var zero = Float64(0)
+            return zero / zero
+        var visitor = _MomentVisitor(m, 3, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        return (
+            Float64(n)
+            / Float64((n - 1) * (n - 2))
+            * visitor.total
+            / (s * s * s)
+        )
+
+    def kurt(self, skipna: Bool = True) raises -> Float64:
+        """Return the excess kurtosis with bias correction (pandas default).
+
+        Formula: ``n*(n+1)/((n-1)*(n-2)*(n-3)) * sum((x-mean)^4/s^4)
+        - 3*(n-1)^2/((n-2)*(n-3))``.
+        Returns NaN when n < 4 or std == 0.
+        """
+        var n = self.count() if skipna else len(self)
+        if n < 4:
+            var zero = Float64(0)
+            return zero / zero
+        var m = self.mean(skipna)
+        var s = self.std(1, skipna)
+        if s == 0.0:
+            var zero = Float64(0)
+            return zero / zero
+        var visitor = _MomentVisitor(m, 4, self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        var fn_ = Float64(n)
+        var term1 = (
+            fn_
+            * (fn_ + 1.0)
+            / ((fn_ - 1.0) * (fn_ - 2.0) * (fn_ - 3.0))
+            * visitor.total
+            / (s * s * s * s)
+        )
+        var term2 = (
+            3.0 * (fn_ - 1.0) * (fn_ - 1.0) / ((fn_ - 2.0) * (fn_ - 3.0))
+        )
+        return term1 - term2
+
+    def argmin(self, skipna: Bool = True) raises -> Int:
+        """Return the positional index of the minimum value.
+
+        Returns -1 if the column is empty or all-null.
+        Raises if ``skipna=False`` and any null is present.
+        """
+        if not skipna and self.has_nulls():
+            raise Error(
+                "argmin: cannot compute with NaN values when skipna=False"
+            )
+        var visitor = _ArgMinVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        if not visitor.found:
+            return -1
+        return visitor.result
+
+    def argmax(self, skipna: Bool = True) raises -> Int:
+        """Return the positional index of the maximum value.
+
+        Returns -1 if the column is empty or all-null.
+        Raises if ``skipna=False`` and any null is present.
+        """
+        if not skipna and self.has_nulls():
+            raise Error(
+                "argmax: cannot compute with NaN values when skipna=False"
+            )
+        var visitor = _ArgMaxVisitor(self._null_mask)
+        visit_col_data_raises(visitor, self._data)
+        if not visitor.found:
+            return -1
+        return visitor.result
+
+    def cov(
+        self, other: Column, ddof: Int = 1, skipna: Bool = True
+    ) raises -> Float64:
+        """Return the sample covariance with ``other``.
+
+        Pairs where either column has a null are excluded when ``skipna=True``.
+        Raises if the columns have different lengths.
+        """
+        var n = len(self)
+        if n != len(other):
+            raise Error("cov: columns must be the same length")
+        var x_vis = _ToFloat64Visitor()
+        visit_col_data_raises(x_vis, self._data)
+        var y_vis = _ToFloat64Visitor()
+        visit_col_data_raises(y_vis, other._data)
+        var xs = x_vis.result.copy()
+        var ys = y_vis.result.copy()
+        var has_x_mask = len(self._null_mask) > 0
+        var has_y_mask = len(other._null_mask) > 0
+        var sum_x = Float64(0)
+        var sum_y = Float64(0)
+        var count = 0
+        for i in range(n):
+            var x_null = has_x_mask and self._null_mask[i]
+            var y_null = has_y_mask and other._null_mask[i]
+            if x_null or y_null:
+                if not skipna:
+                    var zero = Float64(0)
+                    return zero / zero
+                continue
+            sum_x += xs[i]
+            sum_y += ys[i]
+            count += 1
+        if count - ddof <= 0:
+            var zero = Float64(0)
+            return zero / zero
+        var mean_x = sum_x / Float64(count)
+        var mean_y = sum_y / Float64(count)
+        var total = Float64(0)
+        for i in range(n):
+            var x_null = has_x_mask and self._null_mask[i]
+            var y_null = has_y_mask and other._null_mask[i]
+            if x_null or y_null:
+                continue
+            total += (xs[i] - mean_x) * (ys[i] - mean_y)
+        return total / Float64(count - ddof)
+
+    def corr(self, other: Column, skipna: Bool = True) raises -> Float64:
+        """Return the Pearson correlation coefficient with ``other``.
+
+        Pairs where either column has a null are excluded when ``skipna=True``.
+        Raises if the columns have different lengths.
+        """
+        var n = len(self)
+        if n != len(other):
+            raise Error("corr: columns must be the same length")
+        var x_vis = _ToFloat64Visitor()
+        visit_col_data_raises(x_vis, self._data)
+        var y_vis = _ToFloat64Visitor()
+        visit_col_data_raises(y_vis, other._data)
+        var xs = x_vis.result.copy()
+        var ys = y_vis.result.copy()
+        var has_x_mask = len(self._null_mask) > 0
+        var has_y_mask = len(other._null_mask) > 0
+        var sum_x = Float64(0)
+        var sum_y = Float64(0)
+        var count = 0
+        for i in range(n):
+            var x_null = has_x_mask and self._null_mask[i]
+            var y_null = has_y_mask and other._null_mask[i]
+            if x_null or y_null:
+                if not skipna:
+                    var zero = Float64(0)
+                    return zero / zero
+                continue
+            sum_x += xs[i]
+            sum_y += ys[i]
+            count += 1
+        if count <= 1:
+            var zero = Float64(0)
+            return zero / zero
+        var mean_x = sum_x / Float64(count)
+        var mean_y = sum_y / Float64(count)
+        var sum_xy = Float64(0)
+        var sum_x2 = Float64(0)
+        var sum_y2 = Float64(0)
+        for i in range(n):
+            var x_null = has_x_mask and self._null_mask[i]
+            var y_null = has_y_mask and other._null_mask[i]
+            if x_null or y_null:
+                continue
+            var dx = xs[i] - mean_x
+            var dy = ys[i] - mean_y
+            sum_xy += dx * dy
+            sum_x2 += dx * dx
+            sum_y2 += dy * dy
+        var denom = sqrt(sum_x2 * sum_y2)
+        if denom == 0.0:
+            var zero = Float64(0)
+            return zero / zero
+        return sum_xy / denom
 
     def nunique(self) raises -> Int:
         """Return the number of unique non-null values.
