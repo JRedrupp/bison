@@ -5216,7 +5216,7 @@ struct Column(Copyable, Movable, Sized):
         var visitor = _FillScalarVisitor(n)
         visit_scalar_raises(visitor, value)
         var dtype = visitor._dtype
-        return Column(name, visitor^._col_data.copy(), dtype, index)
+        return Column(name, visitor^._col_data.copy(), dtype, index.copy())
 
     def to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
