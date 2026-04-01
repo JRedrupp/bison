@@ -1476,7 +1476,7 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.self_null_mask = self_null_mask.copy()
         var v = _CopyDataVisitor()
         visit_col_data(v, other_data)
-        self.other_data = v^.result
+        self.other_data = v^.result.copy()
         self.other_null_mask = other_null_mask.copy()
 
     def on_int64(mut self, data: List[Int64]) raises:
@@ -2020,7 +2020,7 @@ struct _ConcatDataVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var result: ColumnData
 
     def __init__(out self, other: ColumnData):
-        self.other = other
+        self.other = other.copy()
         self.result = ColumnData(List[PythonObject]())
 
     def on_int64(mut self, data: List[Int64]) raises:
@@ -3465,16 +3465,16 @@ struct Column(Copyable, Movable, Sized):
 
     # ------------------------------------------------------------------
     # Traits
-    # NOTE: ColumnIndex is a Variant, so it supports implicit copy (unlike the
-    # former List[PythonObject] storage which required explicit .copy() here).
-    # _null_mask: List[Bool] is still explicitly copied below.
+    # NOTE: ColumnData and ColumnIndex are Variant types. Nightly Mojo no
+    # longer allows implicit copies of Variant, so both require explicit
+    # .copy() calls. _null_mask: List[Bool] also requires explicit .copy().
     # ------------------------------------------------------------------
 
     def __init__(out self, *, copy: Self):
         self.name = copy.name
         self.dtype = copy.dtype
-        self._data = copy._data
-        self._index = copy._index
+        self._data = copy._data.copy()
+        self._index = copy._index.copy()
         self._null_mask = copy._null_mask.copy()
         self._index_names = copy._index_names.copy()
         self._index_name = copy._index_name
@@ -3516,9 +3516,9 @@ struct Column(Copyable, Movable, Sized):
         """Return an independent copy of this Column."""
         var visitor = _CopyDataVisitor()
         visit_col_data(visitor, self._data)
-        var idx = self._index
+        var idx = self._index.copy()
         var mask = self._null_mask.copy()
-        var col = Column(self.name, visitor^.result, self.dtype, idx^)
+        var col = Column(self.name, visitor^.result.copy(), self.dtype, idx^)
         col._null_mask = mask^
         col._index_names = self._index_names.copy()
         col._index_name = self._index_name
@@ -3812,7 +3812,7 @@ struct Column(Copyable, Movable, Sized):
                 new_mask.append(self._null_mask[i])
         var visitor = _SliceVisitor(s, e)
         visit_col_data(visitor, self._data)
-        var col = Column(self.name, visitor^.result, self.dtype)
+        var col = Column(self.name, visitor^.result.copy(), self.dtype)
         if len(new_mask) > 0:
             col._null_mask = new_mask^
         return col^
@@ -3827,7 +3827,7 @@ struct Column(Copyable, Movable, Sized):
                 new_mask.append(self._null_mask[indices[k]])
         var visitor = _TakeVisitor(indices)
         visit_col_data(visitor, self._data)
-        var col = Column(self.name, visitor^.result, self.dtype)
+        var col = Column(self.name, visitor^.result.copy(), self.dtype)
         if len(new_mask) > 0:
             col._null_mask = new_mask^
         return col^
@@ -3838,7 +3838,7 @@ struct Column(Copyable, Movable, Sized):
         visit_col_data(visitor, self._data)
         # Save out_mask before consuming visitor to avoid partial-move issues.
         var out_mask = visitor.out_mask.copy()
-        var col = Column(self.name, visitor^.result, self.dtype)
+        var col = Column(self.name, visitor^.result.copy(), self.dtype)
         var has_null = False
         for k in range(len(out_mask)):
             if out_mask[k]:
@@ -3852,7 +3852,7 @@ struct Column(Copyable, Movable, Sized):
         """Return a new Column with *other* appended row-wise."""
         var visitor = _ConcatDataVisitor(other._data)
         visit_col_data_raises(visitor, self._data)
-        var col = Column(self.name, visitor^.result, self.dtype)
+        var col = Column(self.name, visitor^.result.copy(), self.dtype)
         # Merge null masks only when at least one side has nulls
         if len(self._null_mask) > 0 or len(other._null_mask) > 0:
             var n_self = len(self)
@@ -4318,7 +4318,7 @@ struct Column(Copyable, Movable, Sized):
         )
         visit_col_data_raises(index_visitor, self._data)
         var result_counts = index_visitor.result_counts.copy()
-        var result_idx = index_visitor.result_idx
+        var result_idx = index_visitor.result_idx.copy()
 
         if normalize:
             var total = Float64(self.count())
@@ -4876,7 +4876,7 @@ struct Column(Copyable, Movable, Sized):
         """
         var visitor = _ToColumnIndexVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
-        return visitor.result
+        return visitor.result.copy()
 
     # Kept for backward compatibility with callers that still need raw PythonObject.
     def _to_pyobj_index(self) raises -> List[PythonObject]:
@@ -5216,7 +5216,7 @@ struct Column(Copyable, Movable, Sized):
         var visitor = _FillScalarVisitor(n)
         visit_scalar_raises(visitor, value)
         var dtype = visitor._dtype
-        return Column(name, visitor^._col_data, dtype, index)
+        return Column(name, visitor^._col_data.copy(), dtype, index)
 
     def to_pandas(self) raises -> PythonObject:
         """Reconstruct a pandas Series from stored values."""
