@@ -2488,7 +2488,6 @@ struct DataFrame(Copyable, Movable):
                     )
                 else:
                     _not_implemented("DataFrame.idxmin with non-integer index")
-                    values.append(Float64(pos))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
         var result_col = Column(None, col_data^, dtype)
@@ -2513,7 +2512,6 @@ struct DataFrame(Copyable, Movable):
                     )
                 else:
                     _not_implemented("DataFrame.idxmax with non-integer index")
-                    values.append(Float64(pos))
         var col_data = ColumnData(values^)
         var dtype = Column._sniff_dtype(col_data)
         var result_col = Column(None, col_data^, dtype)
