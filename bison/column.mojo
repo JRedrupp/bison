@@ -106,6 +106,40 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
         return self._v[T]
 
 
+struct DictSplitResult(Copyable, Movable):
+    """Holds the result of ``DataFrame.to_dict["split"]()`` /
+    ``DataFrame.to_dict["tight"]()``.
+
+    Fields
+    ------
+    columns      : Ordered list of column names.
+    index        : Stringified row-index labels (one per row).
+    data         : Row-major list of value lists.
+    index_names  : Index level names — non-empty only for orient ``"tight"``.
+    column_names : Column level names — non-empty only for orient ``"tight"``.
+    """
+
+    var columns: List[String]
+    var index: List[String]
+    var data: List[List[DFScalar]]
+    var index_names: List[String]
+    var column_names: List[String]
+
+    def __init__(
+        out self,
+        var columns: List[String],
+        var index: List[String],
+        var data: List[List[DFScalar]],
+        var index_names: List[String],
+        var column_names: List[String],
+    ):
+        self.columns = columns^
+        self.index = index^
+        self.data = data^
+        self.index_names = index_names^
+        self.column_names = column_names^
+
+
 # Scalar type returned by Series.iloc / Series.at.
 # Covers all five ColumnData arm types; the PythonObject arm is used only
 # for object/datetime/timedelta columns that have no native Mojo equivalent.
