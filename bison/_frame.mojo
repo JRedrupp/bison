@@ -1,5 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional, Dict
+from std.utils import Variant
 from std.builtin.sort import sort as _sort_list
 from std.math import sqrt
 from std.memory import UnsafePointer
@@ -19,6 +20,7 @@ from .column import (
     ColumnData,
     DFScalar,
     SeriesScalar,
+    DictSplitResult,
     _Null,
     FloatTransformFn,
     _csv_quote_field,
@@ -1636,6 +1638,22 @@ def _sort_col_names(names: List[String]) -> List[String]:
     for i in range(n):
         result.append(names[order[i]])
     return result^
+
+
+# Variant returned by the compile-time-dispatch to_dict[orient] overload.
+# Arms correspond to each orient value:
+#   Dict[String, Dict[String, DFScalar]]  — "dict" / "index"
+#   Dict[String, List[DFScalar]]          — "list"
+#   List[Dict[String, DFScalar]]          — "records"
+#   DictSplitResult                       — "split" / "tight"
+#   Dict[String, Series]                  — "series"
+comptime ToDictResult = Variant[
+    Dict[String, Dict[String, DFScalar]],
+    Dict[String, List[DFScalar]],
+    List[Dict[String, DFScalar]],
+    DictSplitResult,
+    Dict[String, Series],
+]
 
 
 struct DataFrame(Copyable, Movable):
@@ -4585,34 +4603,170 @@ struct DataFrame(Copyable, Movable):
     def to_dict(
         self, orient: String = "dict"
     ) raises -> Dict[String, Dict[String, DFScalar]]:
-        """Return the DataFrame as a nested ``Dict`` mapping column names to
-        index-label → value dicts.
+        """Return the DataFrame as a nested ``Dict``.
 
-        Matches pandas ``orient="dict"`` semantics: the outer key is the
-        column name and the inner key is the stringified row-index label
-        (e.g. ``"0"``, ``"1"`` for the default integer index).
+        Supports two orient values directly:
 
-        All other orient values raise ``Error``.  For row-oriented output use
-        ``to_records()`` (equivalent to ``orient="records"``).
+        - ``"dict"`` *(default)* — ``{column: {index_label: value}}``
+        - ``"index"`` — ``{index_label: {column: value}}``
+
+        All other orient values raise ``Error`` and direct callers to the
+        compile-time generic overload ``to_dict[orient]()``.
 
         Parameters
         ----------
-        orient : Serialisation orientation.  Only ``"dict"`` is supported.
+        orient : ``"dict"`` or ``"index"``.
         """
-        if orient != "dict":
-            _not_implemented("DataFrame.to_dict with orient='" + orient + "'")
-        var result = Dict[String, Dict[String, DFScalar]]()
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
         var has_index = self._has_index()
-        for ci in range(ncols):
-            ref col = self._cols[ci]
-            var inner = Dict[String, DFScalar]()
-            for i in range(nrows):
-                var key = col._index_label(i) if has_index else String(i)
-                inner[key] = _scalar_from_col(col, i)
-            result[col.name.value()] = inner^
-        return result^
+        if orient == "dict":
+            var result = Dict[String, Dict[String, DFScalar]]()
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                var inner = Dict[String, DFScalar]()
+                for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
+                    inner[key] = _scalar_from_col(col, i)
+                result[col.name.value()] = inner^
+            return result^
+        elif orient == "index":
+            var result = Dict[String, Dict[String, DFScalar]]()
+            for ri in range(nrows):
+                var row_key = self._cols[0]._index_label(
+                    ri
+                ) if has_index else String(ri)
+                var inner = Dict[String, DFScalar]()
+                for ci in range(ncols):
+                    inner[self._cols[ci].name.value()] = _scalar_from_col(
+                        self._cols[ci], ri
+                    )
+                result[row_key] = inner^
+            return result^
+        else:
+            raise Error(
+                "DataFrame.to_dict: orient='"
+                + orient
+                + "' is not supported via the runtime-string overload."
+                + ' Use the compile-time generic: df.to_dict["'
+                + orient
+                + '"]()'
+            )
+
+    def to_dict[orient: StringLiteral = "dict"](self) raises -> ToDictResult:
+        """Compile-time generic orient dispatch — returns a ``ToDictResult`` Variant.
+
+        Supported orient values and their result arms:
+
+        - ``"dict"``    → ``Dict[String, Dict[String, DFScalar]]``
+        - ``"index"``   → ``Dict[String, Dict[String, DFScalar]]``
+        - ``"list"``    → ``Dict[String, List[DFScalar]]``
+        - ``"records"`` → ``List[Dict[String, DFScalar]]``
+        - ``"split"``   → ``DictSplitResult`` (columns, index, data)
+        - ``"tight"``   → ``DictSplitResult`` (adds index_names, column_names)
+        - ``"series"``  → ``Dict[String, Series]``
+
+        Call as ``df.to_dict["list"]()`` and unwrap with
+        ``result[Dict[String, List[DFScalar]]]``.
+
+        Unknown orient values produce a compile-time error via ``comptime assert``.
+        """
+        var nrows = self.__len__()
+        var ncols = self._cols.__len__()
+        var has_index = self._has_index()
+
+        comptime if orient == "dict":
+            var result = Dict[String, Dict[String, DFScalar]]()
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                var inner = Dict[String, DFScalar]()
+                for i in range(nrows):
+                    var key = col._index_label(i) if has_index else String(i)
+                    inner[key] = _scalar_from_col(col, i)
+                result[col.name.value()] = inner^
+            return ToDictResult(result^)
+        elif orient == "index":
+            var result = Dict[String, Dict[String, DFScalar]]()
+            for ri in range(nrows):
+                var row_key = self._cols[0]._index_label(
+                    ri
+                ) if has_index else String(ri)
+                var inner = Dict[String, DFScalar]()
+                for ci in range(ncols):
+                    inner[self._cols[ci].name.value()] = _scalar_from_col(
+                        self._cols[ci], ri
+                    )
+                result[row_key] = inner^
+            return ToDictResult(result^)
+        elif orient == "list":
+            var result = Dict[String, List[DFScalar]]()
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                var vals = List[DFScalar]()
+                for i in range(nrows):
+                    vals.append(_scalar_from_col(col, i))
+                result[col.name.value()] = vals^
+            return ToDictResult(result^)
+        elif orient == "records":
+            return ToDictResult(self.to_records(index=False))
+        elif orient == "split":
+            var columns = List[String]()
+            for ci in range(ncols):
+                columns.append(self._cols[ci].name.value())
+            var index_labels = List[String]()
+            for ri in range(nrows):
+                index_labels.append(
+                    self._cols[0]._index_label(ri) if has_index else String(ri)
+                )
+            var data = List[List[DFScalar]]()
+            for ri in range(nrows):
+                var row = List[DFScalar]()
+                for ci in range(ncols):
+                    row.append(_scalar_from_col(self._cols[ci], ri))
+                data.append(row^)
+            var index_names = List[String]()
+            var column_names = List[String]()
+            return ToDictResult(
+                DictSplitResult(
+                    columns^, index_labels^, data^, index_names^, column_names^
+                )
+            )
+        elif orient == "tight":
+            var columns = List[String]()
+            for ci in range(ncols):
+                columns.append(self._cols[ci].name.value())
+            var index_labels = List[String]()
+            for ri in range(nrows):
+                index_labels.append(
+                    self._cols[0]._index_label(ri) if has_index else String(ri)
+                )
+            var data = List[List[DFScalar]]()
+            for ri in range(nrows):
+                var row = List[DFScalar]()
+                for ci in range(ncols):
+                    row.append(_scalar_from_col(self._cols[ci], ri))
+                data.append(row^)
+            var index_names = List[String]()
+            if ncols > 0:
+                index_names.append(self._cols[0]._index_name)
+            var column_names = List[String]()
+            return ToDictResult(
+                DictSplitResult(
+                    columns^, index_labels^, data^, index_names^, column_names^
+                )
+            )
+        elif orient == "series":
+            var result = Dict[String, Series]()
+            for ci in range(ncols):
+                result[self._cols[ci].name.value()] = Series(
+                    self._cols[ci].copy()
+                )
+            return ToDictResult(result^)
+        else:
+            comptime assert False, (
+                "DataFrame.to_dict: unknown orient (must be dict, index,"
+                " list, records, split, tight, or series)"
+            )
 
     def to_records(
         self, index: Bool = True

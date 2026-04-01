@@ -1,7 +1,17 @@
 """Tests for DataFrame IO (read and write methods)."""
 from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, TestSuite
-from bison import read_csv, read_parquet, read_json, read_excel, DataFrame, DFScalar
+from bison import (
+    read_csv,
+    read_parquet,
+    read_json,
+    read_excel,
+    DataFrame,
+    DFScalar,
+    DictSplitResult,
+    ToDictResult,
+    Series,
+)
 
 
 def test_read_csv_basic() raises:
@@ -365,25 +375,131 @@ def test_to_dict_int_columns() raises:
     assert_equal(Int(d["b"]["0"][Int64]), 4)
 
 
-def test_to_dict_list_orient() raises:
-    """DataFrame.to_dict raises for orient='list' (unsupported; use to_records)."""
+def test_to_dict_index_orient() raises:
+    """Runtime orient='index' returns {row_label: {col: val}}."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var d = df.to_dict(orient="index")
+    # Row 0: {"a": 1, "b": 3}
+    assert_equal(Int(d["0"]["a"][Int64]), 1)
+    assert_equal(Int(d["0"]["b"][Int64]), 3)
+    # Row 1: {"a": 2, "b": 4}
+    assert_equal(Int(d["1"]["a"][Int64]), 2)
+    assert_equal(Int(d["1"]["b"][Int64]), 4)
+
+
+def test_to_dict_generic_dict() raises:
+    """Generic to_dict['dict']() returns the same result as to_dict()."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
+    var r = df.to_dict["dict"]()
+    ref d = r[Dict[String, Dict[String, DFScalar]]]
+    assert_equal(Int(d["x"]["0"][Int64]), 10)
+    assert_equal(Int(d["x"]["1"][Int64]), 20)
+
+
+def test_to_dict_generic_index() raises:
+    """Generic to_dict['index']() returns {row_label: {col: val}}."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r = df.to_dict["index"]()
+    ref d = r[Dict[String, Dict[String, DFScalar]]]
+    assert_equal(Int(d["0"]["a"][Int64]), 1)
+    assert_equal(Int(d["0"]["b"][Int64]), 3)
+    assert_equal(Int(d["1"]["a"][Int64]), 2)
+    assert_equal(Int(d["1"]["b"][Int64]), 4)
+
+
+def test_to_dict_generic_list() raises:
+    """Generic to_dict['list']() returns {col: [values]}."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}")))
+    var r = df.to_dict["list"]()
+    ref d = r[Dict[String, List[DFScalar]]]
+    assert_equal(len(d["a"]), 3)
+    assert_equal(len(d["b"]), 3)
+    assert_equal(Int(d["a"][0][Int64]), 1)
+    assert_equal(Int(d["a"][2][Int64]), 3)
+    assert_equal(Int(d["b"][0][Int64]), 4)
+    assert_equal(Int(d["b"][2][Int64]), 6)
+
+
+def test_to_dict_generic_records() raises:
+    """Generic to_dict['records']() returns a list of row dicts without the index key."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [10, 20], 'b': [30, 40]}")))
+    var r = df.to_dict["records"]()
+    ref records = r[List[Dict[String, DFScalar]]]
+    assert_equal(len(records), 2)
+    assert_equal(Int(records[0]["a"][Int64]), 10)
+    assert_equal(Int(records[0]["b"][Int64]), 30)
+    assert_equal(Int(records[1]["a"][Int64]), 20)
+    assert_equal(Int(records[1]["b"][Int64]), 40)
+
+
+def test_to_dict_generic_split() raises:
+    """Generic to_dict['split']() returns a DictSplitResult with columns, index, data."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r = df.to_dict["split"]()
+    ref s = r[DictSplitResult]
+    assert_equal(len(s.columns), 2)
+    assert_equal(s.columns[0], "a")
+    assert_equal(s.columns[1], "b")
+    assert_equal(len(s.index), 2)
+    assert_equal(s.index[0], "0")
+    assert_equal(s.index[1], "1")
+    assert_equal(len(s.data), 2)
+    assert_equal(Int(s.data[0][0][Int64]), 1)
+    assert_equal(Int(s.data[0][1][Int64]), 3)
+    assert_equal(Int(s.data[1][0][Int64]), 2)
+    assert_equal(Int(s.data[1][1][Int64]), 4)
+    # split does not populate index_names
+    assert_equal(len(s.index_names), 0)
+
+
+def test_to_dict_generic_tight() raises:
+    """Generic to_dict['tight']() is like split but adds index_names."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
+    var r = df.to_dict["tight"]()
+    ref s = r[DictSplitResult]
+    assert_equal(len(s.columns), 2)
+    assert_equal(len(s.data), 2)
+    # tight always populates index_names (may be empty string for default RangeIndex)
+    assert_equal(len(s.index_names), 1)
+
+
+def test_to_dict_generic_series() raises:
+    """Generic to_dict['series']() returns {col: Series}."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var r = df.to_dict["series"]()
+    ref d = r[Dict[String, Series]]
+    assert_equal(d["a"].__len__(), 3)
+    assert_equal(Int(d["a"].iloc(0)[Int64]), 1)
+    assert_equal(Int(d["a"].iloc(2)[Int64]), 3)
+
+
+def test_to_dict_unknown_runtime_orient_raises() raises:
+    """Runtime to_dict(orient='xyz') raises a helpful error for unknown orient."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var raised = False
     try:
-        _ = df.to_dict(orient="list")
+        _ = df.to_dict(orient="xyz")
     except:
         raised = True
     assert_true(raised)
 
 
-def test_to_dict_unsupported_orient() raises:
-    """DataFrame.to_dict raises for orient values other than 'dict'."""
+def test_to_dict_list_orient_runtime_raises() raises:
+    """Runtime to_dict(orient='list') raises and points to to_dict['list']()."""
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20]}")))
     var raised = False
     try:
-        _ = df.to_dict(orient="records")
+        _ = df.to_dict(orient="list")
     except:
         raised = True
     assert_true(raised)
