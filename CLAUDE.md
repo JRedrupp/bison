@@ -7,9 +7,33 @@ Mojo DataFrame library with a pandas-compatible API. Every method that is not ye
 ## Layout
 
 ```
-bison/bison/    — the Mojo package (import bison)
-bison/tests/    — one test_*.mojo file per feature area
-bison/scripts/  — gen_version.py, run_tests.sh, update_compat.py
+bison/
+├── bison/              — the Mojo package (import bison)
+│   ├── __init__.mojo   — public API exports
+│   ├── _errors.mojo    — _not_implemented() helper
+│   ├── _version.mojo   — AUTO-GENERATED; never edit by hand
+│   ├── _frame.mojo     — core DataFrame, Series, GroupBy (~6,346 lines)
+│   ├── column.mojo     — Column storage & ColumnData variant (~4,972 lines)
+│   ├── dataframe.mojo  — re-exports from _frame
+│   ├── series.mojo     — re-exports from _frame
+│   ├── groupby.mojo    — re-exports from _frame
+│   ├── indexing.mojo   — re-exports indexer classes
+│   ├── dtypes.mojo     — BisonDtype struct + 14 comptime dtype constants
+│   ├── index.mojo      — Index, RangeIndex, ColumnIndex structs
+│   ├── accessors/
+│   │   ├── str_accessor.mojo   — StringMethods (.str accessor)
+│   │   └── dt_accessor.mojo    — DatetimeMethods (.dt accessor)
+│   ├── io/
+│   │   ├── csv.mojo            — read_csv (native; dtype inference)
+│   │   ├── json.mojo           — read_json (native; type inference)
+│   │   ├── parquet.mojo        — read_parquet (stub → pandas)
+│   │   └── excel.mojo          — read_excel (stub → pandas/openpyxl)
+│   └── reshape/
+│       └── _concat.mojo        — concat axis=0 with dtype promotion
+├── tests/              — one test_*.mojo file per feature area
+├── benchmarks/         — bench_core.mojo + _bench_utils.mojo
+├── scripts/            — gen_version.py, run_tests.sh, update_compat.py, …
+└── docs/               — index.html performance dashboard
 ```
 
 ## Environment
@@ -21,9 +45,48 @@ pixi run gen-version    # write bison/_version.mojo from pixi.toml
 pixi run test           # regenerates version then runs all tests
 pixi run update-compat  # rewrite compat table in README.md
 pixi run fmt            # mojo format bison/
-pixi run check          # mojo build bison/
+pixi run check          # mojo package bison/ --Werror (no warnings allowed)
 pixi run lint           # pre-commit run --all-files
+pixi run bench          # run benchmarks (depends on gen-version)
+pixi run gen-report     # merge benchmark results into docs/data.json
 ```
+
+Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >= 26.2`.
+
+## Architecture
+
+### Column storage
+
+`column.mojo` is the storage layer. `ColumnData` is a `Variant`:
+
+```
+ColumnData = List[Int64] | List[Float64] | List[Bool] | List[String] | List[PythonObject]
+```
+
+Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null mask. Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 column). GroupBy key columns may promote to `List[Float64]` to unify key types.
+
+### Core types
+
+| Type | File | Notes |
+|------|------|-------|
+| `DataFrame` | `_frame.mojo` | `Dict[String, Column]` backing, ordered columns |
+| `Series` | `_frame.mojo` | Wraps `Column` + optional name |
+| `DataFrameGroupBy` / `SeriesGroupBy` | `_frame.mojo` | Supports agg, sum, mean, count, first, last |
+| `Index` | `index.mojo` | `List[String]` backed with name attribute |
+| `RangeIndex` | `index.mojo` | `start, stop, step` — like pandas |
+| `ColumnIndex` | `index.mojo` | Variant: `Index | List[Int64] | List[Float64] | List[PythonObject]` |
+| `BisonDtype` | `dtypes.mojo` | 14 comptime constants: `int8` … `uint64`, `float32/64`, `bool_`, `object_`, `datetime64_ns`, `timedelta64_ns` |
+
+### I/O dtype inference order
+
+- **CSV / JSON**: `bool` > `int64` > `float64` > `String`
+- Null values tracked via `na_set` parameter and null mask
+- `read_parquet` and `read_excel` delegate to pandas (stubs)
+
+### Accessors
+
+`Series.str` returns `StringMethods` (upper, lower, strip, contains, replace, split, …).
+`Series.dt` returns `DatetimeMethods` (year, month, day, hour, minute, second, …).
 
 ## Versioning
 
@@ -41,7 +104,9 @@ fn sort_values(self, by: String, ascending: Bool = True) raises -> Self:
     return self   # never reached; satisfies type checker
 ```
 
-The string passed to `_not_implemented` must be `"TypeName.method_name"` — `scripts/update_compat.py` parses these strings to build the compatibility table.
+Rules:
+- The string passed to `_not_implemented` must be `"TypeName.method_name"` — `scripts/update_compat.py` parses these strings to build the compatibility table.
+- Never use a bare `raise Error("not yet implemented")` — the pre-commit hook will block it.
 
 ## Implementing a stub
 
@@ -60,9 +125,63 @@ Each `tests/test_*.mojo` file has a `main()` that calls every `test_*` function 
 
 Run a single file: `mojo run tests/test_dataframe.mojo`
 
+Test files by feature area:
+
+| File | Area |
+|------|------|
+| `test_dataframe.mojo` | DataFrame construction, selection |
+| `test_series_*.mojo` | Series construction, io, math, transforms |
+| `test_aggregation.mojo` | sum, mean, std, var, min, max |
+| `test_groupby.mojo` | groupby operations |
+| `test_indexing.mojo` | .loc, .iloc, .at, .iat |
+| `test_io.mojo` | CSV, JSON, Excel, Parquet |
+| `test_reshaping.mojo` | concat, melt, pivot |
+| `test_accessors.mojo` | .str and .dt accessors |
+| `test_combining.mojo` | merge, join, append |
+| `test_missing.mojo` | null / NaN handling |
+| `test_functional.mojo` | map, apply, transform |
+| `test_structural.mojo` | shape, columns, dtypes |
+| `test_interop.mojo` | from_pandas / to_pandas |
+| `test_index.mojo` | Index operations |
+| `test_concat.mojo` | concat-specific cases |
+| `test_transform.mojo` | transformation tests |
+
+Helper utilities live in `tests/_helpers.mojo`: `assert_frame_equal`, `assert_series_equal`, `make_simple_df`.
+
+## Test caching
+
+`scripts/run_tests.sh` rebuilds `bison.mojopkg` only when sources are newer than `.bison-cache/`. Tests run in parallel via background jobs; failures are collected and reported at the end.
+
 ## Compatibility table
 
-`README.md` contains the table between `<!-- COMPAT_TABLE_START -->` and `<!-- COMPAT_TABLE_END -->`. Do not edit those lines manually — they are owned by `scripts/update_compat.py`. The script counts `_not_implemented()` calls per category.
+`README.md` contains the table between `<!-- COMPAT_TABLE_START -->` and `<!-- COMPAT_TABLE_END -->`. Do not edit those lines manually — they are owned by `scripts/update_compat.py`. The script counts `_not_implemented()` calls per category (DataFrame, Series, GroupBy, Accessors, IO, Reshape, Index).
+
+## Benchmarks
+
+`benchmarks/bench_core.mojo` measures bison vs pandas across aggregation, groupby, indexing, and I/O operations. `benchmarks/_bench_utils.mojo` provides `time_fn()` (wraps Python timeit) and `BenchResult` (outputs JSON with ratio = bison_ms / pandas_ms).
+
+Iteration counts: `FAST_ITERS=100`, `MED_ITERS=20`, `SLOW_ITERS=3`, `IO_ITERS=5`. Results are stored in `results/<commit>.json`; the latest is symlinked as `results/latest.json`. `scripts/generate_report.py` merges history into `docs/data.json` (capped at 200 runs).
+
+## CI / GitHub Actions
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | push / PR | Matrix: `locked` (pixi.lock) + `latest` (newest MAX ≥ 26.1); lint, test, update compat table on main push |
+| `nightly.yml` | daily + manual | Switches to nightly MAX channel; drops pyarrow; runs tests |
+| `release.yml` | `v*.*.*` tag | Tests + creates GitHub Release |
+| `benchmarks.yml` | push | Runs bench suite; updates dashboard |
+| `renovate.yml` | schedule | Automated dependency bumps |
+
+## Pre-commit hooks
+
+Enforced by `.pre-commit-config.yaml`:
+- Trailing whitespace / end-of-file fixer
+- YAML, TOML, merge-conflict checks
+- No bare `raise Error("not yet implemented")` — must use `_not_implemented()`
+- `mojo format` auto-formatting
+- `mojo package --Werror` — zero warnings policy
+
+Run all hooks manually: `pixi run lint`
 
 ## GitHub issues
 
@@ -123,6 +242,9 @@ Use names from the refactoring.guru catalogs:
 ## Constraints
 
 - `.CLAUDE` and `.claude/` are in `.gitignore` — never commit them.
+- `SESSION.md` is gitignored — never commit it.
 - `README.md` — plain prose, no emojis, no AI-sounding language.
-- `bison/_version.mojo` — never edit by hand.
+- `bison/_version.mojo` — never edit by hand; generated by `scripts/gen_version.py`.
 - Do not add `pixi.lock` to `.gitignore` — commit it for reproducibility.
+- `docs/data.json` and `results/` are gitignored — generated at runtime.
+- The zero-warnings policy is enforced by CI; `pixi run check` must pass before opening a PR.
