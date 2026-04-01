@@ -144,7 +144,46 @@ def test_concat_three_dfs() raises:
     assert_equal(s.iloc(2)[Int64], Int64(3))
 
 
-def test_concat_keys_raises() raises:
+def test_concat_keys_axis0() raises:
+    """keys parameter prepends a __key__ column with one label per source row."""
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3]}")))
+    var dfs = List[DataFrame]()
+    dfs.append(df1^)
+    dfs.append(df2^)
+    var keys = List[String]()
+    keys.append("x")
+    keys.append("y")
+    var result = concat(dfs, keys=Optional[List[String]](keys^))
+    assert_equal(result.shape()[0], 3)
+    assert_equal(result.shape()[1], 2)
+    var k = result["__key__"]
+    assert_equal(k.iloc(0)[String], "x")
+    assert_equal(k.iloc(1)[String], "x")
+    assert_equal(k.iloc(2)[String], "y")
+
+
+def test_concat_keys_axis1() raises:
+    """keys parameter prepends a __key__ column with one label per source column."""
+    var pd = Python.import_module("pandas")
+    var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
+    var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    var dfs = List[DataFrame]()
+    dfs.append(df1^)
+    dfs.append(df2^)
+    var keys = List[String]()
+    keys.append("left")
+    keys.append("right")
+    var result = concat(dfs, axis=1, keys=Optional[List[String]](keys^))
+    assert_equal(result.shape()[1], 3)
+    var k = result["__key__"]
+    assert_equal(k.iloc(0)[String], "left")
+    assert_equal(k.iloc(1)[String], "right")
+
+
+def test_concat_keys_length_mismatch_raises() raises:
+    """concat raises when len(keys) != len(objs)."""
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2]}")))
@@ -154,8 +193,7 @@ def test_concat_keys_raises() raises:
     var raised = False
     try:
         var keys = List[String]()
-        keys.append("k1")
-        keys.append("k2")
+        keys.append("only_one")
         _ = concat(dfs, keys=Optional[List[String]](keys^))
     except:
         raised = True
