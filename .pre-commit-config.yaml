@@ -19,11 +19,11 @@ repos:
         name: "mojo format (auto-format Mojo files)"
         language: script
         entry: scripts/fmt_check.sh
-        files: ^bison/.*\.mojo$
+        files: ^(bison|benchmarks)/.*\.mojo$
         types: [file]
       - id: mojo-build-werror
         name: "mojo build --Werror (no warnings allowed)"
         language: script
         entry: scripts/check_werror.sh
         pass_filenames: false
-        files: ^bison/.*\.mojo$
+        files: ^(bison|benchmarks)/.*\.mojo$
