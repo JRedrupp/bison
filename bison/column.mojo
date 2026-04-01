@@ -4928,16 +4928,16 @@ struct Column(Copyable, Movable, Sized):
         var n = len(self)
         var indices = List[Int]()
         if periods >= 0:
-            var p = periods if periods <= n else n
-            for _ in range(p):
+            var shift_count = periods if periods <= n else n
+            for _ in range(shift_count):
                 indices.append(-1)
-            for i in range(n - p):
+            for i in range(n - shift_count):
                 indices.append(i)
         else:
-            var p = -periods if -periods <= n else n
-            for i in range(p, n):
+            var shift_count = -periods if -periods <= n else n
+            for i in range(shift_count, n):
                 indices.append(i)
-            for _ in range(p):
+            for _ in range(shift_count):
                 indices.append(-1)
         return self._reindex_rows(indices, Optional[DFScalar](None))
 
