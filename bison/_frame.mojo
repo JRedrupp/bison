@@ -3,7 +3,7 @@ from std.collections import Optional, Dict
 from ._errors import _not_implemented
 from .dtypes import BisonDtype, object_, bool_, int64, float64, dtype_from_string, datetime64_ns
 from .index import Index, ColumnIndex
-from .column import Column, ColumnData, DFScalar, SeriesScalar, _Null, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj, _scalar_from_col
+from .column import Column, ColumnData, DFScalar, SeriesScalar, _Null, FloatTransformFn, _csv_quote_field, _col_cell_str, _col_cell_pyobj, _scalar_from_col, _RowKeyVisitor, visit_col_data_raises
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
@@ -3646,6 +3646,26 @@ struct DataFrame(Copyable, Movable):
     # Combining
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _row_key_str(df: DataFrame, key_cols: List[String], row: Int) raises -> String:
+        """Serialise the key column values at *row* to a single String for hashing.
+
+        Dispatches each column's cell via ``_RowKeyVisitor`` so that adding a
+        new ``ColumnData`` arm only requires updating the visitor — no changes
+        needed here.
+        """
+        var key = String()
+        for k in range(len(key_cols)):
+            if k > 0:
+                key += "|"
+            for i in range(len(df._cols)):
+                if df._cols[i].name == key_cols[k]:
+                    var visitor = _RowKeyVisitor(row)
+                    visit_col_data_raises(visitor, df._cols[i]._data)
+                    key += visitor.result
+                    break
+        return key
+
     def merge(
         self,
         right: DataFrame,
@@ -3657,42 +3677,107 @@ struct DataFrame(Copyable, Movable):
         right_index: Bool = False,
         suffixes: Optional[List[String]] = None,
     ) raises -> DataFrame:
-        var left_pd = self.to_pandas()
-        var right_pd = right.to_pandas()
-        var py_none = Python.evaluate("None")
-
-        var py_on: PythonObject = py_none
+        # Determine key columns.
+        var lkeys = List[String]()
+        var rkeys = List[String]()
         if on:
-            py_on = Python.evaluate("[]")
-            for k in range(len(on.value())):
-                _ = py_on.append(on.value()[k])
+            lkeys = on.value().copy()
+            rkeys = on.value().copy()
+        elif left_on:
+            if right_on:
+                lkeys = left_on.value().copy()
+                rkeys = right_on.value().copy()
+            else:
+                raise Error("merge requires both 'left_on' and 'right_on'")
+        else:
+            raise Error("merge requires 'on' or both 'left_on' and 'right_on'")
 
-        var py_left_on: PythonObject = py_none
-        if left_on:
-            py_left_on = Python.evaluate("[]")
-            for k in range(len(left_on.value())):
-                _ = py_left_on.append(left_on.value()[k])
-
-        var py_right_on: PythonObject = py_none
-        if right_on:
-            py_right_on = Python.evaluate("[]")
-            for k in range(len(right_on.value())):
-                _ = py_right_on.append(right_on.value()[k])
-
-        # Default suffixes match pandas defaults.
-        var py_suf: PythonObject = Python.evaluate("('_x', '_y')")
+        var lsuf = "_x"
+        var rsuf = "_y"
         if suffixes:
-            var suf = suffixes.value().copy()
-            var to_tuple = Python.evaluate("lambda a, b: (a, b)")
-            py_suf = to_tuple(suf[0], suf[1])
+            lsuf = suffixes.value()[0]
+            rsuf = suffixes.value()[1]
 
-        var merge_fn = Python.evaluate(
-            "lambda l, r, how, on, lo, ro, li, ri, suf:"
-            " l.merge(r, how=how, on=on, left_on=lo, right_on=ro,"
-            " left_index=li, right_index=ri, suffixes=suf)"
-        )
-        var result = merge_fn(left_pd, right_pd, how, py_on, py_left_on, py_right_on, left_index, right_index, py_suf)
-        return DataFrame.from_pandas(result)
+        # Build right hash map: key_str → list of right row indices.
+        var right_map = Dict[String, List[Int]]()
+        var n_right = right.shape()[0]
+        for i in range(n_right):
+            var k = DataFrame._row_key_str(right, rkeys, i)
+            if k not in right_map:
+                right_map[k] = List[Int]()
+            right_map[k].append(i)
+
+        # Match rows — build parallel index lists (-1 means null/unmatched side).
+        var out_left = List[Int]()
+        var out_right = List[Int]()
+        var n_left = self.shape()[0]
+        var right_matched = List[Bool]()
+        for _ in range(n_right):
+            right_matched.append(False)
+
+        for i in range(n_left):
+            var k = DataFrame._row_key_str(self, lkeys, i)
+            if k in right_map:
+                ref matches = right_map[k]
+                for m in range(len(matches)):
+                    out_left.append(i)
+                    out_right.append(matches[m])
+                    right_matched[matches[m]] = True
+            elif how == "left" or how == "outer":
+                out_left.append(i)
+                out_right.append(-1)
+
+        if how == "right" or how == "outer":
+            for j in range(n_right):
+                if not right_matched[j]:
+                    out_left.append(-1)
+                    out_right.append(j)
+
+        # Determine output column schema.
+        var key_set = Dict[String, Bool]()
+        for k in range(len(lkeys)):
+            key_set[lkeys[k]] = True
+
+        # Right non-key column names (for overlap detection with left).
+        var right_nonkey_names = Dict[String, Bool]()
+        for j in range(len(right._cols)):
+            if right._cols[j].name not in key_set:
+                right_nonkey_names[right._cols[j].name] = True
+
+        # Build output columns.
+        var result_cols = List[Column]()
+
+        # Key columns: use left values (null where left row is unmatched).
+        for k in range(len(lkeys)):
+            for i in range(len(self._cols)):
+                if self._cols[i].name == lkeys[k]:
+                    result_cols.append(self._cols[i].take_with_nulls(out_left))
+                    break
+
+        # Left non-key columns.
+        for i in range(len(self._cols)):
+            if self._cols[i].name in key_set:
+                continue
+            var col = self._cols[i].take_with_nulls(out_left)
+            if col.name in right_nonkey_names:
+                col.name = col.name + lsuf
+            result_cols.append(col^)
+
+        # Right non-key columns.
+        for j in range(len(right._cols)):
+            if right._cols[j].name in key_set:
+                continue
+            var col = right._cols[j].take_with_nulls(out_right)
+            var in_left = False
+            for i in range(len(self._cols)):
+                if self._cols[i].name not in key_set and self._cols[i].name == right._cols[j].name:
+                    in_left = True
+                    break
+            if in_left:
+                col.name = col.name + rsuf
+            result_cols.append(col^)
+
+        return DataFrame(result_cols^)
 
     def join(
         self,
@@ -3703,31 +3788,57 @@ struct DataFrame(Copyable, Movable):
         rsuffix: String = "",
         sort: Bool = False,
     ) raises -> DataFrame:
-        var left_pd = self.to_pandas()
-        var other_pd = other.to_pandas()
-        var py_none = Python.evaluate("None")
+        # Build right column name set for overlap detection.
+        var right_names = Dict[String, Bool]()
+        for j in range(len(other._cols)):
+            right_names[other._cols[j].name] = True
 
-        var py_on: PythonObject = py_none
-        if on:
-            py_on = Python.evaluate("[]")
-            for k in range(len(on.value())):
-                _ = py_on.append(on.value()[k])
+        var left_names = Dict[String, Bool]()
+        for i in range(len(self._cols)):
+            left_names[self._cols[i].name] = True
 
-        var join_fn = Python.evaluate(
-            "lambda l, r, on, how, lsuf, rsuf, sort:"
-            " l.join(r, on=on, how=how, lsuffix=lsuf, rsuffix=rsuf, sort=sort)"
-        )
-        var result = join_fn(left_pd, other_pd, py_on, how, lsuffix, rsuffix, sort)
-        return DataFrame.from_pandas(result)
+        # Detect overlap.
+        var overlap = False
+        for i in range(len(self._cols)):
+            if self._cols[i].name in right_names:
+                overlap = True
+                break
+        if overlap and lsuffix == "" and rsuffix == "":
+            raise Error("columns overlap but no suffix specified: use lsuffix/rsuffix")
+
+        var n_left = self.shape()[0]
+        var result_cols = List[Column]()
+
+        # Left columns — rename if overlap.
+        for i in range(len(self._cols)):
+            var col = self._cols[i].copy()
+            if col.name in right_names:
+                col.name = col.name + lsuffix
+            result_cols.append(col^)
+
+        # Right columns — positional alignment, rename if overlap.
+        for j in range(len(other._cols)):
+            var col = other._cols[j].slice(0, n_left)
+            if col.name in left_names:
+                col.name = col.name + rsuffix
+            result_cols.append(col^)
+
+        return DataFrame(result_cols^)
 
     def append(self, other: DataFrame, ignore_index: Bool = False) raises -> DataFrame:
-        var pd = Python.import_module("pandas")
-        var py_list = Python.evaluate("[]")
-        _ = py_list.append(self.to_pandas())
-        _ = py_list.append(other.to_pandas())
-        var concat_fn = Python.evaluate("lambda frames, ig: __import__('pandas').concat(frames, ignore_index=ig)")
-        var result = concat_fn(py_list, ignore_index)
-        return DataFrame.from_pandas(result)
+        if len(self._cols) != len(other._cols):
+            raise Error("DataFrames have different number of columns")
+        var other_idx = Dict[String, Int]()
+        for j in range(len(other._cols)):
+            other_idx[other._cols[j].name] = j
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            var name = self._cols[i].name
+            if name not in other_idx:
+                raise Error("Column '" + name + "' not found in other DataFrame")
+            var new_col = self._cols[i].concat(other._cols[other_idx[name]])
+            result_cols.append(new_col^)
+        return DataFrame(result_cols^)
 
     # ------------------------------------------------------------------
     # GroupBy
