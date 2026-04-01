@@ -575,5 +575,188 @@ def test_seriesgroupby_dropna_transform_sum() raises:
     testing.assert_series_equal(result_pd, expected, check_dtype=False)
 
 
+def _make_pd_df_multi() raises -> PythonObject:
+    """DataFrame with two groupby key columns for multi-key tests."""
+    var pd = Python.import_module("pandas")
+    return pd.DataFrame(
+        Python.evaluate(
+            "{'grp1': ['a', 'a', 'b', 'b'], 'grp2': ['x', 'y', 'x', 'y'],"
+            " 'val': [1, 2, 3, 4], 'x': [10.0, 20.0, 30.0, 40.0]}"
+        )
+    )
+
+
+# ------------------------------------------------------------------
+# Multi-key groupby tests
+# ------------------------------------------------------------------
+
+
+def test_dataframegroupby_multikey_sum() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).sum().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).sum())
+
+
+def test_dataframegroupby_multikey_mean() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).mean().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).mean())
+
+
+def test_dataframegroupby_multikey_min() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).min().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).min())
+
+
+def test_dataframegroupby_multikey_max() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).max().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).max())
+
+
+def test_dataframegroupby_multikey_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).count().to_pandas()
+    testing.assert_frame_equal(
+        result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).count()
+    )
+
+
+def test_dataframegroupby_multikey_nunique() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).nunique().to_pandas()
+    testing.assert_frame_equal(
+        result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).nunique()
+    )
+
+
+def test_dataframegroupby_multikey_first() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).first().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).first())
+
+
+def test_dataframegroupby_multikey_last() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).last().to_pandas()
+    testing.assert_frame_equal(result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).last())
+
+
+def test_dataframegroupby_multikey_size() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).size().to_pandas()
+    testing.assert_series_equal(
+        result, pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).size()
+    )
+
+
+# ------------------------------------------------------------------
+# as_index=False tests
+# ------------------------------------------------------------------
+
+
+def test_dataframegroupby_as_index_false_sum() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by, as_index=False).sum().to_pandas()
+    testing.assert_frame_equal(
+        result, pd_df.groupby("grp", as_index=False).sum(), check_dtype=False
+    )
+
+
+def test_dataframegroupby_as_index_false_mean() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by, as_index=False).mean().to_pandas()
+    testing.assert_frame_equal(
+        result,
+        pd_df.groupby("grp", as_index=False).mean(),
+        check_dtype=False,
+    )
+
+
+def test_dataframegroupby_as_index_false_count() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by, as_index=False).count().to_pandas()
+    testing.assert_frame_equal(
+        result,
+        pd_df.groupby("grp", as_index=False).count(),
+        check_dtype=False,
+    )
+
+
+def test_dataframegroupby_multikey_as_index_false_sum() raises:
+    var testing = Python.import_module("pandas.testing")
+    var pd_df = _make_pd_df_multi()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by, as_index=False).sum().to_pandas()
+    testing.assert_frame_equal(
+        result,
+        pd_df.groupby(
+            Python.evaluate("['grp1', 'grp2']"), as_index=False
+        ).sum(),
+        check_dtype=False,
+    )
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

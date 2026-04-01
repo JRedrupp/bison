@@ -5323,7 +5323,13 @@ struct Column(Copyable, Movable, Sized):
                 ref obj_idx = self._index[List[PythonObject]]
                 for i in range(n_idx):
                     _ = idx_py.append(obj_idx[i])
-            if self._index_name:
+            if len(self._index_names) > 1:
+                # MultiIndex: build pd.MultiIndex from the list of tuples.
+                var py_names = Python.evaluate("[]")
+                for k in range(len(self._index_names)):
+                    _ = py_names.append(PythonObject(self._index_names[k]))
+                pd_index = pd.MultiIndex.from_tuples(idx_py, names=py_names)
+            elif self._index_name:
                 pd_index = pd.Index(idx_py, name=self._index_name)
             else:
                 pd_index = idx_py
