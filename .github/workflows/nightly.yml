@@ -28,7 +28,7 @@ jobs:
           # pyarrow is absent, so drop it here to keep the nightly run clean.
           sed -i '/^pyarrow/d' pixi.toml
 
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           locked: false
 
