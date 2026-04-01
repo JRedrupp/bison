@@ -23,10 +23,10 @@ from std.time import perf_counter_ns
 # the total benchmark runtime stays under 2 minutes on a typical laptop.
 # ---------------------------------------------------------------------------
 
-comptime FAST_ITERS = 100   # <1 ms per call  (sum, mean, iloc, fillna, apply)
-comptime MED_ITERS  = 20    # 1–20 ms per call (groupby)
-comptime SLOW_ITERS = 3     # >20 ms per call  (query, sort, merge)
-comptime IO_ITERS   = 5     # I/O-bound        (csv round-trip)
+comptime FAST_ITERS = 100  # <1 ms per call  (sum, mean, iloc, fillna, apply)
+comptime MED_ITERS = 20  # 1–20 ms per call (groupby)
+comptime SLOW_ITERS = 3  # >20 ms per call  (query, sort, merge)
+comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -92,7 +92,7 @@ fn main() raises:
         "            'c':   np.random.default_rng(42).integers(0, 1000, n),"
         "            'id':  np.arange(n, dtype='int64'),"
         "        }),"
-        "        pd.DataFrame({"  # dim table: unique 'id' for a many-to-one join
+        "        pd.DataFrame({"
         "            'id':  np.arange(n // 10, dtype='int64'),"
         "            'val': np.random.default_rng(999).random(n // 10),"
         "        }),"
@@ -101,7 +101,7 @@ fn main() raises:
         "    __import__('numpy'),"
         "    __import__('pandas'),"
         "    ['k0','k1','k2','k3','k4','k5','k6','k7','k8','k9'],"
-        ")"
+        ")"  # dim table: unique 'id' for a many-to-one join
     )
     var _fixtures = _make_fixtures(100_000)
     var pd_df = _fixtures[0]
@@ -228,9 +228,7 @@ fn main() raises:
     if skipped:
         results.append(BenchResult.skipped_result("iloc_row"))
     else:
-        results.append(
-            BenchResult("iloc_row", bison_ms, pandas_ms, FAST_ITERS)
-        )
+        results.append(BenchResult("iloc_row", bison_ms, pandas_ms, FAST_ITERS))
 
     # ------------------------------------------------------------------
     # loc_slice  (slice of 100 rows via df.loc(); matches issue #390)
@@ -298,9 +296,7 @@ fn main() raises:
     if skipped:
         results.append(BenchResult.skipped_result("merge"))
     else:
-        results.append(
-            BenchResult("merge", bison_ms, pandas_ms, SLOW_ITERS)
-        )
+        results.append(BenchResult("merge", bison_ms, pandas_ms, SLOW_ITERS))
 
     # ------------------------------------------------------------------
     # fillna  (numeric column only — the string "key" column is an
@@ -323,9 +319,7 @@ fn main() raises:
     if skipped:
         results.append(BenchResult.skipped_result("fillna"))
     else:
-        results.append(
-            BenchResult("fillna", bison_ms, pandas_ms, FAST_ITERS)
-        )
+        results.append(BenchResult("fillna", bison_ms, pandas_ms, FAST_ITERS))
 
     # ------------------------------------------------------------------
     # series_apply  (compile-time sqrt; bison uses FloatTransformFn)
@@ -368,8 +362,7 @@ fn main() raises:
             raise e^
     g["_tmp"] = "/tmp/_pandas_bench_core.csv"
     pandas_ms = _time_pandas(
-        "pd_df.to_csv(_tmp, index=False);"
-        " __import__('pandas').read_csv(_tmp)",
+        "pd_df.to_csv(_tmp, index=False); __import__('pandas').read_csv(_tmp)",
         g,
         IO_ITERS,
     )
