@@ -2145,7 +2145,7 @@ struct DataFrame(Copyable, Movable):
         if axis == 0:
             # Row filtering by index label.
             if len(self._cols) == 0:
-                return self.copy()
+                return self.copy(True)
             var n_rows = self._cols[0].__len__()
             var has_index = self._has_index()
             var keep_rows = List[Int]()
@@ -3899,19 +3899,18 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i].copy())
         return DataFrame(result_cols^)
 
-    def copy(self, deep: Bool) raises -> DataFrame:
+    def copy(self, deep: Bool = True) -> DataFrame:
         """Return an independent copy of this DataFrame.
 
-        When ``deep=True`` (the default in pandas), a full independent copy of
-        all columns is returned.
+        When ``deep=True`` (the default), a full independent copy of all
+        columns is returned.
 
-        ``deep=False`` raises ``Error`` because shallow-copy semantics require
-        reference-counted storage, which Mojo's ownership model does not yet
-        support.  Pass ``deep=True`` (or call ``df.copy(True)``) to obtain a
-        deep copy.
+        When ``deep=False``, a deep copy is also returned.  Mojo's value
+        semantics mean that all ``DataFrame`` copies are independent by
+        construction, so there is no observable difference between a shallow
+        and a deep copy.  This matches the documented behaviour of pandas for
+        copy-on-write-backed DataFrames.
         """
-        if not deep:
-            _not_implemented("DataFrame.copy")
         return self._deep_copy()
 
     def assign(self, cols: Dict[String, Series]) raises -> DataFrame:
@@ -5064,7 +5063,7 @@ struct DataFrameGroupBy:
         sort: Bool,
         dropna: Bool,
     ) raises:
-        self._df = df.copy()
+        self._df = df.copy(True)
         self._by = by.copy()
         self._as_index = as_index
         self._sort = sort
