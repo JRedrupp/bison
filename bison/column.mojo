@@ -3598,6 +3598,8 @@ struct Column(Copyable, Movable, Sized):
             perm.append(i)
         if self._index.isa[Index]():
             ref idx = self._index[Index]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -3608,7 +3610,7 @@ struct Column(Copyable, Movable, Sized):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -3620,23 +3622,28 @@ struct Column(Copyable, Movable, Sized):
                             > idx[lv]
                         )
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         elif self._index.isa[List[Int64]]():
             ref idx = self._index[List[Int64]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -3647,7 +3654,7 @@ struct Column(Copyable, Movable, Sized):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -3659,23 +3666,28 @@ struct Column(Copyable, Movable, Sized):
                             > idx[lv]
                         )
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         elif self._index.isa[List[Float64]]():
             ref idx = self._index[List[Float64]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -3686,7 +3698,7 @@ struct Column(Copyable, Movable, Sized):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -3698,24 +3710,29 @@ struct Column(Copyable, Movable, Sized):
                             > idx[lv]
                         )
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         else:
             # PythonObject fallback: use Python comparison.
             ref idx = self._index[List[PythonObject]]
+            var scratch = List[Int](capacity=n)
+            scratch.resize(n, 0)
             var width = 1
             while width < n:
                 var lo = 0
@@ -3726,7 +3743,7 @@ struct Column(Copyable, Movable, Sized):
                     var hi = lo + 2 * width
                     if hi > n:
                         hi = n
-                    var buf = List[Int]()
+                    var k = lo
                     var li = lo
                     var ri = mid_idx
                     while li < mid_idx and ri < hi:
@@ -3736,19 +3753,22 @@ struct Column(Copyable, Movable, Sized):
                             idx[rv] < idx[lv]
                         ) if ascending else Bool(idx[rv] > idx[lv])
                         if take_right:
-                            buf.append(rv)
+                            scratch[k] = rv
                             ri += 1
                         else:
-                            buf.append(lv)
+                            scratch[k] = lv
                             li += 1
+                        k += 1
                     while li < mid_idx:
-                        buf.append(perm[li])
+                        scratch[k] = perm[li]
                         li += 1
+                        k += 1
                     while ri < hi:
-                        buf.append(perm[ri])
+                        scratch[k] = perm[ri]
                         ri += 1
-                    for k in range(len(buf)):
-                        perm[lo + k] = buf[k]
+                        k += 1
+                    for j in range(lo, hi):
+                        perm[j] = scratch[j]
                     lo += 2 * width
                 width *= 2
         return perm^
