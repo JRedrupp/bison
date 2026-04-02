@@ -2613,6 +2613,89 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
         )
 
 
+# ------------------------------------------------------------------
+# Scalar comparison visitor — compares each element against a single
+# Float64 constant, avoiding the broadcast allocation used by _CmpOpVisitor.
+# ------------------------------------------------------------------
+
+
+struct _CmpScalarVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
+    """Element-wise comparison visitor for ``Column._cmp_scalar_op``.
+
+    Like ``_CmpOpVisitor`` but the RHS is a single ``Float64`` scalar rather
+    than a full column.  This avoids allocating and immediately discarding a
+    length-*n* broadcast list for every scalar comparison.
+
+    ``op`` is one of the ``_CMP_*`` compile-time constants; ``comptime if``
+    folds the branch at compile time so each specialisation is a tight loop.
+    """
+
+    var self_null_mask: List[Bool]
+    var scalar: Float64
+    var result: List[Bool]
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, self_null_mask: List[Bool], scalar: Float64):
+        self.self_null_mask = self_null_mask.copy()
+        self.scalar = scalar
+        self.result = List[Bool]()
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def _run_float64(mut self, a: List[Float64]):
+        """Inner loop: compare ``a`` against the scalar with null propagation.
+        """
+        var has_a_mask = len(self.self_null_mask) > 0
+        for i in range(len(a)):
+            var is_null = has_a_mask and self.self_null_mask[i]
+            if is_null:
+                self.result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v: Bool
+                comptime if Self.op == _CMP_EQ:
+                    v = a[i] == self.scalar
+                elif Self.op == _CMP_NE:
+                    v = a[i] != self.scalar
+                elif Self.op == _CMP_LT:
+                    v = a[i] < self.scalar
+                elif Self.op == _CMP_LE:
+                    v = a[i] <= self.scalar
+                elif Self.op == _CMP_GT:
+                    v = a[i] > self.scalar
+                elif Self.op == _CMP_GE:
+                    v = a[i] >= self.scalar
+                else:
+                    v = False  # unreachable: compile-time guard
+                self.result.append(v)
+                self.result_mask.append(False)
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var a = List[Float64]()
+        for i in range(len(data)):
+            a.append(Float64(data[i]))
+        self._run_float64(a)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self._run_float64(data)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var a = List[Float64]()
+        for i in range(len(data)):
+            a.append(1.0 if data[i] else 0.0)
+        self._run_float64(a)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cmp: cannot compare string column with a numeric scalar")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error(
+            "cmp: comparison not supported for object/datetime column type"
+        )
+
+
 # Compile-time function type for element-wise Float64 transforms (_apply kernel)
 comptime FloatTransformFn = def(Float64) -> Float64
 
@@ -4615,6 +4698,43 @@ struct Column(Copyable, Movable, Sized):
 
     def _cmp_ge(self, other: Column) raises -> Column:
         return self._cmp_op[_CMP_GE]("ge", other)
+
+    def _cmp_scalar_op[op: Int](self, scalar: Float64) raises -> Column:
+        """Core element-wise scalar comparison kernel.
+
+        Like ``_cmp_op`` but compares every element against a single
+        ``Float64`` constant rather than a parallel column.  This avoids the
+        broadcast allocation that ``_cmp_op`` would require when the caller
+        wraps a scalar in a full-length list.
+
+        ``op`` is a compile-time constant (``_CMP_*``) that selects the
+        operation.  Null propagation: null elements produce a null result.
+        """
+        var visitor = _CmpScalarVisitor[op](self._null_mask, scalar)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(
+            ColumnData(visitor.result.copy()),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
+
+    def _cmp_scalar_eq(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_EQ](scalar)
+
+    def _cmp_scalar_ne(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_NE](scalar)
+
+    def _cmp_scalar_lt(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_LT](scalar)
+
+    def _cmp_scalar_le(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_LE](scalar)
+
+    def _cmp_scalar_gt(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_GT](scalar)
+
+    def _cmp_scalar_ge(self, scalar: Float64) raises -> Column:
+        return self._cmp_scalar_op[_CMP_GE](scalar)
 
     # ------------------------------------------------------------------
     # Transformation kernels
