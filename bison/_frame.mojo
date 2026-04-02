@@ -4845,14 +4845,69 @@ struct DataFrame(Copyable, Movable):
         rsuffix: String = "",
         sort: Bool = False,
     ) raises -> DataFrame:
-        # Guard unsupported parameters so callers get a clear failure instead
-        # of silently wrong data.
-        if how != "left":
-            _not_implemented("DataFrame.join", "how='" + how + "'")
+        if (
+            how != "left"
+            and how != "inner"
+            and how != "outer"
+            and how != "right"
+        ):
+            raise Error(
+                "join: 'how' must be one of 'left', 'right', 'inner', 'outer'"
+            )
+
+        # If 'on' is specified, delegate to merge (key-based join).
         if on:
-            _not_implemented("DataFrame.join", "'on' parameter")
-        if sort:
-            _not_implemented("DataFrame.join", "'sort' parameter")
+            var suf = List[String]()
+            suf.append(lsuffix)
+            suf.append(rsuffix)
+            var result = self.merge(
+                other,
+                how=how,
+                on=on,
+                suffixes=Optional[List[String]](suf^),
+            )
+            if sort:
+                result = result.sort_values(on.value())
+            return result^
+
+        # Positional join: align row i of self with row i of other.
+        var n_left = self.shape()[0]
+        var n_right = other.shape()[0]
+
+        # Build parallel index lists for take_with_nulls (-1 inserts a null).
+        var out_left = List[Int]()
+        var out_right = List[Int]()
+
+        if how == "left":
+            for i in range(n_left):
+                out_left.append(i)
+                if i < n_right:
+                    out_right.append(i)
+                else:
+                    out_right.append(-1)
+        elif how == "inner":
+            var min_n = n_left if n_left < n_right else n_right
+            for i in range(min_n):
+                out_left.append(i)
+                out_right.append(i)
+        elif how == "outer":
+            var max_n = n_left if n_left > n_right else n_right
+            for i in range(max_n):
+                if i < n_left:
+                    out_left.append(i)
+                else:
+                    out_left.append(-1)
+                if i < n_right:
+                    out_right.append(i)
+                else:
+                    out_right.append(-1)
+        else:  # how == "right"
+            for i in range(n_right):
+                out_right.append(i)
+                if i < n_left:
+                    out_left.append(i)
+                else:
+                    out_left.append(-1)
 
         # Build right column name set for overlap detection.
         var right_names = Dict[String, Bool]()
@@ -4874,19 +4929,18 @@ struct DataFrame(Copyable, Movable):
                 "columns overlap but no suffix specified: use lsuffix/rsuffix"
             )
 
-        var n_left = self.shape()[0]
         var result_cols = List[Column]()
 
-        # Left columns — rename if overlap.
+        # Left columns — take with nulls, rename if overlap.
         for i in range(len(self._cols)):
-            var col = self._cols[i].copy()
+            var col = self._cols[i].take_with_nulls(out_left)
             if col.name.value() in right_names:
                 col.name = col.name.value() + lsuffix
             result_cols.append(col^)
 
-        # Right columns — positional alignment, rename if overlap.
+        # Right columns — take with nulls, rename if overlap.
         for j in range(len(other._cols)):
-            var col = other._cols[j].slice(0, n_left)
+            var col = other._cols[j].take_with_nulls(out_right)
             if col.name.value() in left_names:
                 col.name = col.name.value() + rsuffix
             result_cols.append(col^)

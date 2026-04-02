@@ -113,76 +113,74 @@ def test_append_ignore_index() raises:
     assert_equal(col.iloc(1)[Int64], Int64(20))
 
 
-def test_join_how_inner_raises() raises:
+def test_join_how_inner() raises:
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = left.join(right, how="inner")
-    except e:
-        raised = True
-        assert_true("not implemented" in String(e))
-    if not raised:
-        raise Error("join with how='inner' should have raised")
+    # left has 3 rows, right has 2 rows — inner keeps min(3,2)=2 rows.
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [10, 20]}")))
+    var result = left.join(right, how="inner")
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result.shape()[1], 2)
+    var a_col = result["a"]
+    var b_col = result["b"]
+    assert_equal(a_col.iloc(0)[Int64], Int64(1))
+    assert_equal(a_col.iloc(1)[Int64], Int64(2))
+    assert_equal(b_col.iloc(0)[Int64], Int64(10))
+    assert_equal(b_col.iloc(1)[Int64], Int64(20))
 
 
-def test_join_how_outer_raises() raises:
+def test_join_how_outer() raises:
     var pd = Python.import_module("pandas")
+    # left has 2 rows, right has 3 rows — outer keeps max(2,3)=3 rows.
     var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = left.join(right, how="outer")
-    except e:
-        raised = True
-        assert_true("not implemented" in String(e))
-    if not raised:
-        raise Error("join with how='outer' should have raised")
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [10, 20, 30]}")))
+    var result = left.join(right, how="outer")
+    assert_equal(result.shape()[0], 3)
+    assert_equal(result.shape()[1], 2)
+    # Row 2: left side is null; right side has 30.
+    var b_col = result["b"]
+    assert_equal(b_col.iloc(2)[Int64], Int64(30))
 
 
-def test_join_how_right_raises() raises:
+def test_join_how_right() raises:
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = left.join(right, how="right")
-    except e:
-        raised = True
-        assert_true("not implemented" in String(e))
-    if not raised:
-        raise Error("join with how='right' should have raised")
+    # left has 1 row, right has 3 rows — right keeps all 3 right rows.
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [10, 20, 30]}")))
+    var result = left.join(right, how="right")
+    assert_equal(result.shape()[0], 3)
+    assert_equal(result.shape()[1], 2)
+    var b_col = result["b"]
+    assert_equal(b_col.iloc(0)[Int64], Int64(10))
+    assert_equal(b_col.iloc(1)[Int64], Int64(20))
+    assert_equal(b_col.iloc(2)[Int64], Int64(30))
 
 
-def test_join_on_raises() raises:
+def test_join_on_parameter() raises:
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
+    # Join on column 'key': key=1 matches, key=2 does not appear in right.
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'a': [10, 20]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 3], 'b': [100, 300]}")))
     var on = List[String]()
-    on.append("a")
-    var raised = False
-    try:
-        _ = left.join(right, on=on^)
-    except e:
-        raised = True
-        assert_true("not implemented" in String(e))
-    if not raised:
-        raise Error("join with on= should have raised")
+    on.append("key")
+    # Default how="left": both left rows kept, row 2 gets null for b.
+    var result = left.join(right, on=on^)
+    assert_equal(result.shape()[0], 2)
 
 
-def test_join_sort_raises() raises:
+def test_join_sort_parameter() raises:
     var pd = Python.import_module("pandas")
-    var left = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
-    var right = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = left.join(right, sort=True)
-    except e:
-        raised = True
-        assert_true("not implemented" in String(e))
-    if not raised:
-        raise Error("join with sort=True should have raised")
+    # Join on 'key' with sort=True: result sorted by key ascending.
+    var left = DataFrame(pd.DataFrame(Python.evaluate("{'key': [2, 1], 'a': [20, 10]}")))
+    var right = DataFrame(pd.DataFrame(Python.evaluate("{'key': [1, 2], 'b': [100, 200]}")))
+    var on = List[String]()
+    on.append("key")
+    var result = left.join(right, on=on^, how="inner", sort=True)
+    assert_equal(result.shape()[0], 2)
+    # After sort by 'key', first row should have key=1.
+    var key_col = result["key"]
+    assert_equal(key_col.iloc(0)[Int64], Int64(1))
+    assert_equal(key_col.iloc(1)[Int64], Int64(2))
 
 
 def test_take_with_nulls_obj_col_null_placeholder_is_none() raises:
