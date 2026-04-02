@@ -540,6 +540,39 @@ def test_df_nunique_axis1() raises:
     assert_true(Float64(String(result.iloc[2])) == Float64(String(expected.iloc[2])))
 
 
+def test_df_count_axis1_with_string_col() raises:
+    # count(axis=1) must include non-numeric columns
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, None], 'b': ['x', 'y']}"))
+    var df = DataFrame(pd_df)
+    var result = df.count(axis=1).to_pandas()
+    var expected = pd_df.count(axis=1)
+    assert_true(Float64(String(result.iloc[0])) == Float64(String(expected.iloc[0])))  # 2
+    assert_true(Float64(String(result.iloc[1])) == Float64(String(expected.iloc[1])))  # 1
+
+
+def test_df_count_axis1_with_bool_col() raises:
+    # count(axis=1) must include Bool columns
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [True, False]}"))
+    var df = DataFrame(pd_df)
+    var result = df.count(axis=1).to_pandas()
+    var expected = pd_df.count(axis=1)
+    assert_true(Float64(String(result.iloc[0])) == Float64(String(expected.iloc[0])))  # 2
+    assert_true(Float64(String(result.iloc[1])) == Float64(String(expected.iloc[1])))  # 2
+
+
+def test_df_nunique_axis1_mixed_types() raises:
+    # nunique(axis=1) must count unique values across all dtypes
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': ['x', 'x']}"))
+    var df = DataFrame(pd_df)
+    var result = df.nunique(axis=1).to_pandas()
+    var expected = pd_df.nunique(axis=1)
+    assert_true(Float64(String(result.iloc[0])) == Float64(String(expected.iloc[0])))  # 2
+    assert_true(Float64(String(result.iloc[1])) == Float64(String(expected.iloc[1])))  # 2
+
+
 def test_df_quantile_axis1() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0]}"))
