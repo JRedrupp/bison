@@ -2388,11 +2388,61 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     # ------------------------------------------------------------------
+    # Row-wise helpers (used by axis=1 aggregation paths)
+    # ------------------------------------------------------------------
+
+    fn _row_numeric_vals(self, row: Int, skipna: Bool) raises -> List[Float64]:
+        """Collect float values from every numeric column at *row*.
+
+        If *skipna* is True, null cells are omitted.
+        If *skipna* is False, null cells contribute NaN so the result
+        propagates NaN (matching pandas skipna=False behaviour).
+        """
+        var vals = List[Float64]()
+        var nan = Float64(0) / Float64(0)
+        for ci in range(len(self._cols)):
+            ref col = self._cols[ci]
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            if col._null_mask[row]:
+                if not skipna:
+                    vals.append(nan)
+                continue
+            if col.dtype.is_integer():
+                vals.append(Float64(col._int64_data()[row]))
+            else:
+                vals.append(col._float64_data()[row])
+        return vals^
+
+    fn _row_non_null_numeric_count(self, row: Int) -> Int:
+        """Count non-null numeric cells in row *row* (used by count axis=1)."""
+        var cnt = 0
+        for ci in range(len(self._cols)):
+            ref col = self._cols[ci]
+            if not (col.dtype.is_integer() or col.dtype.is_float()):
+                continue
+            if not col._null_mask[row]:
+                cnt += 1
+        return cnt
+
+    # ------------------------------------------------------------------
     # Aggregation
     # ------------------------------------------------------------------
 
     def sum(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var s = Float64(0)
+                for vi in range(len(vals)):
+                    s += vals[vi]
+                results.append(s)
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.sum")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2403,7 +2453,24 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n == 0:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                results.append(s / Float64(n))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.mean")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2414,7 +2481,9 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            return self.quantile(0.5, axis=1, skipna=skipna)
+        elif axis != 0:
             _not_implemented("DataFrame.median")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2425,7 +2494,25 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n == 0:
+                    results.append(nan)
+                    continue
+                var m = vals[0]
+                for j in range(1, n):
+                    if vals[j] < m:
+                        m = vals[j]
+                results.append(m)
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.min")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2436,7 +2523,25 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n == 0:
+                    results.append(nan)
+                    continue
+                var m = vals[0]
+                for j in range(1, n):
+                    if vals[j] > m:
+                        m = vals[j]
+                results.append(m)
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.max")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2449,7 +2554,29 @@ struct DataFrame(Copyable, Movable):
     def std(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
     ) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n <= ddof:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                var mean_val = s / Float64(n)
+                var sq_sum = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    sq_sum += diff * diff
+                results.append(sqrt(sq_sum / Float64(n - ddof)))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.std")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2462,7 +2589,29 @@ struct DataFrame(Copyable, Movable):
     def var(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
     ) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n <= ddof:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                var mean_val = s / Float64(n)
+                var sq_sum = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    sq_sum += diff * diff
+                results.append(sq_sum / Float64(n - ddof))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.var")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2473,7 +2622,15 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def count(self, axis: Int = 0) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var results = List[Float64]()
+            for i in range(nrows):
+                results.append(Float64(self._row_non_null_numeric_count(i)))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.count")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2484,7 +2641,33 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def nunique(self, axis: Int = 0) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, True)
+                var n = len(vals)
+                if n == 0:
+                    results.append(Float64(0))
+                    continue
+                # Sort then count distinct values
+                var sorted_vals = vals.copy()
+                for a in range(1, n):
+                    var key = sorted_vals[a]
+                    var b = a - 1
+                    while b >= 0 and sorted_vals[b] > key:
+                        sorted_vals[b + 1] = sorted_vals[b]
+                        b -= 1
+                    sorted_vals[b + 1] = key
+                var unique_count = 1
+                for j in range(1, n):
+                    if sorted_vals[j] != sorted_vals[j - 1]:
+                        unique_count += 1
+                results.append(Float64(unique_count))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.nunique")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2521,7 +2704,36 @@ struct DataFrame(Copyable, Movable):
     def quantile(
         self, q: Float64 = 0.5, axis: Int = 0, skipna: Bool = True
     ) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n == 0:
+                    results.append(nan)
+                    continue
+                # Insertion sort
+                for a in range(1, n):
+                    var key = vals[a]
+                    var b = a - 1
+                    while b >= 0 and vals[b] > key:
+                        vals[b + 1] = vals[b]
+                        b -= 1
+                    vals[b + 1] = key
+                var pos = q * Float64(n - 1)
+                var lo = Int(pos)
+                var hi = lo + 1
+                if hi >= n:
+                    results.append(vals[n - 1])
+                else:
+                    var frac = pos - Float64(lo)
+                    results.append(vals[lo] + frac * (vals[hi] - vals[lo]))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
             _not_implemented("DataFrame.quantile")
         var values = List[Float64]()
         for i in range(len(self._cols)):
@@ -2538,7 +2750,40 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_lists = List[List[Float64]]()
+            for _ in range(ncols):
+                result_lists.append(List[Float64]())
+            for i in range(nrows):
+                var running = Float64(0)
+                var propagate_nan = False
+                for ci in range(ncols):
+                    ref col = self._cols[ci]
+                    if col._null_mask[i] or not (
+                        col.dtype.is_integer() or col.dtype.is_float()
+                    ):
+                        if not skipna:
+                            propagate_nan = True
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+                    else:
+                        var v = Float64(
+                            col._int64_data()[i]
+                        ) if col.dtype.is_integer() else col._float64_data()[i]
+                        running += v
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+            var result_cols = List[Column]()
+            for ci in range(ncols):
+                var cd = ColumnData(result_lists[ci].copy())
+                result_cols.append(Column(self._cols[ci].name, cd^, float64))
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.cumsum")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -2546,7 +2791,40 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def cumprod(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_lists = List[List[Float64]]()
+            for _ in range(ncols):
+                result_lists.append(List[Float64]())
+            for i in range(nrows):
+                var running = Float64(1)
+                var propagate_nan = False
+                for ci in range(ncols):
+                    ref col = self._cols[ci]
+                    if col._null_mask[i] or not (
+                        col.dtype.is_integer() or col.dtype.is_float()
+                    ):
+                        if not skipna:
+                            propagate_nan = True
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+                    else:
+                        var v = Float64(
+                            col._int64_data()[i]
+                        ) if col.dtype.is_integer() else col._float64_data()[i]
+                        running *= v
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+            var result_cols = List[Column]()
+            for ci in range(ncols):
+                var cd = ColumnData(result_lists[ci].copy())
+                result_cols.append(Column(self._cols[ci].name, cd^, float64))
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.cumprod")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -2554,7 +2832,45 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def cummin(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_lists = List[List[Float64]]()
+            for _ in range(ncols):
+                result_lists.append(List[Float64]())
+            for i in range(nrows):
+                var running = Float64(0)
+                var has_value = False
+                var propagate_nan = False
+                for ci in range(ncols):
+                    ref col = self._cols[ci]
+                    if col._null_mask[i] or not (
+                        col.dtype.is_integer() or col.dtype.is_float()
+                    ):
+                        if not skipna:
+                            propagate_nan = True
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+                    else:
+                        var v = Float64(
+                            col._int64_data()[i]
+                        ) if col.dtype.is_integer() else col._float64_data()[i]
+                        if not has_value:
+                            running = v
+                            has_value = True
+                        elif v < running:
+                            running = v
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+            var result_cols = List[Column]()
+            for ci in range(ncols):
+                var cd = ColumnData(result_lists[ci].copy())
+                result_cols.append(Column(self._cols[ci].name, cd^, float64))
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.cummin")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -2562,7 +2878,45 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def cummax(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_lists = List[List[Float64]]()
+            for _ in range(ncols):
+                result_lists.append(List[Float64]())
+            for i in range(nrows):
+                var running = Float64(0)
+                var has_value = False
+                var propagate_nan = False
+                for ci in range(ncols):
+                    ref col = self._cols[ci]
+                    if col._null_mask[i] or not (
+                        col.dtype.is_integer() or col.dtype.is_float()
+                    ):
+                        if not skipna:
+                            propagate_nan = True
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+                    else:
+                        var v = Float64(
+                            col._int64_data()[i]
+                        ) if col.dtype.is_integer() else col._float64_data()[i]
+                        if not has_value:
+                            running = v
+                            has_value = True
+                        elif v > running:
+                            running = v
+                        result_lists[ci].append(
+                            nan if propagate_nan else running
+                        )
+            var result_cols = List[Column]()
+            for ci in range(ncols):
+                var cd = ColumnData(result_lists[ci].copy())
+                result_cols.append(Column(self._cols[ci].name, cd^, float64))
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.cummax")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -2700,7 +3054,33 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     def agg(self, func: String, axis: Int = 0) raises -> Series:
-        if axis != 0:
+        if axis == 1:
+            if func == "sum":
+                return self.sum(axis=1)
+            elif func == "mean":
+                return self.mean(axis=1)
+            elif func == "median":
+                return self.median(axis=1)
+            elif func == "min":
+                return self.min(axis=1)
+            elif func == "max":
+                return self.max(axis=1)
+            elif func == "std":
+                return self.std(axis=1)
+            elif func == "var":
+                return self.var(axis=1)
+            elif func == "count":
+                return self.count(axis=1)
+            elif func == "nunique":
+                return self.nunique(axis=1)
+            else:
+                raise Error(
+                    "DataFrame.agg: unsupported aggregation '"
+                    + func
+                    + "'. Supported: sum, mean, median, min, max, std, var,"
+                    " count, nunique"
+                )
+        elif axis != 0:
             _not_implemented("DataFrame.agg")
         if func == "sum":
             return self.sum()
@@ -2740,7 +3120,22 @@ struct DataFrame(Copyable, Movable):
         return DataFrame()
 
     def transform(self, func: String, axis: Int = 0) raises -> DataFrame:
-        if axis != 0:
+        if axis == 1:
+            if func == "cumsum":
+                return self.cumsum(axis=1)
+            elif func == "cumprod":
+                return self.cumprod(axis=1)
+            elif func == "cummin":
+                return self.cummin(axis=1)
+            elif func == "cummax":
+                return self.cummax(axis=1)
+            else:
+                raise Error(
+                    "DataFrame.transform: unsupported func '"
+                    + func
+                    + "' for axis=1. Supported: cumsum, cumprod, cummin, cummax"
+                )
+        elif axis != 0:
             _not_implemented("DataFrame.transform")
         if func == "abs":
             return self.abs()

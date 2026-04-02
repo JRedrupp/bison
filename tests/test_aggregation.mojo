@@ -438,175 +438,165 @@ def test_df_cummax() raises:
 
 
 # ---------------------------------------------------------------------------
-# axis=1 stubs — all must raise with "not implemented"
+# axis=1 — native row-wise aggregation
 # ---------------------------------------------------------------------------
 
-def test_df_sum_axis1_raises() raises:
+def test_df_sum_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.sum(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.sum axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.sum(axis=1).to_pandas()
+    var expected = pd_df.sum(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_mean_axis1_raises() raises:
+def test_df_mean_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.mean(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.mean axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [3.0, 4.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.mean(axis=1).to_pandas()
+    var expected = pd_df.mean(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_median_axis1_raises() raises:
+def test_df_median_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.median(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.median axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0], 'c': [2.0, 6.0, 1.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.median(axis=1).to_pandas()
+    var expected = pd_df.median(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_min_axis1_raises() raises:
+def test_df_min_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.min(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.min axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 1.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.min(axis=1).to_pandas()
+    var expected = pd_df.min(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_max_axis1_raises() raises:
+def test_df_max_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.max(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.max axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 1.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.max(axis=1).to_pandas()
+    var expected = pd_df.max(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_std_axis1_raises() raises:
+def test_df_std_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.std(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.std axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.std(axis=1).to_pandas()
+    var expected = pd_df.std(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_var_axis1_raises() raises:
+def test_df_var_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.var(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.var axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.var(axis=1).to_pandas()
+    var expected = pd_df.var(axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_count_axis1_raises() raises:
+def test_df_count_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.count(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.count axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.count(axis=1).to_pandas()
+    var expected = pd_df.count(axis=1)
+    assert_true(Float64(String(result.iloc[0])) == Float64(String(expected.iloc[0])))
+    assert_true(Float64(String(result.iloc[1])) == Float64(String(expected.iloc[1])))
+    assert_true(Float64(String(result.iloc[2])) == Float64(String(expected.iloc[2])))
 
 
-def test_df_nunique_axis1_raises() raises:
+def test_df_nunique_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.nunique(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.nunique axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [1.0, 4.0, 3.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.nunique(axis=1).to_pandas()
+    var expected = pd_df.nunique(axis=1)
+    assert_true(Float64(String(result.iloc[0])) == Float64(String(expected.iloc[0])))
+    assert_true(Float64(String(result.iloc[1])) == Float64(String(expected.iloc[1])))
+    assert_true(Float64(String(result.iloc[2])) == Float64(String(expected.iloc[2])))
 
 
-def test_df_quantile_axis1_raises() raises:
+def test_df_quantile_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.quantile(0.5, axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.quantile axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.quantile(0.5, axis=1).to_pandas()
+    var expected = pd_df.quantile(0.5, axis=1)
+    assert_true(abs(Float64(String(result.iloc[0])) - Float64(String(expected.iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[1])) - Float64(String(expected.iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result.iloc[2])) - Float64(String(expected.iloc[2]))) < 1e-9)
 
 
-def test_df_cumsum_axis1_raises() raises:
+def test_df_cumsum_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.cumsum(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.cumsum axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.cumsum(axis=1)
+    var expected = pd_df.cumsum(axis=1)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[0])) - Float64(String(expected["a"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[0])) - Float64(String(expected["b"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[1])) - Float64(String(expected["a"].iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[1])) - Float64(String(expected["b"].iloc[1]))) < 1e-9)
 
 
-def test_df_cumprod_axis1_raises() raises:
+def test_df_cumprod_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.cumprod(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.cumprod axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.cumprod(axis=1)
+    var expected = pd_df.cumprod(axis=1)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[0])) - Float64(String(expected["a"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[0])) - Float64(String(expected["b"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[1])) - Float64(String(expected["a"].iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[1])) - Float64(String(expected["b"].iloc[1]))) < 1e-9)
 
 
-def test_df_cummin_axis1_raises() raises:
+def test_df_cummin_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.cummin(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.cummin axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0], 'b': [1.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.cummin(axis=1)
+    var expected = pd_df.cummin(axis=1)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[0])) - Float64(String(expected["a"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[0])) - Float64(String(expected["b"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[1])) - Float64(String(expected["a"].iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[1])) - Float64(String(expected["b"].iloc[1]))) < 1e-9)
 
 
-def test_df_cummax_axis1_raises() raises:
+def test_df_cummax_axis1() raises:
     var pd = Python.import_module("pandas")
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
-    var raised = False
-    try:
-        _ = df.cummax(axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.cummax axis=1 should have raised")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [3.0, 1.0], 'b': [1.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var result = df.cummax(axis=1)
+    var expected = pd_df.cummax(axis=1)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[0])) - Float64(String(expected["a"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[0])) - Float64(String(expected["b"].iloc[0]))) < 1e-9)
+    assert_true(abs(Float64(String(result["a"].to_pandas().iloc[1])) - Float64(String(expected["a"].iloc[1]))) < 1e-9)
+    assert_true(abs(Float64(String(result["b"].to_pandas().iloc[1])) - Float64(String(expected["b"].iloc[1]))) < 1e-9)
 
 
 # ---------------------------------------------------------------------------
