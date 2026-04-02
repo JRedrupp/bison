@@ -5698,6 +5698,32 @@ struct DataFrame(Copyable, Movable):
         return result^
 
 
+fn _insertion_sort_keys_by[
+    T: Comparable & Copyable & Movable & ImplicitlyCopyable
+](
+    mut group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    column_data: List[T],
+) raises -> None:
+    """Insertion-sort *group_keys* in ascending order of typed column values.
+
+    Uses the first row index stored in *group_map[key]* to look up the
+    representative value for each group in column data *column_data*.
+    """
+    var n = len(group_keys)
+    for i in range(1, n):
+        var key_i = group_keys[i]
+        var val_i = column_data[group_map[key_i][0]]
+        var j = i - 1
+        while j >= 0:
+            var gk_j = group_keys[j]
+            if column_data[group_map[gk_j][0]] <= val_i:
+                break
+            group_keys[j + 1] = gk_j
+            j -= 1
+        group_keys[j + 1] = key_i
+
+
 def _groupby_indices(
     df: DataFrame,
     by: List[String],
@@ -5748,33 +5774,13 @@ def _groupby_indices(
                 var ci = col_idx[by[0]]
                 ref col_data = df._cols[ci]._data
                 if col_data.isa[List[Int64]]():
-                    ref d = col_data[List[Int64]]
-                    # Insertion sort over group_keys using Int64 typed comparison.
-                    for i in range(1, n_groups):
-                        var key_i = group_keys[i]
-                        var val_i = d[group_map[key_i][0]]
-                        var j = i - 1
-                        while j >= 0:
-                            var gk_j = group_keys[j]
-                            if d[group_map[gk_j][0]] <= val_i:
-                                break
-                            group_keys[j + 1] = gk_j
-                            j -= 1
-                        group_keys[j + 1] = key_i
+                    _insertion_sort_keys_by[Int64](
+                        group_keys, group_map, col_data[List[Int64]]
+                    )
                 elif col_data.isa[List[Float64]]():
-                    ref d = col_data[List[Float64]]
-                    # Insertion sort over group_keys using Float64 typed comparison.
-                    for i in range(1, n_groups):
-                        var key_i = group_keys[i]
-                        var val_i = d[group_map[key_i][0]]
-                        var j = i - 1
-                        while j >= 0:
-                            var gk_j = group_keys[j]
-                            if d[group_map[gk_j][0]] <= val_i:
-                                break
-                            group_keys[j + 1] = gk_j
-                            j -= 1
-                        group_keys[j + 1] = key_i
+                    _insertion_sort_keys_by[Float64](
+                        group_keys, group_map, col_data[List[Float64]]
+                    )
                 else:
                     _sort_list(group_keys)
             else:
