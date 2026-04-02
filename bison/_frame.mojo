@@ -226,6 +226,114 @@ struct Series(Copyable, Movable):
     def ge(self, other: Series) raises -> Series:
         return Series(self._col._cmp_ge(other._col))
 
+    def __gt__(self, other: Float64) raises -> Series:
+        """Element-wise ``>`` against a scalar, returning a boolean Series."""
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_gt(rhs_col))
+
+    def __lt__(self, other: Float64) raises -> Series:
+        """Element-wise ``<`` against a scalar, returning a boolean Series."""
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_lt(rhs_col))
+
+    def __ge__(self, other: Float64) raises -> Series:
+        """Element-wise ``>=`` against a scalar, returning a boolean Series."""
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_ge(rhs_col))
+
+    def __le__(self, other: Float64) raises -> Series:
+        """Element-wise ``<=`` against a scalar, returning a boolean Series."""
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_le(rhs_col))
+
+    def __eq__(self, other: Float64) raises -> Series:
+        """Element-wise ``==`` against a numeric scalar, returning a boolean Series.
+        """
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_eq(rhs_col))
+
+    def __ne__(self, other: Float64) raises -> Series:
+        """Element-wise ``!=`` against a numeric scalar, returning a boolean Series.
+        """
+        var n = len(self._col)
+        var rhs = List[Float64]()
+        for _ in range(n):
+            rhs.append(other)
+        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
+        return Series(self._col._cmp_ne(rhs_col))
+
+    def __eq__(self, other: String) raises -> Series:
+        """Element-wise ``==`` against a string scalar, returning a boolean Series.
+        """
+        var n = len(self._col)
+        var result = List[Bool]()
+        var has_mask = len(self._col._null_mask) > 0
+        if self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            for i in range(n):
+                if has_mask and self._col._null_mask[i]:
+                    result.append(False)
+                else:
+                    result.append(d[i] == other)
+        elif self._col._data.isa[List[PythonObject]]():
+            ref d = self._col._data[List[PythonObject]]
+            for i in range(n):
+                if has_mask and self._col._null_mask[i]:
+                    result.append(False)
+                else:
+                    result.append(String(d[i]) == other)
+        else:
+            for _ in range(n):
+                result.append(False)
+        var col = Column(self._col.name, ColumnData(result^), bool_)
+        return Series(col^)
+
+    def __ne__(self, other: String) raises -> Series:
+        """Element-wise ``!=`` against a string scalar, returning a boolean Series.
+        """
+        var n = len(self._col)
+        var result = List[Bool]()
+        var has_mask = len(self._col._null_mask) > 0
+        if self._col._data.isa[List[String]]():
+            ref d = self._col._data[List[String]]
+            for i in range(n):
+                if has_mask and self._col._null_mask[i]:
+                    result.append(True)
+                else:
+                    result.append(d[i] != other)
+        elif self._col._data.isa[List[PythonObject]]():
+            ref d = self._col._data[List[PythonObject]]
+            for i in range(n):
+                if has_mask and self._col._null_mask[i]:
+                    result.append(True)
+                else:
+                    result.append(String(d[i]) != other)
+        else:
+            for _ in range(n):
+                result.append(True)
+        var col = Column(self._col.name, ColumnData(result^), bool_)
+        return Series(col^)
+
     # ------------------------------------------------------------------
     # Aggregation
     # ------------------------------------------------------------------
@@ -2043,6 +2151,42 @@ struct DataFrame(Copyable, Movable):
             if self._cols[i].name == key:
                 return Series(self._cols[i].copy())
         raise Error("DataFrame.__getitem__: column not found: " + key)
+
+    def __getitem__(self, mask: Series) raises -> DataFrame:
+        """Filter rows using a boolean mask Series.
+
+        Returns a new DataFrame containing only the rows where *mask* is True.
+        Null mask values are treated as False (row excluded).
+
+        Example::
+
+            df[df["a"] > 0.5]
+        """
+        var n = self.shape()[0]
+        var mask_len = len(mask._col)
+        if mask_len != n:
+            raise Error(
+                "DataFrame.__getitem__: boolean mask length "
+                + String(mask_len)
+                + " does not match DataFrame length "
+                + String(n)
+            )
+        var indices = List[Int]()
+        var has_mask = len(mask._col._null_mask) > 0
+        if mask._col._data.isa[List[Bool]]():
+            ref d = mask._col._data[List[Bool]]
+            for i in range(mask_len):
+                var is_null = has_mask and mask._col._null_mask[i]
+                if not is_null and d[i]:
+                    indices.append(i)
+        else:
+            raise Error(
+                "DataFrame.__getitem__: mask Series must have bool dtype"
+            )
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].take(indices))
+        return DataFrame(result_cols^)
 
     def __setitem__(mut self, key: String, value: Series) raises:
         var new_col = value._col.copy()

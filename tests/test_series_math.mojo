@@ -663,5 +663,90 @@ def test_cov_with_nulls() raises:
     assert_true(result > expected - 1e-9 and result < expected + 1e-9)
 
 
+def test_gt_scalar() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 3.0, 5.0]")))
+    var mask = s.__gt__(2.0)
+    assert_equal(mask.dtype().name, "bool")
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
+def test_lt_scalar() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 3.0, 5.0]")))
+    var mask = s.__lt__(3.0)
+    assert_equal(mask.dtype().name, "bool")
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == False)
+
+
+def test_ge_scalar() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 3.0, 5.0]")))
+    var mask = s.__ge__(3.0)
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
+def test_le_scalar() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 3.0, 5.0]")))
+    var mask = s.__le__(3.0)
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == False)
+
+
+def test_eq_scalar_float() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var mask = s.__eq__(Float64(2.0))
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == False)
+
+
+def test_ne_scalar_float() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.0, 3.0]")))
+    var mask = s.__ne__(Float64(2.0))
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
+def test_eq_scalar_string() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("['a', 'b', 'a']")))
+    var mask = s.__eq__(String("a"))
+    assert_equal(mask.dtype().name, "bool")
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
+def test_ne_scalar_string() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("['a', 'b', 'a']")))
+    var mask = s.__ne__(String("a"))
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == False)
+
+
+def test_gt_int_series() raises:
+    # Int64 column compared against a Float64 scalar (numeric promotion path)
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]")))
+    var mask = s.__gt__(3.0)
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(3)[Bool] == True)
+    assert_true(mask.iloc(4)[Bool] == True)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

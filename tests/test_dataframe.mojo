@@ -102,6 +102,70 @@ def test_getitem_column() raises:
     assert_equal(s.size(), 3)
 
 
+def test_getitem_bool_mask_basic() raises:
+    """df[boolean_series] returns only rows where mask is True."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
+    var mask = df["a"].__gt__(3.0)
+    var result = df[mask]
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result.shape()[1], 1)
+
+
+def test_getitem_bool_mask_pattern() raises:
+    """df[df['a'] > threshold] is the canonical pandas filter pattern."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
+    var result = df[df["a"].__gt__(1.5)]
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result.shape()[1], 2)
+    # Rows 1 and 2 survive; first value of 'b' should be 5.0
+    assert_true(result["b"].iloc(0)[Float64] == 5.0)
+    assert_true(result["b"].iloc(1)[Float64] == 6.0)
+
+
+def test_getitem_bool_mask_none_pass() raises:
+    """All-False mask returns empty DataFrame."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var mask = df["a"].__gt__(100.0)
+    var result = df[mask]
+    assert_equal(result.shape()[0], 0)
+    assert_equal(result.shape()[1], 1)
+
+
+def test_getitem_bool_mask_all_pass() raises:
+    """All-True mask returns all rows."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var mask = df["a"].__gt__(0.0)
+    var result = df[mask]
+    assert_equal(result.shape()[0], 3)
+
+
+def test_getitem_bool_mask_length_mismatch_raises() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var mask = Series(pd.Series(Python.evaluate("[True, False]")))
+    var raised = False
+    try:
+        _ = df[mask]
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_getitem_bool_mask_string_eq() raises:
+    """Boolean mask created via string equality filters correctly."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'cat': ['a', 'b', 'a', 'c'], 'val': [1, 2, 3, 4]}")))
+    var mask = df["cat"].__eq__(String("a"))
+    var result = df[mask]
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result["val"].iloc(0)[Int64], Int64(1))
+    assert_equal(result["val"].iloc(1)[Int64], Int64(3))
+
+
 def test_getitem_missing_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
