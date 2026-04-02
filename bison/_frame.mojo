@@ -2384,14 +2384,12 @@ struct DataFrame(Copyable, Movable):
                 vals.append(col._float64_data()[row])
         return vals^
 
-    fn _row_non_null_numeric_count(self, row: Int) -> Int:
-        """Count non-null numeric cells in row *row* (used by count axis=1)."""
+    fn _row_non_null_count(self, row: Int) -> Int:
+        """Count non-null cells in row *row* across all dtypes (used by count axis=1).
+        """
         var cnt = 0
         for ci in range(len(self._cols)):
-            ref col = self._cols[ci]
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            if not col._null_mask[row]:
+            if not self._cols[ci]._null_mask[row]:
                 cnt += 1
         return cnt
 
@@ -2596,7 +2594,7 @@ struct DataFrame(Copyable, Movable):
             var nrows = self.shape()[0]
             var results = List[Float64]()
             for i in range(nrows):
-                results.append(Float64(self._row_non_null_numeric_count(i)))
+                results.append(Float64(self._row_non_null_count(i)))
             var col_data = ColumnData(results^)
             var dtype = Column._sniff_dtype(col_data)
             return Series(Column(None, col_data^, dtype))
@@ -2615,25 +2613,26 @@ struct DataFrame(Copyable, Movable):
             var nrows = self.shape()[0]
             var results = List[Float64]()
             for i in range(nrows):
-                var vals = self._row_numeric_vals(i, True)
-                var n = len(vals)
-                if n == 0:
-                    results.append(Float64(0))
-                    continue
-                # Sort then count distinct values
-                var sorted_vals = vals.copy()
-                for a in range(1, n):
-                    var key = sorted_vals[a]
-                    var b = a - 1
-                    while b >= 0 and sorted_vals[b] > key:
-                        sorted_vals[b + 1] = sorted_vals[b]
-                        b -= 1
-                    sorted_vals[b + 1] = key
-                var unique_count = 1
-                for j in range(1, n):
-                    if sorted_vals[j] != sorted_vals[j - 1]:
-                        unique_count += 1
-                results.append(Float64(unique_count))
+                var seen = Dict[String, Bool]()
+                for ci in range(len(self._cols)):
+                    ref col = self._cols[ci]
+                    if col._null_mask[i]:
+                        continue
+                    var key: String
+                    ref cd = col._data
+                    if cd.isa[List[Int64]]():
+                        # Represent as Float64 so int 1 == float 1.0 (matches pandas)
+                        key = "n:" + String(Float64(Int(cd[List[Int64]][i])))
+                    elif cd.isa[List[Float64]]():
+                        key = "n:" + String(cd[List[Float64]][i])
+                    elif cd.isa[List[Bool]]():
+                        key = "b:" + ("1" if cd[List[Bool]][i] else "0")
+                    elif cd.isa[List[String]]():
+                        key = "s:" + cd[List[String]][i]
+                    else:
+                        key = "o:" + String(cd[List[PythonObject]][i])
+                    seen[key] = True
+                results.append(Float64(len(seen)))
             var col_data = ColumnData(results^)
             var dtype = Column._sniff_dtype(col_data)
             return Series(Column(None, col_data^, dtype))
