@@ -2442,14 +2442,16 @@ comptime _CMP_GE = 5
 struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     """Element-wise comparison visitor for ``Column._cmp_op``.
 
-    At construction time the RHS column's data is split into two pre-computed
-    forms: ``other_bool`` (populated when the RHS holds Bool data) and
+    At construction time the RHS column's data is split into pre-computed
+    forms: ``other_bool`` (populated when the RHS holds Bool data),
+    ``other_str`` (populated when the RHS holds String data), and
     ``other_float`` (a Float64 projection populated for all other numeric
     arms).  This avoids a repeated ``_ToFloat64Visitor`` call per dispatch
     and eliminates the need for a live ``ColumnData`` reference inside the
     visitor.  ``on_bool`` uses the Bool-Bool fast path when ``other_is_bool``
-    is set; all other numeric arms delegate to ``_run_float64``.  String and
-    object arms raise.
+    is set; ``on_str`` uses the String-String fast path when ``other_is_str``
+    is set (EQ and NE only); all other numeric arms delegate to
+    ``_run_float64``.  Object arms raise.
 
     ``op`` is one of the ``_CMP_*`` compile-time constants; ``comptime if``
     folds the branch at compile time so each specialisation is a tight loop.
@@ -2460,8 +2462,10 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     var other_bool: List[Bool]  # Bool RHS data; non-empty iff other_is_bool
     var other_float: List[
         Float64
-    ]  # Float64 RHS data; non-empty iff not other_is_bool
+    ]  # Float64 RHS data; non-empty iff not other_is_bool and not other_is_str
+    var other_str: List[String]  # String RHS data; non-empty iff other_is_str
     var other_is_bool: Bool
+    var other_is_str: Bool
     var result: List[Bool]
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -2474,11 +2478,21 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
         self.has_any_null = False
         if other._data.isa[List[Bool]]():
             self.other_is_bool = True
+            self.other_is_str = False
             self.other_bool = other._data[List[Bool]].copy()
             self.other_float = List[Float64]()
+            self.other_str = List[String]()
+        elif other._data.isa[List[String]]():
+            self.other_is_bool = False
+            self.other_is_str = True
+            self.other_bool = List[Bool]()
+            self.other_float = List[Float64]()
+            self.other_str = other._data[List[String]].copy()
         else:
             self.other_is_bool = False
+            self.other_is_str = False
             self.other_bool = List[Bool]()
+            self.other_str = List[String]()
             var f64_v = _ToFloat64Visitor()
             visit_col_data_raises(f64_v, other._data)
             self.other_float = f64_v.result.copy()
@@ -2566,7 +2580,32 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
             self._run_float64(a)
 
     def on_str(mut self, data: List[String]) raises:
-        raise Error("cmp: comparison not supported for string column type")
+        if not self.other_is_str:
+            raise Error(
+                "cmp: cannot compare string column with non-string column"
+            )
+        var has_a_mask = len(self.self_null_mask) > 0
+        var has_b_mask = len(self.other_null_mask) > 0
+        ref ds = self.other_str
+        for i in range(len(data)):
+            var is_null = (has_a_mask and self.self_null_mask[i]) or (
+                has_b_mask and self.other_null_mask[i]
+            )
+            if is_null:
+                self.result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                comptime if Self.op == _CMP_EQ:
+                    self.result.append(data[i] == ds[i])
+                    self.result_mask.append(False)
+                elif Self.op == _CMP_NE:
+                    self.result.append(data[i] != ds[i])
+                    self.result_mask.append(False)
+                else:
+                    raise Error(
+                        "cmp: only == and != are supported for string columns"
+                    )
 
     def on_obj(mut self, data: List[PythonObject]) raises:
         raise Error(

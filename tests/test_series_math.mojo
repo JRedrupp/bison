@@ -748,5 +748,25 @@ def test_gt_int_series() raises:
     assert_true(mask.iloc(4)[Bool] == True)
 
 
+def test_eq_string_series() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("['a', 'b', 'c']"), dtype="string"))
+    var s2 = Series(pd.Series(Python.evaluate("['a', 'x', 'c']"), dtype="string"))
+    var rp = s1.eq(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == True)
+    assert_true(Bool(rp.iloc[1]) == False)
+    assert_true(Bool(rp.iloc[2]) == True)
+
+
+def test_ne_string_series() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("['a', 'b', 'c']"), dtype="string"))
+    var s2 = Series(pd.Series(Python.evaluate("['a', 'x', 'c']"), dtype="string"))
+    var rp = s1.ne(s2).to_pandas()
+    assert_true(Bool(rp.iloc[0]) == False)
+    assert_true(Bool(rp.iloc[1]) == True)
+    assert_true(Bool(rp.iloc[2]) == False)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
