@@ -228,59 +228,29 @@ struct Series(Copyable, Movable):
 
     def __gt__(self, other: Float64) raises -> Series:
         """Element-wise ``>`` against a scalar, returning a boolean Series."""
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_gt(rhs_col))
+        return Series(self._col._cmp_scalar_gt(other))
 
     def __lt__(self, other: Float64) raises -> Series:
         """Element-wise ``<`` against a scalar, returning a boolean Series."""
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_lt(rhs_col))
+        return Series(self._col._cmp_scalar_lt(other))
 
     def __ge__(self, other: Float64) raises -> Series:
         """Element-wise ``>=`` against a scalar, returning a boolean Series."""
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_ge(rhs_col))
+        return Series(self._col._cmp_scalar_ge(other))
 
     def __le__(self, other: Float64) raises -> Series:
         """Element-wise ``<=`` against a scalar, returning a boolean Series."""
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_le(rhs_col))
+        return Series(self._col._cmp_scalar_le(other))
 
     def __eq__(self, other: Float64) raises -> Series:
         """Element-wise ``==`` against a numeric scalar, returning a boolean Series.
         """
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_eq(rhs_col))
+        return Series(self._col._cmp_scalar_eq(other))
 
     def __ne__(self, other: Float64) raises -> Series:
         """Element-wise ``!=`` against a numeric scalar, returning a boolean Series.
         """
-        var n = len(self._col)
-        var rhs = List[Float64]()
-        for _ in range(n):
-            rhs.append(other)
-        var rhs_col = Column(self._col.name, ColumnData(rhs^), float64)
-        return Series(self._col._cmp_ne(rhs_col))
+        return Series(self._col._cmp_scalar_ne(other))
 
     def __eq__(self, other: String) raises -> Series:
         """Element-wise ``==`` against a string scalar, returning a boolean Series.
