@@ -1,6 +1,69 @@
 {
   "runs": [
     {
+      "commit": "b4f5fbee29c00dcb966ff31848c71a25057872cc",
+      "short_commit": "b4f5fbe",
+      "timestamp": "2026-04-02T00:48:42Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.22269042,
+          "pandas_ms": 0.09205872999984877,
+          "ratio": 2.4190038250621733
+        },
+        "series_mean": {
+          "bison_ms": 0.25048489,
+          "pandas_ms": 0.12178280999989965,
+          "ratio": 2.056816475167607
+        },
+        "groupby_sum": {
+          "bison_ms": 25.432970899999997,
+          "pandas_ms": 4.407382050000308,
+          "ratio": 5.7705392025177895
+        },
+        "query_filter": {
+          "bison_ms": 401.804977,
+          "pandas_ms": 1.2338123333298274,
+          "ratio": 325.66133936723094
+        },
+        "iloc_row": {
+          "bison_ms": 0.00110907,
+          "pandas_ms": 0.04073963999985608,
+          "ratio": 0.027223362798589234
+        },
+        "loc_slice": {
+          "bison_ms": 0.0102589,
+          "pandas_ms": 0.03188708000010365,
+          "ratio": 0.3217259153226527
+        },
+        "sort_values": {
+          "bison_ms": 37.61959233333334,
+          "pandas_ms": 6.040501333330894,
+          "ratio": 6.2278923978962
+        },
+        "merge": {
+          "bison_ms": 12.145266666666666,
+          "pandas_ms": 1.9952339999917967,
+          "ratio": 6.087138985560892
+        },
+        "fillna": {
+          "bison_ms": 0.14166192000000002,
+          "pandas_ms": 0.07079348999980084,
+          "ratio": 2.0010585719166913
+        },
+        "series_apply": {
+          "bison_ms": 0.44988286,
+          "pandas_ms": 0.21949027999994541,
+          "ratio": 2.049670992264951
+        },
+        "csv_roundtrip": {
+          "bison_ms": 517.926996,
+          "pandas_ms": 338.21569159999854,
+          "ratio": 1.5313511728265485
+        }
+      }
+    },
+    {
       "commit": "0d48e1ccf5c209365b86ed84902bff09e97ec1bf",
       "short_commit": "0d48e1c",
       "timestamp": "2026-04-02T00:02:13Z",
