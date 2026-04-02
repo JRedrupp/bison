@@ -286,16 +286,15 @@ struct Series(Copyable, Movable):
         """Element-wise ``==`` against a string scalar, returning a boolean Series.
         """
         var n = len(self._col)
+        if self._col._data.isa[List[String]]():
+            var rhs = List[String]()
+            for _ in range(n):
+                rhs.append(other)
+            var rhs_col = Column(self._col.name, ColumnData(rhs^), object_)
+            return Series(self._col._cmp_eq(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
-        if self._col._data.isa[List[String]]():
-            ref d = self._col._data[List[String]]
-            for i in range(n):
-                if has_mask and self._col._null_mask[i]:
-                    result.append(False)
-                else:
-                    result.append(d[i] == other)
-        elif self._col._data.isa[List[PythonObject]]():
+        if self._col._data.isa[List[PythonObject]]():
             ref d = self._col._data[List[PythonObject]]
             for i in range(n):
                 if has_mask and self._col._null_mask[i]:
@@ -312,16 +311,15 @@ struct Series(Copyable, Movable):
         """Element-wise ``!=`` against a string scalar, returning a boolean Series.
         """
         var n = len(self._col)
+        if self._col._data.isa[List[String]]():
+            var rhs = List[String]()
+            for _ in range(n):
+                rhs.append(other)
+            var rhs_col = Column(self._col.name, ColumnData(rhs^), object_)
+            return Series(self._col._cmp_ne(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
-        if self._col._data.isa[List[String]]():
-            ref d = self._col._data[List[String]]
-            for i in range(n):
-                if has_mask and self._col._null_mask[i]:
-                    result.append(True)
-                else:
-                    result.append(d[i] != other)
-        elif self._col._data.isa[List[PythonObject]]():
+        if self._col._data.isa[List[PythonObject]]():
             ref d = self._col._data[List[PythonObject]]
             for i in range(n):
                 if has_mask and self._col._null_mask[i]:
