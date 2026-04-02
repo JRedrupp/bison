@@ -1731,6 +1731,12 @@ comptime ToDictResult = Variant[
     Dict[String, Series],
 ]
 
+# Compile-time operation selectors for DataFrame._cum_axis1
+comptime _CUM_SUM = 0
+comptime _CUM_PROD = 1
+comptime _CUM_MIN = 2
+comptime _CUM_MAX = 3
+
 
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
@@ -2718,40 +2724,63 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i]._abs())
         return DataFrame(result_cols^)
 
+    def _cum_axis1[op: Int](self, skipna: Bool) raises -> DataFrame:
+        """Shared axis=1 kernel for cumsum, cumprod, cummin, and cummax.
+
+        ``op`` is one of the ``_CUM_*`` compile-time constants; ``comptime if``
+        folds the accumulation branch at compile time so each specialisation
+        compiles to a tight loop with no runtime dispatch.
+        """
+        var nrows = self.shape()[0]
+        var ncols = len(self._cols)
+        var nan = Float64(0) / Float64(0)
+        var result_lists = List[List[Float64]]()
+        for _ in range(ncols):
+            result_lists.append(List[Float64]())
+        for i in range(nrows):
+            var running = Float64(0)
+            comptime if op == _CUM_PROD:
+                running = Float64(1)
+            var has_value = False
+            var propagate_nan = False
+            for ci in range(ncols):
+                ref col = self._cols[ci]
+                if col._null_mask[i] or not (
+                    col.dtype.is_integer() or col.dtype.is_float()
+                ):
+                    if not skipna:
+                        propagate_nan = True
+                    result_lists[ci].append(nan if propagate_nan else running)
+                else:
+                    var v = Float64(
+                        col._int64_data()[i]
+                    ) if col.dtype.is_integer() else col._float64_data()[i]
+                    comptime if op == _CUM_SUM:
+                        running += v
+                    elif op == _CUM_PROD:
+                        running *= v
+                    elif op == _CUM_MIN:
+                        if not has_value:
+                            running = v
+                            has_value = True
+                        elif v < running:
+                            running = v
+                    else:
+                        if not has_value:
+                            running = v
+                            has_value = True
+                        elif v > running:
+                            running = v
+                    result_lists[ci].append(nan if propagate_nan else running)
+        var result_cols = List[Column]()
+        for ci in range(ncols):
+            var cd = ColumnData(result_lists[ci].copy())
+            result_cols.append(Column(self._cols[ci].name, cd^, float64))
+        return DataFrame(result_cols^)
+
     def cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis == 1:
-            var nrows = self.shape()[0]
-            var ncols = len(self._cols)
-            var nan = Float64(0) / Float64(0)
-            var result_lists = List[List[Float64]]()
-            for _ in range(ncols):
-                result_lists.append(List[Float64]())
-            for i in range(nrows):
-                var running = Float64(0)
-                var propagate_nan = False
-                for ci in range(ncols):
-                    ref col = self._cols[ci]
-                    if col._null_mask[i] or not (
-                        col.dtype.is_integer() or col.dtype.is_float()
-                    ):
-                        if not skipna:
-                            propagate_nan = True
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-                    else:
-                        var v = Float64(
-                            col._int64_data()[i]
-                        ) if col.dtype.is_integer() else col._float64_data()[i]
-                        running += v
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-            var result_cols = List[Column]()
-            for ci in range(ncols):
-                var cd = ColumnData(result_lists[ci].copy())
-                result_cols.append(Column(self._cols[ci].name, cd^, float64))
-            return DataFrame(result_cols^)
+            return self._cum_axis1[_CUM_SUM](skipna)
         elif axis != 0:
             _not_implemented("DataFrame.cumsum")
         var result_cols = List[Column]()
@@ -2761,38 +2790,7 @@ struct DataFrame(Copyable, Movable):
 
     def cumprod(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis == 1:
-            var nrows = self.shape()[0]
-            var ncols = len(self._cols)
-            var nan = Float64(0) / Float64(0)
-            var result_lists = List[List[Float64]]()
-            for _ in range(ncols):
-                result_lists.append(List[Float64]())
-            for i in range(nrows):
-                var running = Float64(1)
-                var propagate_nan = False
-                for ci in range(ncols):
-                    ref col = self._cols[ci]
-                    if col._null_mask[i] or not (
-                        col.dtype.is_integer() or col.dtype.is_float()
-                    ):
-                        if not skipna:
-                            propagate_nan = True
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-                    else:
-                        var v = Float64(
-                            col._int64_data()[i]
-                        ) if col.dtype.is_integer() else col._float64_data()[i]
-                        running *= v
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-            var result_cols = List[Column]()
-            for ci in range(ncols):
-                var cd = ColumnData(result_lists[ci].copy())
-                result_cols.append(Column(self._cols[ci].name, cd^, float64))
-            return DataFrame(result_cols^)
+            return self._cum_axis1[_CUM_PROD](skipna)
         elif axis != 0:
             _not_implemented("DataFrame.cumprod")
         var result_cols = List[Column]()
@@ -2802,43 +2800,7 @@ struct DataFrame(Copyable, Movable):
 
     def cummin(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis == 1:
-            var nrows = self.shape()[0]
-            var ncols = len(self._cols)
-            var nan = Float64(0) / Float64(0)
-            var result_lists = List[List[Float64]]()
-            for _ in range(ncols):
-                result_lists.append(List[Float64]())
-            for i in range(nrows):
-                var running = Float64(0)
-                var has_value = False
-                var propagate_nan = False
-                for ci in range(ncols):
-                    ref col = self._cols[ci]
-                    if col._null_mask[i] or not (
-                        col.dtype.is_integer() or col.dtype.is_float()
-                    ):
-                        if not skipna:
-                            propagate_nan = True
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-                    else:
-                        var v = Float64(
-                            col._int64_data()[i]
-                        ) if col.dtype.is_integer() else col._float64_data()[i]
-                        if not has_value:
-                            running = v
-                            has_value = True
-                        elif v < running:
-                            running = v
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-            var result_cols = List[Column]()
-            for ci in range(ncols):
-                var cd = ColumnData(result_lists[ci].copy())
-                result_cols.append(Column(self._cols[ci].name, cd^, float64))
-            return DataFrame(result_cols^)
+            return self._cum_axis1[_CUM_MIN](skipna)
         elif axis != 0:
             _not_implemented("DataFrame.cummin")
         var result_cols = List[Column]()
@@ -2848,43 +2810,7 @@ struct DataFrame(Copyable, Movable):
 
     def cummax(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
         if axis == 1:
-            var nrows = self.shape()[0]
-            var ncols = len(self._cols)
-            var nan = Float64(0) / Float64(0)
-            var result_lists = List[List[Float64]]()
-            for _ in range(ncols):
-                result_lists.append(List[Float64]())
-            for i in range(nrows):
-                var running = Float64(0)
-                var has_value = False
-                var propagate_nan = False
-                for ci in range(ncols):
-                    ref col = self._cols[ci]
-                    if col._null_mask[i] or not (
-                        col.dtype.is_integer() or col.dtype.is_float()
-                    ):
-                        if not skipna:
-                            propagate_nan = True
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-                    else:
-                        var v = Float64(
-                            col._int64_data()[i]
-                        ) if col.dtype.is_integer() else col._float64_data()[i]
-                        if not has_value:
-                            running = v
-                            has_value = True
-                        elif v > running:
-                            running = v
-                        result_lists[ci].append(
-                            nan if propagate_nan else running
-                        )
-            var result_cols = List[Column]()
-            for ci in range(ncols):
-                var cd = ColumnData(result_lists[ci].copy())
-                result_cols.append(Column(self._cols[ci].name, cd^, float64))
-            return DataFrame(result_cols^)
+            return self._cum_axis1[_CUM_MAX](skipna)
         elif axis != 0:
             _not_implemented("DataFrame.cummax")
         var result_cols = List[Column]()
