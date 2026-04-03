@@ -30,6 +30,11 @@ fi
 pids=()
 files=()
 
+# Leave at least one core free so the machine stays responsive.
+MAX_JOBS=$(( $(nproc) - 1 ))
+[ "$MAX_JOBS" -lt 1 ] && MAX_JOBS=1
+running=0
+
 for f in "$TESTS_DIR"/test_*.mojo; do
     result_file="$TMP_DIR/$(basename "$f").result"
     echo "Running $f ..."
@@ -42,6 +47,14 @@ for f in "$TESTS_DIR"/test_*.mojo; do
     ) &
     pids+=($!)
     files+=("$f")
+    running=$(( running + 1 ))
+
+    # Once we have MAX_JOBS in flight, wait for the oldest to finish
+    # before spawning the next one.
+    if [ "$running" -ge "$MAX_JOBS" ]; then
+        wait "${pids[$(( ${#pids[@]} - running ))]}" || true
+        running=$(( running - 1 ))
+    fi
 done
 
 # Wait for all test processes to finish
