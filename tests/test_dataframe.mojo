@@ -103,7 +103,7 @@ def test_getitem_column() raises:
 
 
 def test_getitem_bool_mask_basic() raises:
-    """df[boolean_series] returns only rows where mask is True."""
+    """Boolean mask df[boolean_series] returns only rows where mask is True."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4, 5]}")))
     var mask = df["a"].__gt__(3.0)
@@ -113,7 +113,7 @@ def test_getitem_bool_mask_basic() raises:
 
 
 def test_getitem_bool_mask_pattern() raises:
-    """df[df['a'] > threshold] is the canonical pandas filter pattern."""
+    """The df[df['a'] > threshold] pattern is the canonical pandas filter."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [4.0, 5.0, 6.0]}")))
     var result = df[df["a"].__gt__(1.5)]
