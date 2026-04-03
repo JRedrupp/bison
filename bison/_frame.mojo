@@ -226,6 +226,36 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     def ge(self, other: Series) raises -> Series:
         return Series(self._col._cmp_ge(other._col))
 
+    def __eq__(self, other: Series) raises -> Series:
+        """Element-wise ``==`` against another Series, returning a boolean Series.
+        """
+        return self.eq(other)
+
+    def __ne__(self, other: Series) raises -> Series:
+        """Element-wise ``!=`` against another Series, returning a boolean Series.
+        """
+        return self.ne(other)
+
+    def __lt__(self, other: Series) raises -> Series:
+        """Element-wise ``<`` against another Series, returning a boolean Series.
+        """
+        return self.lt(other)
+
+    def __le__(self, other: Series) raises -> Series:
+        """Element-wise ``<=`` against another Series, returning a boolean Series.
+        """
+        return self.le(other)
+
+    def __gt__(self, other: Series) raises -> Series:
+        """Element-wise ``>`` against another Series, returning a boolean Series.
+        """
+        return self.gt(other)
+
+    def __ge__(self, other: Series) raises -> Series:
+        """Element-wise ``>=`` against another Series, returning a boolean Series.
+        """
+        return self.ge(other)
+
     # ------------------------------------------------------------------
     # Boolean logical
     # ------------------------------------------------------------------
