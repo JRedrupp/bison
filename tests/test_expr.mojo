@@ -795,5 +795,120 @@ def test_df_eval_not() raises:
     assert_true(not d[2])
 
 
+# ------------------------------------------------------------------
+# NK_NULL evaluation tests
+# ------------------------------------------------------------------
+
+
+def test_eval_null_eq() raises:
+    """col == None returns isna() mask: True where the value is None."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
+    )
+    var mask = eval_expr(parse("a == None"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
+def test_eval_null_ne() raises:
+    """col != None returns notna() mask: True where the value is not None."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
+    )
+    var mask = eval_expr(parse("a != None"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
+def test_eval_null_flipped_eq() raises:
+    """None == col (flipped) behaves identically to col == None."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
+    )
+    var mask = eval_expr(parse("None == a"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
+def test_eval_null_invalid_op_raises() raises:
+    """col < None raises with a clear message (ordering against None is undefined)."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0]}"))
+    )
+    var raised = False
+    try:
+        _ = eval_expr(parse("a < None"), df)
+    except e:
+        raised = "null (None) comparisons only support == and !=" in String(e)
+    assert_true(raised)
+
+
+# ------------------------------------------------------------------
+# NK_BOOL evaluation tests
+# ------------------------------------------------------------------
+
+
+def test_eval_bool_eq_true() raises:
+    """flag == True returns True for rows where the bool column is True."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
+    )
+    var mask = eval_expr(parse("flag == True"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
+def test_eval_bool_eq_false() raises:
+    """flag == False returns True for rows where the bool column is False."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
+    )
+    var mask = eval_expr(parse("flag == False"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
+def test_eval_bool_ne_true() raises:
+    """flag != True returns True for rows where the bool column is False."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
+    )
+    var mask = eval_expr(parse("flag != True"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
+def test_eval_bool_flipped_eq() raises:
+    """True == flag (flipped) behaves identically to flag == True."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
+    )
+    var mask = eval_expr(parse("True == flag"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

@@ -89,6 +89,38 @@ fn _apply_string_op(col: Series, op: String, val: String) raises -> Series:
         )
 
 
+fn _apply_null_op(col: Series, op: String) raises -> Series:
+    """Apply a null-check operator to *col*.
+
+    ``==`` maps to ``isna()`` (True where the value is null) and ``!=``
+    maps to ``notna()`` (True where the value is not null).  All other
+    operators raise, because ordering comparisons against ``None`` are
+    undefined.
+    """
+    if op == "==":
+        return col.isna()
+    elif op == "!=":
+        return col.notna()
+    else:
+        raise Error(
+            "evaluator: null (None) comparisons only support == and !=; got '"
+            + op
+            + "'"
+        )
+
+
+fn _parse_bool_literal(node: ASTNode) raises -> Float64:
+    """Convert an NK_BOOL node to 1.0 (True) or 0.0 (False)."""
+    if node.value == "True":
+        return Float64(1.0)
+    elif node.value == "False":
+        return Float64(0.0)
+    else:
+        raise Error(
+            "evaluator: unexpected boolean literal value '" + node.value + "'"
+        )
+
+
 fn _parse_numeric_literal(node: ASTNode) raises -> Float64:
     """Convert an NK_INT or NK_FLOAT node value to Float64."""
     return atof(node.value)
@@ -112,6 +144,10 @@ fn _eval_compare(
     var rhs_is_numeric = (rhs.kind == NK_INT) or (rhs.kind == NK_FLOAT)
     var lhs_is_string = lhs.kind == NK_STRING
     var rhs_is_string = rhs.kind == NK_STRING
+    var lhs_is_null = lhs.kind == NK_NULL
+    var rhs_is_null = rhs.kind == NK_NULL
+    var lhs_is_bool = lhs.kind == NK_BOOL
+    var rhs_is_bool = rhs.kind == NK_BOOL
 
     if lhs_is_ident and rhs_is_ident:
         # column vs column
@@ -151,6 +187,26 @@ fn _eval_compare(
         var col = _resolve_ident(rhs.value, df)
         var flipped = _flip_op(op)
         return _apply_string_op(col, flipped, lhs.value)
+
+    elif lhs_is_ident and rhs_is_null:
+        var col = _resolve_ident(lhs.value, df)
+        return _apply_null_op(col, op)
+
+    elif lhs_is_null and rhs_is_ident:
+        var col = _resolve_ident(rhs.value, df)
+        var flipped = _flip_op(op)
+        return _apply_null_op(col, flipped)
+
+    elif lhs_is_ident and rhs_is_bool:
+        var col = _resolve_ident(lhs.value, df)
+        var val = _parse_bool_literal(rhs)
+        return _apply_numeric_op(col, op, val)
+
+    elif lhs_is_bool and rhs_is_ident:
+        var col = _resolve_ident(rhs.value, df)
+        var val = _parse_bool_literal(lhs)
+        var flipped = _flip_op(op)
+        return _apply_numeric_op(col, flipped, val)
 
     else:
         raise Error(
