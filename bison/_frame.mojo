@@ -327,6 +327,36 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """
         return Series(self._col._cmp_scalar_ne(other))
 
+    def __gt__(self, other: Int64) raises -> Series:
+        """Element-wise ``>`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_gt(other))
+
+    def __lt__(self, other: Int64) raises -> Series:
+        """Element-wise ``<`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_lt(other))
+
+    def __ge__(self, other: Int64) raises -> Series:
+        """Element-wise ``>=`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_ge(other))
+
+    def __le__(self, other: Int64) raises -> Series:
+        """Element-wise ``<=`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_le(other))
+
+    def __eq__(self, other: Int64) raises -> Series:
+        """Element-wise ``==`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_eq(other))
+
+    def __ne__(self, other: Int64) raises -> Series:
+        """Element-wise ``!=`` against an integer scalar, returning a boolean Series.
+        """
+        return Series(self._col._cmp_scalar_ne(other))
+
     def __eq__(self, other: String) raises -> Series:
         """Element-wise ``==`` against a string scalar, returning a boolean Series.
         """
