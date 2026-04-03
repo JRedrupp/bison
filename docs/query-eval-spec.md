@@ -1,6 +1,6 @@
 # Query/Eval Minimal Grammar Specification
 
-Status: Draft for issue #492 (parent: #491, related: #418)
+Status: Shipped — covers the first native query/eval milestone (#497, #498, #499). Part of parent issue #491.
 
 This document defines the minimal grammar and semantics for the first native
 `DataFrame.query()` and `DataFrame.eval()` release.
