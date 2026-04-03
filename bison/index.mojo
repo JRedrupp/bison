@@ -1,6 +1,6 @@
 from std.collections import Set
 from std.python import PythonObject
-from std.builtin.sort import sort
+from std.builtin.sort import sort as _sort_list
 from std.utils import Variant
 
 
@@ -58,7 +58,7 @@ struct Index(Copyable, Movable):
 
     def sort_values(self, ascending: Bool = True) raises -> Index:
         var result = self._data.copy()
-        sort(result)
+        _sort_list(result)
         if not ascending:
             var n = len(result)
             for i in range(n // 2):
