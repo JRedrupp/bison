@@ -4314,6 +4314,13 @@ struct DataFrame(Copyable, Movable):
 
                 ref vcol = self._cols[name_to_ci[val_names[vi]]]
                 var is_null = len(vcol._null_mask) > 0 and vcol._null_mask[r]
+                if not is_null and vcol._data.isa[List[PythonObject]]():
+                    is_null = (
+                        String(
+                            vcol._data[List[PythonObject]][r].__class__.__name__
+                        )
+                        == "NoneType"
+                    )
                 if is_null:
                     continue
 
@@ -4345,15 +4352,17 @@ struct DataFrame(Copyable, Movable):
             var null_mask = List[Bool]()
             var any_null = False
             for rk in range(n_rk):
+                if aggfunc == "count":
+                    data.append(PythonObject(Int(counts[rk][out_i])))
+                    null_mask.append(False)
+                    continue
                 if counts[rk][out_i] == 0:
                     data.append(py_none)
                     null_mask.append(True)
                     any_null = True
                     continue
                 null_mask.append(False)
-                if aggfunc == "count":
-                    data.append(PythonObject(Int(counts[rk][out_i])))
-                elif aggfunc == "sum":
+                if aggfunc == "sum":
                     data.append(PythonObject(sums[rk][out_i]))
                 else:
                     data.append(

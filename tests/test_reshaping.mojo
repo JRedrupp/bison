@@ -208,11 +208,14 @@ def test_pivot_table_mean_matches_pandas() raises:
 
 def test_pivot_table_count_matches_pandas_with_nulls() raises:
     var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame(Python.evaluate(
-        "{'grp': ['a', 'a', 'b', 'b'],"
-        " 'cat': ['x', 'y', 'x', 'y'],"
-        " 'val': [1.0, None, 2.0, 8.0]}"
-    ))
+    var make_df = Python.evaluate(
+        "lambda pd: pd.DataFrame({"
+        "'grp': ['a', 'a', 'b', 'b'], "
+        "'cat': ['x', 'y', 'x', 'y'], "
+        "'val': pd.Series([1, None, 2, 8], dtype=object)"
+        "})"
+    )
+    var pd_df = make_df(pd)
     var df = DataFrame(pd_df)
 
     var values = List[String]()
@@ -236,9 +239,8 @@ def test_pivot_table_count_matches_pandas_with_nulls() raises:
     )
     assert_true(String(got.shape[0]) == String(expected.shape[0]))
     assert_true(String(got.shape[1]) == String(expected.shape[1]))
-    # Validate stable count buckets and keep the null-containing bucket out of
-    # strict parity checks until null-masking for object values is unified.
     assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(got.iloc[0, 1]) == String(expected.iloc[0, 1]))
     assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
     assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
 
