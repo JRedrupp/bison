@@ -2434,6 +2434,14 @@ comptime _CMP_GE = 5
 
 
 # ------------------------------------------------------------------
+# Compile-time operation selectors for Column._bool_op
+# ------------------------------------------------------------------
+comptime _BOOL_AND = 0
+comptime _BOOL_OR = 1
+comptime _BOOL_XOR = 2
+
+
+# ------------------------------------------------------------------
 # Comparison visitor — dispatches on self's ColumnData arm and stores
 # the RHS column's data to handle the Bool-Bool fast path internally.
 # ------------------------------------------------------------------
@@ -2694,6 +2702,130 @@ struct _CmpScalarVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
         raise Error(
             "cmp: comparison not supported for object/datetime column type"
         )
+
+
+# ------------------------------------------------------------------
+# Boolean logical visitor — element-wise and/or/xor with Kleene three-valued
+# null semantics (per docs/query-eval-spec.md § 3).
+#
+# Both self and other must be bool_ columns; all other arms raise.
+# Kleene short-circuit rules for AND and OR differ from the simple
+# "null if either null" propagation used in arithmetic / comparison:
+#
+#   AND: False AND Null → False   (False absorbs)
+#        True  AND Null → Null
+#   OR:  True  OR  Null → True    (True absorbs)
+#        False OR  Null → Null
+#   XOR: standard propagation — null if either operand is null.
+# ------------------------------------------------------------------
+
+
+struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
+    """Element-wise boolean logical visitor for ``Column._bool_op``.
+
+    ``op`` is one of the ``_BOOL_*`` compile-time constants.  Both the
+    self column and the RHS column must be bool_ dtype; any other arm raises
+    immediately.  Null propagation follows Kleene three-valued logic for AND
+    and OR, and standard (either-null → null) propagation for XOR.
+    """
+
+    var self_null_mask: List[Bool]
+    var other_null_mask: List[Bool]
+    var other_bool: List[Bool]
+    var result: List[Bool]
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, self_null_mask: List[Bool], other: Column) raises:
+        if not other._data.isa[List[Bool]]():
+            raise Error("bool_op: non-bool column type on right-hand side")
+        self.self_null_mask = self_null_mask.copy()
+        self.other_null_mask = other._null_mask.copy()
+        self.other_bool = other._data[List[Bool]].copy()
+        self.result = List[Bool]()
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var has_a_mask = len(self.self_null_mask) > 0
+        var has_b_mask = len(self.other_null_mask) > 0
+        ref ob = self.other_bool
+        for i in range(len(data)):
+            var a_null = has_a_mask and self.self_null_mask[i]
+            var b_null = has_b_mask and self.other_null_mask[i]
+            comptime if Self.op == _BOOL_AND:
+                # Kleene AND: False absorbs null
+                if a_null:
+                    if (not b_null) and (not ob[i]):
+                        # Null AND False → False
+                        self.result.append(False)
+                        self.result_mask.append(False)
+                    else:
+                        # Null AND True → Null; Null AND Null → Null
+                        self.result.append(False)
+                        self.result_mask.append(True)
+                        self.has_any_null = True
+                elif b_null:
+                    if not data[i]:
+                        # False AND Null → False
+                        self.result.append(False)
+                        self.result_mask.append(False)
+                    else:
+                        # True AND Null → Null
+                        self.result.append(False)
+                        self.result_mask.append(True)
+                        self.has_any_null = True
+                else:
+                    self.result.append(data[i] and ob[i])
+                    self.result_mask.append(False)
+            elif Self.op == _BOOL_OR:
+                # Kleene OR: True absorbs null
+                if a_null:
+                    if (not b_null) and ob[i]:
+                        # Null OR True → True
+                        self.result.append(True)
+                        self.result_mask.append(False)
+                    else:
+                        # Null OR False → Null; Null OR Null → Null
+                        self.result.append(False)
+                        self.result_mask.append(True)
+                        self.has_any_null = True
+                elif b_null:
+                    if data[i]:
+                        # True OR Null → True
+                        self.result.append(True)
+                        self.result_mask.append(False)
+                    else:
+                        # False OR Null → Null
+                        self.result.append(False)
+                        self.result_mask.append(True)
+                        self.has_any_null = True
+                else:
+                    self.result.append(data[i] or ob[i])
+                    self.result_mask.append(False)
+            else:
+                # XOR: standard null propagation
+                if a_null or b_null:
+                    self.result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+                else:
+                    self.result.append(
+                        (data[i] and not ob[i]) or (not data[i] and ob[i])
+                    )
+                    self.result_mask.append(False)
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        raise Error("bool_op: non-bool column type (got int64)")
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        raise Error("bool_op: non-bool column type (got float64)")
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("bool_op: non-bool column type (got string)")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("bool_op: non-bool column type (got object)")
 
 
 # Compile-time function type for element-wise Float64 transforms (_apply kernel)
@@ -4737,6 +4869,75 @@ struct Column(Copyable, Movable, Sized):
         return self._cmp_scalar_op[_CMP_GE](scalar)
 
     # ------------------------------------------------------------------
+    # Boolean logical kernels
+    # ------------------------------------------------------------------
+
+    def _bool_op[
+        op: Int
+    ](self, op_name: String, other: Column) raises -> Column:
+        """Core element-wise boolean logical kernel with Kleene null semantics.
+
+        Dispatches through ``_BoolOpVisitor[op]``.  Both self and other must
+        be bool_ columns; any other dtype raises.  ``op`` is one of the
+        ``_BOOL_*`` compile-time constants.
+
+        AND and OR use Kleene three-valued logic (False absorbs null for AND;
+        True absorbs null for OR).  XOR uses standard null propagation.
+        """
+        if len(self) != len(other):
+            raise Error(
+                op_name
+                + ": length mismatch ("
+                + String(len(self))
+                + " vs "
+                + String(len(other))
+                + ")"
+            )
+        if not self._data.isa[List[Bool]]():
+            raise Error("bool_op: non-bool column type on left-hand side")
+        var visitor = _BoolOpVisitor[op](self._null_mask, other)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(
+            ColumnData(visitor.result.copy()),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
+
+    def _bool_and(self, other: Column) raises -> Column:
+        return self._bool_op[_BOOL_AND]("and", other)
+
+    def _bool_or(self, other: Column) raises -> Column:
+        return self._bool_op[_BOOL_OR]("or", other)
+
+    def _bool_xor(self, other: Column) raises -> Column:
+        return self._bool_op[_BOOL_XOR]("xor", other)
+
+    def _bool_invert(self) raises -> Column:
+        """Element-wise boolean NOT.  Returns a bool_ Column with the same
+        null mask; null elements remain null.  Raises if self is not bool_.
+        """
+        if not self._data.isa[List[Bool]]():
+            raise Error("bool_op: non-bool column type (invert)")
+        ref src = self._data[List[Bool]]
+        var result = List[Bool]()
+        var result_mask = List[Bool]()
+        var has_any_null = False
+        var has_input_mask = len(self._null_mask) > 0
+        for i in range(len(src)):
+            if has_input_mask and self._null_mask[i]:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+            else:
+                result.append(not src[i])
+                result_mask.append(False)
+        return self._build_result_col(
+            ColumnData(result^),
+            result_mask^,
+            has_any_null,
+        )
+
+    # ------------------------------------------------------------------
     # Transformation kernels
     # ------------------------------------------------------------------
 
@@ -5324,7 +5525,7 @@ struct Column(Copyable, Movable, Sized):
             bison_dtype = int64
         elif dtype_str == "float32" or dtype_str == "float64":
             bison_dtype = float64
-        elif dtype_str == "bool":
+        elif dtype_str == "bool" or dtype_str == "boolean":
             bison_dtype = bool_
         elif dtype_str.startswith("datetime64"):
             bison_dtype = datetime64_ns
