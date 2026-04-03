@@ -525,6 +525,28 @@ def test_dataframegroupby_float_key_natural_sort() raises:
     )
 
 
+def test_dataframegroupby_multikey_numeric_secondary_sort() raises:
+    """Multi-key groupby must sort later numeric keys numerically within each prefix."""
+    var testing = Python.import_module("pandas.testing")
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp1': ['a', 'a', 'a', 'b', 'b', 'b'],"
+            " 'grp2': [10, 1, 2, 10, 1, 2],"
+            " 'val': [100, 10, 20, 200, 30, 40]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp1")
+    by.append("grp2")
+    var result = df.groupby(by).sum().to_pandas()
+    testing.assert_frame_equal(
+        result,
+        pd_df.groupby(Python.evaluate("['grp1', 'grp2']")).sum(),
+    )
+
+
 def test_seriesgroupby_dropna_sum() raises:
     """Dropna=True must exclude null-labelled rows from all groups."""
     var testing = Python.import_module("pandas.testing")
