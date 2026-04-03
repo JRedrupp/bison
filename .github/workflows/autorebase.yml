@@ -34,3 +34,5 @@ jobs:
 
       - name: Run autorebase
         run: autorebase --onto main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
