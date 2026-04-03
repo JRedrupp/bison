@@ -630,5 +630,77 @@ def test_eval_null_or() raises:
     assert_true(mask._col._data[List[Bool]][2])
 
 
+# ------------------------------------------------------------------
+# DataFrame.query integration tests
+# ------------------------------------------------------------------
+
+
+def test_query_simple_numeric() raises:
+    """df.query("a > 0.5") filters rows natively; result matches direct bool-mask filter."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [0.1, 0.6, 0.9, 0.3], 'b': [1, 2, 3, 4]}"))
+    )
+    var result = df.query("a > 0.5")
+    # Rows at index 1 (0.6) and 2 (0.9) pass the filter.
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result.shape()[1], 2)
+    var col_a = result["a"]
+    assert_true(col_a._col._data[List[Float64]][0] > 0.5)
+    assert_true(col_a._col._data[List[Float64]][1] > 0.5)
+
+
+def test_query_logical_and() raises:
+    """df.query("a > 1 and b < 4") applies compound logical filter natively."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4], 'b': [10, 3, 5, 2]}"))
+    )
+    var result = df.query("a > 1 and b < 4")
+    # Row 1: a=2 > 1 and b=3 < 4 → pass
+    # Row 3: a=4 > 1 and b=2 < 4 → pass
+    assert_equal(result.shape()[0], 2)
+
+
+def test_query_string_eq() raises:
+    """df.query("cat == 'foo'") filters on a string column natively."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'cat': ['foo', 'bar', 'foo'], 'val': [1, 2, 3]}")
+        )
+    )
+    var result = df.query("cat == 'foo'")
+    assert_equal(result.shape()[0], 2)
+
+
+def test_query_unknown_column_raises() raises:
+    """df.query referencing a missing column raises with 'unknown identifier'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
+    )
+    var raised = False
+    try:
+        _ = df.query("z > 1")
+    except e:
+        raised = "unknown identifier" in String(e)
+    assert_true(raised)
+
+
+def test_query_unsupported_syntax_raises() raises:
+    """df.query with unsupported syntax (e.g. '+') raises with 'unsupported syntax'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
+    )
+    var raised = False
+    try:
+        _ = df.query("a + 1 > 2")
+    except e:
+        raised = "unsupported syntax" in String(e)
+    assert_true(raised)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

@@ -32,6 +32,7 @@ from .column import (
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
+from .expr import parse as _parse_expr, eval_expr as _eval_expr
 
 
 struct Series(Copyable, ImplicitlyCopyable, Movable):
@@ -3159,16 +3160,9 @@ struct DataFrame(Copyable, Movable):
         return Series.from_pandas(result)
 
     def query(self, expr: String) raises -> DataFrame:
-        var pd_df = self.to_pandas()
-        # Filter via module-level pd.eval() with explicit local_dict to avoid
-        # sys._getframe() failures when called from Mojo's shallow call stack.
-        var query_fn = Python.evaluate(
-            "lambda df, e: df.loc["
-            "__import__('pandas').eval("
-            "e, local_dict={c: df[c] for c in df.columns}, engine='python')]"
-        )
-        var result = query_fn(pd_df, expr)
-        return DataFrame.from_pandas(result)
+        var parsed = _parse_expr(expr)
+        var mask = _eval_expr(parsed, self)
+        return self[mask]
 
     def pipe(self, func: String) raises -> DataFrame:
         _not_implemented("DataFrame.pipe")
