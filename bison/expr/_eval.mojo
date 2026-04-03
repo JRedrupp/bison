@@ -1,9 +1,9 @@
 """Expression evaluator: resolve identifiers and literals, execute comparisons.
 
 Walks a ``ParsedExpr`` arena produced by ``parse()`` and emits a boolean
-``Series`` mask.  Only ``NK_COMPARE`` nodes are evaluated natively; logical
-connectives (NK_AND, NK_OR, NK_NOT) raise with a clear "unsupported expression
-kind" message and will be wired in by later issues.
+``Series`` mask.  Supports comparison predicates (``NK_COMPARE``) and logical
+connectives (``NK_AND``, ``NK_OR``, ``NK_NOT``) with Kleene three-valued null
+semantics.  Parenthetical grouping and precedence are handled by the parser.
 """
 
 from ._ast import (

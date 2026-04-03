@@ -6,6 +6,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `DataFrame.query()` and `DataFrame.eval()` are now implemented natively in
+  Mojo via the `bison.expr` parser and evaluator. Supported grammar: column
+  references, integer/float/bool/string/null literals, comparison operators
+  (`<`, `<=`, `>`, `>=`, `==`, `!=`), logical operators (`not`, `and`, `or`),
+  and parenthetical grouping. Kleene three-valued null semantics apply for
+  logical connectives. Unsupported constructs (arithmetic, function calls,
+  attribute access, indexing, membership/identity operators, comparison
+  chaining) raise with `"unsupported syntax"` in the message. See
+  `docs/query-eval-spec.md` for the full grammar and semantics reference.
+
 ## [0.1.0] - 2026-03-08
 
 ### Added

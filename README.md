@@ -153,17 +153,44 @@ This is a current limitation of Mojo's parametric function support
 (tracked in [modularml/mojo#6130](https://github.com/modularml/mojo/issues/6130)).
 Use `clip()` or `where()` for threshold-style operations in the meantime.
 
-### Query/eval native grammar specification
+### Native query/eval subset
 
-`DataFrame.query()` and `DataFrame.eval()` currently delegate to pandas.
-A native Mojo parser for the query/eval grammar is available as the public
-`bison.expr` module (`parse`, `ParsedExpr`, `ASTNode`, `Tokenizer`). Full
-native execution backed by that parser is tracked as the next milestone.
+`DataFrame.query()` and `DataFrame.eval()` are implemented natively in Mojo
+using the `bison.expr` parser and evaluator. The first milestone covers a
+well-defined subset of the pandas query/eval grammar:
 
-The grammar and semantics are documented in
-[`docs/query-eval-spec.md`](docs/query-eval-spec.md). Use this as the
-canonical reference for supported syntax, precedence, null semantics, and
-unsupported expression behavior.
+**Supported in this release:**
+
+- Column references by bare identifier name (`a`, `column_name`).
+- Scalar literals: integer, float, boolean (`True`/`False`), string, and
+  null (`None`).
+- Comparison operators: `<`, `<=`, `>`, `>=`, `==`, `!=`.
+- Logical operators: `not`, `and`, `or` (with Kleene three-valued null
+  semantics).
+- Parenthetical grouping for explicit precedence.
+- Column-vs-column and column-vs-scalar comparisons in either order.
+
+**Explicitly out of scope (raise with `"unsupported syntax"`):**
+
+- Arithmetic expressions: `a + b`, `a * 2`, `-a`.
+- Function calls: `abs(a)`, `len(a)`.
+- Attribute access: `a.str.len`.
+- Indexing and slicing: `a[0]`, `a[1:3]`.
+- Membership and identity operators: `in`, `not in`, `is`, `is not`.
+- Comparison chaining: `a < b < c`.
+- Assignment expressions: `a = b`, `a := b`.
+
+**Error messages:**
+
+| Situation | Message contains |
+|-----------|-----------------|
+| Unsupported grammar | `unsupported syntax` |
+| Malformed expression | `invalid expression` |
+| Unknown column name | `unknown column` |
+| Type mismatch | `type error` |
+
+The full grammar, precedence table, and null-semantics truth tables are
+documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
 
 ## Contributing
 
