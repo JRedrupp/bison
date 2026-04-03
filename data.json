@@ -1,6 +1,69 @@
 {
   "runs": [
     {
+      "commit": "7c91c459e23dc3549c063c7acd7ace424787188d",
+      "short_commit": "7c91c45",
+      "timestamp": "2026-04-03T18:23:32Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.22734452,
+          "pandas_ms": 0.09529285000006382,
+          "ratio": 2.385745835074171
+        },
+        "series_mean": {
+          "bison_ms": 0.25251928,
+          "pandas_ms": 0.12671940000004156,
+          "ratio": 1.9927436525103275
+        },
+        "groupby_sum": {
+          "bison_ms": 25.4554976,
+          "pandas_ms": 4.280363599999859,
+          "ratio": 5.947040947643055
+        },
+        "query_filter": {
+          "bison_ms": 3.6630516666666666,
+          "pandas_ms": 1.1199469999993994,
+          "ratio": 3.270736621169244
+        },
+        "iloc_row": {
+          "bison_ms": 0.00106799,
+          "pandas_ms": 0.03917603999994412,
+          "ratio": 0.027261305634809524
+        },
+        "loc_slice": {
+          "bison_ms": 0.01012212,
+          "pandas_ms": 0.03148215000003063,
+          "ratio": 0.3215193371478807
+        },
+        "sort_values": {
+          "bison_ms": 32.156002,
+          "pandas_ms": 5.8964299999999525,
+          "ratio": 5.453469641800252
+        },
+        "merge": {
+          "bison_ms": 11.719920333333334,
+          "pandas_ms": 1.9174743333323363,
+          "ratio": 6.112165430118454
+        },
+        "fillna": {
+          "bison_ms": 0.13895347,
+          "pandas_ms": 0.07124429000000987,
+          "ratio": 1.9503804445237751
+        },
+        "series_apply": {
+          "bison_ms": 0.46439708,
+          "pandas_ms": 0.21726127000000872,
+          "ratio": 2.1375051337957354
+        },
+        "csv_roundtrip": {
+          "bison_ms": 526.0121306,
+          "pandas_ms": 334.6251621999983,
+          "ratio": 1.5719443425644537
+        }
+      }
+    },
+    {
       "commit": "388bfb3064262a0b61045fd17efe4dc51b5c18c3",
       "short_commit": "388bfb3",
       "timestamp": "2026-04-03T18:19:38Z",
