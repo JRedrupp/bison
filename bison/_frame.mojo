@@ -6200,6 +6200,89 @@ fn _insertion_sort_keys_by[
         group_keys[j + 1] = key_i
 
 
+fn _groupby_row_less(
+    df: DataFrame,
+    by: List[String],
+    left_row: Int,
+    right_row: Int,
+    col_idx: Dict[String, Int],
+) raises -> Bool:
+    """Return True when *left_row* should sort before *right_row* for groupby keys.
+    """
+    for key_i in range(len(by)):
+        var ci = col_idx[by[key_i]]
+        ref col = df._cols[ci]
+        var left_is_null = len(col._null_mask) > 0 and col._null_mask[left_row]
+        var right_is_null = (
+            len(col._null_mask) > 0 and col._null_mask[right_row]
+        )
+        if left_is_null or right_is_null:
+            if left_is_null and right_is_null:
+                continue
+            return not left_is_null and right_is_null
+
+        ref col_data = col._data
+        if col_data.isa[List[Int64]]():
+            var left_val = col_data[List[Int64]][left_row]
+            var right_val = col_data[List[Int64]][right_row]
+            if left_val < right_val:
+                return True
+            if left_val > right_val:
+                return False
+        elif col_data.isa[List[Float64]]():
+            var left_val = col_data[List[Float64]][left_row]
+            var right_val = col_data[List[Float64]][right_row]
+            if left_val < right_val:
+                return True
+            if left_val > right_val:
+                return False
+        elif col_data.isa[List[Bool]]():
+            var left_val = col_data[List[Bool]][left_row]
+            var right_val = col_data[List[Bool]][right_row]
+            if left_val != right_val:
+                return not left_val and right_val
+        elif col_data.isa[List[String]]():
+            var left_val = col_data[List[String]][left_row]
+            var right_val = col_data[List[String]][right_row]
+            if left_val < right_val:
+                return True
+            if left_val > right_val:
+                return False
+        else:
+            var left_val = String(col_data[List[PythonObject]][left_row])
+            var right_val = String(col_data[List[PythonObject]][right_row])
+            if left_val < right_val:
+                return True
+            if left_val > right_val:
+                return False
+
+    return False
+
+
+fn _insertion_sort_multikey_group_keys(
+    df: DataFrame,
+    by: List[String],
+    mut group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    col_idx: Dict[String, Int],
+) raises -> None:
+    """Insertion-sort *group_keys* using typed comparisons across multiple key columns.
+    """
+    var n = len(group_keys)
+    for i in range(1, n):
+        var key_i = group_keys[i]
+        var row_i = group_map[key_i][0]
+        var j = i - 1
+        while j >= 0:
+            var key_j = group_keys[j]
+            var row_j = group_map[key_j][0]
+            if not _groupby_row_less(df, by, row_i, row_j, col_idx):
+                break
+            group_keys[j + 1] = key_j
+            j -= 1
+        group_keys[j + 1] = key_i
+
+
 def _groupby_indices(
     df: DataFrame,
     by: List[String],
@@ -6260,8 +6343,9 @@ def _groupby_indices(
                 else:
                     _sort_list(group_keys)
             else:
-                # Multi-column groupby: fall back to lexicographic sort for now.
-                _sort_list(group_keys)
+                _insertion_sort_multikey_group_keys(
+                    df, by, group_keys, group_map, col_idx
+                )
 
 
 def _label_groupby_indices(
