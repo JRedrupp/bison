@@ -153,8 +153,8 @@ def test_pivot_basic() raises:
     assert_equal(r.shape()[1], 2)  # two unique cities
     # NYC on 2020-01-01 = 32, on 2020-01-02 = 28
     var nyc = r["NYC"]
-    assert_true(Bool(nyc.iloc(0)[PythonObject] == 32))
-    assert_true(Bool(nyc.iloc(1)[PythonObject] == 28))
+    assert_true(String(nyc.iloc(0)[PythonObject]) == "32")
+    assert_true(String(nyc.iloc(1)[PythonObject]) == "28")
 
 
 def test_pivot_duplicate_raises() raises:
@@ -290,10 +290,10 @@ def test_transpose_values() raises:
     var r = df.transpose()
     # Original col 'x' becomes row 0 in result; col 'y' becomes row 1.
     # Original row 0 (10, 30) becomes result col '0'; row 1 (20, 40) → col '1'.
-    assert_true(Bool(r["0"].iloc(0)[PythonObject] == 10))  # x, row 0
-    assert_true(Bool(r["0"].iloc(1)[PythonObject] == 30))  # y, row 0
-    assert_true(Bool(r["1"].iloc(0)[PythonObject] == 20))  # x, row 1
-    assert_true(Bool(r["1"].iloc(1)[PythonObject] == 40))  # y, row 1
+    assert_true(String(r["0"].iloc(0)[PythonObject]) == "10")  # x, row 0
+    assert_true(String(r["0"].iloc(1)[PythonObject]) == "30")  # y, row 0
+    assert_true(String(r["1"].iloc(0)[PythonObject]) == "20")  # x, row 1
+    assert_true(String(r["1"].iloc(1)[PythonObject]) == "40")  # y, row 1
 
 
 def test_T_alias() raises:
@@ -438,9 +438,9 @@ def test_set_index_multi_drop_true() raises:
     assert_true(r["c"].iloc(2)[Int64] == 30)
     # Index entries must be Python tuples (1, 'x'), (2, 'y'), (3, 'z').
     var pd_series = r["c"].to_pandas()
-    assert_true(Bool(pd_series.index[0] == pd.Index(Python.evaluate("[(1, 'x')]"))[0]))
-    assert_true(Bool(pd_series.index[1] == pd.Index(Python.evaluate("[(2, 'y')]"))[0]))
-    assert_true(Bool(pd_series.index[2] == pd.Index(Python.evaluate("[(3, 'z')]"))[0]))
+    assert_true(String(pd_series.index[0]) == String(pd.Index(Python.evaluate("[(1, 'x')]"))[0]))
+    assert_true(String(pd_series.index[1]) == String(pd.Index(Python.evaluate("[(2, 'y')]"))[0]))
+    assert_true(String(pd_series.index[2]) == String(pd.Index(Python.evaluate("[(3, 'z')]"))[0]))
 
 
 def test_set_index_multi_drop_false() raises:
@@ -498,11 +498,11 @@ def test_set_index_multi_reset_index_drop_false() raises:
     assert_equal(r.shape()[1], 3)
     # Values from the expanded index columns match originals.
     var pd_a = r["a"].to_pandas()
-    assert_true(Bool(pd_a.iloc[0] == 1))
-    assert_true(Bool(pd_a.iloc[1] == 2))
+    assert_true(String(pd_a.iloc[0]) == "1")
+    assert_true(String(pd_a.iloc[1]) == "2")
     var pd_c = r["c"].to_pandas()
-    assert_true(Bool(pd_c.iloc[0] == 10))
-    assert_true(Bool(pd_c.iloc[1] == 20))
+    assert_true(String(pd_c.iloc[0]) == "10")
+    assert_true(String(pd_c.iloc[1]) == "20")
 
 
 def test_set_index_null_key() raises:
@@ -516,10 +516,10 @@ def test_set_index_null_key() raises:
     var r = df.set_index(keys)
     # Row 1 index entry must be None/NaN, not the typed placeholder 0.0.
     var pd_series = r["b"].to_pandas()
-    assert_true(Bool(pd.isna(pd_series.index[1])))
+    assert_true(String(pd.isna(pd_series.index[1])) == "True")
     # Non-null rows must retain their original values.
-    assert_true(Bool(pd_series.index[0] == 1.0))
-    assert_true(Bool(pd_series.index[2] == 3.0))
+    assert_true(String(pd_series.index[0]) == "1.0")
+    assert_true(String(pd_series.index[2]) == "3.0")
 
 
 # ------------------------------------------------------------------
@@ -692,10 +692,10 @@ def test_stack_values() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [10, 20], 'y': [30, 40]}")))
     var s = df.stack()
     assert_equal(s.shape()[0], 4)
-    assert_true(Bool(s.iloc(0)[PythonObject] == 10))
-    assert_true(Bool(s.iloc(1)[PythonObject] == 30))
-    assert_true(Bool(s.iloc(2)[PythonObject] == 20))
-    assert_true(Bool(s.iloc(3)[PythonObject] == 40))
+    assert_true(String(s.iloc(0)[PythonObject]) == "10")
+    assert_true(String(s.iloc(1)[PythonObject]) == "30")
+    assert_true(String(s.iloc(2)[PythonObject]) == "20")
+    assert_true(String(s.iloc(3)[PythonObject]) == "40")
 
 
 def test_explode_basic() raises:
@@ -711,9 +711,9 @@ def test_explode_basic() raises:
     assert_true(r["a"].iloc(1)[Int64] == 1)
     assert_true(r["a"].iloc(2)[Int64] == 2)
     # 'b' values are individual elements.
-    assert_true(Bool(r["b"].iloc(0)[PythonObject] == 10))
-    assert_true(Bool(r["b"].iloc(1)[PythonObject] == 11))
-    assert_true(Bool(r["b"].iloc(2)[PythonObject] == 20))
+    assert_true(String(r["b"].iloc(0)[PythonObject]) == "10")
+    assert_true(String(r["b"].iloc(1)[PythonObject]) == "11")
+    assert_true(String(r["b"].iloc(2)[PythonObject]) == "20")
 
 
 def test_explode_missing_column_raises() raises:
