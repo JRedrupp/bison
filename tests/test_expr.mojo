@@ -702,5 +702,98 @@ def test_query_unsupported_syntax_raises() raises:
     assert_true(raised)
 
 
+# ------------------------------------------------------------------
+# DataFrame.eval integration tests
+# ------------------------------------------------------------------
+
+
+def test_df_eval_simple_numeric() raises:
+    """df.eval("a > 5") returns a boolean Series with the correct mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 6, 3, 8], 'b': [10, 20, 30, 40]}"))
+    )
+    var mask = df.eval("a > 5")
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+    assert_true(d[3])
+
+
+def test_df_eval_logical_and() raises:
+    """df.eval("a > 1 and b < 4") returns the correct compound boolean mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4], 'b': [10, 3, 5, 2]}"))
+    )
+    var mask = df.eval("a > 1 and b < 4")
+    ref d = mask._col._data[List[Bool]]
+    # Row 0: a=1 not > 1 → False
+    assert_true(not d[0])
+    # Row 1: a=2 > 1 and b=3 < 4 → True
+    assert_true(d[1])
+    # Row 2: a=3 > 1 but b=5 not < 4 → False
+    assert_true(not d[2])
+    # Row 3: a=4 > 1 and b=2 < 4 → True
+    assert_true(d[3])
+
+
+def test_df_eval_string_eq() raises:
+    """df.eval('cat == "foo"') returns the correct boolean mask for a string column."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'cat': ['foo', 'bar', 'foo'], 'val': [1, 2, 3]}")
+        )
+    )
+    var mask = df.eval('cat == "foo"')
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
+def test_df_eval_unknown_column_raises() raises:
+    """df.eval referencing a missing column raises with 'unknown identifier'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
+    )
+    var raised = False
+    try:
+        _ = df.eval("z > 1")
+    except e:
+        raised = "unknown identifier" in String(e)
+    assert_true(raised)
+
+
+def test_df_eval_unsupported_syntax_raises() raises:
+    """df.eval with unsupported syntax ('+') raises with 'unsupported syntax'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
+    )
+    var raised = False
+    try:
+        _ = df.eval("a + 1 > 2")
+    except e:
+        raised = "unsupported syntax" in String(e)
+    assert_true(raised)
+
+
+def test_df_eval_not() raises:
+    """df.eval("not a > 2") returns the inverted mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
+    )
+    var mask = df.eval("not a > 2")
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
