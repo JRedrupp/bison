@@ -632,6 +632,54 @@ def test_df_cummax_axis1() raises:
     assert_true(abs(Float64(String(result["b"].to_pandas().iloc[1])) - Float64(String(expected["b"].iloc[1]))) < 1e-9)
 
 
+def test_df_cumsum_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.cumsum(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_df_cumprod_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.cumprod(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_df_cummin_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.cummin(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_df_cummax_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.cummax(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
 # ---------------------------------------------------------------------------
 # sem
 # ---------------------------------------------------------------------------
@@ -658,6 +706,32 @@ def test_df_sem() raises:
     assert_true(
         abs(Float64(String(result_pd.iloc[1])) - Float64(String(expected_pd.iloc[1]))) < 1e-9
     )
+
+
+def test_df_sem_axis1() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0, 3.0], 'b': [3.0, 4.0, 5.0], 'c': [5.0, 6.0, 7.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.sem(axis=1).to_pandas()
+    var expected = pd_df.sem(axis=1)
+    for i in range(3):
+        assert_true(
+            abs(Float64(String(result.iloc[i])) - Float64(String(expected.iloc[i]))) < 1e-9
+        )
+
+
+def test_df_sem_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.sem(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
 
 
 # ---------------------------------------------------------------------------
@@ -688,6 +762,32 @@ def test_df_skew() raises:
     )
 
 
+def test_df_skew_axis1() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0], 'b': [4.0, 3.0], 'c': [2.0, 5.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.skew(axis=1).to_pandas()
+    var expected = pd_df.skew(axis=1)
+    for i in range(2):
+        assert_true(
+            abs(Float64(String(result.iloc[i])) - Float64(String(expected.iloc[i]))) < 1e-9
+        )
+
+
+def test_df_skew_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.skew(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
+
+
 # ---------------------------------------------------------------------------
 # kurt
 # ---------------------------------------------------------------------------
@@ -714,6 +814,32 @@ def test_df_kurt() raises:
     assert_true(
         abs(Float64(String(result_pd.iloc[1])) - Float64(String(expected_pd.iloc[1]))) < 1e-9
     )
+
+
+def test_df_kurt_axis1() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.0], 'b': [2.0, 3.0], 'c': [3.0, 4.0], 'd': [10.0, 5.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result = df.kurt(axis=1).to_pandas()
+    var expected = pd_df.kurt(axis=1)
+    for i in range(2):
+        var r = Float64(String(result.iloc[i]))
+        var e = Float64(String(expected.iloc[i]))
+        assert_true(abs(r - e) < 1e-9)
+
+
+def test_df_kurt_invalid_axis() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+    var df = DataFrame(pd_df)
+    var raised = False
+    try:
+        _ = df.kurt(axis=2)
+    except:
+        raised = True
+    assert_true(raised)
 
 
 # ---------------------------------------------------------------------------

@@ -2848,7 +2848,9 @@ struct DataFrame(Copyable, Movable):
         if axis == 1:
             return self._cum_axis1[_CUM_SUM](skipna)
         elif axis != 0:
-            _not_implemented("DataFrame.cumsum")
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cumsum(skipna))
@@ -2858,7 +2860,9 @@ struct DataFrame(Copyable, Movable):
         if axis == 1:
             return self._cum_axis1[_CUM_PROD](skipna)
         elif axis != 0:
-            _not_implemented("DataFrame.cumprod")
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cumprod(skipna))
@@ -2868,7 +2872,9 @@ struct DataFrame(Copyable, Movable):
         if axis == 1:
             return self._cum_axis1[_CUM_MIN](skipna)
         elif axis != 0:
-            _not_implemented("DataFrame.cummin")
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cummin(skipna))
@@ -2878,7 +2884,9 @@ struct DataFrame(Copyable, Movable):
         if axis == 1:
             return self._cum_axis1[_CUM_MAX](skipna)
         elif axis != 0:
-            _not_implemented("DataFrame.cummax")
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             result_cols.append(self._cols[i].cummax(skipna))
@@ -2887,8 +2895,33 @@ struct DataFrame(Copyable, Movable):
     def sem(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
     ) raises -> Series:
-        if axis != 0:
-            _not_implemented("DataFrame.sem")
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n <= ddof:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                var mean_val = s / Float64(n)
+                var sq_sum = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    sq_sum += diff * diff
+                var std_val = sqrt(sq_sum / Float64(n - ddof))
+                results.append(std_val / sqrt(Float64(n)))
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var values = List[Float64]()
         for i in range(len(self._cols)):
             var n = self._cols[i].count() if skipna else len(self._cols[i])
@@ -2905,8 +2938,46 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def skew(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
-            _not_implemented("DataFrame.skew")
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n < 3:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                var mean_val = s / Float64(n)
+                var sq_sum = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    sq_sum += diff * diff
+                var std_val = sqrt(sq_sum / Float64(n - 1))
+                if std_val == 0.0:
+                    results.append(nan)
+                    continue
+                var m3 = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    m3 += diff * diff * diff
+                var fn_ = Float64(n)
+                results.append(
+                    fn_
+                    / ((fn_ - 1.0) * (fn_ - 2.0))
+                    * m3
+                    / (std_val * std_val * std_val)
+                )
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].skew(skipna))
@@ -2916,8 +2987,54 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def kurt(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
-        if axis != 0:
-            _not_implemented("DataFrame.kurt")
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var nan = Float64(0) / Float64(0)
+            var results = List[Float64]()
+            for i in range(nrows):
+                var vals = self._row_numeric_vals(i, skipna)
+                var n = len(vals)
+                if n < 4:
+                    results.append(nan)
+                    continue
+                var s = Float64(0)
+                for vi in range(n):
+                    s += vals[vi]
+                var mean_val = s / Float64(n)
+                var sq_sum = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    sq_sum += diff * diff
+                var std_val = sqrt(sq_sum / Float64(n - 1))
+                if std_val == 0.0:
+                    results.append(nan)
+                    continue
+                var m4 = Float64(0)
+                for vi in range(n):
+                    var diff = vals[vi] - mean_val
+                    m4 += diff * diff * diff * diff
+                var fn_ = Float64(n)
+                var term1 = (
+                    fn_
+                    * (fn_ + 1.0)
+                    / ((fn_ - 1.0) * (fn_ - 2.0) * (fn_ - 3.0))
+                    * m4
+                    / (std_val * std_val * std_val * std_val)
+                )
+                var term2 = (
+                    3.0
+                    * (fn_ - 1.0)
+                    * (fn_ - 1.0)
+                    / ((fn_ - 2.0) * (fn_ - 3.0))
+                )
+                results.append(term1 - term2)
+            var col_data = ColumnData(results^)
+            var dtype = Column._sniff_dtype(col_data)
+            return Series(Column(None, col_data^, dtype))
+        elif axis != 0:
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].kurt(skipna))
