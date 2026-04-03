@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
 from ..column import Column, ColumnData
-from ..dtypes import int64, float64, object_
+from ..dtypes import int64, float64, object_, bool_
 
 
 # ------------------------------------------------------------------
@@ -18,6 +18,17 @@ def _in_na_set(s: String, na_set: List[String]) -> Bool:
     return False
 
 
+def _is_bool_value(s: String) -> Bool:
+    """Return True if *s* is a case-insensitive match for 'true' or 'false'."""
+    var lower = s.lower()
+    return lower == "true" or lower == "false"
+
+
+def _parse_bool_value(s: String) -> Bool:
+    """Parse a bool CSV token — 'true' (case-insensitive) returns True."""
+    return s.lower() == "true"
+
+
 def _infer_and_build_column(
     name: String,
     raw: List[String],
@@ -25,13 +36,42 @@ def _infer_and_build_column(
 ) raises -> Column:
     """Infer the best dtype and build a Column from raw CSV string values.
 
-    Priority: Int64 > Float64 > String (object_).
+    Priority: Bool > Int64 > Float64 > String (object_).
     Null-mask is set for any cell whose value is in *na_set*.
     """
     var n = len(raw)
 
     if n == 0:
         return Column(name, ColumnData(List[String]()), object_)
+
+    # ------------------------------------------------------------------
+    # Try Bool — "true" / "false" (case-insensitive).
+    # ------------------------------------------------------------------
+    var all_bool = True
+    for i in range(n):
+        if _in_na_set(raw[i], na_set):
+            continue
+        if not _is_bool_value(raw[i]):
+            all_bool = False
+            break
+
+    if all_bool:
+        var data = List[Bool]()
+        var null_mask = List[Bool]()
+        var has_null = False
+        for i in range(n):
+            if _in_na_set(raw[i], na_set):
+                data.append(False)
+                null_mask.append(True)
+                has_null = True
+            else:
+                data.append(_parse_bool_value(raw[i]))
+                null_mask.append(False)
+        var col_data = ColumnData(data^)
+        var col = Column(name, col_data^, bool_)
+        if has_null:
+            col._null_mask = null_mask^
+        return col^
 
     # ------------------------------------------------------------------
     # Try Int64 — atol() raises for anything that isn't a decimal integer.

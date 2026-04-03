@@ -11,6 +11,7 @@ from bison import (
     DictSplitResult,
     ToDictResult,
     Series,
+    bool_,
 )
 
 
@@ -71,6 +72,55 @@ def test_read_csv_no_header() raises:
     assert_equal(cols[0], "0")
     assert_equal(cols[1], "1")
     assert_equal(cols[2], "2")
+
+
+def test_read_csv_bool_inference() raises:
+    """CSV reader infers bool dtype for columns containing True/False values."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("flag,value\nTrue,1\nFalse,2\nTrue,3\n")
+
+    var df = read_csv(path)
+    assert_equal(df.shape()[0], 3)
+    assert_equal(df.shape()[1], 2)
+    # 'flag' column should be inferred as bool_
+    var col = df["flag"]._col
+    assert_true(col.dtype == bool_)
+    ref data = col._data[List[Bool]]
+    assert_true(data[0])
+    assert_true(not data[1])
+    assert_true(data[2])
+
+
+def test_read_csv_bool_case_insensitive() raises:
+    """CSV bool inference is case-insensitive (true/TRUE/True all work)."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("a,b,c\ntrue,TRUE,True\nfalse,FALSE,False\n")
+
+    var df = read_csv(path)
+    assert_equal(df.shape()[0], 2)
+    assert_equal(df.shape()[1], 3)
+    assert_true(df["a"]._col.dtype == bool_)
+    assert_true(df["b"]._col.dtype == bool_)
+    assert_true(df["c"]._col.dtype == bool_)
+
+
+def test_read_csv_bool_with_nulls() raises:
+    """Bool columns with NA values are correctly null-masked."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("flag\nTrue\n\nFalse\n")
+
+    var df = read_csv(path)
+    var col = df["flag"]._col
+    assert_true(col.dtype == bool_)
+    assert_true(not col._null_mask[0])
+    assert_true(col._null_mask[1])
+    assert_true(not col._null_mask[2])
 
 
 def test_to_csv_returns_string() raises:
