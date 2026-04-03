@@ -496,5 +496,97 @@ def test_eval_all_numeric_ops() raises:
     assert_true(ne._col._data[List[Bool]][2])
 
 
+def test_eval_and() raises:
+    # a > 1 and a < 4 → [F, T, T, F]
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
+    var mask = eval_expr(parse("a > 1 and a < 4"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(d[1])
+    assert_true(d[2])
+    assert_true(not d[3])
+
+
+def test_eval_or() raises:
+    # a < 2 or a > 3 → [T, F, F, T]
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
+    var mask = eval_expr(parse("a < 2 or a > 3"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(not d[2])
+    assert_true(d[3])
+
+
+def test_eval_not() raises:
+    # not a > 2 → [T, T, F]
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var mask = eval_expr(parse("not a > 2"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(d[1])
+    assert_true(not d[2])
+
+
+def test_eval_chained_and() raises:
+    # a > 0 and b > 0 with b = [4, 0, 5] → [T, F, T]
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 0, 5]}")))
+    var mask = eval_expr(parse("a > 0 and b > 0"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
+def test_eval_mixed_parens() raises:
+    # a > 1 and (b > 5 or a > 2) with a=[1,2,3], b=[10,1,10]
+    # row 0: F and (T or F) = F and T = F
+    # row 1: T and (F or F) = T and F = F
+    # row 2: T and (T or T) = T and T = T
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [10, 1, 10]}")))
+    var mask = eval_expr(parse("a > 1 and (b > 5 or a > 2)"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+
+
+def test_eval_null_and() raises:
+    # a = [1.0, None, 3.0]; expr "a > 1 and a < 5"
+    # row 0: F and T = F (non-null)
+    # row 1: null and null = null
+    # row 2: T and T = T (non-null)
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
+    var mask = eval_expr(parse("a > 1 and a < 5"), df)
+    assert_true(len(mask._col._null_mask) > 0)
+    assert_true(not mask._col._null_mask[0])
+    assert_true(not mask._col._data[List[Bool]][0])
+    assert_true(mask._col._null_mask[1])
+    assert_true(not mask._col._null_mask[2])
+    assert_true(mask._col._data[List[Bool]][2])
+
+
+def test_eval_null_or() raises:
+    # a = [1.0, None, 6.0]; expr "a < 2 or a > 5"
+    # row 0: T or F = T (non-null)
+    # row 1: null or null = null
+    # row 2: F or T = T (non-null)
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 6.0]}")))
+    var mask = eval_expr(parse("a < 2 or a > 5"), df)
+    assert_true(len(mask._col._null_mask) > 0)
+    assert_true(not mask._col._null_mask[0])
+    assert_true(mask._col._data[List[Bool]][0])
+    assert_true(mask._col._null_mask[1])
+    assert_true(not mask._col._null_mask[2])
+    assert_true(mask._col._data[List[Bool]][2])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
