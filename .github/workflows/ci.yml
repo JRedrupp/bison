@@ -9,9 +9,6 @@ jobs:
   test:
     name: test (${{ matrix.max-version }})
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
 
     strategy:
       fail-fast: false
@@ -24,8 +21,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
@@ -46,38 +41,3 @@ jobs:
 
       - name: Run tests
         run: pixi run test
-
-      - name: Update compatibility table
-        if: matrix.max-version == 'locked'
-        run: |
-          PASSING=$(cat .test-pass-count 2>/dev/null || echo 0)
-          python scripts/update_compat.py --passing "$PASSING"
-
-      - name: Check if README.md changed
-        id: readme-diff
-        if: >
-          matrix.max-version == 'locked' &&
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/main'
-        run: |
-          if git diff --quiet README.md; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Open PR for updated README
-        if: >
-          matrix.max-version == 'locked' &&
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/main' &&
-          steps.readme-diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
-          commit-message: "chore: update compatibility table in README"
-          branch: chore/update-compat-table
-          delete-branch: true
-          title: "chore: update compatibility table"
-          body: "Automated update of the compatibility table in README.md by CI."
-          add-paths: README.md

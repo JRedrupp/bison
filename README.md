@@ -11,16 +11,17 @@ ported to Mojo.
 
 ## Status
 
-361 of 366 tracked API methods are implemented natively in Mojo across
-DataFrame, Series, GroupBy, string and datetime accessors, native CSV and JSON
-I/O, and reshape. The five remaining DataFrame stubs raise:
+Most of the pandas DataFrame and Series API is implemented natively in Mojo
+across DataFrame, Series, GroupBy, string and datetime accessors, native CSV
+and JSON I/O, and reshape. A small number of DataFrame methods remain as stubs
+and raise:
 
 ```
 bison.<method>: not implemented
 ```
 
 `from_pandas()` and `to_pandas()` are available for wrapping and unwrapping
-pandas objects. See the compatibility table below for the current counts.
+pandas objects.
 
 Native I/O highlights:
 
@@ -105,32 +106,6 @@ pixi run gen-report   # merge results into docs/data.json
 The `docs/` directory contains an HTML performance dashboard that plots ratio
 history across commits.
 
-## pandas compatibility
-
-This table is generated automatically from the source by `scripts/update_compat.py`,
-which counts fully stubbed APIs in the bison package. Run it locally with:
-
-```bash
-python scripts/update_compat.py
-```
-
-In CI it runs after the test suite and the result is committed back to the branch.
-
-<!-- COMPAT_TABLE_START -->
-| Category | Stubs | Implemented |
-|----------|-------|-------------|
-| DataFrame | 5 | 139 |
-| Series | 0 | 129 |
-| GroupBy (DataFrame) | 0 | 24 |
-| GroupBy (Series) | 0 | 17 |
-| String accessor | 0 | 21 |
-| Datetime accessor | 0 | 20 |
-| Index | 0 | 14 |
-| IO | 0 | 8 |
-| Reshape | 0 | 2 |
-| **Total** | **5** | **374** |
-<!-- COMPAT_TABLE_END -->
-
 ## Known limitations
 
 ### `apply` and `map` require compile-time functions
@@ -194,7 +169,7 @@ documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
 
 ## Contributing
 
-1. Pick a stub method from the table above.
+1. Pick a stub method (any `_not_implemented` call in `bison/`).
 2. Replace the `_not_implemented` call with a native Mojo implementation.
 3. Update the corresponding test: remove the "expect raise" assertion and add
    real assertions comparing against pandas output.
