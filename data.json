@@ -1,6 +1,69 @@
 {
   "runs": [
     {
+      "commit": "53ad20b752d3b3338e72e84bce77b968dd40cc4a",
+      "short_commit": "53ad20b",
+      "timestamp": "2026-04-03T13:15:53Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.22199203,
+          "pandas_ms": 0.09799740000005386,
+          "ratio": 2.265284895312304
+        },
+        "series_mean": {
+          "bison_ms": 0.25043765,
+          "pandas_ms": 0.12640262999980223,
+          "ratio": 1.9812692979599542
+        },
+        "groupby_sum": {
+          "bison_ms": 25.4942703,
+          "pandas_ms": 4.296766500000615,
+          "ratio": 5.933361819869977
+        },
+        "query_filter": {
+          "bison_ms": 393.383512,
+          "pandas_ms": 1.068067666665229,
+          "ratio": 368.313286018891
+        },
+        "iloc_row": {
+          "bison_ms": 0.00104726,
+          "pandas_ms": 0.04251419000013357,
+          "ratio": 0.02463318717813299
+        },
+        "loc_slice": {
+          "bison_ms": 0.01008924,
+          "pandas_ms": 0.03307376000009299,
+          "ratio": 0.3050527064346973
+        },
+        "sort_values": {
+          "bison_ms": 33.76732833333334,
+          "pandas_ms": 5.494366666662624,
+          "ratio": 6.1458090407796195
+        },
+        "merge": {
+          "bison_ms": 11.612778333333335,
+          "pandas_ms": 1.878915333331103,
+          "ratio": 6.180575637085893
+        },
+        "fillna": {
+          "bison_ms": 0.13965078,
+          "pandas_ms": 0.07979360999996743,
+          "ratio": 1.7501499180204656
+        },
+        "series_apply": {
+          "bison_ms": 0.46708731,
+          "pandas_ms": 0.21971909000001233,
+          "ratio": 2.1258385422949537
+        },
+        "csv_roundtrip": {
+          "bison_ms": 519.2721392,
+          "pandas_ms": 333.2072052000001,
+          "ratio": 1.5584060941548927
+        }
+      }
+    },
+    {
       "commit": "f81e35b71081de0729f4cee4d43f874e36d1bc00",
       "short_commit": "f81e35b",
       "timestamp": "2026-04-03T13:03:45Z",
