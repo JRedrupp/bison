@@ -894,6 +894,98 @@ def test_gt_int_series() raises:
     assert_true(mask.iloc(4)[Bool] == True)
 
 
+def test_gt_scalar_int64() raises:
+    # Int64 column compared against an Int64 scalar — exact integer path.
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__gt__(Int64(3))
+    assert_equal(mask.dtype().name, "bool")
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == False)
+    assert_true(mask.iloc(3)[Bool] == True)
+    assert_true(mask.iloc(4)[Bool] == True)
+
+
+def test_lt_scalar_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__lt__(Int64(3))
+    assert_equal(mask.dtype().name, "bool")
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == False)
+    assert_true(mask.iloc(3)[Bool] == False)
+    assert_true(mask.iloc(4)[Bool] == False)
+
+
+def test_ge_scalar_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__ge__(Int64(3))
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == True)
+    assert_true(mask.iloc(3)[Bool] == True)
+    assert_true(mask.iloc(4)[Bool] == True)
+
+
+def test_le_scalar_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__le__(Int64(3))
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == True)
+    assert_true(mask.iloc(3)[Bool] == False)
+    assert_true(mask.iloc(4)[Bool] == False)
+
+
+def test_eq_scalar_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__eq__(Int64(3))
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == False)
+    assert_true(mask.iloc(2)[Bool] == True)
+    assert_true(mask.iloc(3)[Bool] == False)
+    assert_true(mask.iloc(4)[Bool] == False)
+
+
+def test_ne_scalar_int64() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 2, 3, 4, 5]"), dtype="int64"))
+    var mask = s.__ne__(Int64(3))
+    assert_true(mask.iloc(0)[Bool] == True)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == False)
+    assert_true(mask.iloc(3)[Bool] == True)
+    assert_true(mask.iloc(4)[Bool] == True)
+
+
+def test_int64_scalar_null_propagation() raises:
+    # Float64 column with nulls compared against an Int64 scalar — verify null
+    # propagation works end-to-end.  Null elements must remain null in the result.
+    var pd = Python.import_module("pandas")
+    var raw = Python.evaluate("[1.0, None, 3.0]")
+    var s = Series(pd.Series(raw))
+    var mask = s.__gt__(Int64(1))
+    assert_true(mask.iloc(0)[Bool] == False)
+    # null element: result is marked null
+    assert_true(mask.isna().iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
+def test_float64_col_int64_scalar() raises:
+    # Float64 column vs Int64 scalar: scalar widens to Float64 for the comparison.
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.5, 2.5, 3.5]")))
+    var mask = s.__gt__(Int64(2))
+    assert_true(mask.iloc(0)[Bool] == False)
+    assert_true(mask.iloc(1)[Bool] == True)
+    assert_true(mask.iloc(2)[Bool] == True)
+
+
 def test_eq_string_series() raises:
     var pd = Python.import_module("pandas")
     var s1 = Series(pd.Series(Python.evaluate("['a', 'b', 'c']"), dtype="string"))

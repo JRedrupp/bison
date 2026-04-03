@@ -2704,6 +2704,118 @@ struct _CmpScalarVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
         )
 
 
+struct _CmpScalarInt64Visitor[op: Int](
+    ColumnDataVisitorRaises, Copyable, Movable
+):
+    """Element-wise comparison visitor for ``Column._cmp_scalar_op_int64``.
+
+    Like ``_CmpScalarVisitor`` but the RHS is a single ``Int64`` scalar.
+    For ``List[Int64]`` columns the comparison is performed in exact integer
+    arithmetic, avoiding the Float64 widening that ``_CmpScalarVisitor``
+    applies and the consequent precision loss for values outside the
+    ``Float64`` mantissa range (|v| > 2**53).
+
+    For ``List[Float64]`` columns the scalar is widened to ``Float64`` for
+    the comparison (which is exact for the common case where the literal
+    fits in 53 bits).  ``List[Bool]`` is treated as 0/1 integer values.
+
+    ``op`` is one of the ``_CMP_*`` compile-time constants; ``comptime if``
+    folds the branch at compile time so each specialisation is a tight loop.
+    """
+
+    var self_null_mask: List[Bool]
+    var scalar: Int64
+    var result: List[Bool]
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+
+    def __init__(out self, self_null_mask: List[Bool], scalar: Int64):
+        self.self_null_mask = self_null_mask.copy()
+        self.scalar = scalar
+        self.result = List[Bool]()
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+
+    def _run_int64(mut self, a: List[Int64]):
+        """Inner loop: compare ``a`` against the Int64 scalar with null propagation.
+        """
+        var has_a_mask = len(self.self_null_mask) > 0
+        for i in range(len(a)):
+            var is_null = has_a_mask and self.self_null_mask[i]
+            if is_null:
+                self.result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v: Bool
+                comptime if Self.op == _CMP_EQ:
+                    v = a[i] == self.scalar
+                elif Self.op == _CMP_NE:
+                    v = a[i] != self.scalar
+                elif Self.op == _CMP_LT:
+                    v = a[i] < self.scalar
+                elif Self.op == _CMP_LE:
+                    v = a[i] <= self.scalar
+                elif Self.op == _CMP_GT:
+                    v = a[i] > self.scalar
+                elif Self.op == _CMP_GE:
+                    v = a[i] >= self.scalar
+                else:
+                    v = False  # unreachable: compile-time guard
+                self.result.append(v)
+                self.result_mask.append(False)
+
+    def _run_float64(mut self, a: List[Float64]):
+        """Inner loop: widen scalar to Float64 and compare with null propagation.
+        """
+        var scalar_f = Float64(self.scalar)
+        var has_a_mask = len(self.self_null_mask) > 0
+        for i in range(len(a)):
+            var is_null = has_a_mask and self.self_null_mask[i]
+            if is_null:
+                self.result.append(False)
+                self.result_mask.append(True)
+                self.has_any_null = True
+            else:
+                var v: Bool
+                comptime if Self.op == _CMP_EQ:
+                    v = a[i] == scalar_f
+                elif Self.op == _CMP_NE:
+                    v = a[i] != scalar_f
+                elif Self.op == _CMP_LT:
+                    v = a[i] < scalar_f
+                elif Self.op == _CMP_LE:
+                    v = a[i] <= scalar_f
+                elif Self.op == _CMP_GT:
+                    v = a[i] > scalar_f
+                elif Self.op == _CMP_GE:
+                    v = a[i] >= scalar_f
+                else:
+                    v = False  # unreachable: compile-time guard
+                self.result.append(v)
+                self.result_mask.append(False)
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self._run_int64(data)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self._run_float64(data)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var a = List[Int64]()
+        for i in range(len(data)):
+            a.append(Int64(1) if data[i] else Int64(0))
+        self._run_int64(a)
+
+    def on_str(mut self, data: List[String]) raises:
+        raise Error("cmp: cannot compare string column with a numeric scalar")
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error(
+            "cmp: comparison not supported for object/datetime column type"
+        )
+
+
 # ------------------------------------------------------------------
 # Boolean logical visitor — element-wise and/or/xor with Kleene three-valued
 # null semantics (per docs/query-eval-spec.md § 3).
@@ -4870,6 +4982,43 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
     def _cmp_scalar_ge(self, scalar: Float64) raises -> Column:
         return self._cmp_scalar_op[_CMP_GE](scalar)
+
+    def _cmp_scalar_op_int64[op: Int](self, scalar: Int64) raises -> Column:
+        """Core element-wise scalar comparison kernel for ``Int64`` scalars.
+
+        Like ``_cmp_scalar_op`` but accepts an ``Int64`` scalar so that
+        integer columns are compared in exact integer arithmetic rather than
+        being widened to ``Float64`` first.  This avoids precision loss for
+        large integer values (|v| > 2**53).
+
+        ``op`` is a compile-time constant (``_CMP_*``) that selects the
+        operation.  Null propagation: null elements produce a null result.
+        """
+        var visitor = _CmpScalarInt64Visitor[op](self._null_mask, scalar)
+        visit_col_data_raises(visitor, self._data)
+        return self._build_result_col(
+            ColumnData(visitor.result.copy()),
+            visitor.result_mask.copy(),
+            visitor.has_any_null,
+        )
+
+    def _cmp_scalar_eq(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_EQ](scalar)
+
+    def _cmp_scalar_ne(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_NE](scalar)
+
+    def _cmp_scalar_lt(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_LT](scalar)
+
+    def _cmp_scalar_le(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_LE](scalar)
+
+    def _cmp_scalar_gt(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_GT](scalar)
+
+    def _cmp_scalar_ge(self, scalar: Int64) raises -> Column:
+        return self._cmp_scalar_op_int64[_CMP_GE](scalar)
 
     # ------------------------------------------------------------------
     # Boolean logical kernels

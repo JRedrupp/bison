@@ -74,6 +74,30 @@ fn _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
+fn _apply_int_op(col: Series, op: String, val: Int64) raises -> Series:
+    """Apply a comparison operator to *col* against an integer scalar *val*.
+
+    Routes through the ``Int64`` overloads of the Series comparison operators
+    so that integer columns are compared in exact integer arithmetic rather
+    than being widened to ``Float64`` first.  This avoids precision loss for
+    values outside the ``Float64`` mantissa range (|v| > 2**53).
+    """
+    if op == "<":
+        return col.__lt__(val)
+    elif op == "<=":
+        return col.__le__(val)
+    elif op == ">":
+        return col.__gt__(val)
+    elif op == ">=":
+        return col.__ge__(val)
+    elif op == "==":
+        return col.__eq__(val)
+    elif op == "!=":
+        return col.__ne__(val)
+    else:
+        raise Error("evaluator: unknown operator '" + op + "'")
+
+
 fn _apply_string_op(col: Series, op: String, val: String) raises -> Series:
     """Apply a string equality/inequality operator to *col* against scalar *val*.
     """
@@ -121,9 +145,14 @@ fn _parse_bool_literal(node: ASTNode) raises -> Float64:
         )
 
 
-fn _parse_numeric_literal(node: ASTNode) raises -> Float64:
-    """Convert an NK_INT or NK_FLOAT node value to Float64."""
+fn _parse_float_literal(node: ASTNode) raises -> Float64:
+    """Convert an NK_FLOAT node value to Float64."""
     return atof(node.value)
+
+
+fn _parse_int_literal(node: ASTNode) raises -> Int64:
+    """Convert an NK_INT node value to Int64 without Float64 widening."""
+    return Int64(Int(node.value))
 
 
 fn _eval_compare(
@@ -140,8 +169,10 @@ fn _eval_compare(
 
     var lhs_is_ident = lhs.kind == NK_IDENT
     var rhs_is_ident = rhs.kind == NK_IDENT
-    var lhs_is_numeric = (lhs.kind == NK_INT) or (lhs.kind == NK_FLOAT)
-    var rhs_is_numeric = (rhs.kind == NK_INT) or (rhs.kind == NK_FLOAT)
+    var lhs_is_int = lhs.kind == NK_INT
+    var rhs_is_int = rhs.kind == NK_INT
+    var lhs_is_float = lhs.kind == NK_FLOAT
+    var rhs_is_float = rhs.kind == NK_FLOAT
     var lhs_is_string = lhs.kind == NK_STRING
     var rhs_is_string = rhs.kind == NK_STRING
     var lhs_is_null = lhs.kind == NK_NULL
@@ -168,18 +199,29 @@ fn _eval_compare(
         else:
             raise Error("evaluator: unknown operator '" + op + "'")
 
-    elif lhs_is_ident and rhs_is_numeric:
+    elif lhs_is_ident and rhs_is_int:
         var col = _resolve_ident(lhs.value, df)
-        var val = _parse_numeric_literal(rhs)
+        var val = _parse_int_literal(rhs)
+        return _apply_int_op(col, op, val)
+
+    elif lhs_is_ident and rhs_is_float:
+        var col = _resolve_ident(lhs.value, df)
+        var val = _parse_float_literal(rhs)
         return _apply_numeric_op(col, op, val)
 
     elif lhs_is_ident and rhs_is_string:
         var col = _resolve_ident(lhs.value, df)
         return _apply_string_op(col, op, rhs.value)
 
-    elif lhs_is_numeric and rhs_is_ident:
+    elif lhs_is_int and rhs_is_ident:
         var col = _resolve_ident(rhs.value, df)
-        var val = _parse_numeric_literal(lhs)
+        var val = _parse_int_literal(lhs)
+        var flipped = _flip_op(op)
+        return _apply_int_op(col, flipped, val)
+
+    elif lhs_is_float and rhs_is_ident:
+        var col = _resolve_ident(rhs.value, df)
+        var val = _parse_float_literal(lhs)
         var flipped = _flip_op(op)
         return _apply_numeric_op(col, flipped, val)
 
