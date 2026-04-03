@@ -257,8 +257,6 @@ def test_unstack_matches_pandas() raises:
 
     var got = df.unstack().to_pandas()
     var expected = indexed.unstack()
-    if String(expected.__class__.__name__) == "Series":
-        expected = expected.to_frame()
     assert_true(String(got.shape[0]) == String(expected.shape[0]))
     assert_true(String(got.shape[1]) == String(expected.shape[1]))
     assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
@@ -279,14 +277,32 @@ def test_unstack_explicit_level_matches_pandas() raises:
 
     var got = df.unstack(level=0).to_pandas()
     var expected = indexed.unstack(level=0)
-    if String(expected.__class__.__name__) == "Series":
-        expected = expected.to_frame()
     assert_true(String(got.shape[0]) == String(expected.shape[0]))
     assert_true(String(got.shape[1]) == String(expected.shape[1]))
     assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
     assert_true(String(got.iloc[0, 1]) == String(expected.iloc[0, 1]))
     assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
     assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
+
+
+def test_unstack_simple_index_to_series_matches_pandas() raises:
+    # When a DataFrame has a simple (non-MultiIndex) row index,
+    # pandas.DataFrame.unstack() returns a Series with a 2-level MultiIndex
+    # (column_name, row_label).  unstack_to_series() provides that path.
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate("{'A': [1, 2], 'B': [3, 4]}"))
+    pd_df.index = Python.evaluate("['x', 'y']")
+    var df = DataFrame(pd_df)
+
+    var got = df.unstack_to_series().to_pandas()
+    var expected = pd_df.unstack()
+    # Both should have the same length.
+    assert_true(Int(got.__len__()) == Int(expected.__len__()))
+    # Values should match in (column, row) order.
+    assert_true(String(got.iloc[0]) == String(expected.iloc[0]))
+    assert_true(String(got.iloc[1]) == String(expected.iloc[1]))
+    assert_true(String(got.iloc[2]) == String(expected.iloc[2]))
+    assert_true(String(got.iloc[3]) == String(expected.iloc[3]))
 
 
 def test_swaplevel_matches_pandas() raises:
