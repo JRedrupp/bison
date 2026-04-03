@@ -116,6 +116,13 @@ This is a current limitation of Mojo's parametric function support
 (tracked in [modularml/mojo#6130](https://github.com/modularml/mojo/issues/6130)).
 Use `clip()` or `where()` for threshold-style operations in the meantime.
 
+### Query/eval native grammar specification
+
+The minimal native `DataFrame.query()` and `DataFrame.eval()` grammar and
+semantics are documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
+Use this as the canonical reference for supported syntax, precedence,
+null semantics, and unsupported expression behavior.
+
 ## Contributing
 
 1. Pick a stub method from the table above.
