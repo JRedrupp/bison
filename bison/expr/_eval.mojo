@@ -160,23 +160,16 @@ def _eval_node(idx: Int, parsed: ParsedExpr, df: DataFrame) raises -> Series:
     if node.kind == NK_COMPARE:
         return _eval_compare(node, parsed, df)
     elif node.kind == NK_AND:
-        raise Error(
-            "evaluator: unsupported expression kind "
-            + String(node.kind)
-            + " (NK_AND — not yet implemented)"
-        )
+        var left_mask = _eval_node(node.left, parsed, df)
+        var right_mask = _eval_node(node.right, parsed, df)
+        return left_mask.__and__(right_mask)
     elif node.kind == NK_OR:
-        raise Error(
-            "evaluator: unsupported expression kind "
-            + String(node.kind)
-            + " (NK_OR — not yet implemented)"
-        )
+        var left_mask = _eval_node(node.left, parsed, df)
+        var right_mask = _eval_node(node.right, parsed, df)
+        return left_mask.__or__(right_mask)
     elif node.kind == NK_NOT:
-        raise Error(
-            "evaluator: unsupported expression kind "
-            + String(node.kind)
-            + " (NK_NOT — not yet implemented)"
-        )
+        var operand = _eval_node(node.left, parsed, df)
+        return operand.__invert__()
     else:
         raise Error(
             "evaluator: unsupported expression kind " + String(node.kind)
@@ -191,8 +184,8 @@ def _eval_node(idx: Int, parsed: ParsedExpr, df: DataFrame) raises -> Series:
 def eval_expr(parsed: ParsedExpr, df: DataFrame) raises -> Series:
     """Evaluate *parsed* against *df* and return a boolean Series mask.
 
-    Only single ``NK_COMPARE`` nodes are supported at this stage.  Logical
-    connectives (and / or / not) will be added in a later release and raise
-    with a clear "unsupported expression kind" error until then.
+    Supports comparison nodes (``NK_COMPARE``) and logical connectives
+    (``NK_AND``, ``NK_OR``, ``NK_NOT``) with Kleene null semantics.
+    Parenthetical groupings and precedence are handled by the parser.
     """
     return _eval_node(parsed.root, parsed, df)
