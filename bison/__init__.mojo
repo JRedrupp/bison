@@ -33,5 +33,6 @@ from .groupby import DataFrameGroupBy, SeriesGroupBy
 from .indexing import LocIndexer, ILocIndexer, AtIndexer, IAtIndexer
 from .io import read_csv, read_parquet, read_json, read_excel
 from .reshape import concat
+from .expr import parse, ParsedExpr
 
 comptime __version__ = VERSION
