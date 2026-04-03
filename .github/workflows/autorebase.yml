@@ -20,7 +20,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch all branches
-        run: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+        run: git fetch origin '+refs/heads/*:refs/heads/*' --update-head-ok
 
       - name: Configure git
         run: |
