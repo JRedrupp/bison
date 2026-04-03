@@ -1,16 +1,20 @@
 from std.python import Python, PythonObject
 
 
-def assert_frame_equal(left: PythonObject, right: PythonObject) raises:
+def assert_frame_equal(
+    left: PythonObject, right: PythonObject, check_dtype: Bool = True
+) raises:
     """Assert two pandas DataFrames are equal (delegates to pandas.testing)."""
     var testing = Python.import_module("pandas.testing")
-    testing.assert_frame_equal(left, right)
+    testing.assert_frame_equal(left, right, check_dtype=check_dtype)
 
 
-def assert_series_equal(left: PythonObject, right: PythonObject) raises:
+def assert_series_equal(
+    left: PythonObject, right: PythonObject, check_dtype: Bool = True
+) raises:
     """Assert two pandas Series are equal (delegates to pandas.testing)."""
     var testing = Python.import_module("pandas.testing")
-    testing.assert_series_equal(left, right)
+    testing.assert_series_equal(left, right, check_dtype=check_dtype)
 
 
 def make_simple_df() raises -> PythonObject:
