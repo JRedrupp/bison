@@ -29,6 +29,8 @@ from .column import (
     _scalar_from_col,
     _SetScalarInColMutVisitor,
     visit_col_data_mut_raises,
+    _merge_sort_perm_comparable,
+    _merge_sort_perm_pyobj,
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -1003,267 +1005,23 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             perm.append(i)
         if n <= 1:
             return perm^
-        var has_mask = len(self._col._null_mask) > 0
+        # ref binding avoids copying the null mask (which may be O(n) bytes).
+        ref null_mask = self._col._null_mask
         if self._col._data.isa[List[Int64]]():
             ref d = self._col._data[List[Int64]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var lnull = has_mask and self._col._null_mask[lv]
-                        var rnull = has_mask and self._col._null_mask[rv]
-                        var take_right: Bool
-                        if lnull and rnull:
-                            take_right = False
-                        elif lnull:
-                            take_right = na_last
-                        elif rnull:
-                            take_right = not na_last
-                        elif ascending:
-                            take_right = d[rv] < d[lv]
-                        else:
-                            take_right = d[rv] > d[lv]
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
         elif self._col._data.isa[List[Float64]]():
             ref d = self._col._data[List[Float64]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var lnull = has_mask and self._col._null_mask[lv]
-                        var rnull = has_mask and self._col._null_mask[rv]
-                        var take_right: Bool
-                        if lnull and rnull:
-                            take_right = False
-                        elif lnull:
-                            take_right = na_last
-                        elif rnull:
-                            take_right = not na_last
-                        elif ascending:
-                            take_right = d[rv] < d[lv]
-                        else:
-                            take_right = d[rv] > d[lv]
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
         elif self._col._data.isa[List[Bool]]():
             ref d = self._col._data[List[Bool]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var lnull = has_mask and self._col._null_mask[lv]
-                        var rnull = has_mask and self._col._null_mask[rv]
-                        var take_right: Bool
-                        if lnull and rnull:
-                            take_right = False
-                        elif lnull:
-                            take_right = na_last
-                        elif rnull:
-                            take_right = not na_last
-                        elif ascending:
-                            take_right = (not d[rv]) and d[lv]  # False < True
-                        else:
-                            take_right = d[rv] and (not d[lv])  # True > False
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
         elif self._col._data.isa[List[String]]():
             ref d = self._col._data[List[String]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var lnull = has_mask and self._col._null_mask[lv]
-                        var rnull = has_mask and self._col._null_mask[rv]
-                        var take_right: Bool
-                        if lnull and rnull:
-                            take_right = False
-                        elif lnull:
-                            take_right = na_last
-                        elif rnull:
-                            take_right = not na_last
-                        elif ascending:
-                            take_right = d[rv] < d[lv]
-                        else:
-                            take_right = d[rv] > d[lv]
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
         else:
             ref d = self._col._data[List[PythonObject]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var lnull = has_mask and self._col._null_mask[lv]
-                        var rnull = has_mask and self._col._null_mask[rv]
-                        var take_right: Bool
-                        if lnull and rnull:
-                            take_right = False
-                        elif lnull:
-                            take_right = not na_last
-                        elif rnull:
-                            take_right = na_last
-                        elif ascending:
-                            take_right = Bool(d[rv] < d[lv])
-                        else:
-                            take_right = Bool(d[rv] > d[lv])
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_pyobj(perm, d, null_mask, ascending, na_last)
         return perm^
 
     def sort_values(
