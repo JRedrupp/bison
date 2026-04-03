@@ -4129,8 +4129,245 @@ struct DataFrame(Copyable, Movable):
         columns: Optional[List[String]] = None,
         aggfunc: String = "mean",
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.pivot_table")
-        return DataFrame()
+        if aggfunc != "mean" and aggfunc != "sum" and aggfunc != "count":
+            raise Error(
+                "DataFrame.pivot_table: aggfunc must be one of 'mean', 'sum',"
+                " or 'count'"
+            )
+
+        var idx_names = List[String]()
+        if index:
+            idx_names = index.value().copy()
+
+        var col_names = List[String]()
+        if columns:
+            col_names = columns.value().copy()
+
+        var val_names = List[String]()
+        if values:
+            val_names = values.value().copy()
+
+        var name_to_ci = Dict[String, Int]()
+        for j in range(len(self._cols)):
+            name_to_ci[self._cols[j].name.value()] = j
+
+        for k in range(len(idx_names)):
+            if idx_names[k] not in name_to_ci:
+                raise Error(
+                    "DataFrame.pivot_table: index column not found: "
+                    + idx_names[k]
+                )
+        for k in range(len(col_names)):
+            if col_names[k] not in name_to_ci:
+                raise Error(
+                    "DataFrame.pivot_table: columns column not found: "
+                    + col_names[k]
+                )
+
+        if len(val_names) == 0:
+            for j in range(len(self._cols)):
+                var name = self._cols[j].name.value()
+                var used = False
+                for k in range(len(idx_names)):
+                    if name == idx_names[k]:
+                        used = True
+                        break
+                if not used:
+                    for k in range(len(col_names)):
+                        if name == col_names[k]:
+                            used = True
+                            break
+                if not used:
+                    val_names.append(name)
+
+        if len(val_names) == 0:
+            raise Error(
+                "DataFrame.pivot_table: values resolved to an empty column list"
+            )
+        for k in range(len(val_names)):
+            if val_names[k] not in name_to_ci:
+                raise Error(
+                    "DataFrame.pivot_table: values column not found: "
+                    + val_names[k]
+                )
+
+        var py = Python.import_module("builtins")
+        var py_none = Python.evaluate("None")
+        var nrows = self.shape()[0]
+
+        var row_labels = List[String]()
+        var row_keys = Dict[String, Int]()
+        var col_labels = List[String]()
+        var col_keys = Dict[String, Int]()
+
+        for r in range(nrows):
+            var row_label = String("0")
+            if len(idx_names) == 1:
+                row_label = _frame_cell_as_str(
+                    self._cols[name_to_ci[idx_names[0]]], r
+                )
+            elif len(idx_names) > 1:
+                var items = py.list()
+                for k in range(len(idx_names)):
+                    _ = items.append(
+                        _frame_cell_as_python(
+                            self._cols[name_to_ci[idx_names[k]]], r
+                        )
+                    )
+                row_label = String(py.tuple(items))
+            if row_label not in row_keys:
+                row_keys[row_label] = len(row_labels)
+                row_labels.append(row_label)
+
+            var col_label = String("__all__")
+            if len(col_names) == 1:
+                col_label = _frame_cell_as_str(
+                    self._cols[name_to_ci[col_names[0]]], r
+                )
+            elif len(col_names) > 1:
+                var citems = py.list()
+                for k in range(len(col_names)):
+                    _ = citems.append(
+                        _frame_cell_as_python(
+                            self._cols[name_to_ci[col_names[k]]], r
+                        )
+                    )
+                col_label = String(py.tuple(citems))
+            if col_label not in col_keys:
+                col_keys[col_label] = len(col_labels)
+                col_labels.append(col_label)
+
+        var n_rk = len(row_labels)
+        var n_ck = len(col_labels)
+        var n_val = len(val_names)
+
+        var n_out = n_val
+        if len(col_names) > 0:
+            if n_val == 1:
+                n_out = n_ck
+            else:
+                n_out = n_val * n_ck
+
+        var out_names = List[String]()
+        if len(col_names) == 0:
+            for vi in range(n_val):
+                out_names.append(val_names[vi])
+        elif n_val == 1:
+            for ck in range(n_ck):
+                out_names.append(col_labels[ck])
+        else:
+            for vi in range(n_val):
+                for ck in range(n_ck):
+                    out_names.append(val_names[vi] + "|" + col_labels[ck])
+
+        var sums = List[List[Float64]]()
+        var counts = List[List[Int]]()
+        for _ in range(n_rk):
+            var sum_row = List[Float64]()
+            var count_row = List[Int]()
+            for _ in range(n_out):
+                sum_row.append(0.0)
+                count_row.append(0)
+            sums.append(sum_row^)
+            counts.append(count_row^)
+
+        for r in range(nrows):
+            var row_label = String("0")
+            if len(idx_names) == 1:
+                row_label = _frame_cell_as_str(
+                    self._cols[name_to_ci[idx_names[0]]], r
+                )
+            elif len(idx_names) > 1:
+                var items = py.list()
+                for k in range(len(idx_names)):
+                    _ = items.append(
+                        _frame_cell_as_python(
+                            self._cols[name_to_ci[idx_names[k]]], r
+                        )
+                    )
+                row_label = String(py.tuple(items))
+            var rk = row_keys[row_label]
+
+            var col_label = String("__all__")
+            if len(col_names) == 1:
+                col_label = _frame_cell_as_str(
+                    self._cols[name_to_ci[col_names[0]]], r
+                )
+            elif len(col_names) > 1:
+                var citems = py.list()
+                for k in range(len(col_names)):
+                    _ = citems.append(
+                        _frame_cell_as_python(
+                            self._cols[name_to_ci[col_names[k]]], r
+                        )
+                    )
+                col_label = String(py.tuple(citems))
+            var ck = col_keys[col_label]
+
+            for vi in range(n_val):
+                var out_pos = vi
+                if len(col_names) > 0:
+                    if n_val == 1:
+                        out_pos = ck
+                    else:
+                        out_pos = vi * n_ck + ck
+
+                ref vcol = self._cols[name_to_ci[val_names[vi]]]
+                var is_null = len(vcol._null_mask) > 0 and vcol._null_mask[r]
+                if is_null:
+                    continue
+
+                if aggfunc == "count":
+                    counts[rk][out_pos] += 1
+                    continue
+
+                if vcol._data.isa[List[Int64]]():
+                    sums[rk][out_pos] += Float64(vcol._data[List[Int64]][r])
+                elif vcol._data.isa[List[Float64]]():
+                    sums[rk][out_pos] += vcol._data[List[Float64]][r]
+                elif vcol._data.isa[List[Bool]]():
+                    if vcol._data[List[Bool]][r]:
+                        sums[rk][out_pos] += Float64(1.0)
+                else:
+                    raise Error(
+                        "DataFrame.pivot_table: aggfunc "
+                        + aggfunc
+                        + " requires numeric values; got non-numeric column: "
+                        + val_names[vi]
+                    )
+                counts[rk][out_pos] += 1
+
+        var result_idx = ColumnIndex(Index(row_labels^))
+        var result_cols = List[Column]()
+
+        for out_i in range(n_out):
+            var data = List[PythonObject]()
+            var null_mask = List[Bool]()
+            var any_null = False
+            for rk in range(n_rk):
+                if counts[rk][out_i] == 0:
+                    data.append(py_none)
+                    null_mask.append(True)
+                    any_null = True
+                    continue
+                null_mask.append(False)
+                if aggfunc == "count":
+                    data.append(PythonObject(Int(counts[rk][out_i])))
+                elif aggfunc == "sum":
+                    data.append(PythonObject(sums[rk][out_i]))
+                else:
+                    data.append(
+                        PythonObject(
+                            sums[rk][out_i] / Float64(counts[rk][out_i])
+                        )
+                    )
+            var col = Column(out_names[out_i], ColumnData(data^), object_)
+            col._index = result_idx.copy()
+            if any_null:
+                col._null_mask = null_mask^
+            result_cols.append(col^)
+
+        return DataFrame(result_cols^)
 
     def melt(
         self,
@@ -4280,8 +4517,150 @@ struct DataFrame(Copyable, Movable):
         return Series(result_col^)
 
     def unstack(self, level: Int = -1) raises -> DataFrame:
-        _not_implemented("DataFrame.unstack")
-        return DataFrame()
+        if len(self._cols) == 0:
+            return DataFrame()
+        if not self._has_index():
+            raise Error("DataFrame.unstack: requires an explicit MultiIndex")
+        if not self._cols[0]._index.isa[List[PythonObject]]():
+            raise Error("DataFrame.unstack: requires a tuple-backed MultiIndex")
+
+        ref idx_objs = self._cols[0]._index[List[PythonObject]]
+        if len(idx_objs) == 0:
+            raise Error("DataFrame.unstack: requires a non-empty MultiIndex")
+        if String(idx_objs[0].__class__.__name__) != "tuple":
+            raise Error("DataFrame.unstack: requires a tuple-backed MultiIndex")
+
+        var n_levels = Int(idx_objs[0].__len__())
+        var lvl = level
+        if lvl < 0:
+            lvl += n_levels
+        if lvl < 0 or lvl >= n_levels:
+            raise Error("DataFrame.unstack: level out of range")
+        if n_levels < 2:
+            raise Error("DataFrame.unstack: requires at least 2 index levels")
+
+        var py = Python.import_module("builtins")
+        var py_none = Python.evaluate("None")
+
+        var row_keys = List[PythonObject]()
+        var row_seen = Dict[String, Int]()
+        var col_keys = List[PythonObject]()
+        var col_seen = Dict[String, Int]()
+
+        for r in range(self.shape()[0]):
+            var idx_t = idx_objs[r]
+            var col_key = idx_t.__getitem__(lvl)
+            var col_s = String(col_key)
+            if col_s not in col_seen:
+                col_seen[col_s] = len(col_keys)
+                col_keys.append(col_key)
+
+            var rem_items = py.list()
+            for k in range(n_levels):
+                if k == lvl:
+                    continue
+                _ = rem_items.append(idx_t.__getitem__(k))
+            var row_key: PythonObject
+            if n_levels - 1 == 1:
+                row_key = rem_items.__getitem__(0)
+            else:
+                row_key = py.tuple(rem_items)
+            var row_s = String(row_key)
+            if row_s not in row_seen:
+                row_seen[row_s] = len(row_keys)
+                row_keys.append(row_key)
+
+        var n_rk = len(row_keys)
+        var n_ck = len(col_keys)
+        var n_src = len(self._cols)
+
+        var table = List[List[PythonObject]]()
+        var filled = List[List[Bool]]()
+        var n_out = n_src * n_ck
+        for _ in range(n_rk):
+            var row_data = List[PythonObject]()
+            var row_fill = List[Bool]()
+            for _ in range(n_out):
+                row_data.append(py_none)
+                row_fill.append(False)
+            table.append(row_data^)
+            filled.append(row_fill^)
+
+        for r in range(self.shape()[0]):
+            var idx_t = idx_objs[r]
+            var col_s = String(idx_t.__getitem__(lvl))
+            var ck = col_seen[col_s]
+
+            var rem_items = py.list()
+            for k in range(n_levels):
+                if k == lvl:
+                    continue
+                _ = rem_items.append(idx_t.__getitem__(k))
+            var row_key: PythonObject
+            if n_levels - 1 == 1:
+                row_key = rem_items.__getitem__(0)
+            else:
+                row_key = py.tuple(rem_items)
+            var rk = row_seen[String(row_key)]
+
+            for j in range(n_src):
+                var out = j * n_ck + ck
+                if filled[rk][out]:
+                    raise Error(
+                        "DataFrame.unstack: duplicate entry for the same index"
+                        " combination"
+                    )
+                table[rk][out] = _frame_cell_as_python(self._cols[j], r)
+                filled[rk][out] = True
+
+        var result_idx = ColumnIndex(row_keys^)
+        var src_idx_names = self._cols[0]._index_names.copy()
+        var rem_idx_names = List[String]()
+        if len(src_idx_names) == n_levels:
+            for k in range(n_levels):
+                if k != lvl:
+                    rem_idx_names.append(src_idx_names[k])
+
+        var result_cols = List[Column]()
+        for j in range(n_src):
+            for ck in range(n_ck):
+                var out = j * n_ck + ck
+                var out_name: String
+                if n_src == 1:
+                    out_name = String(col_keys[ck])
+                else:
+                    var pair_items = py.list()
+                    _ = pair_items.append(
+                        PythonObject(self._cols[j].name.value())
+                    )
+                    _ = pair_items.append(col_keys[ck])
+                    out_name = String(py.tuple(pair_items))
+
+                var data = List[PythonObject]()
+                var null_mask = List[Bool]()
+                var any_null = False
+                for rk in range(n_rk):
+                    if not filled[rk][out]:
+                        data.append(py_none)
+                        null_mask.append(True)
+                        any_null = True
+                    else:
+                        data.append(table[rk][out])
+                        null_mask.append(False)
+
+                var col = Column(out_name, ColumnData(data^), object_)
+                col._index = result_idx.copy()
+                if len(rem_idx_names) > 1:
+                    col._index_names = rem_idx_names.copy()
+                    col._index_name = ""
+                elif len(rem_idx_names) == 1:
+                    col._index_names = List[String]()
+                    col._index_name = rem_idx_names[0]
+                if any_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+
+        return DataFrame(result_cols^)
 
     def transpose(self) raises -> DataFrame:
         """Transpose rows and columns.
@@ -4342,8 +4721,71 @@ struct DataFrame(Copyable, Movable):
     def swaplevel(
         self, i: Int = -2, j: Int = -1, axis: Int = 0
     ) raises -> DataFrame:
-        _not_implemented("DataFrame.swaplevel")
-        return DataFrame()
+        if axis != 0:
+            raise Error(
+                "DataFrame.swaplevel: only axis=0 is currently supported"
+            )
+        if len(self._cols) == 0:
+            return DataFrame()
+        if not self._has_index():
+            raise Error("DataFrame.swaplevel: requires a MultiIndex on axis 0")
+        if not self._cols[0]._index.isa[List[PythonObject]]():
+            raise Error(
+                "DataFrame.swaplevel: requires a tuple-backed MultiIndex"
+            )
+
+        ref idx_objs = self._cols[0]._index[List[PythonObject]]
+        if len(idx_objs) == 0:
+            raise Error("DataFrame.swaplevel: requires a non-empty MultiIndex")
+        if String(idx_objs[0].__class__.__name__) != "tuple":
+            raise Error(
+                "DataFrame.swaplevel: requires a tuple-backed MultiIndex"
+            )
+
+        var n_levels = Int(idx_objs[0].__len__())
+        if n_levels < 2:
+            raise Error("DataFrame.swaplevel: requires at least 2 index levels")
+
+        var ii = i
+        var jj = j
+        if ii < 0:
+            ii += n_levels
+        if jj < 0:
+            jj += n_levels
+        if ii < 0 or ii >= n_levels or jj < 0 or jj >= n_levels:
+            raise Error("DataFrame.swaplevel: level out of range")
+        if ii == jj:
+            return self.copy(deep=True)
+
+        var py = Python.import_module("builtins")
+        var swapped_idx = List[PythonObject]()
+        for r in range(len(idx_objs)):
+            var tup = idx_objs[r]
+            var items = py.list()
+            for k in range(n_levels):
+                if k == ii:
+                    _ = items.append(tup.__getitem__(jj))
+                elif k == jj:
+                    _ = items.append(tup.__getitem__(ii))
+                else:
+                    _ = items.append(tup.__getitem__(k))
+            swapped_idx.append(py.tuple(items))
+
+        var idx_names = self._cols[0]._index_names.copy()
+        if len(idx_names) == n_levels:
+            var tmp_name = idx_names[ii]
+            idx_names[ii] = idx_names[jj]
+            idx_names[jj] = tmp_name
+
+        var new_cols = List[Column]()
+        for c in range(len(self._cols)):
+            var col = self._cols[c].copy()
+            col._index = ColumnIndex(swapped_idx.copy())
+            if len(idx_names) == n_levels:
+                col._index_names = idx_names.copy()
+                col._index_name = ""
+            new_cols.append(col^)
+        return DataFrame(new_cols^)
 
     def explode(self, column: String) raises -> DataFrame:
         """Expand list-like values in *column* into separate rows.

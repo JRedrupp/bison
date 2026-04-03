@@ -170,6 +170,84 @@ def test_pivot_duplicate_raises() raises:
     assert_true(raised)
 
 
+def test_pivot_table_mean_matches_pandas() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'grp': ['a', 'a', 'b', 'b'],"
+        " 'cat': ['x', 'x', 'x', 'y'],"
+        " 'val': [1.0, 3.0, 2.0, 8.0]}"
+    ))
+    var df = DataFrame(pd_df)
+
+    var values = List[String]()
+    values.append("val")
+    var index = List[String]()
+    index.append("grp")
+    var columns = List[String]()
+    columns.append("cat")
+
+    var got = df.pivot_table(
+        values=Optional[List[String]](values^),
+        index=Optional[List[String]](index^),
+        columns=Optional[List[String]](columns^),
+        aggfunc="mean",
+    ).to_pandas()
+    var expected = pd_df.pivot_table(
+        values=Python.evaluate("['val']"),
+        index=Python.evaluate("['grp']"),
+        columns=Python.evaluate("['cat']"),
+        aggfunc="mean",
+    )
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(pd.isna(got.iloc[0, 1])) == String(pd.isna(expected.iloc[0, 1])))
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+    assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
+
+
+def test_unstack_matches_pandas() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'k1': ['a', 'a', 'b', 'b'],"
+        " 'k2': ['x', 'y', 'x', 'y'],"
+        " 'v': [1, 2, 3, 4]}"
+    ))
+    var indexed = pd_df.set_index(Python.evaluate("['k1', 'k2']"))
+    var df = DataFrame(indexed)
+
+    var got = df.unstack().to_pandas()
+    var expected = indexed.unstack()
+    if String(expected.__class__.__name__) == "Series":
+        expected = expected.to_frame()
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(got.iloc[0, 1]) == String(expected.iloc[0, 1]))
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+    assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
+
+
+def test_swaplevel_matches_pandas() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'k1': ['a', 'a', 'b', 'b'],"
+        " 'k2': ['x', 'y', 'x', 'y'],"
+        " 'v': [10, 20, 30, 40]}"
+    ))
+    var indexed = pd_df.set_index(Python.evaluate("['k1', 'k2']"))
+    var df = DataFrame(indexed)
+
+    var got = df.swaplevel(i=0, j=1, axis=0).to_pandas()
+    var expected = indexed.swaplevel(i=0, j=1, axis=0)
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+    assert_true(String(got.iloc[2, 0]) == String(expected.iloc[2, 0]))
+    assert_true(String(got.iloc[3, 0]) == String(expected.iloc[3, 0]))
+
+
 def test_melt_no_id_vars() raises:
     # All columns become value_vars when id_vars is empty.
     var pd = Python.import_module("pandas")
