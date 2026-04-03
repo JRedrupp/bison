@@ -24,8 +24,8 @@ from std.time import perf_counter_ns
 # ---------------------------------------------------------------------------
 
 comptime FAST_ITERS = 100  # <1 ms per call  (sum, mean, iloc, fillna, apply)
-comptime MED_ITERS = 20  # 1–20 ms per call (groupby)
-comptime SLOW_ITERS = 3  # >20 ms per call  (query, sort, merge)
+comptime MED_ITERS = 20  # 1–20 ms per call (groupby, query/eval)
+comptime SLOW_ITERS = 3  # >20 ms per call  (sort, merge)
 comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 
 # ---------------------------------------------------------------------------
@@ -69,17 +69,18 @@ fn main() raises:
     var results = List[BenchResult]()
 
     # ------------------------------------------------------------------
-    # Build fixture in a single Python call to avoid pandas __setitem__
+    # Build fixtures in a single Python call to avoid pandas __setitem__
     # triggering sys._getframe() through Mojo's shallow call stack.
     #
-    # Fixture 1 — 100 000 rows:
+    # Fixture schema (created at three sizes for query size-sweep):
     #   key  (str, 10 unique values)
     #   a    (float64)
     #   b    (float64)
     #   c    (int64)
+    #   id   (int64, unique)
     #
-    # Fixture 2 — 10 000 rows (used for merge):
-    #   key  (str, 10 unique values)
+    # Fixture 2 — n//10 rows (used for merge):
+    #   id   (int64, unique)
     #   val  (float64)
     # ------------------------------------------------------------------
     var _make_fixtures = Python.evaluate(
@@ -107,8 +108,16 @@ fn main() raises:
     var pd_df = _fixtures[0]
     var pd_df2 = _fixtures[1]
 
+    # Smaller fixtures for query size-sweep (1 K and 10 K rows)
+    var _fixtures_1k = _make_fixtures(1_000)
+    var pd_df_1k = _fixtures_1k[0]
+    var _fixtures_10k = _make_fixtures(10_000)
+    var pd_df_10k = _fixtures_10k[0]
+
     var df = DataFrame.from_pandas(pd_df)
     var df2 = DataFrame.from_pandas(pd_df2)
+    var df_1k = DataFrame.from_pandas(pd_df_1k)
+    var df_10k = DataFrame.from_pandas(pd_df_10k)
 
     var np = Python.import_module("numpy")
 
@@ -116,6 +125,8 @@ fn main() raises:
     var g = Python.evaluate("{}")
     g["pd_df"] = pd_df
     g["pd_df2"] = pd_df2
+    g["pd_df_1k"] = pd_df_1k
+    g["pd_df_10k"] = pd_df_10k
     g["np"] = np
 
     # ------------------------------------------------------------------
@@ -188,25 +199,146 @@ fn main() raises:
         )
 
     # ------------------------------------------------------------------
-    # query_filter  (native parse+eval+mask pipeline via df.query)
+    # query_simple  (native single-condition filter via df.query)
+    #
+    # Uses the native parse+eval+mask pipeline; no pandas round-trip.
+    # Comparison baseline uses boolean-index pandas (not pd.query) so
+    # both sides use the cheapest available path.
     # ------------------------------------------------------------------
     skipped = False
     try:
         var t0 = perf_counter_ns()
-        for _ in range(SLOW_ITERS):
+        for _ in range(MED_ITERS):
             _ = df.query("a > 0.5")
-        bison_ms = _elapsed_ms(t0, SLOW_ITERS)
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
     except e:
         if "not implemented" in String(e):
             skipped = True
         else:
             raise e^
-    pandas_ms = _time_pandas("pd_df[pd_df['a'] > 0.5]", g, SLOW_ITERS)
+    pandas_ms = _time_pandas("pd_df[pd_df['a'] > 0.5]", g, MED_ITERS)
     if skipped:
-        results.append(BenchResult.skipped_result("query_filter"))
+        results.append(BenchResult.skipped_result("query_simple"))
     else:
         results.append(
-            BenchResult("query_filter", bison_ms, pandas_ms, SLOW_ITERS)
+            BenchResult("query_simple", bison_ms, pandas_ms, MED_ITERS)
+        )
+
+    # ------------------------------------------------------------------
+    # query_and  (native two-condition AND filter via df.query)
+    #
+    # Both logical connectives and comparisons are evaluated natively
+    # without a pandas round-trip.  Pandas baseline uses boolean-index
+    # form which avoids pd.eval overhead.
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.query("a > 0.5 and b < 0.3")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas(
+        "pd_df[(pd_df['a'] > 0.5) & (pd_df['b'] < 0.3)]", g, MED_ITERS
+    )
+    if skipped:
+        results.append(BenchResult.skipped_result("query_and"))
+    else:
+        results.append(BenchResult("query_and", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # query_or  (native two-condition OR filter via df.query)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.query("a > 0.8 or b > 0.8")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas(
+        "pd_df[(pd_df['a'] > 0.8) | (pd_df['b'] > 0.8)]", g, MED_ITERS
+    )
+    if skipped:
+        results.append(BenchResult.skipped_result("query_or"))
+    else:
+        results.append(BenchResult("query_or", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # eval_expr  (native df.eval returning a boolean Series)
+    #
+    # df.eval("a > 0.5") runs the same parse+eval pipeline as df.query
+    # but returns the raw boolean mask instead of filtering rows.
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.eval("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df['a'] > 0.5", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("eval_expr"))
+    else:
+        results.append(BenchResult("eval_expr", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # query_size_1k / query_size_10k
+    #
+    # Size sweep for the simple single-condition filter at 1 K and 10 K
+    # rows.  Together with query_simple (100 K rows above) these three
+    # data points make the native-path overhead trend visible across
+    # representative sizes.
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df_1k.query("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df_1k[pd_df_1k['a'] > 0.5]", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("query_size_1k"))
+    else:
+        results.append(
+            BenchResult("query_size_1k", bison_ms, pandas_ms, MED_ITERS)
+        )
+
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df_10k.query("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df_10k[pd_df_10k['a'] > 0.5]", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("query_size_10k"))
+    else:
+        results.append(
+            BenchResult("query_size_10k", bison_ms, pandas_ms, MED_ITERS)
         )
 
     # ------------------------------------------------------------------
