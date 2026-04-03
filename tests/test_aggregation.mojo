@@ -176,7 +176,7 @@ def test_series_var() raises:
 
 
 def test_series_std_single_element() raises:
-    """std of a single-element series with ddof=1 should be NaN."""
+    """Std of a single-element series with ddof=1 should be NaN."""
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[5.0]")))
     assert_true(isnan(s.std()))

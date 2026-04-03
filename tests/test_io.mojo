@@ -230,7 +230,7 @@ def test_json_roundtrip() raises:
 
 
 def test_read_excel_missing_file() raises:
-    """read_excel raises when the file does not exist."""
+    """Read_excel raises when the file does not exist."""
     var raised = False
     try:
         _ = read_excel("/tmp/bison_nonexistent_file.xlsx")
@@ -294,7 +294,7 @@ def test_read_excel_no_header() raises:
 
 
 def test_read_excel_sheet_name_string() raises:
-    """read_excel accepts a string sheet_name (e.g. 'Sales')."""
+    """Read_excel accepts a string sheet_name (e.g. 'Sales')."""
     var openpyxl_available = False
     try:
         _ = Python.import_module("openpyxl")

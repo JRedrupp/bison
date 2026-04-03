@@ -184,7 +184,7 @@ def test_join_sort_parameter() raises:
 
 
 def test_take_with_nulls_obj_col_null_placeholder_is_none() raises:
-    """take_with_nulls on a PythonObject column must emit None (not data[0])
+    """Take_with_nulls on a PythonObject column must emit None (not data[0])
     as the null placeholder for unmatched rows.  Regression test for #331."""
     var pd = Python.import_module("pandas")
     # Build a right frame whose 'tag' column is object-dtype so bison stores
@@ -212,7 +212,7 @@ def test_take_with_nulls_obj_col_null_placeholder_is_none() raises:
 
 
 def test_merge_outer_key_col_right_only_rows() raises:
-    """outer join: right-only rows must carry the right key value, not NaN.
+    """Outer join: right-only rows must carry the right key value, not NaN.
 
     Regression test for issue #334: the key column was built exclusively from
     take_with_nulls(out_left), so any row where out_left[r]==-1 (right-only)
@@ -240,7 +240,7 @@ def test_merge_outer_key_col_right_only_rows() raises:
 
 
 def test_merge_right_key_col_right_only_rows() raises:
-    """right join: right-only rows must carry the right key value, not NaN.
+    """Right join: right-only rows must carry the right key value, not NaN.
 
     Regression test for issue #334.
     """

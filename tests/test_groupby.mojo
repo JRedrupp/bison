@@ -140,7 +140,7 @@ def test_dataframegroupby_transform() raises:
 
 
 def test_dataframegroupby_transform_dropna() raises:
-    """transform() with dropna=True must not raise when key column has nulls."""
+    """Transform() with dropna=True must not raise when key column has nulls."""
     var pd = Python.import_module("pandas")
     # Build a DataFrame with one null in the groupby key column.
     var pd_df = pd.DataFrame(

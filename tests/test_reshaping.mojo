@@ -604,7 +604,7 @@ def test_set_index_null_key() raises:
 # ------------------------------------------------------------------
 
 def test_rename_axis_sets_name() raises:
-    """rename_axis stores the name and round-trips through to_pandas."""
+    """Rename_axis stores the name and round-trips through to_pandas."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var r = df.rename_axis(mapper=Optional[String]("rows"))

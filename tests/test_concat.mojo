@@ -145,7 +145,7 @@ def test_concat_three_dfs() raises:
 
 
 def test_concat_keys_axis0() raises:
-    """keys parameter prepends a __key__ column with one label per source row."""
+    """The keys parameter prepends a __key__ column with one label per source row."""
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3]}")))
@@ -165,7 +165,7 @@ def test_concat_keys_axis0() raises:
 
 
 def test_concat_keys_axis1() raises:
-    """keys parameter prepends a __key__ column with one label per source column."""
+    """The keys parameter prepends a __key__ column with one label per source column."""
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'b': [3, 4]}")))
@@ -183,7 +183,7 @@ def test_concat_keys_axis1() raises:
 
 
 def test_concat_keys_length_mismatch_raises() raises:
-    """concat raises when len(keys) != len(objs)."""
+    """Concat raises when len(keys) != len(objs)."""
     var pd = Python.import_module("pandas")
     var df1 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
     var df2 = DataFrame(pd.DataFrame(Python.evaluate("{'a': [2]}")))
