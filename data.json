@@ -1,6 +1,69 @@
 {
   "runs": [
     {
+      "commit": "fa287016f28e79c07a4faaf64d43735ea06a0fa4",
+      "short_commit": "fa28701",
+      "timestamp": "2026-04-03T12:35:13Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.22037653,
+          "pandas_ms": 0.09641567000002738,
+          "ratio": 2.2856920457010506
+        },
+        "series_mean": {
+          "bison_ms": 0.24875348,
+          "pandas_ms": 0.12725341999995976,
+          "ratio": 1.954788169937426
+        },
+        "groupby_sum": {
+          "bison_ms": 25.251439050000002,
+          "pandas_ms": 4.3259921000000645,
+          "ratio": 5.837144050725295
+        },
+        "query_filter": {
+          "bison_ms": 402.722239,
+          "pandas_ms": 1.044015333334869,
+          "ratio": 385.74360561697466
+        },
+        "iloc_row": {
+          "bison_ms": 0.00115786,
+          "pandas_ms": 0.040688370000054874,
+          "ratio": 0.02845678015606028
+        },
+        "loc_slice": {
+          "bison_ms": 0.010088459999999999,
+          "pandas_ms": 0.03166950999997198,
+          "ratio": 0.3185543445417667
+        },
+        "sort_values": {
+          "bison_ms": 33.25216666666667,
+          "pandas_ms": 5.7660303333335605,
+          "ratio": 5.7669080362680525
+        },
+        "merge": {
+          "bison_ms": 11.883361,
+          "pandas_ms": 1.8665833333339303,
+          "ratio": 6.366370462965061
+        },
+        "fillna": {
+          "bison_ms": 0.13855415,
+          "pandas_ms": 0.07128777999994895,
+          "ratio": 1.9435890695445868
+        },
+        "series_apply": {
+          "bison_ms": 0.44744357,
+          "pandas_ms": 0.21878935999993132,
+          "ratio": 2.0450883443332915
+        },
+        "csv_roundtrip": {
+          "bison_ms": 520.3256526,
+          "pandas_ms": 353.4371743999998,
+          "ratio": 1.4721871107172373
+        }
+      }
+    },
+    {
       "commit": "245c37e5cb09d8f21fc7cdab7a0be68617ed1901",
       "short_commit": "245c37e",
       "timestamp": "2026-04-03T12:13:27Z",
