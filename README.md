@@ -11,8 +11,9 @@ ported to Mojo.
 
 ## Status
 
-Core aggregation, statistics, and interop methods are implemented natively in
-Mojo. Methods that are not yet ported raise:
+361 of 366 tracked API methods are implemented natively in Mojo across
+DataFrame, Series, GroupBy, string and datetime accessors, native CSV and JSON
+I/O, and reshape. The five remaining DataFrame stubs raise:
 
 ```
 bison.<method>: not implemented
@@ -20,6 +21,15 @@ bison.<method>: not implemented
 
 `from_pandas()` and `to_pandas()` are available for wrapping and unwrapping
 pandas objects. See the compatibility table below for the current counts.
+
+Native I/O highlights:
+
+- `read_csv` — pure Mojo reader with automatic dtype inference (`bool` >
+  `int64` > `float64` > `String`), configurable delimiter, `usecols`,
+  `nrows`, `skiprows`, and NA-value handling.
+- `read_json` — pure Mojo reader supporting `records`, `split`, `columns`,
+  `index`, `values` orient formats, and JSON Lines / NDJSON (`lines=True`).
+- `read_parquet` and `read_excel` delegate to pandas (stubs).
 
 ## Install
 
@@ -55,6 +65,18 @@ def main() raises:
     var original = df.to_pandas()
 ```
 
+Read a CSV file directly without pandas:
+
+```mojo
+import bison as bs
+
+def main() raises:
+    # Dtype is inferred automatically: bool > int64 > float64 > String
+    var df = bs.read_csv("data.csv")
+    print(df.shape())
+    print(df["price"].mean())
+```
+
 ## Version
 
 ```mojo
@@ -67,6 +89,21 @@ print(bs.__version__)
 ```bash
 pixi run test
 ```
+
+## Benchmarks
+
+The benchmark suite in `benchmarks/bench_core.mojo` compares bison against
+pandas across aggregation, groupby, indexing, and I/O operations. Each entry
+reports a ratio of bison time to pandas time; values below 1.0 mean bison is
+faster.
+
+```bash
+pixi run bench        # run the full suite
+pixi run gen-report   # merge results into docs/data.json
+```
+
+The `docs/` directory contains an HTML performance dashboard that plots ratio
+history across commits.
 
 ## pandas compatibility
 
@@ -118,10 +155,15 @@ Use `clip()` or `where()` for threshold-style operations in the meantime.
 
 ### Query/eval native grammar specification
 
-The minimal native `DataFrame.query()` and `DataFrame.eval()` grammar and
-semantics are documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
-Use this as the canonical reference for supported syntax, precedence,
-null semantics, and unsupported expression behavior.
+`DataFrame.query()` and `DataFrame.eval()` currently delegate to pandas.
+A native Mojo parser for the query/eval grammar is available as the public
+`bison.expr` module (`parse`, `ParsedExpr`, `ASTNode`, `Tokenizer`). Full
+native execution backed by that parser is tracked as the next milestone.
+
+The grammar and semantics are documented in
+[`docs/query-eval-spec.md`](docs/query-eval-spec.md). Use this as the
+canonical reference for supported syntax, precedence, null semantics, and
+unsupported expression behavior.
 
 ## Contributing
 
