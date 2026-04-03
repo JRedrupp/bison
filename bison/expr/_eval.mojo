@@ -102,6 +102,8 @@ fn _eval_compare(
     *lhs* and *rhs* are the already-resolved child nodes (left and right
     operands of the comparison).
     """
+    # For NK_COMPARE nodes, node.value holds the operator string
+    # ("<", "<=", ">", ">=", "==", "!=") as set by the parser.
     var op = node.value
 
     var lhs_is_ident = lhs.kind == NK_IDENT
