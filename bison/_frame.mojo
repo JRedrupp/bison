@@ -2930,16 +2930,48 @@ struct DataFrame(Copyable, Movable):
         return DataFrame(result_cols^)
 
     def shift(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.shift")
-        return DataFrame()
+        """Return a DataFrame with values shifted by *periods* positions.
+
+        For ``axis=0`` (default), each column is shifted independently:
+        positive *periods* lags rows (first *periods* rows become null);
+        negative *periods* leads rows (last *|periods|* rows become null).
+        String and object columns are supported in addition to numeric.
+        ``axis=1`` is not yet implemented.
+        """
+        if axis != 0:
+            _not_implemented("DataFrame.shift")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].shift(periods))
+        return DataFrame(result_cols^)
 
     def diff(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.diff")
-        return DataFrame()
+        """Return element-wise first discrete difference along the rows.
+
+        ``result[i] = self[i] - self[i - periods]`` for each numeric column.
+        Exposed positions are null.  Non-numeric columns raise.
+        ``axis=1`` is not yet implemented.
+        """
+        if axis != 0:
+            _not_implemented("DataFrame.diff")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].diff(periods))
+        return DataFrame(result_cols^)
 
     def pct_change(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.pct_change")
-        return DataFrame()
+        """Return element-wise percentage change along the rows.
+
+        ``result[i] = (self[i] - self[i - periods]) / self[i - periods]``
+        for each numeric column.  Exposed positions are null.
+        ``axis=1`` is not yet implemented.
+        """
+        if axis != 0:
+            _not_implemented("DataFrame.pct_change")
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            result_cols.append(self._cols[i].pct_change(periods))
+        return DataFrame(result_cols^)
 
     def agg(self, func: String, axis: Int = 0) raises -> Series:
         if axis == 1:
