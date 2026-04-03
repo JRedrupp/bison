@@ -3682,6 +3682,167 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = ColumnIndex(result^)
 
 
+# ------------------------------------------------------------------
+# Generic merge-sort permutation helpers
+# ------------------------------------------------------------------
+# These two functions contain the single canonical bottom-up merge-sort
+# loop.  They replace the nine near-identical copy-pasted loops that used
+# to live inside Series._sort_perm (5 type arms) and
+# Column._sort_perm_by_index (4 type arms).
+#
+# _merge_sort_perm_comparable  — Int64, Float64, Bool, String (native </>)
+# _merge_sort_perm_pyobj       — PythonObject (Python comparison, raises)
+#
+# Both accept an optional null_mask.  Pass List[Bool]() and na_last=True
+# when null handling is not required (e.g. for index sorts).
+
+
+fn _merge_sort_perm_comparable[
+    T: Comparable & Copyable & Movable
+](
+    mut perm: List[Int],
+    data: List[T],
+    null_mask: List[Bool],
+    ascending: Bool,
+    na_last: Bool,
+) raises:
+    """Bottom-up merge-sort permutation using the native ``<`` / ``>`` operator.
+
+    Shared by the Int64, Float64, Bool, and String data arms of
+    ``Series._sort_perm`` and the Index (string), Int64, and Float64 index
+    arms of ``Column._sort_perm_by_index``.
+
+    For Bool data, Mojo's ``Bool.__lt__`` follows ``False < True`` (i.e.
+    ``False`` sorts before ``True`` in ascending order), which is the same
+    ordering as the original explicit ``(not d[rv]) and d[lv]`` expression.
+
+    Pass an empty ``null_mask`` and ``na_last=True`` when null handling is
+    not required (e.g. for index sorts where no index label can be null).
+    """
+    var n = len(perm)
+    if n <= 1:
+        return
+    var has_mask = len(null_mask) > 0
+    var scratch = List[Int](capacity=n)
+    scratch.resize(n, 0)
+    var width = 1
+    while width < n:
+        var lo = 0
+        while lo < n:
+            var mid_idx = lo + width
+            if mid_idx >= n:
+                break
+            var hi = lo + 2 * width
+            if hi > n:
+                hi = n
+            var k = lo
+            var li = lo
+            var ri = mid_idx
+            while li < mid_idx and ri < hi:
+                var lv = perm[li]
+                var rv = perm[ri]
+                var lnull = has_mask and null_mask[lv]
+                var rnull = has_mask and null_mask[rv]
+                var take_right: Bool
+                if lnull and rnull:
+                    take_right = False
+                elif lnull:
+                    take_right = na_last
+                elif rnull:
+                    take_right = not na_last
+                elif ascending:
+                    take_right = data[rv] < data[lv]
+                else:
+                    take_right = data[rv] > data[lv]
+                if take_right:
+                    scratch[k] = rv
+                    ri += 1
+                else:
+                    scratch[k] = lv
+                    li += 1
+                k += 1
+            while li < mid_idx:
+                scratch[k] = perm[li]
+                li += 1
+                k += 1
+            while ri < hi:
+                scratch[k] = perm[ri]
+                ri += 1
+                k += 1
+            for j in range(lo, hi):
+                perm[j] = scratch[j]
+            lo += 2 * width
+        width *= 2
+
+
+fn _merge_sort_perm_pyobj(
+    mut perm: List[Int],
+    data: List[PythonObject],
+    null_mask: List[Bool],
+    ascending: Bool,
+    na_last: Bool,
+) raises:
+    """Bottom-up merge-sort permutation using Python ``<`` / ``>`` comparison.
+
+    Used for the PythonObject data arm of ``Series._sort_perm`` and the
+    PythonObject index arm of ``Column._sort_perm_by_index``.
+    """
+    var n = len(perm)
+    if n <= 1:
+        return
+    var has_mask = len(null_mask) > 0
+    var scratch = List[Int](capacity=n)
+    scratch.resize(n, 0)
+    var width = 1
+    while width < n:
+        var lo = 0
+        while lo < n:
+            var mid_idx = lo + width
+            if mid_idx >= n:
+                break
+            var hi = lo + 2 * width
+            if hi > n:
+                hi = n
+            var k = lo
+            var li = lo
+            var ri = mid_idx
+            while li < mid_idx and ri < hi:
+                var lv = perm[li]
+                var rv = perm[ri]
+                var lnull = has_mask and null_mask[lv]
+                var rnull = has_mask and null_mask[rv]
+                var take_right: Bool
+                if lnull and rnull:
+                    take_right = False
+                elif lnull:
+                    take_right = na_last
+                elif rnull:
+                    take_right = not na_last
+                elif ascending:
+                    take_right = Bool(data[rv] < data[lv])
+                else:
+                    take_right = Bool(data[rv] > data[lv])
+                if take_right:
+                    scratch[k] = rv
+                    ri += 1
+                else:
+                    scratch[k] = lv
+                    li += 1
+                k += 1
+            while li < mid_idx:
+                scratch[k] = perm[li]
+                li += 1
+                k += 1
+            while ri < hi:
+                scratch[k] = perm[ri]
+                ri += 1
+                k += 1
+            for j in range(lo, hi):
+                perm[j] = scratch[j]
+            lo += 2 * width
+        width *= 2
+
+
 struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -3884,181 +4045,23 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var perm = List[Int]()
         for i in range(n):
             perm.append(i)
+        # Index labels are never null, so pass an empty mask.
+        var no_mask = List[Bool]()
         if self._index.isa[Index]():
             ref idx = self._index[Index]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var take_right = (
-                            idx[rv]
-                            < idx[lv] if ascending else idx[rv]
-                            > idx[lv]
-                        )
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(
+                perm, idx._data, no_mask, ascending, True
+            )
         elif self._index.isa[List[Int64]]():
             ref idx = self._index[List[Int64]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var take_right = (
-                            idx[rv]
-                            < idx[lv] if ascending else idx[rv]
-                            > idx[lv]
-                        )
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, idx, no_mask, ascending, True)
         elif self._index.isa[List[Float64]]():
             ref idx = self._index[List[Float64]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var take_right = (
-                            idx[rv]
-                            < idx[lv] if ascending else idx[rv]
-                            > idx[lv]
-                        )
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_comparable(perm, idx, no_mask, ascending, True)
         else:
-            # PythonObject fallback: use Python comparison.
+            # PythonObject fallback: use Python comparison (may raise).
             ref idx = self._index[List[PythonObject]]
-            var scratch = List[Int](capacity=n)
-            scratch.resize(n, 0)
-            var width = 1
-            while width < n:
-                var lo = 0
-                while lo < n:
-                    var mid_idx = lo + width
-                    if mid_idx >= n:
-                        break
-                    var hi = lo + 2 * width
-                    if hi > n:
-                        hi = n
-                    var k = lo
-                    var li = lo
-                    var ri = mid_idx
-                    while li < mid_idx and ri < hi:
-                        var lv = perm[li]
-                        var rv = perm[ri]
-                        var take_right = Bool(
-                            idx[rv] < idx[lv]
-                        ) if ascending else Bool(idx[rv] > idx[lv])
-                        if take_right:
-                            scratch[k] = rv
-                            ri += 1
-                        else:
-                            scratch[k] = lv
-                            li += 1
-                        k += 1
-                    while li < mid_idx:
-                        scratch[k] = perm[li]
-                        li += 1
-                        k += 1
-                    while ri < hi:
-                        scratch[k] = perm[ri]
-                        ri += 1
-                        k += 1
-                    for j in range(lo, hi):
-                        perm[j] = scratch[j]
-                    lo += 2 * width
-                width *= 2
+            _merge_sort_perm_pyobj(perm, idx, no_mask, ascending, True)
         return perm^
 
     # ------------------------------------------------------------------
