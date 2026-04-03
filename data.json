@@ -1,6 +1,69 @@
 {
   "runs": [
     {
+      "commit": "b024682908ad5651bc15070e14a3149acd8fb302",
+      "short_commit": "b024682",
+      "timestamp": "2026-04-03T13:28:57Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.22701383,
+          "pandas_ms": 0.09391843000003064,
+          "ratio": 2.4171382549721705
+        },
+        "series_mean": {
+          "bison_ms": 0.25201009,
+          "pandas_ms": 0.12411739000000921,
+          "ratio": 2.0304172525701785
+        },
+        "groupby_sum": {
+          "bison_ms": 28.49061295,
+          "pandas_ms": 4.286894399999852,
+          "ratio": 6.645979651376759
+        },
+        "query_filter": {
+          "bison_ms": 404.813641,
+          "pandas_ms": 1.0990493333338236,
+          "ratio": 368.3307279501734
+        },
+        "iloc_row": {
+          "bison_ms": 0.00157837,
+          "pandas_ms": 0.040823359999961895,
+          "ratio": 0.038663402522513414
+        },
+        "loc_slice": {
+          "bison_ms": 0.010226959999999998,
+          "pandas_ms": 0.030744089999927834,
+          "ratio": 0.33264799836404346
+        },
+        "sort_values": {
+          "bison_ms": 31.42241566666667,
+          "pandas_ms": 5.4930556666666535,
+          "ratio": 5.720389082773433
+        },
+        "merge": {
+          "bison_ms": 11.800057333333333,
+          "pandas_ms": 1.9113586666653266,
+          "ratio": 6.173648901762868
+        },
+        "fillna": {
+          "bison_ms": 0.13531558,
+          "pandas_ms": 0.06938914999992107,
+          "ratio": 1.9500970973149823
+        },
+        "series_apply": {
+          "bison_ms": 0.44719608,
+          "pandas_ms": 0.2155244799999423,
+          "ratio": 2.0749201204434864
+        },
+        "csv_roundtrip": {
+          "bison_ms": 523.2492618,
+          "pandas_ms": 330.8290903999989,
+          "ratio": 1.581630143731767
+        }
+      }
+    },
+    {
       "commit": "53ad20b752d3b3338e72e84bce77b968dd40cc4a",
       "short_commit": "53ad20b",
       "timestamp": "2026-04-03T13:15:53Z",
