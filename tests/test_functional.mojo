@@ -2,6 +2,7 @@
 from std.python import Python
 from std.testing import assert_true, TestSuite
 from bison import DataFrame, Series
+from _helpers import assert_frame_equal, assert_series_equal
 
 
 # ---------------------------------------------------------------------------
@@ -10,12 +11,11 @@ from bison import DataFrame, Series
 
 def test_df_abs() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [-1, -2, 3], 'b': [4.0, -5.0, -6.0]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.abs().to_pandas()
     var expected_pd = pd_df.abs()
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 # ---------------------------------------------------------------------------
@@ -79,12 +79,11 @@ def test_df_agg_unknown_raises() raises:
 
 def test_df_aggregate_delegates() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
     var agg_pd = df.agg("sum").to_pandas()
     var aggregate_pd = df.aggregate("sum").to_pandas()
-    testing.assert_series_equal(agg_pd, aggregate_pd)
+    assert_series_equal(agg_pd, aggregate_pd)
 
 
 # ---------------------------------------------------------------------------
@@ -124,12 +123,11 @@ def test_df_apply_axis1_not_implemented() raises:
 
 def test_df_transform_abs() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [-1, -2, 3], 'b': [4.0, -5.0, -6.0]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.transform("abs").to_pandas()
     var expected_pd = pd_df.abs()
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 def test_df_transform_unknown_raises() raises:
@@ -146,42 +144,38 @@ def test_df_transform_unknown_raises() raises:
 
 def test_df_transform_cumsum() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.transform("cumsum").to_pandas()
     var expected_pd = pd_df.transform("cumsum")
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 def test_df_transform_cumprod() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 5, 6]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.transform("cumprod").to_pandas()
     var expected_pd = pd_df.transform("cumprod")
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 def test_df_transform_cummin() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [3, 1, 2], 'b': [6, 4, 5]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.transform("cummin").to_pandas()
     var expected_pd = pd_df.transform("cummin")
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 def test_df_transform_cummax() raises:
     var pd = Python.import_module("pandas")
-    var testing = Python.import_module("pandas.testing")
     var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 3, 2], 'b': [4, 6, 5]}"))
     var df = DataFrame(pd_df)
     var result_pd = df.transform("cummax").to_pandas()
     var expected_pd = pd_df.transform("cummax")
-    testing.assert_frame_equal(result_pd, expected_pd)
+    assert_frame_equal(result_pd, expected_pd)
 
 
 # ---------------------------------------------------------------------------
