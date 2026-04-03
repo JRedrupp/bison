@@ -3126,9 +3126,56 @@ struct DataFrame(Copyable, Movable):
         positive *periods* lags rows (first *periods* rows become null);
         negative *periods* leads rows (last *|periods|* rows become null).
         String and object columns are supported in addition to numeric.
-        ``axis=1`` is not yet implemented.
+
+        For ``axis=1``, values are shifted across columns within each row:
+        positive *periods* shifts values to the right (first *periods* columns
+        become null); negative *periods* shifts values to the left (last
+        *|periods|* columns become null).  All columns must be numeric.
         """
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_cols = List[Column]()
+            for j in range(ncols):
+                var src_j = j - periods
+                var values = List[Float64]()
+                var null_mask = List[Bool]()
+                var has_null = False
+                if src_j < 0 or src_j >= ncols:
+                    for _ in range(nrows):
+                        values.append(nan)
+                        null_mask.append(True)
+                    has_null = True
+                else:
+                    ref src_col = self._cols[src_j]
+                    if not (
+                        src_col.dtype.is_integer() or src_col.dtype.is_float()
+                    ):
+                        raise Error(
+                            "DataFrame.shift(axis=1) requires numeric columns"
+                        )
+                    var has_src_mask = len(src_col._null_mask) > 0
+                    for i in range(nrows):
+                        var is_null = has_src_mask and src_col._null_mask[i]
+                        if is_null:
+                            values.append(nan)
+                            null_mask.append(True)
+                            has_null = True
+                        elif src_col.dtype.is_integer():
+                            values.append(Float64(src_col._int64_data()[i]))
+                            null_mask.append(False)
+                        else:
+                            values.append(src_col._float64_data()[i])
+                            null_mask.append(False)
+                var col_data = ColumnData(values^)
+                var dtype = Column._sniff_dtype(col_data)
+                var col = Column(self._cols[j].name, col_data^, dtype)
+                if has_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.shift")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -3138,11 +3185,74 @@ struct DataFrame(Copyable, Movable):
     def diff(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
         """Return element-wise first discrete difference along the rows.
 
-        ``result[i] = self[i] - self[i - periods]`` for each numeric column.
-        Exposed positions are null.  Non-numeric columns raise.
-        ``axis=1`` is not yet implemented.
+        For ``axis=0`` (default), ``result[i] = self[i] - self[i - periods]``
+        for each numeric column.  Exposed positions are null.
+        Non-numeric columns raise.
+
+        For ``axis=1``, ``result[row][j] = self[row][j] - self[row][j - periods]``
+        shifting the differencing across columns within each row.  Exposed
+        column positions are null.  All columns must be numeric.
         """
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_cols = List[Column]()
+            for j in range(ncols):
+                var src_j = j - periods
+                var values = List[Float64]()
+                var null_mask = List[Bool]()
+                var has_null = False
+                if src_j < 0 or src_j >= ncols:
+                    for _ in range(nrows):
+                        values.append(nan)
+                        null_mask.append(True)
+                    has_null = True
+                else:
+                    ref cur_col = self._cols[j]
+                    ref src_col = self._cols[src_j]
+                    if not (
+                        cur_col.dtype.is_integer() or cur_col.dtype.is_float()
+                    ):
+                        raise Error(
+                            "DataFrame.diff(axis=1) requires numeric columns"
+                        )
+                    if not (
+                        src_col.dtype.is_integer() or src_col.dtype.is_float()
+                    ):
+                        raise Error(
+                            "DataFrame.diff(axis=1) requires numeric columns"
+                        )
+                    var has_cur_mask = len(cur_col._null_mask) > 0
+                    var has_src_mask = len(src_col._null_mask) > 0
+                    for i in range(nrows):
+                        var cur_null = has_cur_mask and cur_col._null_mask[i]
+                        var src_null = has_src_mask and src_col._null_mask[i]
+                        if cur_null or src_null:
+                            values.append(nan)
+                            null_mask.append(True)
+                            has_null = True
+                        else:
+                            var cur_val: Float64
+                            if cur_col.dtype.is_integer():
+                                cur_val = Float64(cur_col._int64_data()[i])
+                            else:
+                                cur_val = cur_col._float64_data()[i]
+                            var src_val: Float64
+                            if src_col.dtype.is_integer():
+                                src_val = Float64(src_col._int64_data()[i])
+                            else:
+                                src_val = src_col._float64_data()[i]
+                            values.append(cur_val - src_val)
+                            null_mask.append(False)
+                var col_data = ColumnData(values^)
+                var dtype = Column._sniff_dtype(col_data)
+                var col = Column(self._cols[j].name, col_data^, dtype)
+                if has_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.diff")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
@@ -3152,11 +3262,77 @@ struct DataFrame(Copyable, Movable):
     def pct_change(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
         """Return element-wise percentage change along the rows.
 
+        For ``axis=0`` (default),
         ``result[i] = (self[i] - self[i - periods]) / self[i - periods]``
         for each numeric column.  Exposed positions are null.
-        ``axis=1`` is not yet implemented.
+
+        For ``axis=1``,
+        ``result[row][j] = (self[row][j] - self[row][j - periods]) / self[row][j - periods]``
+        shifting the computation across columns within each row.  Exposed
+        column positions are null.  All columns must be numeric.
         """
-        if axis != 0:
+        if axis == 1:
+            var nrows = self.shape()[0]
+            var ncols = len(self._cols)
+            var nan = Float64(0) / Float64(0)
+            var result_cols = List[Column]()
+            for j in range(ncols):
+                var src_j = j - periods
+                var values = List[Float64]()
+                var null_mask = List[Bool]()
+                var has_null = False
+                if src_j < 0 or src_j >= ncols:
+                    for _ in range(nrows):
+                        values.append(nan)
+                        null_mask.append(True)
+                    has_null = True
+                else:
+                    ref cur_col = self._cols[j]
+                    ref src_col = self._cols[src_j]
+                    if not (
+                        cur_col.dtype.is_integer() or cur_col.dtype.is_float()
+                    ):
+                        raise Error(
+                            "DataFrame.pct_change(axis=1) requires numeric"
+                            " columns"
+                        )
+                    if not (
+                        src_col.dtype.is_integer() or src_col.dtype.is_float()
+                    ):
+                        raise Error(
+                            "DataFrame.pct_change(axis=1) requires numeric"
+                            " columns"
+                        )
+                    var has_cur_mask = len(cur_col._null_mask) > 0
+                    var has_src_mask = len(src_col._null_mask) > 0
+                    for i in range(nrows):
+                        var cur_null = has_cur_mask and cur_col._null_mask[i]
+                        var src_null = has_src_mask and src_col._null_mask[i]
+                        if cur_null or src_null:
+                            values.append(nan)
+                            null_mask.append(True)
+                            has_null = True
+                        else:
+                            var cur_val: Float64
+                            if cur_col.dtype.is_integer():
+                                cur_val = Float64(cur_col._int64_data()[i])
+                            else:
+                                cur_val = cur_col._float64_data()[i]
+                            var src_val: Float64
+                            if src_col.dtype.is_integer():
+                                src_val = Float64(src_col._int64_data()[i])
+                            else:
+                                src_val = src_col._float64_data()[i]
+                            values.append((cur_val - src_val) / src_val)
+                            null_mask.append(False)
+                var col_data = ColumnData(values^)
+                var dtype = Column._sniff_dtype(col_data)
+                var col = Column(self._cols[j].name, col_data^, dtype)
+                if has_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+            return DataFrame(result_cols^)
+        elif axis != 0:
             _not_implemented("DataFrame.pct_change")
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
