@@ -239,6 +239,42 @@ Use names from the refactoring.guru catalogs:
 
 `SESSION.md` is for Claude's working notes only — it is gitignored and must never be committed.
 
+## Mojo language gotchas
+
+### `mut self` for mutating struct methods
+
+Any `def` method that writes to a struct field must declare `mut self` explicitly.
+Read-only methods omit the annotation entirely.
+
+```mojo
+struct Counter:
+    var count: Int
+
+    # Mutating — must have mut self
+    def increment(mut self):
+        self.count += 1
+
+    # Read-only — no annotation needed
+    def value(self) -> Int:
+        return self.count
+```
+
+Without `mut self`, Mojo silently copies `self` instead of mutating it in-place, so
+field updates are lost and callers see no change. This affects every stateful struct
+(e.g. any struct that accumulates state across method calls).
+
+### Import aliases for stdlib names that shadow parameters
+
+When importing a stdlib function whose name collides with a common parameter name
+(`sort`, `min`, `max`, `sum`, `len`, `print`), alias the import to a leading-underscore
+name and call the alias:
+
+```mojo
+from algorithm import sort as _sort_list
+
+_sort_list(my_list)   # NOT sort(my_list) — would shadow the built-in
+```
+
 ## Constraints
 
 - `.CLAUDE` and `.claude/` are in `.gitignore` — never commit them.
@@ -248,4 +284,3 @@ Use names from the refactoring.guru catalogs:
 - Do not add `pixi.lock` to `.gitignore` — commit it for reproducibility.
 - `docs/data.json` and `results/` are gitignored — generated at runtime.
 - The zero-warnings policy is enforced by CI; `pixi run check` must pass before opening a PR.
-- When importing stdlib helpers that may collide with parameter names (`sort`, `min`, `max`, `sum`, `len`, `print`), alias the import to a leading-underscore name (for example `sort as _sort_list`) and call the alias.
