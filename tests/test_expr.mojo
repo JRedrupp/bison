@@ -496,5 +496,49 @@ def test_eval_all_numeric_ops() raises:
     assert_true(ne._col._data[List[Bool]][2])
 
 
+def test_eval_column_vs_column() raises:
+    """Column-vs-column comparisons use Series overloads without touching _col."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [1, 5, 3], 'b': [2, 4, 3]}"))
+    )
+    # a < b  → [T, F, F]
+    var lt = eval_expr(parse("a < b"), df)
+    ref lt_d = lt._col._data[List[Bool]]
+    assert_true(lt_d[0])
+    assert_true(not lt_d[1])
+    assert_true(not lt_d[2])
+    # a > b  → [F, T, F]
+    var gt = eval_expr(parse("a > b"), df)
+    ref gt_d = gt._col._data[List[Bool]]
+    assert_true(not gt_d[0])
+    assert_true(gt_d[1])
+    assert_true(not gt_d[2])
+    # a == b → [F, F, T]
+    var eq = eval_expr(parse("a == b"), df)
+    ref eq_d = eq._col._data[List[Bool]]
+    assert_true(not eq_d[0])
+    assert_true(not eq_d[1])
+    assert_true(eq_d[2])
+    # a != b → [T, T, F]
+    var ne = eval_expr(parse("a != b"), df)
+    ref ne_d = ne._col._data[List[Bool]]
+    assert_true(ne_d[0])
+    assert_true(ne_d[1])
+    assert_true(not ne_d[2])
+    # a <= b → [T, F, T]
+    var le = eval_expr(parse("a <= b"), df)
+    ref le_d = le._col._data[List[Bool]]
+    assert_true(le_d[0])
+    assert_true(not le_d[1])
+    assert_true(le_d[2])
+    # a >= b → [F, T, T]
+    var ge = eval_expr(parse("a >= b"), df)
+    ref ge_d = ge._col._data[List[Bool]]
+    assert_true(not ge_d[0])
+    assert_true(ge_d[1])
+    assert_true(ge_d[2])
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

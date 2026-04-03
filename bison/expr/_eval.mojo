@@ -114,17 +114,17 @@ def _eval_compare(
         var left_col = _resolve_ident(lhs.value, df)
         var right_col = _resolve_ident(rhs.value, df)
         if op == "<":
-            return Series(left_col._col._cmp_lt(right_col._col))
+            return left_col.__lt__(right_col)
         elif op == "<=":
-            return Series(left_col._col._cmp_le(right_col._col))
+            return left_col.__le__(right_col)
         elif op == ">":
-            return Series(left_col._col._cmp_gt(right_col._col))
+            return left_col.__gt__(right_col)
         elif op == ">=":
-            return Series(left_col._col._cmp_ge(right_col._col))
+            return left_col.__ge__(right_col)
         elif op == "==":
-            return Series(left_col._col._cmp_eq(right_col._col))
+            return left_col.__eq__(right_col)
         elif op == "!=":
-            return Series(left_col._col._cmp_ne(right_col._col))
+            return left_col.__ne__(right_col)
         else:
             raise Error("evaluator: unknown operator '" + op + "'")
 
