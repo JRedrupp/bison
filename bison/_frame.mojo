@@ -34,7 +34,7 @@ from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 
 
-struct Series(Copyable, Movable):
+struct Series(Copyable, ImplicitlyCopyable, Movable):
     """A one-dimensional labeled array, mirroring the pandas Series API."""
 
     var _col: Column
@@ -2220,7 +2220,7 @@ struct DataFrame(Copyable, Movable):
             if self._cols[i].name == key:
                 return Series(self._cols[i].copy())
         if default:
-            return Optional[Series](default.value().copy())
+            return default
         return None
 
     def head(self, n: Int = 5) -> DataFrame:

@@ -3682,7 +3682,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = ColumnIndex(result^)
 
 
-struct Column(Copyable, Movable, Sized):
+struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
     Data is stored as a ``ColumnData`` Variant — one typed list per column,
