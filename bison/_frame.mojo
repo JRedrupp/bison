@@ -6255,6 +6255,41 @@ def _groupby_indices(
                 _sort_list(group_keys)
 
 
+def _label_groupby_indices(
+    by: List[String],
+    by_null_mask: List[Bool],
+    sort_keys: Bool,
+    dropna: Bool,
+    mut group_map: Dict[String, List[Int]],
+    mut group_keys: List[String],
+) raises:
+    """Build key→row-index mapping for label-based Series.groupby.
+
+    Mirrors DataFrame groupby index construction semantics for dropna/sort,
+    including explicit handling for externally supplied null-label masks.
+    """
+    var has_null_mask = len(by_null_mask) > 0
+    for i in range(len(by)):
+        if has_null_mask and by_null_mask[i]:
+            if dropna:
+                continue
+            var null_key = String("")
+            if null_key not in group_map:
+                group_keys.append(null_key)
+                group_map[null_key] = List[Int]()
+            group_map[null_key].append(i)
+            continue
+
+        var k = by[i]
+        if k not in group_map:
+            group_keys.append(k)
+            group_map[k] = List[Int]()
+        group_map[k].append(i)
+
+    if sort_keys:
+        _sort_list(group_keys)
+
+
 struct DataFrameGroupBy:
     """GroupBy object returned by DataFrame.groupby().
 
@@ -6905,25 +6940,14 @@ struct SeriesGroupBy:
         self._dropna = dropna
         self._group_map = Dict[String, List[Int]]()
         self._group_keys = List[String]()
-        var has_null_mask = len(by_null_mask) > 0
-        for i in range(len(by)):
-            if has_null_mask and by_null_mask[i]:
-                # Null label: skip when dropna=True; include as "" group when dropna=False.
-                if dropna:
-                    continue
-                var null_key = String("")
-                if null_key not in self._group_map:
-                    self._group_keys.append(null_key)
-                    self._group_map[null_key] = List[Int]()
-                self._group_map[null_key].append(i)
-                continue
-            var k = by[i]
-            if k not in self._group_map:
-                self._group_keys.append(k)
-                self._group_map[k] = List[Int]()
-            self._group_map[k].append(i)
-        if sort:
-            _sort_list(self._group_keys)
+        _label_groupby_indices(
+            by,
+            by_null_mask,
+            sort,
+            dropna,
+            self._group_map,
+            self._group_keys,
+        )
 
     def _pd_groupby(self) raises -> PythonObject:
         """Return the pandas GroupBy object for this group configuration."""
