@@ -188,8 +188,7 @@ fn main() raises:
         )
 
     # ------------------------------------------------------------------
-    # query_filter  (boolean-mask equivalent; uses df.query since
-    #               df[bool_series] is not yet supported natively)
+    # query_filter  (native parse+eval+mask pipeline via df.query)
     # ------------------------------------------------------------------
     skipped = False
     try:
