@@ -58,18 +58,22 @@ def test_df_shift_negative() raises:
     assert_true(r["a"].isna().iloc(2)[Bool])
 
 
-def test_df_shift_axis1_raises() raises:
+def test_df_shift_axis1() raises:
+    """Shift(axis=1) with periods=1: first column null, rest shift right."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(
-        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0], 'c': [5.0, 6.0]}"))
     )
-    var raised = False
-    try:
-        _ = df.shift(1, axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.shift(axis=1) should have raised")
+    var r = df.shift(1, axis=1)
+    # Column 'a' (j=0, src=-1) is all null
+    assert_true(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].isna().iloc(1)[Bool])
+    # Column 'b' (j=1, src=0) gets column 'a' values
+    assert_true(r["b"].iloc(0)[Float64] == 1.0)
+    assert_true(r["b"].iloc(1)[Float64] == 2.0)
+    # Column 'c' (j=2, src=1) gets column 'b' values
+    assert_true(r["c"].iloc(0)[Float64] == 3.0)
+    assert_true(r["c"].iloc(1)[Float64] == 4.0)
 
 
 # ---------------------------------------------------------------------------
@@ -112,18 +116,22 @@ def test_df_diff_periods_2() raises:
     assert_true(r["a"].iloc(3)[Float64] == 5.0)
 
 
-def test_df_diff_axis1_raises() raises:
+def test_df_diff_axis1() raises:
+    """Diff(axis=1) with periods=1: first column null, rest = col[j] - col[j-1]."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(
-        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 5.0], 'c': [6.0, 9.0]}"))
     )
-    var raised = False
-    try:
-        _ = df.diff(1, axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.diff(axis=1) should have raised")
+    var r = df.diff(1, axis=1)
+    # Column 'a' (j=0, no source) is all null
+    assert_true(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].isna().iloc(1)[Bool])
+    # Column 'b' (j=1) = b - a
+    assert_true(r["b"].iloc(0)[Float64] == 2.0)
+    assert_true(r["b"].iloc(1)[Float64] == 3.0)
+    # Column 'c' (j=2) = c - b
+    assert_true(r["c"].iloc(0)[Float64] == 3.0)
+    assert_true(r["c"].iloc(1)[Float64] == 4.0)
 
 
 # ---------------------------------------------------------------------------
@@ -166,18 +174,22 @@ def test_df_pct_change_periods_2() raises:
     assert_true(r["a"].iloc(3)[Float64] == 2.0)
 
 
-def test_df_pct_change_axis1_raises() raises:
+def test_df_pct_change_axis1() raises:
+    """Pct_change(axis=1) with periods=1: first column null, rest = (cur-prev)/prev."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(
-        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [3.0, 4.0]}"))
+        pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0], 'b': [2.0, 6.0], 'c': [4.0, 9.0]}"))
     )
-    var raised = False
-    try:
-        _ = df.pct_change(1, axis=1)
-    except:
-        raised = True
-    if not raised:
-        raise Error("DataFrame.pct_change(axis=1) should have raised")
+    var r = df.pct_change(1, axis=1)
+    # Column 'a' (j=0, no source) is all null
+    assert_true(r["a"].isna().iloc(0)[Bool])
+    assert_true(r["a"].isna().iloc(1)[Bool])
+    # Column 'b' (j=1) = (b - a) / a
+    assert_true(r["b"].iloc(0)[Float64] == 1.0)
+    assert_true(r["b"].iloc(1)[Float64] == 2.0)
+    # Column 'c' (j=2) = (c - b) / b
+    assert_true(r["c"].iloc(0)[Float64] == 1.0)
+    assert_true(r["c"].iloc(1)[Float64] == 0.5)
 
 
 def main() raises:
