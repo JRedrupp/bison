@@ -36,4 +36,9 @@ from ._ast import (
     NK_OR,
 )
 from ._parser import parse
-from ._eval import eval_expr
+from ._eval import (
+    eval_expr,
+    ExprEvaluator,
+    ASTNodeVisitorRaises,
+    visit_ast_node_raises,
+)

@@ -29,7 +29,7 @@ from ..dataframe import DataFrame
 # ------------------------------------------------------------------
 
 
-def _resolve_ident(name: String, df: DataFrame) raises -> Series:
+fn _resolve_ident(name: String, df: DataFrame) raises -> Series:
     """Return the column *name* from *df*, or raise a clear evaluator error."""
     try:
         return df[name]
@@ -37,7 +37,7 @@ def _resolve_ident(name: String, df: DataFrame) raises -> Series:
         raise Error("evaluator: unknown identifier '" + name + "'")
 
 
-def _flip_op(op: String) raises -> String:
+fn _flip_op(op: String) raises -> String:
     """Flip a comparison operator for 'literal op identifier' → 'identifier flipped_op literal'.
     """
     if op == "<":
@@ -56,7 +56,7 @@ def _flip_op(op: String) raises -> String:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
-def _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
+fn _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
     """Apply a numeric comparison operator to *col* against scalar *val*."""
     if op == "<":
         return col.__lt__(val)
@@ -74,7 +74,7 @@ def _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
-def _apply_string_op(col: Series, op: String, val: String) raises -> Series:
+fn _apply_string_op(col: Series, op: String, val: String) raises -> Series:
     """Apply a string equality/inequality operator to *col* against scalar *val*.
     """
     if op == "==":
@@ -89,18 +89,22 @@ def _apply_string_op(col: Series, op: String, val: String) raises -> Series:
         )
 
 
-def _parse_numeric_literal(node: ASTNode) raises -> Float64:
+fn _parse_numeric_literal(node: ASTNode) raises -> Float64:
     """Convert an NK_INT or NK_FLOAT node value to Float64."""
     return atof(node.value)
 
 
-def _eval_compare(
-    node: ASTNode, parsed: ParsedExpr, df: DataFrame
+fn _eval_compare(
+    node: ASTNode, lhs: ASTNode, rhs: ASTNode, df: DataFrame
 ) raises -> Series:
-    """Evaluate a single NK_COMPARE node into a boolean Series mask."""
+    """Evaluate a single NK_COMPARE node into a boolean Series mask.
+
+    *lhs* and *rhs* are the already-resolved child nodes (left and right
+    operands of the comparison).
+    """
+    # For NK_COMPARE nodes, node.value holds the operator string
+    # ("<", "<=", ">", ">=", "==", "!=") as set by the parser.
     var op = node.value
-    var lhs = parsed.node_at(node.left)
-    var rhs = parsed.node_at(node.right)
 
     var lhs_is_ident = lhs.kind == NK_IDENT
     var rhs_is_ident = rhs.kind == NK_IDENT
@@ -154,26 +158,127 @@ def _eval_compare(
         )
 
 
-def _eval_node(idx: Int, parsed: ParsedExpr, df: DataFrame) raises -> Series:
-    """Recursively evaluate the node at arena index *idx*."""
-    var node = parsed.node_at(idx)
+# ------------------------------------------------------------------
+# Visitor — single canonical dispatch site for ASTNode kind
+# ------------------------------------------------------------------
+
+
+trait ASTNodeVisitorRaises:
+    """Visitor over the expression-node kind set of an ``ASTNode`` arena.
+
+    Implement one ``on_*`` method per expression node kind.  Pass an
+    instance to ``visit_ast_node_raises``, which contains the **only**
+    kind-dispatch chain in the codebase for expression nodes; all
+    evaluation logic should delegate here instead of writing its own
+    ``node.kind == NK_*`` checks.
+
+    Each ``on_*`` method receives the current ``node``, the full
+    ``ParsedExpr`` arena (for child-node look-ups), and the ``DataFrame``
+    (for identifier resolution) as borrowed context parameters, so no data
+    needs to be copied into the visitor struct.  Leaf node kinds
+    (``NK_IDENT``, ``NK_INT``, ``NK_FLOAT``, ``NK_BOOL``, ``NK_NULL``,
+    ``NK_STRING``) are resolved inside ``on_compare`` and do not require
+    their own visitor methods.
+    """
+
+    def on_compare(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        ...
+
+    def on_not(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        ...
+
+    def on_and(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        ...
+
+    def on_or(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        ...
+
+
+def visit_ast_node_raises[
+    V: ASTNodeVisitorRaises
+](mut visitor: V, node: ASTNode, parsed: ParsedExpr, df: DataFrame) raises:
+    """Dispatch *visitor* to the correct ``on_*`` method based on ``node.kind``.
+
+    This is the **only** place in the codebase that reads the ``ASTNode``
+    kind discriminant for expression nodes.  Add new expression node kinds
+    here *and* in ``ASTNodeVisitorRaises``; every evaluation site is then
+    updated automatically because it delegates here.
+
+    *parsed* and *df* are passed through to each ``on_*`` method as borrowed
+    context, so no copies of the arena or the ``DataFrame`` are made.
+    """
     if node.kind == NK_COMPARE:
-        return _eval_compare(node, parsed, df)
-    elif node.kind == NK_AND:
-        var left_mask = _eval_node(node.left, parsed, df)
-        var right_mask = _eval_node(node.right, parsed, df)
-        return left_mask.__and__(right_mask)
-    elif node.kind == NK_OR:
-        var left_mask = _eval_node(node.left, parsed, df)
-        var right_mask = _eval_node(node.right, parsed, df)
-        return left_mask.__or__(right_mask)
+        visitor.on_compare(node, parsed, df)
     elif node.kind == NK_NOT:
-        var operand = _eval_node(node.left, parsed, df)
-        return operand.__invert__()
+        visitor.on_not(node, parsed, df)
+    elif node.kind == NK_AND:
+        visitor.on_and(node, parsed, df)
+    elif node.kind == NK_OR:
+        visitor.on_or(node, parsed, df)
     else:
         raise Error(
             "evaluator: unsupported expression kind " + String(node.kind)
         )
+
+
+# ------------------------------------------------------------------
+# ExprEvaluator — visitor that walks the AST and builds a boolean mask
+# ------------------------------------------------------------------
+
+
+struct ExprEvaluator(ASTNodeVisitorRaises, Movable):
+    """Visitor that evaluates an expression AST into a boolean ``Series`` mask.
+
+    After a successful call to ``visit_ast_node_raises``, the resulting
+    boolean mask is in ``result``.  The ``ParsedExpr`` arena and
+    ``DataFrame`` are passed as borrowed context through ``visit_ast_node_raises``
+    and the ``on_*`` methods; no copies of either are made.
+    """
+
+    var result: Series
+
+    def __init__(out self):
+        self.result = Series()
+
+    def __init__(out self, *, deinit take: Self):
+        self.result = take.result^
+
+    def on_compare(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        var lhs = parsed.node_at(node.left)
+        var rhs = parsed.node_at(node.right)
+        self.result = _eval_compare(node, lhs, rhs, df)
+
+    def on_not(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        visit_ast_node_raises(self, parsed.node_at(node.left), parsed, df)
+        self.result = self.result.__invert__()
+
+    def on_and(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        visit_ast_node_raises(self, parsed.node_at(node.left), parsed, df)
+        var left_result = self.result
+        visit_ast_node_raises(self, parsed.node_at(node.right), parsed, df)
+        self.result = left_result.__and__(self.result)
+
+    def on_or(
+        mut self, node: ASTNode, parsed: ParsedExpr, df: DataFrame
+    ) raises:
+        visit_ast_node_raises(self, parsed.node_at(node.left), parsed, df)
+        var left_result = self.result
+        visit_ast_node_raises(self, parsed.node_at(node.right), parsed, df)
+        self.result = left_result.__or__(self.result)
 
 
 # ------------------------------------------------------------------
@@ -188,4 +293,6 @@ def eval_expr(parsed: ParsedExpr, df: DataFrame) raises -> Series:
     (``NK_AND``, ``NK_OR``, ``NK_NOT``) with Kleene null semantics.
     Parenthetical groupings and precedence are handled by the parser.
     """
-    return _eval_node(parsed.root, parsed, df)
+    var evaluator = ExprEvaluator()
+    visit_ast_node_raises(evaluator, parsed.node_at(parsed.root), parsed, df)
+    return evaluator.result
