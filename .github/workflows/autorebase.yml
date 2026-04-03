@@ -37,3 +37,9 @@ jobs:
         run: autorebase --onto main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push rebased branches
+        run: |
+          git for-each-ref --format='%(refname:short)' refs/heads/ | grep -v '^main$' | while read branch; do
+            git push origin "$branch" --force-with-lease && echo "Pushed $branch" || echo "Skipped $branch (push rejected)"
+          done
