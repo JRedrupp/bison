@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Count stub methods per category and update the compatibility table in README.md.
+Count fully stubbed methods per category and update the compatibility table in README.md.
 
-Stubs are detected by _not_implemented() calls in bison/**/*.mojo.
-Each call is expected on a line of the form:
-    _not_implemented("Category.method_name")
+Stubs are detected by scanning bison/**/*.mojo for API bodies whose first
+executable statement is _not_implemented("Category.method_name").
 
 The table in README.md is rewritten between the sentinel comments:
     <!-- COMPAT_TABLE_START -->
@@ -93,6 +92,21 @@ STRUCT_PATTERN = re.compile(r"^\s*struct\s+([A-Za-z_][A-Za-z0-9_]*)\b")
 FN_PATTERN = re.compile(r"^\s*(?:fn|def)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _is_meaningful_statement(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("#"):
+        return False
+    if stripped in {'"""', "'''"}:
+        return False
+    return True
+
+
 def _category_for_key(key: str) -> str:
     # Longest prefix match wins (e.g. "Series.str" before "Series").
     for prefix in sorted(CATEGORY_MAP, key=len, reverse=True):
@@ -107,18 +121,65 @@ def _function_key(struct_name: str | None, fn_name: str) -> str | None:
     return TOP_LEVEL_KEY_MAP.get(fn_name)
 
 
-def collect_stubs() -> dict[str, int]:
-    """Return {category: stub_count} by scanning _not_implemented() calls."""
-    counts: dict[str, int] = {}
+def _iter_functions() -> list[tuple[str | None, str, list[str]]]:
+    functions: list[tuple[str | None, str, list[str]]] = []
 
     for mojo_file in BISON_DIR.rglob("*.mojo"):
+        current_struct: str | None = None
+        current_fn: tuple[str | None, str, int, list[str]] | None = None
+
         for line in mojo_file.read_text().splitlines():
-            m = NOT_IMPLEMENTED_PATTERN.search(line)
-            if not m:
+            stripped = line.lstrip()
+            line_indent = _indent(line)
+
+            if current_fn is not None:
+                _, _, fn_indent, fn_body = current_fn
+                if stripped and line_indent <= fn_indent:
+                    functions.append((current_fn[0], current_fn[1], fn_body))
+                    current_fn = None
+
+            if current_struct is not None and stripped and line == stripped:
+                current_struct = None
+
+            m_struct = STRUCT_PATTERN.match(line)
+            if m_struct:
+                current_struct = m_struct.group(1)
                 continue
-            key = m.group(1)
-            category = _category_for_key(key)
-            counts[category] = counts.get(category, 0) + 1
+
+            m_fn = FN_PATTERN.match(line)
+            if m_fn:
+                current_fn = (current_struct, m_fn.group(1), line_indent, [])
+                continue
+
+            if current_fn is not None:
+                current_fn[3].append(line)
+
+        if current_fn is not None:
+            functions.append((current_fn[0], current_fn[1], current_fn[3]))
+
+    return functions
+
+
+def _is_full_stub(function_key: str, body_lines: list[str]) -> bool:
+    for line in body_lines:
+        if not _is_meaningful_statement(line):
+            continue
+        match = NOT_IMPLEMENTED_PATTERN.search(line)
+        # Only count methods whose first executable statement is the stub marker.
+        return match is not None and match.group(1) == function_key
+    return False
+
+
+def collect_stubs() -> dict[str, int]:
+    """Return {category: stub_count} by counting fully stubbed API methods."""
+    counts: dict[str, int] = {}
+
+    for struct_name, fn_name, body_lines in _iter_functions():
+        key = _function_key(struct_name, fn_name)
+        if key is None or not _is_full_stub(key, body_lines):
+            continue
+        category = _category_for_key(key)
+        counts[category] = counts.get(category, 0) + 1
 
     return counts
 

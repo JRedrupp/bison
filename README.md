@@ -71,7 +71,7 @@ pixi run test
 ## pandas compatibility
 
 This table is generated automatically from the source by `scripts/update_compat.py`,
-which counts `_not_implemented()` calls in the bison package. Run it locally with:
+which counts fully stubbed APIs in the bison package. Run it locally with:
 
 ```bash
 python scripts/update_compat.py
@@ -82,7 +82,7 @@ In CI it runs after the test suite and the result is committed back to the branc
 <!-- COMPAT_TABLE_START -->
 | Category | Stubs | Implemented |
 |----------|-------|-------------|
-| DataFrame | 34 | 109 |
+| DataFrame | 5 | 138 |
 | Series | 0 | 106 |
 | GroupBy (DataFrame) | 0 | 24 |
 | GroupBy (Series) | 0 | 17 |
@@ -91,7 +91,7 @@ In CI it runs after the test suite and the result is committed back to the branc
 | Index | 0 | 14 |
 | IO | 0 | 8 |
 | Reshape | 0 | 2 |
-| **Total** | **34** | **321** |
+| **Total** | **5** | **350** |
 <!-- COMPAT_TABLE_END -->
 
 ## Known limitations
