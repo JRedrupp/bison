@@ -248,3 +248,4 @@ Use names from the refactoring.guru catalogs:
 - Do not add `pixi.lock` to `.gitignore` — commit it for reproducibility.
 - `docs/data.json` and `results/` are gitignored — generated at runtime.
 - The zero-warnings policy is enforced by CI; `pixi run check` must pass before opening a PR.
+- When importing stdlib helpers that may collide with parameter names (`sort`, `min`, `max`, `sum`, `len`, `print`), alias the import to a leading-underscore name (for example `sort as _sort_list`) and call the alias.
