@@ -85,9 +85,9 @@ def test_read_csv_bool_inference() raises:
     assert_equal(df.shape()[0], 3)
     assert_equal(df.shape()[1], 2)
     # 'flag' column should be inferred as bool_
-    var flag_col = df["flag"]._col
-    assert_true(flag_col.dtype == bool_)
-    ref data = flag_col._data[List[Bool]]
+    var col = df["flag"]._col
+    assert_true(col.dtype == bool_)
+    ref data = col._data[List[Bool]]
     assert_true(data[0])
     assert_true(not data[1])
     assert_true(data[2])

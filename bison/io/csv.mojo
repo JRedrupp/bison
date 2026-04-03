@@ -24,6 +24,11 @@ def _is_bool_value(s: String) -> Bool:
     return lower == "true" or lower == "false"
 
 
+def _parse_bool_value(s: String) -> Bool:
+    """Parse a bool CSV token — 'true' (case-insensitive) returns True."""
+    return s.lower() == "true"
+
+
 def _infer_and_build_column(
     name: String,
     raw: List[String],
@@ -60,7 +65,7 @@ def _infer_and_build_column(
                 null_mask.append(True)
                 has_null = True
             else:
-                data.append(raw[i].lower() == "true")
+                data.append(_parse_bool_value(raw[i]))
                 null_mask.append(False)
         var col_data = ColumnData(data^)
         var col = Column(name, col_data^, bool_)
