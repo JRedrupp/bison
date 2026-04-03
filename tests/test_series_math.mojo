@@ -547,6 +547,152 @@ def test_bool_ge() raises:
     assert_true(Bool(rp.iloc[3]) == True)
 
 
+# ------------------------------------------------------------------
+# Bool column logical operator tests (and/or/xor/invert) — issue #493
+# ------------------------------------------------------------------
+
+
+def test_bool_and() raises:
+    # [T,T,F,F] AND [T,F,T,F] == [T,F,F,F]
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var result = s1.and_(s2)
+    ref d = result._col._data[List[Bool]]
+    assert_true(d[0] == True)
+    assert_true(d[1] == False)
+    assert_true(d[2] == False)
+    assert_true(d[3] == False)
+    assert_true(len(result._col._null_mask) == 0)
+
+
+def test_bool_and_dunder() raises:
+    # __and__ delegates to and_
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[False, False]"), dtype="bool"))
+    var result = s1.__and__(s2)
+    ref d = result._col._data[List[Bool]]
+    assert_true(d[0] == False)
+    assert_true(d[1] == False)
+
+
+def test_bool_or() raises:
+    # [T,T,F,F] OR [T,F,T,F] == [T,T,T,F]
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var result = s1.or_(s2)
+    ref d = result._col._data[List[Bool]]
+    assert_true(d[0] == True)
+    assert_true(d[1] == True)
+    assert_true(d[2] == True)
+    assert_true(d[3] == False)
+    assert_true(len(result._col._null_mask) == 0)
+
+
+def test_bool_xor() raises:
+    # [T,T,F,F] XOR [T,F,T,F] == [F,T,T,F]
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var result = s1.xor(s2)
+    ref d = result._col._data[List[Bool]]
+    assert_true(d[0] == False)
+    assert_true(d[1] == True)
+    assert_true(d[2] == True)
+    assert_true(d[3] == False)
+    assert_true(len(result._col._null_mask) == 0)
+
+
+def test_bool_invert() raises:
+    # ~[T,F,T,F] == [F,T,F,T]
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
+    var result = s.invert()
+    ref d = result._col._data[List[Bool]]
+    assert_true(d[0] == False)
+    assert_true(d[1] == True)
+    assert_true(d[2] == False)
+    assert_true(d[3] == True)
+    assert_true(len(result._col._null_mask) == 0)
+
+
+def test_bool_and_kleene_nulls() raises:
+    # Kleene AND: False AND Null = False; True AND Null = Null; Null AND Null = Null
+    var pd = Python.import_module("pandas")
+    # s1 = [False, True,  Null]
+    # s2 = [Null,  Null,  Null]
+    var s1 = Series(pd.Series(Python.evaluate("[False, True, None]"), dtype="object").astype("boolean"))
+    var s2 = Series(pd.Series(Python.evaluate("[None, None, None]"), dtype="object").astype("boolean"))
+    var result = s1.and_(s2)
+    # False AND Null → False (non-null)
+    assert_true(len(result._col._null_mask) > 0)
+    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col._data[List[Bool]][0] == False)
+    # True AND Null → Null
+    assert_true(result._col._null_mask[1] == True)
+    # Null AND Null → Null
+    assert_true(result._col._null_mask[2] == True)
+
+
+def test_bool_or_kleene_nulls() raises:
+    # Kleene OR: True OR Null = True; False OR Null = Null; Null OR Null = Null
+    var pd = Python.import_module("pandas")
+    # s1 = [True, False, Null]
+    # s2 = [Null, Null,  Null]
+    var s1 = Series(pd.Series(Python.evaluate("[True, False, None]"), dtype="object").astype("boolean"))
+    var s2 = Series(pd.Series(Python.evaluate("[None, None, None]"), dtype="object").astype("boolean"))
+    var result = s1.or_(s2)
+    # True OR Null → True (non-null)
+    assert_true(len(result._col._null_mask) > 0)
+    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col._data[List[Bool]][0] == True)
+    # False OR Null → Null
+    assert_true(result._col._null_mask[1] == True)
+    # Null OR Null → Null
+    assert_true(result._col._null_mask[2] == True)
+
+
+def test_bool_invert_null() raises:
+    # ~Null == Null
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[True, None, False]"), dtype="object").astype("boolean"))
+    var result = s.invert()
+    assert_true(len(result._col._null_mask) > 0)
+    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col._data[List[Bool]][0] == False)
+    assert_true(result._col._null_mask[1] == True)
+    assert_true(result._col._null_mask[2] == False)
+    assert_true(result._col._data[List[Bool]][2] == True)
+
+
+def test_bool_and_mismatch() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[True, False]"), dtype="bool"))
+    var s2 = Series(pd.Series(Python.evaluate("[True, False, True]"), dtype="bool"))
+    var raised = False
+    try:
+        _ = s1.and_(s2)
+    except e:
+        raised = True
+        assert_true("length mismatch" in String(e))
+    assert_true(raised)
+
+
+def test_bool_non_bool_dtype() raises:
+    var pd = Python.import_module("pandas")
+    var s1 = Series(pd.Series(Python.evaluate("[1, 0, 1]")))
+    var s2 = Series(pd.Series(Python.evaluate("[1, 1, 0]")))
+    var raised = False
+    try:
+        _ = s1.and_(s2)
+    except e:
+        raised = True
+        assert_true("non-bool" in String(e))
+    assert_true(raised)
+
+
 def test_sem() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]")))

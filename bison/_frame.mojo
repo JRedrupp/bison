@@ -226,6 +226,48 @@ struct Series(Copyable, Movable):
     def ge(self, other: Series) raises -> Series:
         return Series(self._col._cmp_ge(other._col))
 
+    # ------------------------------------------------------------------
+    # Boolean logical
+    # ------------------------------------------------------------------
+
+    def and_(self, other: Series) raises -> Series:
+        """Element-wise logical AND with Kleene null semantics."""
+        return Series(self._col._bool_and(other._col))
+
+    def or_(self, other: Series) raises -> Series:
+        """Element-wise logical OR with Kleene null semantics."""
+        return Series(self._col._bool_or(other._col))
+
+    def xor(self, other: Series) raises -> Series:
+        """Element-wise logical XOR (null propagates if either operand is null).
+        """
+        return Series(self._col._bool_xor(other._col))
+
+    def invert(self) raises -> Series:
+        """Element-wise logical NOT.  Null elements remain null."""
+        return Series(self._col._bool_invert())
+
+    def __and__(self, other: Series) raises -> Series:
+        return self.and_(other)
+
+    def __or__(self, other: Series) raises -> Series:
+        return self.or_(other)
+
+    def __xor__(self, other: Series) raises -> Series:
+        return self.xor(other)
+
+    def __invert__(self) raises -> Series:
+        return self.invert()
+
+    def __rand__(self, other: Series) raises -> Series:
+        return other.and_(self)
+
+    def __ror__(self, other: Series) raises -> Series:
+        return other.or_(self)
+
+    def __rxor__(self, other: Series) raises -> Series:
+        return other.xor(self)
+
     def __gt__(self, other: Float64) raises -> Series:
         """Element-wise ``>`` against a scalar, returning a boolean Series."""
         return Series(self._col._cmp_scalar_gt(other))
