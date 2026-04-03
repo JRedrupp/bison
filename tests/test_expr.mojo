@@ -1,7 +1,10 @@
-"""Tests for bison.expr: tokenizer, AST, and parser."""
+"""Tests for bison.expr: tokenizer, AST, parser, and evaluator."""
+from std.python import Python
 from std.testing import assert_true, assert_equal, TestSuite
+from bison import DataFrame, Series
 from bison.expr import (
     parse,
+    eval_expr,
     ParsedExpr,
     ASTNode,
     Tokenizer,
@@ -368,6 +371,129 @@ def test_parser_empty_expr() raises:
     except e:
         raised = "invalid expression" in String(e)
     assert_true(raised)
+
+
+# ------------------------------------------------------------------
+# Evaluator tests
+# ------------------------------------------------------------------
+
+
+def test_eval_int_gt() raises:
+    """Evaluator with 'a > 2' against an int column produces the correct mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
+    var mask = eval_expr(parse("a > 2"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+    assert_true(d[3])
+
+
+def test_eval_float_ge() raises:
+    """Evaluator with 'y >= 3.5' against a float column produces the correct mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'y': [1.0, 2.5, 3.5, 4.0]}"))
+    )
+    var mask = eval_expr(parse("y >= 3.5"), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(not d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+    assert_true(d[3])
+
+
+def test_eval_string_eq() raises:
+    """Evaluator with 'name == \"alice\"' against a string column gives the right mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'name': ['alice', 'bob', 'alice', 'carol']}")
+        )
+    )
+    var mask = eval_expr(parse('name == "alice"'), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+    assert_true(not d[3])
+
+
+def test_eval_string_ne() raises:
+    """Evaluator with 'name != \"bob\"' gives the inverted-bob mask."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'name': ['alice', 'bob', 'alice', 'carol']}")
+        )
+    )
+    var mask = eval_expr(parse('name != "bob"'), df)
+    ref d = mask._col._data[List[Bool]]
+    assert_true(d[0])
+    assert_true(not d[1])
+    assert_true(d[2])
+    assert_true(d[3])
+
+
+def test_eval_unknown_ident() raises:
+    """Evaluator raises with 'unknown identifier' for a column not in the DataFrame."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
+    var raised = False
+    try:
+        _ = eval_expr(parse("unk > 1"), df)
+    except e:
+        raised = "unknown identifier" in String(e)
+    assert_true(raised)
+
+
+def test_eval_literal_left() raises:
+    """A literal on the left ('5 < a') gives the same mask as 'a > 5'."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 5, 10]}")))
+    var mask_normal = eval_expr(parse("a > 5"), df)
+    var mask_flipped = eval_expr(parse("5 < a"), df)
+    ref dn = mask_normal._col._data[List[Bool]]
+    ref df2 = mask_flipped._col._data[List[Bool]]
+    for i in range(3):
+        assert_equal(dn[i], df2[i])
+
+
+def test_eval_all_numeric_ops() raises:
+    """All six comparison operators produce correct boolean masks."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1, 2, 3]}")))
+    # x < 2  → [T, F, F]
+    var lt = eval_expr(parse("x < 2"), df)
+    assert_true(lt._col._data[List[Bool]][0])
+    assert_true(not lt._col._data[List[Bool]][1])
+    assert_true(not lt._col._data[List[Bool]][2])
+    # x <= 2 → [T, T, F]
+    var le = eval_expr(parse("x <= 2"), df)
+    assert_true(le._col._data[List[Bool]][0])
+    assert_true(le._col._data[List[Bool]][1])
+    assert_true(not le._col._data[List[Bool]][2])
+    # x > 2  → [F, F, T]
+    var gt = eval_expr(parse("x > 2"), df)
+    assert_true(not gt._col._data[List[Bool]][0])
+    assert_true(not gt._col._data[List[Bool]][1])
+    assert_true(gt._col._data[List[Bool]][2])
+    # x >= 2 → [F, T, T]
+    var ge = eval_expr(parse("x >= 2"), df)
+    assert_true(not ge._col._data[List[Bool]][0])
+    assert_true(ge._col._data[List[Bool]][1])
+    assert_true(ge._col._data[List[Bool]][2])
+    # x == 2 → [F, T, F]
+    var eq = eval_expr(parse("x == 2"), df)
+    assert_true(not eq._col._data[List[Bool]][0])
+    assert_true(eq._col._data[List[Bool]][1])
+    assert_true(not eq._col._data[List[Bool]][2])
+    # x != 2 → [T, F, T]
+    var ne = eval_expr(parse("x != 2"), df)
+    assert_true(ne._col._data[List[Bool]][0])
+    assert_true(not ne._col._data[List[Bool]][1])
+    assert_true(ne._col._data[List[Bool]][2])
 
 
 def main() raises:
