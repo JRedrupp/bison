@@ -2689,14 +2689,7 @@ struct DataFrame(Copyable, Movable):
                 if n == 0:
                     results.append(nan)
                     continue
-                # Insertion sort
-                for a in range(1, n):
-                    var key = vals[a]
-                    var b = a - 1
-                    while b >= 0 and vals[b] > key:
-                        vals[b + 1] = vals[b]
-                        b -= 1
-                    vals[b + 1] = key
+                _sort_list(vals)
                 var pos = q * Float64(n - 1)
                 var lo = Int(pos)
                 var hi = lo + 1
