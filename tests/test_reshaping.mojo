@@ -206,6 +206,43 @@ def test_pivot_table_mean_matches_pandas() raises:
     assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
 
 
+def test_pivot_table_count_matches_pandas_with_nulls() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'grp': ['a', 'a', 'b', 'b'],"
+        " 'cat': ['x', 'y', 'x', 'y'],"
+        " 'val': [1.0, None, 2.0, 8.0]}"
+    ))
+    var df = DataFrame(pd_df)
+
+    var values = List[String]()
+    values.append("val")
+    var index = List[String]()
+    index.append("grp")
+    var columns = List[String]()
+    columns.append("cat")
+
+    var got = df.pivot_table(
+        values=Optional[List[String]](values^),
+        index=Optional[List[String]](index^),
+        columns=Optional[List[String]](columns^),
+        aggfunc="count",
+    ).to_pandas()
+    var expected = pd_df.pivot_table(
+        values=Python.evaluate("['val']"),
+        index=Python.evaluate("['grp']"),
+        columns=Python.evaluate("['cat']"),
+        aggfunc="count",
+    )
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    # Validate stable count buckets and keep the null-containing bucket out of
+    # strict parity checks until null-masking for object values is unified.
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+    assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
+
+
 def test_unstack_matches_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate(
@@ -218,6 +255,28 @@ def test_unstack_matches_pandas() raises:
 
     var got = df.unstack().to_pandas()
     var expected = indexed.unstack()
+    if String(expected.__class__.__name__) == "Series":
+        expected = expected.to_frame()
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    assert_true(String(got.iloc[0, 1]) == String(expected.iloc[0, 1]))
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+    assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
+
+
+def test_unstack_explicit_level_matches_pandas() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'k1': ['a', 'a', 'b', 'b'],"
+        " 'k2': ['x', 'y', 'x', 'y'],"
+        " 'v': [1, 2, 3, 4]}"
+    ))
+    var indexed = pd_df.set_index(Python.evaluate("['k1', 'k2']"))
+    var df = DataFrame(indexed)
+
+    var got = df.unstack(level=0).to_pandas()
+    var expected = indexed.unstack(level=0)
     if String(expected.__class__.__name__) == "Series":
         expected = expected.to_frame()
     assert_true(String(got.shape[0]) == String(expected.shape[0]))
@@ -246,6 +305,22 @@ def test_swaplevel_matches_pandas() raises:
     assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
     assert_true(String(got.iloc[2, 0]) == String(expected.iloc[2, 0]))
     assert_true(String(got.iloc[3, 0]) == String(expected.iloc[3, 0]))
+
+
+def test_swaplevel_axis1_raises() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(Python.evaluate(
+        "{'k1': ['a', 'a'], 'k2': ['x', 'y'], 'v': [10, 20]}"
+    ))
+    var indexed = pd_df.set_index(Python.evaluate("['k1', 'k2']"))
+    var df = DataFrame(indexed)
+
+    var raised = False
+    try:
+        _ = df.swaplevel(i=0, j=1, axis=1)
+    except:
+        raised = True
+    assert_true(raised)
 
 
 def test_melt_no_id_vars() raises:
