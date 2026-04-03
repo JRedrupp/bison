@@ -5029,6 +5029,60 @@ struct DataFrame(Copyable, Movable):
 
         return DataFrame(result_cols^)
 
+    def unstack_to_series(self) raises -> Series:
+        """Pivot row labels to a new column dimension for a simple-index DataFrame.
+
+        Returns a ``Series`` whose index is a 2-level MultiIndex of
+        ``(column_name, row_label)`` tuples and whose values are the cell
+        values of this DataFrame in column-major order.  All values are
+        converted to Python objects so the result always uses ``object`` dtype.
+
+        This method provides the same result as ``pandas.DataFrame.unstack``
+        when the source DataFrame has a regular (non-MultiIndex) row index.
+        For DataFrames that already carry a MultiIndex, use
+        :meth:`unstack` instead, which returns a :class:`DataFrame`.
+        """
+        var ncols = len(self._cols)
+        if ncols == 0:
+            return Series()
+        var nrows = self.shape()[0]
+        var py = Python.import_module("builtins")
+        var py_none = Python.evaluate("None")
+
+        var val_data = List[PythonObject]()
+        var null_mask = List[Bool]()
+        var idx_objs = List[PythonObject]()
+        var any_null = False
+
+        for j in range(ncols):
+            ref col = self._cols[j]
+            var col_label = PythonObject(col.name.value())
+            for r in range(nrows):
+                var row_label: PythonObject
+                if self._has_index():
+                    row_label = PythonObject(self._cols[0]._index_label(r))
+                else:
+                    row_label = PythonObject(r)
+                var is_null = len(col._null_mask) > 0 and col._null_mask[r]
+                var tup_items = py.list()
+                _ = tup_items.append(col_label)
+                _ = tup_items.append(row_label)
+                idx_objs.append(py.tuple(tup_items))
+                if is_null:
+                    val_data.append(py_none)
+                    null_mask.append(True)
+                    any_null = True
+                else:
+                    null_mask.append(False)
+                    val_data.append(_frame_cell_as_python(col, r))
+
+        var result_col = Column(
+            "", ColumnData(val_data^), object_, ColumnIndex(idx_objs^)
+        )
+        if any_null:
+            result_col._null_mask = null_mask^
+        return Series(result_col^)
+
     def transpose(self) raises -> DataFrame:
         """Transpose rows and columns.
 
