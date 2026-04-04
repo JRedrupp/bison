@@ -4,12 +4,13 @@ version = "0.1.0"
 description = "A Mojo DataFrame library with a pandas-compatible API"
 license = "Apache-2.0"
 requires-pixi = ">=0.41.0"
-channels = ["conda-forge", "https://conda.modular.com/max"]
+channels = ["conda-forge", "https://conda.modular.com/max", "https://prefix.dev/pontoneer"]
 platforms = ["linux-64", "osx-arm64"]
 
 [dependencies]
 max = ">=26.2"
 mblack = ">=26.2"
+marrow = ">=0.0.6"
 
 [feature.dev.dependencies]
 pandas = ">=2.0"
@@ -20,10 +21,11 @@ python = ">=3.11"
 
 [tasks]
 gen-version   = "python scripts/gen_version.py"
-test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version"] }
+build-marrow  = "mojo package vendor/marrow/marrow -o .pixi/envs/default/lib/mojo/marrow.mojopkg"
+test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
 update-compat = "python scripts/update_compat.py"
 fmt           = "mojo format bison/"
-check         = "mojo package bison/ --Werror -o /tmp/bison.mojopkg"
+check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
 lint          = "pre-commit run --all-files"
 bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version"] }
 gen-report    = "python scripts/generate_report.py"
