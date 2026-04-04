@@ -34,5 +34,11 @@ from .indexing import LocIndexer, ILocIndexer, AtIndexer, IAtIndexer
 from .io import read_csv, read_parquet, read_json, read_excel
 from .reshape import concat
 from .expr import parse, ParsedExpr
+from .arrow import (
+    column_to_marrow_array,
+    marrow_array_to_column,
+    dataframe_to_record_batch,
+    record_batch_to_dataframe,
+)
 
 comptime __version__ = VERSION
