@@ -263,6 +263,34 @@ Without `mut self`, Mojo silently copies `self` instead of mutating it in-place,
 field updates are lost and callers see no change. This affects every stateful struct
 (e.g. any struct that accumulates state across method calls).
 
+### `ref` for non-copyable Variant arms
+
+Accessing a `Variant` arm whose inner type does not implement `ImplicitlyCopyable`
+(e.g. `List[T]`) must use a `ref` borrow, not a `var` assignment:
+
+```mojo
+# WRONG — compile error if List[T] is not ImplicitlyCopyable
+var src = col._data[List[Int64]]
+
+# CORRECT — zero-cost borrow tied to the Variant's lifetime
+ref src = col._data[List[Int64]]
+```
+
+### `rebind[T]` for structurally identical but nominally different types
+
+When two types are bit-for-bit identical but the type checker treats them as
+distinct (e.g. a third-party library's `Scalar[dtype.native]` vs the stdlib's
+`Int64`), use `rebind[T]` to assert the structural equivalence:
+
+```mojo
+data.append(rebind[Int64](src.unsafe_get(i)))  # Scalar[int64.native] → Int64
+```
+
+### `def main() raises:` in test files
+
+Test-file `main()` functions must declare `raises` if they call any raising
+function — omitting it is a **compile error**, not a warning.
+
 ### Import aliases for stdlib names that shadow parameters
 
 When importing a stdlib function whose name collides with a common parameter name
