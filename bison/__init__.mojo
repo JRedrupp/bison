@@ -39,6 +39,8 @@ from .arrow import (
     marrow_array_to_column,
     dataframe_to_record_batch,
     record_batch_to_dataframe,
+    dataframe_to_table,
+    table_to_dataframe,
 )
 
 comptime __version__ = VERSION

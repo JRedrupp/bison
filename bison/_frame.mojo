@@ -5742,18 +5742,30 @@ struct DataFrame(Copyable, Movable):
     ) raises:
         """Write the DataFrame to a Parquet file.
 
-        Uses pandas interop: converts to a pandas DataFrame then calls
-        ``pandas.DataFrame.to_parquet``.
+        Uses marrow's native Parquet writer (via the Arrow C Stream
+        Interface) for int64, float64, bool, and string columns.  Falls
+        back to pandas when the DataFrame contains unsupported column
+        types (e.g. object / datetime stored as PythonObject).
 
         Parameters
         ----------
         path        : Destination file path.
         engine      : Parquet library to use (``"auto"``, ``"pyarrow"``,
-                      ``"fastparquet"``).  Passed directly to pandas.
-        compression : Compression codec (default ``"snappy"``).
+                      ``"fastparquet"``).  Only used on the pandas
+                      fallback path.
+        compression : Compression codec (default ``"snappy"``).  Only
+                      used on the pandas fallback path.
         """
-        var pd_df = self.to_pandas()
-        pd_df.to_parquet(path, engine=engine, compression=compression)
+        from .arrow import dataframe_to_table
+        from marrow.parquet import write_table as _marrow_write_table
+
+        try:
+            var table = dataframe_to_table(self)
+            _marrow_write_table(table, path)
+        except:
+            # Fallback for object columns → pandas path.
+            var pd_df = self.to_pandas()
+            pd_df.to_parquet(path, engine=engine, compression=compression)
 
     def to_json(
         self, path_or_buf: String = "", orient: String = ""

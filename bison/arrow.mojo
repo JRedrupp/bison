@@ -10,6 +10,8 @@ Public API
 - marrow_array_to_column  — AnyArray → Column
 - dataframe_to_record_batch — DataFrame → RecordBatch
 - record_batch_to_dataframe — RecordBatch → DataFrame
+- dataframe_to_table       — DataFrame → Table
+- table_to_dataframe       — Table → DataFrame
 """
 from marrow.arrays import AnyArray, StringArray
 from marrow.builders import array, StringBuilder
@@ -22,7 +24,7 @@ from marrow.dtypes import (
     Field as _MarrowField,
 )
 from marrow.schema import Schema as _MarrowSchema
-from marrow.tabular import RecordBatch
+from marrow.tabular import RecordBatch, Table
 from .column import Column, ColumnData
 from .dataframe import DataFrame
 from .dtypes import int64, float64, bool_, object_
@@ -217,3 +219,28 @@ def record_batch_to_dataframe(rb: RecordBatch) raises -> DataFrame:
         var col_name = rb.schema.fields[i].name
         cols.append(marrow_array_to_column(rb.column(i).copy(), col_name))
     return DataFrame(cols^)
+
+
+def dataframe_to_table(df: DataFrame) raises -> Table:
+    """Convert a bison DataFrame to a marrow Table.
+
+    Wraps the result of dataframe_to_record_batch in a single-batch Table.
+    """
+    var rb = dataframe_to_record_batch(df)
+    var schema = rb.schema
+    var batches = List[RecordBatch]()
+    batches.append(rb^)
+    return Table.from_batches(schema, batches^)
+
+
+def table_to_dataframe(table: Table) raises -> DataFrame:
+    """Convert a marrow Table to a bison DataFrame.
+
+    Converts the Table to RecordBatches, then converts the first batch.
+    For multi-batch Tables (uncommon with Parquet), only the first batch
+    is used.
+    """
+    var batches = table.to_batches()
+    if len(batches) == 0:
+        return DataFrame()
+    return record_batch_to_dataframe(batches[0])

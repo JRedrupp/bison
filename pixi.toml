@@ -22,7 +22,6 @@ python = ">=3.11"
 gen-version   = "python scripts/gen_version.py"
 build-marrow  = "mojo package vendor/marrow/marrow -o .pixi/envs/default/lib/mojo/marrow.mojopkg"
 test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
-update-compat = "python scripts/update_compat.py"
 fmt           = "mojo format bison/"
 check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
 lint          = "pre-commit run --all-files"

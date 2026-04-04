@@ -11,7 +11,12 @@ from bison import (
     DictSplitResult,
     ToDictResult,
     Series,
+    Column,
+    ColumnData,
     bool_,
+    int64,
+    float64,
+    object_,
 )
 
 
@@ -173,22 +178,23 @@ def test_read_parquet_missing_file() raises:
 
 
 def test_parquet_roundtrip() raises:
-    """Write a DataFrame to Parquet and read it back (skipped when pyarrow is absent)."""
-    var pyarrow_available = False
-    try:
-        _ = Python.import_module("pyarrow")
-        pyarrow_available = True
-    except:
-        pass
-    if not pyarrow_available:
-        return
-
-    var pd = Python.import_module("pandas")
+    """Write a DataFrame with int64 and float64 columns to Parquet and read it back."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
-    var df = DataFrame(
-        pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4.0, 5.0, 6.0]}"))
-    )
+
+    var d_a = List[Int64]()
+    d_a.append(1)
+    d_a.append(2)
+    d_a.append(3)
+    var d_b = List[Float64]()
+    d_b.append(4.0)
+    d_b.append(5.0)
+    d_b.append(6.0)
+    var cols = List[Column]()
+    cols.append(Column("a", ColumnData(d_a^), int64))
+    cols.append(Column("b", ColumnData(d_b^), float64))
+    var df = DataFrame(cols^)
+
     df.to_parquet(path)
 
     var df2 = read_parquet(path)
@@ -197,6 +203,12 @@ def test_parquet_roundtrip() raises:
     assert_equal(shape[1], 2)
     assert_equal(df2.columns()[0], "a")
     assert_equal(df2.columns()[1], "b")
+
+    # Verify values round-tripped correctly.
+    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(1))
+    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(3))
+    assert_equal(df2._cols[1]._data[List[Float64]][0], Float64(4.0))
+    assert_equal(df2._cols[1]._data[List[Float64]][2], Float64(6.0))
 
 
 def test_read_json_records() raises:
@@ -372,23 +384,132 @@ def test_read_excel_sheet_name_string() raises:
 
 
 def test_to_parquet_writes_file() raises:
-    """Write a DataFrame to Parquet and verify the file exists (skipped when pyarrow is absent)."""
-    var pyarrow_available = False
-    try:
-        _ = Python.import_module("pyarrow")
-        pyarrow_available = True
-    except:
-        pass
-    if not pyarrow_available:
-        return
-
-    var pd = Python.import_module("pandas")
+    """Write a DataFrame to Parquet and verify the file exists."""
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
-    var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3.0, 4.0]}")))
+
+    var d_a = List[Int64]()
+    d_a.append(1)
+    d_a.append(2)
+    var d_b = List[Float64]()
+    d_b.append(3.0)
+    d_b.append(4.0)
+    var cols = List[Column]()
+    cols.append(Column("a", ColumnData(d_a^), int64))
+    cols.append(Column("b", ColumnData(d_b^), float64))
+    var df = DataFrame(cols^)
+
     df.to_parquet(path)
     var os = Python.import_module("os")
     assert_true(Bool(os.path.exists(path)))
+
+
+def test_parquet_roundtrip_bool_string() raises:
+    """Parquet round-trip for bool and string columns."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+
+    var d_flag = List[Bool]()
+    d_flag.append(True)
+    d_flag.append(False)
+    d_flag.append(True)
+    var d_name = List[String]()
+    d_name.append("alice")
+    d_name.append("bob")
+    d_name.append("carol")
+    var cols = List[Column]()
+    cols.append(Column("flag", ColumnData(d_flag^), bool_))
+    cols.append(Column("name", ColumnData(d_name^), object_))
+    var df = DataFrame(cols^)
+
+    df.to_parquet(path)
+    var df2 = read_parquet(path)
+
+    assert_equal(df2.shape()[0], 3)
+    assert_equal(df2.shape()[1], 2)
+    assert_equal(df2._cols[0]._data[List[Bool]][0], True)
+    assert_equal(df2._cols[0]._data[List[Bool]][1], False)
+    assert_equal(df2._cols[1]._data[List[String]][0], "alice")
+    assert_equal(df2._cols[1]._data[List[String]][2], "carol")
+
+
+def test_parquet_roundtrip_with_nulls() raises:
+    """Parquet round-trip preserves null masks."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+
+    var d_a = List[Int64]()
+    d_a.append(10)
+    d_a.append(0)
+    d_a.append(30)
+    var col_a = Column("a", ColumnData(d_a^), int64)
+    col_a._null_mask = List[Bool]()
+    col_a._null_mask.append(False)
+    col_a._null_mask.append(True)
+    col_a._null_mask.append(False)
+
+    var d_b = List[String]()
+    d_b.append("hi")
+    d_b.append("")
+    d_b.append("bye")
+    var col_b = Column("b", ColumnData(d_b^), object_)
+    col_b._null_mask = List[Bool]()
+    col_b._null_mask.append(False)
+    col_b._null_mask.append(True)
+    col_b._null_mask.append(False)
+
+    var cols = List[Column]()
+    cols.append(col_a^)
+    cols.append(col_b^)
+    var df = DataFrame(cols^)
+
+    df.to_parquet(path)
+    var df2 = read_parquet(path)
+
+    assert_equal(df2.shape()[0], 3)
+    assert_equal(df2.shape()[1], 2)
+
+    # Non-null values preserved.
+    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(10))
+    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(30))
+    assert_equal(df2._cols[1]._data[List[String]][0], "hi")
+    assert_equal(df2._cols[1]._data[List[String]][2], "bye")
+
+    # Null masks preserved.
+    assert_true(not df2._cols[0]._null_mask[0])
+    assert_true(df2._cols[0]._null_mask[1])
+    assert_true(not df2._cols[0]._null_mask[2])
+    assert_true(not df2._cols[1]._null_mask[0])
+    assert_true(df2._cols[1]._null_mask[1])
+    assert_true(not df2._cols[1]._null_mask[2])
+
+
+def test_parquet_interop_pyarrow() raises:
+    """Parquet files written by bison are readable by PyArrow."""
+    var tempfile = Python.import_module("tempfile")
+    var pq = Python.import_module("pyarrow.parquet")
+    var path = String(tempfile.mktemp(suffix=".parquet"))
+
+    var d_x = List[Int64]()
+    d_x.append(100)
+    d_x.append(200)
+    var d_y = List[Float64]()
+    d_y.append(1.5)
+    d_y.append(2.5)
+    var cols = List[Column]()
+    cols.append(Column("x", ColumnData(d_x^), int64))
+    cols.append(Column("y", ColumnData(d_y^), float64))
+    var df = DataFrame(cols^)
+
+    df.to_parquet(path)
+
+    # Read back with PyArrow directly.
+    var pa_table = pq.read_table(path)
+    assert_equal(Int(py=pa_table.num_rows), 2)
+    assert_equal(Int(py=pa_table.num_columns), 2)
+    var col_names = pa_table.column_names
+    assert_equal(String(col_names[0]), "x")
+    assert_equal(String(col_names[1]), "y")
 
 
 def test_to_excel_writes_file() raises:
