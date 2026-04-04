@@ -32,7 +32,7 @@ bison/
 │       └── _concat.mojo        — concat axis=0 with dtype promotion
 ├── tests/              — one test_*.mojo file per feature area
 ├── benchmarks/         — bench_core.mojo + _bench_utils.mojo
-├── scripts/            — gen_version.py, run_tests.sh, update_compat.py, …
+├── scripts/            — gen_version.py, run_tests.sh, …
 └── docs/               — index.html performance dashboard
 ```
 
@@ -43,7 +43,6 @@ Mojo is installed via **Pixi** (`pixi install`). Do not use Magic — it is depr
 ```bash
 pixi run gen-version    # write bison/_version.mojo from pixi.toml
 pixi run test           # regenerates version then runs all tests
-pixi run update-compat  # rewrite compat table in README.md
 pixi run fmt            # mojo format bison/
 pixi run check          # mojo package bison/ --Werror (no warnings allowed)
 pixi run lint           # pre-commit run --all-files
@@ -105,7 +104,7 @@ fn sort_values(self, by: String, ascending: Bool = True) raises -> Self:
 ```
 
 Rules:
-- The string passed to `_not_implemented` must be `"TypeName.method_name"` — `scripts/update_compat.py` parses these strings to build the compatibility table.
+- The string passed to `_not_implemented` must be `"TypeName.method_name"`.
 - Never use a bare `raise Error("not yet implemented")` — the pre-commit hook will block it.
 
 ## Implementing a stub
@@ -113,8 +112,7 @@ Rules:
 1. Replace `_not_implemented(...)` with native Mojo code.
 2. Remove the `return self` / `return PythonObject(None)` dummy if the real return is different.
 3. Update the corresponding test in `tests/` — remove the "expect raise" assertion and add a real assertion comparing against pandas output.
-4. Run `pixi run update-compat` to refresh the README table.
-5. Open a PR; CI will run tests and commit the updated table automatically.
+4. Open a PR; CI will run tests automatically.
 
 ## Tests
 
@@ -151,10 +149,6 @@ Helper utilities live in `tests/_helpers.mojo`: `assert_frame_equal`, `assert_se
 ## Test caching
 
 `scripts/run_tests.sh` rebuilds `bison.mojopkg` only when sources are newer than `.bison-cache/`. Tests run in parallel via background jobs; failures are collected and reported at the end.
-
-## Compatibility table
-
-`README.md` contains the table between `<!-- COMPAT_TABLE_START -->` and `<!-- COMPAT_TABLE_END -->`. Do not edit those lines manually — they are owned by `scripts/update_compat.py`. The script counts `_not_implemented()` calls per category (DataFrame, Series, GroupBy, Accessors, IO, Reshape, Index).
 
 ## Benchmarks
 

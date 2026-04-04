@@ -12,7 +12,7 @@ bison/bison/accessors/  — .str and .dt accessor structs
 bison/bison/io/         — read_csv, read_parquet, read_json, read_excel stubs
 bison/bison/reshape/    — concat stub
 bison/tests/         — one test_*.mojo file per feature area
-bison/scripts/       — gen_version.py, run_tests.sh, update_compat.py
+bison/scripts/       — gen_version.py, run_tests.sh
 ```
 
 ## Language and tooling
@@ -22,7 +22,6 @@ bison/scripts/       — gen_version.py, run_tests.sh, update_compat.py
 - **Tasks** (run with `pixi run <task>`):
   - `gen-version` — write `bison/_version.mojo` from `pixi.toml`
   - `test` — regenerate version then run all tests
-  - `update-compat` — rewrite the compat table in `README.md`
   - `fmt` — `mojo format bison/`
   - `check` — `mojo build bison/`
 
@@ -41,7 +40,6 @@ fn sort_values(self, by: String, ascending: Bool = True) raises -> Self:
 ```
 
 - The string passed to `_not_implemented` must be `"TypeName.method_name"`.
-- `scripts/update_compat.py` parses these strings to build the compatibility table in `README.md`.
 - The `return` after the raise is always required to satisfy Mojo's type checker.
 
 ## Implementing a stub
@@ -49,7 +47,6 @@ fn sort_values(self, by: String, ascending: Bool = True) raises -> Self:
 1. Remove the `_not_implemented(...)` call and implement the method in native Mojo.
 2. Remove the dummy `return`.
 3. Update the test in `tests/` — replace the "expect raise" assertion with a real assertion comparing against pandas output via Python interop.
-4. Run `pixi run update-compat` to refresh the README table.
 
 ## Internal representation
 
@@ -70,15 +67,6 @@ As methods are implemented natively, the `PythonObject` backing is replaced with
 Each `tests/test_*.mojo` has a `main()` that calls every `test_*` function. Working paths assert real values. Stub paths assert the method raises with `"not implemented"` in the message.
 
 Run a single test file: `mojo run tests/test_dataframe.mojo`
-
-## Compatibility table
-
-`README.md` contains the compat table between:
-```
-<!-- COMPAT_TABLE_START -->
-<!-- COMPAT_TABLE_END -->
-```
-Never edit those lines manually. They are owned by `scripts/update_compat.py`.
 
 ## Session notes
 
