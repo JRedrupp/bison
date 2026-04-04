@@ -4,13 +4,12 @@ version = "0.1.0"
 description = "A Mojo DataFrame library with a pandas-compatible API"
 license = "Apache-2.0"
 requires-pixi = ">=0.41.0"
-channels = ["conda-forge", "https://conda.modular.com/max", "https://prefix.dev/pontoneer"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 platforms = ["linux-64", "osx-arm64"]
 
 [dependencies]
 max = ">=26.2"
 mblack = ">=26.2"
-marrow = ">=0.0.6"
 
 [feature.dev.dependencies]
 pandas = ">=2.0"
