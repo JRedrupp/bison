@@ -26,10 +26,6 @@ jobs:
           sed -i \
             's|https://conda.modular.com/max"|https://conda.modular.com/max-nightly"|g' \
             pixi.toml
-          # pyarrow crashes on the Python version pulled in by the nightly
-          # channel (currently 3.14); the parquet tests skip gracefully when
-          # pyarrow is absent, so drop it here to keep the nightly run clean.
-          sed -i '/^pyarrow/d' pixi.toml
 
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
