@@ -3,6 +3,18 @@ from std.utils import Variant
 from std.memory import bitcast
 from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor
+from marrow.arrays import AnyArray
+from marrow.builders import array as _marrow_array
+from marrow.dtypes import (
+    int64 as _m_int64,
+    float64 as _m_float64,
+)
+from marrow.kernels.aggregate import (
+    sum_ as _marrow_sum,
+    min_ as _marrow_min,
+    max_ as _marrow_max,
+)
+from marrow.scalars import AnyScalar
 from .index import Index, ColumnIndex
 from .dtypes import (
     BisonDtype,
@@ -645,6 +657,52 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 _ = self.py_list.append(self.py_none)
             else:
                 _ = self.py_list.append(data[i])
+
+
+# ------------------------------------------------------------------
+# Marrow SIMD aggregation helpers (issue #582)
+# ------------------------------------------------------------------
+
+
+def _to_numeric_marrow_array(col: Column) raises -> AnyArray:
+    """Convert an Int64 or Float64 Column to a marrow AnyArray.
+
+    Only handles the two numeric arms needed for SIMD aggregation.
+    Null mask entries become Arrow null values. Raises for non-numeric types.
+    """
+    var n = len(col)
+    var has_mask = len(col._null_mask) > 0
+
+    if col._data.isa[List[Int64]]():
+        ref src = col._data[List[Int64]]
+        var vals = List[Optional[Int]]()
+        for i in range(n):
+            if has_mask and col._null_mask[i]:
+                vals.append(None)
+            else:
+                vals.append(Int(src[i]))
+        return AnyArray(_marrow_array[_m_int64](vals^))
+
+    elif col._data.isa[List[Float64]]():
+        ref src = col._data[List[Float64]]
+        var vals = List[Optional[Float64]]()
+        for i in range(n):
+            if has_mask and col._null_mask[i]:
+                vals.append(None)
+            else:
+                vals.append(src[i])
+        return AnyArray(_marrow_array[_m_float64](vals^))
+
+    else:
+        raise Error("_to_numeric_marrow_array: not a numeric column")
+
+
+def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
+    """Extract a Float64 from a marrow AnyScalar (int64 or float64)."""
+    if scalar.type() == _m_float64:
+        return Float64(scalar.as_primitive[_m_float64]().value())
+    else:
+        return Float64(scalar.as_primitive[_m_int64]().value())
 
 
 # ------------------------------------------------------------------
@@ -4294,6 +4352,11 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             # Return NaN (IEEE 754: 0/0 → quiet NaN).
             var zero = Float64(0)
             return zero / zero
+        # Use marrow SIMD kernel for Int64/Float64 arms.
+        if self._data.isa[List[Int64]]() or self._data.isa[List[Float64]]():
+            var arr = _to_numeric_marrow_array(self)
+            return _marrow_scalar_to_float64(_marrow_sum(arr))
+        # Fall back to visitor for Bool/String/PythonObject.
         var visitor = _SumVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return visitor.result
@@ -4330,6 +4393,14 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if not skipna and self.has_nulls():
             var zero = Float64(0)
             return zero / zero
+        # Use marrow SIMD kernel for Int64/Float64 arms.
+        if self._data.isa[List[Int64]]() or self._data.isa[List[Float64]]():
+            if self.count() == 0:
+                var zero = Float64(0)
+                return zero / zero
+            var arr = _to_numeric_marrow_array(self)
+            return _marrow_scalar_to_float64(_marrow_min(arr))
+        # Fall back to visitor for Bool/String/PythonObject.
         var visitor = _MinVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
@@ -4346,6 +4417,14 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if not skipna and self.has_nulls():
             var zero = Float64(0)
             return zero / zero
+        # Use marrow SIMD kernel for Int64/Float64 arms.
+        if self._data.isa[List[Int64]]() or self._data.isa[List[Float64]]():
+            if self.count() == 0:
+                var zero = Float64(0)
+                return zero / zero
+            var arr = _to_numeric_marrow_array(self)
+            return _marrow_scalar_to_float64(_marrow_max(arr))
+        # Fall back to visitor for Bool/String/PythonObject.
         var visitor = _MaxVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
