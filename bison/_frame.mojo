@@ -2228,7 +2228,7 @@ struct DataFrame(Copyable, Movable):
     # Row-wise helpers (used by axis=1 aggregation paths)
     # ------------------------------------------------------------------
 
-    fn _row_numeric_vals(self, row: Int, skipna: Bool) raises -> List[Float64]:
+    def _row_numeric_vals(self, row: Int, skipna: Bool) raises -> List[Float64]:
         """Collect float values from every numeric column at *row*.
 
         If *skipna* is True, null cells are omitted.
@@ -2251,7 +2251,7 @@ struct DataFrame(Copyable, Movable):
                 vals.append(col._float64_data()[row])
         return vals^
 
-    fn _row_non_null_count(self, row: Int) -> Int:
+    def _row_non_null_count(self, row: Int) -> Int:
         """Count non-null cells in row *row* across all dtypes (used by count axis=1).
         """
         var cnt = 0
