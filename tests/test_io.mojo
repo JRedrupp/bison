@@ -181,6 +181,8 @@ def test_read_parquet_missing_file() raises:
 
 def test_parquet_roundtrip() raises:
     """Write a DataFrame with int64 and float64 columns to Parquet and read it back."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
 
@@ -387,6 +389,8 @@ def test_read_excel_sheet_name_string() raises:
 
 def test_to_parquet_writes_file() raises:
     """Write a DataFrame to Parquet and verify the file exists."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
 
@@ -408,6 +412,8 @@ def test_to_parquet_writes_file() raises:
 
 def test_parquet_roundtrip_bool_string() raises:
     """Parquet round-trip for bool and string columns."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
 
@@ -437,6 +443,8 @@ def test_parquet_roundtrip_bool_string() raises:
 
 def test_parquet_roundtrip_with_nulls() raises:
     """Parquet round-trip preserves null masks."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".parquet"))
 
