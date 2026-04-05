@@ -6,6 +6,8 @@ from bison import (
     read_parquet,
     read_json,
     read_excel,
+    read_ipc,
+    write_ipc,
     DataFrame,
     DFScalar,
     DictSplitResult,
@@ -510,6 +512,175 @@ def test_parquet_interop_pyarrow() raises:
     var col_names = pa_table.column_names
     assert_equal(String(col_names[0]), "x")
     assert_equal(String(col_names[1]), "y")
+
+
+def test_ipc_roundtrip() raises:
+    """IPC round-trip for int64 and float64 columns."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".arrow"))
+
+    var d_a = List[Int64]()
+    d_a.append(1)
+    d_a.append(2)
+    d_a.append(3)
+    var d_b = List[Float64]()
+    d_b.append(4.0)
+    d_b.append(5.0)
+    d_b.append(6.0)
+    var cols = List[Column]()
+    cols.append(Column("a", ColumnData(d_a^), int64))
+    cols.append(Column("b", ColumnData(d_b^), float64))
+    var df = DataFrame(cols^)
+
+    write_ipc(df, path)
+    var df2 = read_ipc(path)
+    var shape = df2.shape()
+
+    assert_equal(shape[0], 3)
+    assert_equal(shape[1], 2)
+    assert_equal(df2.columns()[0], "a")
+    assert_equal(df2.columns()[1], "b")
+    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(1))
+    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(3))
+    assert_equal(df2._cols[1]._data[List[Float64]][0], Float64(4.0))
+    assert_equal(df2._cols[1]._data[List[Float64]][2], Float64(6.0))
+
+
+def test_ipc_roundtrip_bool_string() raises:
+    """IPC round-trip for bool and string columns."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".arrow"))
+
+    var d_flag = List[Bool]()
+    d_flag.append(True)
+    d_flag.append(False)
+    d_flag.append(True)
+    var d_name = List[String]()
+    d_name.append("alice")
+    d_name.append("bob")
+    d_name.append("carol")
+    var cols = List[Column]()
+    cols.append(Column("flag", ColumnData(d_flag^), bool_))
+    cols.append(Column("name", ColumnData(d_name^), object_))
+    var df = DataFrame(cols^)
+
+    write_ipc(df, path)
+    var df2 = read_ipc(path)
+
+    assert_equal(df2.shape()[0], 3)
+    assert_equal(df2.shape()[1], 2)
+    assert_equal(df2._cols[0]._data[List[Bool]][0], True)
+    assert_equal(df2._cols[0]._data[List[Bool]][1], False)
+    # Strings come back as List[PythonObject] via the pandas interop path.
+    assert_equal(String(df2._cols[1]._data[List[PythonObject]][0]), "alice")
+    assert_equal(String(df2._cols[1]._data[List[PythonObject]][2]), "carol")
+
+
+def test_ipc_roundtrip_with_nulls() raises:
+    """IPC round-trip preserves null masks."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".arrow"))
+
+    var d_a = List[Float64]()
+    d_a.append(10.0)
+    d_a.append(0.0)
+    d_a.append(30.0)
+    var col_a = Column("a", ColumnData(d_a^), float64)
+    col_a._null_mask = List[Bool]()
+    col_a._null_mask.append(False)
+    col_a._null_mask.append(True)
+    col_a._null_mask.append(False)
+
+    var d_b = List[String]()
+    d_b.append("hi")
+    d_b.append("")
+    d_b.append("bye")
+    var col_b = Column("b", ColumnData(d_b^), object_)
+    col_b._null_mask = List[Bool]()
+    col_b._null_mask.append(False)
+    col_b._null_mask.append(True)
+    col_b._null_mask.append(False)
+
+    var cols = List[Column]()
+    cols.append(col_a^)
+    cols.append(col_b^)
+    var df = DataFrame(cols^)
+
+    write_ipc(df, path)
+    var df2 = read_ipc(path)
+
+    assert_equal(df2.shape()[0], 3)
+    assert_equal(df2.shape()[1], 2)
+
+    # Non-null values preserved (float64 survives pandas round-trip as Float64).
+    assert_equal(df2._cols[0]._data[List[Float64]][0], Float64(10.0))
+    assert_equal(df2._cols[0]._data[List[Float64]][2], Float64(30.0))
+    # Strings come back as List[PythonObject] via the pandas interop path.
+    assert_equal(String(df2._cols[1]._data[List[PythonObject]][0]), "hi")
+    assert_equal(String(df2._cols[1]._data[List[PythonObject]][2]), "bye")
+
+    # Null masks preserved.
+    assert_true(not df2._cols[0]._null_mask[0])
+    assert_true(df2._cols[0]._null_mask[1])
+    assert_true(not df2._cols[0]._null_mask[2])
+    assert_true(not df2._cols[1]._null_mask[0])
+    assert_true(df2._cols[1]._null_mask[1])
+    assert_true(not df2._cols[1]._null_mask[2])
+
+
+def test_to_ipc_writes_file() raises:
+    """Verify to_ipc() creates a file on disk."""
+    var tempfile = Python.import_module("tempfile")
+    var os = Python.import_module("os")
+    var path = String(tempfile.mktemp(suffix=".arrow"))
+
+    var d_x = List[Int64]()
+    d_x.append(1)
+    d_x.append(2)
+    var cols = List[Column]()
+    cols.append(Column("x", ColumnData(d_x^), int64))
+    var df = DataFrame(cols^)
+
+    df.to_ipc(path)
+    assert_true(Bool(os.path.exists(path)))
+
+
+def test_ipc_interop_pyarrow() raises:
+    """IPC files written by bison are readable by PyArrow."""
+    var tempfile = Python.import_module("tempfile")
+    var pf = Python.import_module("pyarrow.feather")
+    var path = String(tempfile.mktemp(suffix=".arrow"))
+
+    var d_x = List[Int64]()
+    d_x.append(100)
+    d_x.append(200)
+    var d_y = List[Float64]()
+    d_y.append(1.5)
+    d_y.append(2.5)
+    var cols = List[Column]()
+    cols.append(Column("x", ColumnData(d_x^), int64))
+    cols.append(Column("y", ColumnData(d_y^), float64))
+    var df = DataFrame(cols^)
+
+    write_ipc(df, path)
+
+    # Read back with PyArrow directly.
+    var pa_table = pf.read_table(path)
+    assert_equal(Int(py=pa_table.num_rows), 2)
+    assert_equal(Int(py=pa_table.num_columns), 2)
+    var col_names = pa_table.column_names
+    assert_equal(String(col_names[0]), "x")
+    assert_equal(String(col_names[1]), "y")
+
+
+def test_read_ipc_missing_file() raises:
+    """Verify read_ipc raises on a nonexistent file."""
+    var raised = False
+    try:
+        _ = read_ipc("/tmp/nonexistent_bison_test_file.arrow")
+    except:
+        raised = True
+    assert_true(raised)
 
 
 def test_to_excel_writes_file() raises:

@@ -5767,6 +5767,19 @@ struct DataFrame(Copyable, Movable):
             var pd_df = self.to_pandas()
             pd_df.to_parquet(path, engine=engine, compression=compression)
 
+    def to_ipc(self, path: String) raises:
+        """Write the DataFrame to an Arrow IPC (Feather v2) file.
+
+        Uses PyArrow's feather module via pandas interop.
+
+        Parameters
+        ----------
+        path : Destination file path.
+        """
+        from .io.ipc import write_ipc
+
+        write_ipc(self, path)
+
     def to_json(
         self, path_or_buf: String = "", orient: String = ""
     ) raises -> String:
