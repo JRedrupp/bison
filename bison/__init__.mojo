@@ -31,7 +31,14 @@ from .series import Series
 from .dataframe import DataFrame, ToDictResult
 from .groupby import DataFrameGroupBy, SeriesGroupBy
 from .indexing import LocIndexer, ILocIndexer, AtIndexer, IAtIndexer
-from .io import read_csv, read_parquet, read_json, read_excel
+from .io import (
+    read_csv,
+    read_parquet,
+    read_json,
+    read_excel,
+    read_ipc,
+    write_ipc,
+)
 from .reshape import concat
 from .expr import parse, ParsedExpr
 from .arrow import (
