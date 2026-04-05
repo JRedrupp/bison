@@ -6399,7 +6399,7 @@ struct DataFrame(Copyable, Movable):
         return result^
 
 
-fn _insertion_sort_keys_by[
+def _insertion_sort_keys_by[
     T: Comparable & Copyable & Movable & ImplicitlyCopyable
 ](
     mut group_keys: List[String],
@@ -6425,7 +6425,7 @@ fn _insertion_sort_keys_by[
         group_keys[j + 1] = key_i
 
 
-fn _groupby_row_less(
+def _groupby_row_less(
     df: DataFrame,
     by: List[String],
     left_row: Int,
@@ -6484,7 +6484,7 @@ fn _groupby_row_less(
     return False
 
 
-fn _insertion_sort_multikey_group_keys(
+def _insertion_sort_multikey_group_keys(
     df: DataFrame,
     by: List[String],
     mut group_keys: List[String],
