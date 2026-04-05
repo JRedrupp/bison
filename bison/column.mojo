@@ -3867,7 +3867,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # when null handling is not required (e.g. for index sorts).
 
 
-fn _merge_sort_perm_comparable[
+def _merge_sort_perm_comparable[
     T: Comparable & Copyable & Movable
 ](
     mut perm: List[Int],
@@ -3945,7 +3945,7 @@ fn _merge_sort_perm_comparable[
         width *= 2
 
 
-fn _merge_sort_perm_pyobj(
+def _merge_sort_perm_pyobj(
     mut perm: List[Int],
     data: List[PythonObject],
     null_mask: List[Bool],

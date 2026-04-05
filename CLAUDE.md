@@ -285,6 +285,21 @@ data.append(rebind[Int64](src.unsafe_get(i)))  # Scalar[int64.native] → Int64
 Test-file `main()` functions must declare `raises` if they call any raising
 function — omitting it is a **compile error**, not a warning.
 
+### Nightly compiler hangs on standalone `query()`/`eval()` modules
+
+The nightly Mojo compiler (`0.26.3.0+`) enters infinite recursion when compiling
+a standalone module that calls `DataFrame.query()` or `DataFrame.eval()` (or
+`eval_expr` directly). The same calls compile fine when co-located with
+tokenizer/parser unit tests in `test_expr.mojo`.
+
+**Workaround**: all query/eval conformance tests live in `tests/test_expr.mojo`,
+not in a separate file. If you add new query/eval tests, add them there.
+
+### `fn` is deprecated on nightly — use `def` everywhere
+
+Nightly Mojo deprecated the `fn` keyword (warning today, error soon). All function
+and method definitions must use `def`. Do not introduce new `fn` declarations.
+
 ### Import aliases for stdlib names that shadow parameters
 
 When importing a stdlib function whose name collides with a common parameter name

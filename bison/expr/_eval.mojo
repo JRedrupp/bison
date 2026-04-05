@@ -29,7 +29,7 @@ from ..dataframe import DataFrame
 # ------------------------------------------------------------------
 
 
-fn _resolve_ident(name: String, df: DataFrame) raises -> Series:
+def _resolve_ident(name: String, df: DataFrame) raises -> Series:
     """Return the column *name* from *df*, or raise a clear evaluator error."""
     try:
         return df[name]
@@ -37,7 +37,7 @@ fn _resolve_ident(name: String, df: DataFrame) raises -> Series:
         raise Error("evaluator: unknown identifier '" + name + "'")
 
 
-fn _flip_op(op: String) raises -> String:
+def _flip_op(op: String) raises -> String:
     """Flip a comparison operator for 'literal op identifier' → 'identifier flipped_op literal'.
     """
     if op == "<":
@@ -56,7 +56,7 @@ fn _flip_op(op: String) raises -> String:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
-fn _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
+def _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
     """Apply a numeric comparison operator to *col* against scalar *val*."""
     if op == "<":
         return col.__lt__(val)
@@ -74,7 +74,7 @@ fn _apply_numeric_op(col: Series, op: String, val: Float64) raises -> Series:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
-fn _apply_int_op(col: Series, op: String, val: Int64) raises -> Series:
+def _apply_int_op(col: Series, op: String, val: Int64) raises -> Series:
     """Apply a comparison operator to *col* against an integer scalar *val*.
 
     Routes through the ``Int64`` overloads of the Series comparison operators
@@ -98,7 +98,7 @@ fn _apply_int_op(col: Series, op: String, val: Int64) raises -> Series:
         raise Error("evaluator: unknown operator '" + op + "'")
 
 
-fn _apply_string_op(col: Series, op: String, val: String) raises -> Series:
+def _apply_string_op(col: Series, op: String, val: String) raises -> Series:
     """Apply a string equality/inequality operator to *col* against scalar *val*.
     """
     if op == "==":
@@ -113,7 +113,7 @@ fn _apply_string_op(col: Series, op: String, val: String) raises -> Series:
         )
 
 
-fn _apply_null_op(col: Series, op: String) raises -> Series:
+def _apply_null_op(col: Series, op: String) raises -> Series:
     """Apply a null-check operator to *col*.
 
     ``==`` maps to ``isna()`` (True where the value is null) and ``!=``
@@ -133,7 +133,7 @@ fn _apply_null_op(col: Series, op: String) raises -> Series:
         )
 
 
-fn _parse_bool_literal(node: ASTNode) raises -> Float64:
+def _parse_bool_literal(node: ASTNode) raises -> Float64:
     """Convert an NK_BOOL node to 1.0 (True) or 0.0 (False)."""
     if node.value == "True":
         return Float64(1.0)
@@ -145,17 +145,17 @@ fn _parse_bool_literal(node: ASTNode) raises -> Float64:
         )
 
 
-fn _parse_float_literal(node: ASTNode) raises -> Float64:
+def _parse_float_literal(node: ASTNode) raises -> Float64:
     """Convert an NK_FLOAT node value to Float64."""
     return atof(node.value)
 
 
-fn _parse_int_literal(node: ASTNode) raises -> Int64:
+def _parse_int_literal(node: ASTNode) raises -> Int64:
     """Convert an NK_INT node value to Int64 without Float64 widening."""
     return Int64(Int(node.value))
 
 
-fn _eval_compare(
+def _eval_compare(
     node: ASTNode, lhs: ASTNode, rhs: ASTNode, df: DataFrame
 ) raises -> Series:
     """Evaluate a single NK_COMPARE node into a boolean Series mask.
