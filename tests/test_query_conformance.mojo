@@ -41,7 +41,8 @@ def test_conformance_query_scalar_lt() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -58,7 +59,8 @@ def test_conformance_query_scalar_le() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -75,7 +77,8 @@ def test_conformance_query_scalar_gt() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -92,7 +95,8 @@ def test_conformance_query_scalar_ge() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -109,7 +113,8 @@ def test_conformance_query_scalar_eq() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -126,7 +131,8 @@ def test_conformance_query_scalar_ne() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -145,7 +151,8 @@ def test_conformance_query_float_scalar() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["y"].tolist()
-    ref bs_y = bs_result["y"]._col._data[List[Float64]]
+    var bs_y_series = bs_result["y"]
+    ref bs_y = bs_y_series._col._data[List[Float64]]
     for i in range(expected_n):
         assert_true(abs(bs_y[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -166,7 +173,8 @@ def test_conformance_query_string_eq() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["val"].tolist()
-    ref bs_vals = bs_result["val"]._col._data[List[Int64]]
+    var bs_val_series = bs_result["val"]
+    ref bs_vals = bs_val_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_vals[i]), Int(py=pd_vals[i]))
 
@@ -187,7 +195,8 @@ def test_conformance_query_string_ne() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["val"].tolist()
-    ref bs_vals = bs_result["val"]._col._data[List[Int64]]
+    var bs_val_series = bs_result["val"]
+    ref bs_vals = bs_val_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_vals[i]), Int(py=pd_vals[i]))
 
@@ -211,7 +220,8 @@ def test_conformance_query_col_vs_col_lt() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -230,7 +240,8 @@ def test_conformance_query_col_vs_col_eq() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -249,7 +260,8 @@ def test_conformance_query_col_vs_col_ne() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -273,7 +285,8 @@ def test_conformance_query_and() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -290,7 +303,8 @@ def test_conformance_query_or() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -307,7 +321,8 @@ def test_conformance_query_not() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -326,7 +341,8 @@ def test_conformance_query_chained_and() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -350,7 +366,8 @@ def test_conformance_query_parens_override_precedence() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -369,7 +386,8 @@ def test_conformance_query_not_parens() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Int64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Int64]]
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -393,7 +411,8 @@ def test_conformance_query_nulls_excluded() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Float64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Float64]]
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -412,7 +431,8 @@ def test_conformance_query_nulls_and() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Float64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Float64]]
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -431,7 +451,8 @@ def test_conformance_query_nulls_or() raises:
 
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
-    ref bs_a = bs_result["a"]._col._data[List[Float64]]
+    var bs_a_series = bs_result["a"]
+    ref bs_a = bs_a_series._col._data[List[Float64]]
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
