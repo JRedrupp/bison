@@ -5311,23 +5311,35 @@ struct DataFrame(Copyable, Movable):
 
         *col_idx* must be a pre-built name→column-index map for *df* so that
         each key lookup is O(1) rather than O(n_cols).
+
+        For multi-column keys, uses length-prefixed encoding (``len:value``)
+        for each component so that values containing arbitrary characters
+        never cause collisions.  For example, (``"a|b"``, ``"c"``) encodes
+        as ``"3:a|b1:c"`` while (``"a"``, ``"b|c"``) encodes as
+        ``"1:a3:b|c"`` — always distinct.
+
+        Single-column keys return the raw stringified value (no encoding
+        needed since there is no inter-column delimiter to collide with).
         """
+        var n_keys = len(key_cols)
         var key = String()
-        for k in range(len(key_cols)):
-            if k > 0:
-                key += "|"
+        for k in range(n_keys):
             var i = col_idx[key_cols[k]]
             ref col_data = df._cols[i]._data
+            var part: String
             if col_data.isa[List[Int64]]():
-                key += String(Int(col_data[List[Int64]][row]))
+                part = String(Int(col_data[List[Int64]][row]))
             elif col_data.isa[List[Float64]]():
-                key += String(col_data[List[Float64]][row])
+                part = String(col_data[List[Float64]][row])
             elif col_data.isa[List[Bool]]():
-                key += "1" if col_data[List[Bool]][row] else "0"
+                part = "1" if col_data[List[Bool]][row] else "0"
             elif col_data.isa[List[String]]():
-                key += col_data[List[String]][row]
+                part = col_data[List[String]][row]
             else:
-                key += String(col_data[List[PythonObject]][row])
+                part = String(col_data[List[PythonObject]][row])
+            if n_keys == 1:
+                return part
+            key += String(len(part)) + ":" + part
         return key
 
     def merge(
