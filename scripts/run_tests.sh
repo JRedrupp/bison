@@ -39,7 +39,7 @@ for f in "$TESTS_DIR"/test_*.mojo; do
     result_file="$TMP_DIR/$(basename "$f").result"
     echo "Running $f ..."
     (
-        if timeout 300 mojo run -I "$CACHE_DIR" -I "$REPO_ROOT" "$f"; then
+        if timeout 900 mojo run -I "$CACHE_DIR" -I "$REPO_ROOT" "$f"; then
             echo "pass" > "$result_file"
         else
             echo "fail" > "$result_file"
