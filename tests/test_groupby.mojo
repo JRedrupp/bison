@@ -1,6 +1,6 @@
 """Tests for DataFrame.groupby(), DataFrameGroupBy, and SeriesGroupBy."""
 from std.python import Python, PythonObject
-from std.testing import TestSuite
+from std.testing import assert_equal, TestSuite
 from bison import DataFrame, Series
 from _helpers import assert_frame_equal, assert_series_equal
 
@@ -720,6 +720,55 @@ def test_dataframegroupby_multikey_as_index_false_sum() raises:
         ).sum(),
         check_dtype=False,
     )
+
+
+# ------------------------------------------------------------------
+# Composite key delimiter collision tests (issue #506)
+# ------------------------------------------------------------------
+
+
+def test_groupby_multikey_delimiter_in_value() raises:
+    """Groupby with two string key columns where values contain the pipe
+    delimiter must produce the same number of groups as pandas.
+
+    Without collision-safe serialisation, ("a|b", "c") and ("a", "b|c")
+    both serialise to "a|b|c" and get merged into one group.
+    """
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'k1': ['a|b', 'a'], 'k2': ['c', 'b|c'], 'val': [10, 20]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("k1")
+    by.append("k2")
+    var result = df.groupby(by).sum()
+    # pandas sees two distinct groups: ("a|b", "c") and ("a", "b|c")
+    assert_equal(result.shape()[0], 2)
+    var result_pd = result.to_pandas()
+    var expected = pd_df.groupby(Python.evaluate("['k1', 'k2']")).sum()
+    assert_frame_equal(result_pd, expected)
+
+
+def test_groupby_multikey_delimiter_only_values() raises:
+    """Edge case: key values that are exactly the delimiter character."""
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'k1': ['|', 'a'], 'k2': ['a', '|'], 'val': [1, 2]}"
+        )
+    )
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("k1")
+    by.append("k2")
+    var result = df.groupby(by).sum()
+    assert_equal(result.shape()[0], 2)
+    var result_pd = result.to_pandas()
+    var expected = pd_df.groupby(Python.evaluate("['k1', 'k2']")).sum()
+    assert_frame_equal(result_pd, expected)
 
 
 def main() raises:

@@ -264,5 +264,67 @@ def test_merge_right_key_col_right_only_rows() raises:
     assert_equal(Int(py=key_col_pd.iloc[1]), 3)
 
 
+# ------------------------------------------------------------------
+# Composite key delimiter collision tests (issue #506)
+# ------------------------------------------------------------------
+
+
+def test_merge_multikey_delimiter_collision() raises:
+    """Multi-key merge where string values contain the pipe delimiter.
+
+    Without collision-safe serialisation, ("a|b", "c") and ("a", "b|c")
+    both serialise to "a|b|c", producing incorrect join matches.
+    """
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(
+            Python.evaluate(
+                "{'k1': ['a|b', 'a'], 'k2': ['c', 'b|c'], 'val': [1, 2]}"
+            )
+        )
+    )
+    var right = DataFrame(
+        pd.DataFrame(
+            Python.evaluate(
+                "{'k1': ['a|b', 'a'], 'k2': ['c', 'b|c'], 'score': [100, 200]}"
+            )
+        )
+    )
+    var on = List[String]()
+    on.append("k1")
+    on.append("k2")
+    var result = right.merge(left, on=on^)
+    # Each row should match exactly once: 2 result rows, not 4.
+    assert_equal(result.shape()[0], 2)
+    var result_pd = result.to_pandas()
+    # Verify row 0 matched ("a|b", "c") → score=100, val=1
+    assert_equal(Int(py=result_pd["score"].iloc[0]), 100)
+    assert_equal(Int(py=result_pd["val"].iloc[0]), 1)
+    # Verify row 1 matched ("a", "b|c") → score=200, val=2
+    assert_equal(Int(py=result_pd["score"].iloc[1]), 200)
+    assert_equal(Int(py=result_pd["val"].iloc[1]), 2)
+
+
+def test_merge_multikey_delimiter_no_false_match() raises:
+    """Keys that would collide under naive pipe-joining must NOT match."""
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'k1': ['a|b'], 'k2': ['c'], 'val': [1]}")
+        )
+    )
+    var right = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'k1': ['a'], 'k2': ['b|c'], 'score': [99]}")
+        )
+    )
+    var on = List[String]()
+    on.append("k1")
+    on.append("k2")
+    var result = left.merge(right, on=on^)
+    # Inner join: no keys actually match, so result must be empty.
+    assert_equal(result.shape()[0], 0)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
