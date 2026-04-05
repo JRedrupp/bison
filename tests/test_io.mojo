@@ -486,8 +486,19 @@ def test_parquet_roundtrip_with_nulls() raises:
     assert_true(not df2._cols[1]._null_mask[2])
 
 
+def _pyarrow_available() raises -> Bool:
+    """Return True if pyarrow can be imported, False otherwise."""
+    try:
+        _ = Python.import_module("pyarrow")
+        return True
+    except:
+        return False
+
+
 def test_parquet_interop_pyarrow() raises:
     """Parquet files written by bison are readable by PyArrow."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var pq = Python.import_module("pyarrow.parquet")
     var path = String(tempfile.mktemp(suffix=".parquet"))
@@ -516,6 +527,8 @@ def test_parquet_interop_pyarrow() raises:
 
 def test_ipc_roundtrip() raises:
     """IPC round-trip for int64 and float64 columns."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".arrow"))
 
@@ -548,6 +561,8 @@ def test_ipc_roundtrip() raises:
 
 def test_ipc_roundtrip_bool_string() raises:
     """IPC round-trip for bool and string columns."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".arrow"))
 
@@ -578,6 +593,8 @@ def test_ipc_roundtrip_bool_string() raises:
 
 def test_ipc_roundtrip_with_nulls() raises:
     """IPC round-trip preserves null masks."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var path = String(tempfile.mktemp(suffix=".arrow"))
 
@@ -630,6 +647,8 @@ def test_ipc_roundtrip_with_nulls() raises:
 
 def test_to_ipc_writes_file() raises:
     """Verify to_ipc() creates a file on disk."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var os = Python.import_module("os")
     var path = String(tempfile.mktemp(suffix=".arrow"))
@@ -647,6 +666,8 @@ def test_to_ipc_writes_file() raises:
 
 def test_ipc_interop_pyarrow() raises:
     """IPC files written by bison are readable by PyArrow."""
+    if not _pyarrow_available():
+        return
     var tempfile = Python.import_module("tempfile")
     var pf = Python.import_module("pyarrow.feather")
     var path = String(tempfile.mktemp(suffix=".arrow"))
@@ -675,6 +696,8 @@ def test_ipc_interop_pyarrow() raises:
 
 def test_read_ipc_missing_file() raises:
     """Verify read_ipc raises on a nonexistent file."""
+    if not _pyarrow_available():
+        return
     var raised = False
     try:
         _ = read_ipc("/tmp/nonexistent_bison_test_file.arrow")
