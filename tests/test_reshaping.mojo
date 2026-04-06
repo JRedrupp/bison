@@ -751,9 +751,9 @@ def test_reindex_axis0_obj_fill_value() raises:
     var r = df.reindex(labels=Optional[List[String]](lbls^), fill_value=fv)
     assert_equal(r.shape()[0], 2)
     # existing row preserved
-    assert_true(String(r["a"].iloc(0)[PythonObject]) == "x")
+    assert_true(r["a"].iloc(0)[String] == "x")
     # missing row gets fill_value, not None
-    assert_true(String(r["a"].iloc(1)[PythonObject]) == "FILL")
+    assert_true(r["a"].iloc(1)[String] == "FILL")
 
 
 def test_reindex_axis0_obj_null_propagation() raises:
@@ -766,7 +766,7 @@ def test_reindex_axis0_obj_null_propagation() raises:
     var r = df.reindex(labels=Optional[List[String]](lbls^))
     assert_equal(r.shape()[0], 2)
     # non-null row
-    assert_true(String(r["a"].iloc(0)[PythonObject]) == "y")
+    assert_true(r["a"].iloc(0)[String] == "y")
     # row that was null in the source should still be null
     assert_true(r["a"].isna().iloc(1)[Bool] == True)
 

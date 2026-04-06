@@ -5853,6 +5853,32 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             col._index_name = idx_name
             return col^
         else:
+            # Promote pure-string object columns to List[String] so that
+            # marrow fast paths (GroupBy, SIMD kernels) can activate.
+            if bison_dtype == object_:
+                var all_str = True
+                var builtins = Python.import_module("builtins")
+                var str_type = builtins.str
+                var isinstance_fn = builtins.isinstance
+                for i in range(n):
+                    if null_mask[i]:
+                        continue
+                    if not isinstance_fn(py_list[i], str_type).__bool__():
+                        all_str = False
+                        break
+                if all_str:
+                    var str_data = List[String]()
+                    for i in range(n):
+                        if null_mask[i]:
+                            str_data.append(String(""))
+                        else:
+                            str_data.append(String(py_list[i]))
+                    var col = Column(
+                        name, ColumnData(str_data^), object_, bison_idx^
+                    )
+                    col._null_mask = null_mask^
+                    col._index_name = idx_name
+                    return col^
             var data = List[PythonObject]()
             for i in range(n):
                 data.append(py_list[i])
