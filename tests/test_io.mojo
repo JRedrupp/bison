@@ -579,9 +579,9 @@ def test_ipc_roundtrip_bool_string() raises:
     assert_equal(df2.shape()[1], 2)
     assert_equal(df2._cols[0]._data[List[Bool]][0], True)
     assert_equal(df2._cols[0]._data[List[Bool]][1], False)
-    # Strings come back as List[PythonObject] via the pandas interop path.
-    assert_equal(String(df2._cols[1]._data[List[PythonObject]][0]), "alice")
-    assert_equal(String(df2._cols[1]._data[List[PythonObject]][2]), "carol")
+    # Strings come back as List[String] (promoted from object dtype by from_pandas).
+    assert_equal(df2._cols[1]._data[List[String]][0], "alice")
+    assert_equal(df2._cols[1]._data[List[String]][2], "carol")
 
 
 def test_ipc_roundtrip_with_nulls() raises:
@@ -624,9 +624,9 @@ def test_ipc_roundtrip_with_nulls() raises:
     # Non-null values preserved (float64 survives pandas round-trip as Float64).
     assert_equal(df2._cols[0]._data[List[Float64]][0], Float64(10.0))
     assert_equal(df2._cols[0]._data[List[Float64]][2], Float64(30.0))
-    # Strings come back as List[PythonObject] via the pandas interop path.
-    assert_equal(String(df2._cols[1]._data[List[PythonObject]][0]), "hi")
-    assert_equal(String(df2._cols[1]._data[List[PythonObject]][2]), "bye")
+    # Strings come back as List[String] (promoted from object dtype by from_pandas).
+    assert_equal(df2._cols[1]._data[List[String]][0], "hi")
+    assert_equal(df2._cols[1]._data[List[String]][2], "bye")
 
     # Null masks preserved.
     assert_true(not df2._cols[0]._null_mask[0])
