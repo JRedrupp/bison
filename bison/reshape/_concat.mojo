@@ -1,9 +1,93 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame, _sort_col_names
-from ..column import Column, ColumnData
+from ..column import Column
 from ..dtypes import BisonDtype, int64, float64, bool_, object_
 from .._errors import _not_implemented
+
+
+# ------------------------------------------------------------------
+# Promotion helpers — used by _vstack to upcast heterogeneous pieces
+# into a unified output list.  Dispatch uses ``Column`` predicate
+# methods (``is_int`` / ``is_float`` / ``is_bool`` / ``is_string``) so
+# the underlying ``ColumnData`` discriminant is touched in exactly one
+# place per type — ``column.mojo`` — and never here.  Arms that cannot
+# occur for a given target dtype raise — ``_promote_dtype`` guarantees
+# they never reach here.
+# ------------------------------------------------------------------
+
+
+def _promote_piece_to_float64(piece: Column, mut out: List[Float64]) raises:
+    if piece.is_float():
+        ref src = piece._float64_data()
+        for k in range(len(src)):
+            out.append(src[k])
+    elif piece.is_int():
+        ref src = piece._int64_data()
+        for k in range(len(src)):
+            out.append(Float64(Int(src[k])))
+    elif piece.is_bool():
+        ref src = piece._bool_data()
+        for k in range(len(src)):
+            out.append(Float64(1) if src[k] else Float64(0))
+    else:
+        raise Error("concat: cannot promote non-numeric column to float64")
+
+
+def _promote_piece_to_int64(piece: Column, mut out: List[Int64]) raises:
+    if piece.is_int():
+        ref src = piece._int64_data()
+        for k in range(len(src)):
+            out.append(src[k])
+    elif piece.is_bool():
+        ref src = piece._bool_data()
+        for k in range(len(src)):
+            out.append(Int64(1) if src[k] else Int64(0))
+    else:
+        raise Error("concat: cannot promote non-int/bool column to int64")
+
+
+def _promote_piece_to_object(
+    piece: Column, mut out: List[PythonObject], py_str: PythonObject
+) raises:
+    """Append a piece into ``out`` as ``PythonObject``.
+
+    Used for non-numeric same-dtype concatenation (e.g. ``datetime64_ns``)
+    where pieces may be backed by either ``List[String]`` or
+    ``List[PythonObject]``.  String elements are wrapped via Python's
+    ``str()`` to materialise a ``PythonObject``.
+    """
+    if piece.is_string():
+        ref src = piece._str_data()
+        for k in range(len(src)):
+            out.append(py_str(src[k]))
+    elif piece.is_object():
+        ref src = piece._obj_data()
+        for k in range(len(src)):
+            out.append(src[k])
+    else:
+        raise Error("concat: cannot promote non-string/object column to object")
+
+
+# ------------------------------------------------------------------
+# Mask helper — appends one piece's null-mask contribution into the
+# rolling output mask.  Centralises the per-piece mask logic shared by
+# every concat path.
+# ------------------------------------------------------------------
+
+
+def _append_piece_mask(
+    mut mask: List[Bool], piece: Column, need_mask: Bool
+) raises:
+    if not need_mask:
+        return
+    var has_m = len(piece._null_mask) > 0
+    var n = len(piece)
+    for k in range(n):
+        if has_m:
+            mask.append(piece._null_mask[k])
+        else:
+            mask.append(False)
 
 
 # ------------------------------------------------------------------
@@ -22,28 +106,28 @@ def _null_col(
         var data = List[Int64]()
         for _ in range(n):
             data.append(Int64(0))
-        var col = Column(name, ColumnData(data^), dtype)
+        var col = Column(name, data^, dtype)
         col._null_mask = mask^
         return col^
     elif dtype == float64:
         var data = List[Float64]()
         for _ in range(n):
             data.append(Float64(0))
-        var col = Column(name, ColumnData(data^), dtype)
+        var col = Column(name, data^, dtype)
         col._null_mask = mask^
         return col^
     elif dtype == bool_:
         var data = List[Bool]()
         for _ in range(n):
             data.append(False)
-        var col = Column(name, ColumnData(data^), dtype)
+        var col = Column(name, data^, dtype)
         col._null_mask = mask^
         return col^
     else:
         var data = List[PythonObject]()
         for _ in range(n):
             data.append(Python.evaluate("None"))
-        var col = Column(name, ColumnData(data^), object_)
+        var col = Column(name, data^, object_)
         col._null_mask = mask^
         return col^
 
@@ -55,7 +139,7 @@ def _build_key_col(keys: List[String], counts: List[Int]) raises -> Column:
     for i in range(len(keys)):
         for _ in range(counts[i]):
             data.append(keys[i])
-    return Column(Optional[String]("__key__"), ColumnData(data^), object_)
+    return Column(Optional[String]("__key__"), data^, object_)
 
 
 def _promote_dtype(a: BisonDtype, b: BisonDtype) raises -> BisonDtype:
@@ -123,18 +207,18 @@ def _common_dtype(pieces: List[Column]) -> Optional[BisonDtype]:
     """
     if len(pieces) == 0:
         return None
-    var is_int = pieces[0]._data.isa[List[Int64]]()
-    var is_float = pieces[0]._data.isa[List[Float64]]()
-    var is_bool = pieces[0]._data.isa[List[Bool]]()
-    var is_str = pieces[0]._data.isa[List[String]]()
+    var is_int = pieces[0].is_int()
+    var is_float = pieces[0].is_float()
+    var is_bool = pieces[0].is_bool()
+    var is_str = pieces[0].is_string()
     for i in range(1, len(pieces)):
-        if is_int and not pieces[i]._data.isa[List[Int64]]():
+        if is_int and not pieces[i].is_int():
             is_int = False
-        if is_float and not pieces[i]._data.isa[List[Float64]]():
+        if is_float and not pieces[i].is_float():
             is_float = False
-        if is_bool and not pieces[i]._data.isa[List[Bool]]():
+        if is_bool and not pieces[i].is_bool():
             is_bool = False
-        if is_str and not pieces[i]._data.isa[List[String]]():
+        if is_str and not pieces[i].is_string():
             is_str = False
     if is_int:
         return int64
@@ -183,15 +267,11 @@ def _vstack(pieces: List[Column]) raises -> Column:
         var data = List[Int64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            for k in range(len(pieces[i]._data[List[Int64]])):
-                data.append(pieces[i]._data[List[Int64]][k])
-                if need_mask:
-                    if has_m:
-                        mask.append(pieces[i]._null_mask[k])
-                    else:
-                        mask.append(False)
-        var col = Column(col_name, ColumnData(data^), target_dtype)
+            ref src = pieces[i]._int64_data()
+            for k in range(len(src)):
+                data.append(src[k])
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, target_dtype)
         if need_mask:
             col._null_mask = mask^
         return col^
@@ -199,15 +279,11 @@ def _vstack(pieces: List[Column]) raises -> Column:
         var data = List[Float64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            for k in range(len(pieces[i]._data[List[Float64]])):
-                data.append(pieces[i]._data[List[Float64]][k])
-                if need_mask:
-                    if has_m:
-                        mask.append(pieces[i]._null_mask[k])
-                    else:
-                        mask.append(False)
-        var col = Column(col_name, ColumnData(data^), target_dtype)
+            ref src = pieces[i]._float64_data()
+            for k in range(len(src)):
+                data.append(src[k])
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, target_dtype)
         if need_mask:
             col._null_mask = mask^
         return col^
@@ -215,15 +291,11 @@ def _vstack(pieces: List[Column]) raises -> Column:
         var data = List[Bool]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            for k in range(len(pieces[i]._data[List[Bool]])):
-                data.append(pieces[i]._data[List[Bool]][k])
-                if need_mask:
-                    if has_m:
-                        mask.append(pieces[i]._null_mask[k])
-                    else:
-                        mask.append(False)
-        var col = Column(col_name, ColumnData(data^), target_dtype)
+            ref src = pieces[i]._bool_data()
+            for k in range(len(src)):
+                data.append(src[k])
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, target_dtype)
         if need_mask:
             col._null_mask = mask^
         return col^
@@ -232,83 +304,33 @@ def _vstack(pieces: List[Column]) raises -> Column:
         var data = List[String]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            for k in range(len(pieces[i]._data[List[String]])):
-                data.append(pieces[i]._data[List[String]][k])
-                if need_mask:
-                    if has_m:
-                        mask.append(pieces[i]._null_mask[k])
-                    else:
-                        mask.append(False)
-        var col = Column(col_name, ColumnData(data^), target_dtype)
+            ref src = pieces[i]._str_data()
+            for k in range(len(src)):
+                data.append(src[k])
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, target_dtype)
         if need_mask:
             col._null_mask = mask^
         return col^
     elif target_dtype == float64:
         # Numeric promotion: pieces are a mix of float64, int64, and/or bool_.
-        # Upcast each piece to float64 when concatenating.
         var data = List[Float64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            if pieces[i]._data.isa[List[Float64]]():
-                for k in range(len(pieces[i]._data[List[Float64]])):
-                    data.append(pieces[i]._data[List[Float64]][k])
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-            elif pieces[i]._data.isa[List[Int64]]():
-                for k in range(len(pieces[i]._data[List[Int64]])):
-                    data.append(Float64(Int(pieces[i]._data[List[Int64]][k])))
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-            else:  # bool_
-                for k in range(len(pieces[i]._data[List[Bool]])):
-                    data.append(
-                        Float64(1) if pieces[i]._data[List[Bool]][
-                            k
-                        ] else Float64(0)
-                    )
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-        var col = Column(col_name, ColumnData(data^), float64)
+            _promote_piece_to_float64(pieces[i], data)
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, float64)
         if need_mask:
             col._null_mask = mask^
         return col^
     elif target_dtype == int64:
         # Numeric promotion: pieces are a mix of int64 and bool_.
-        # Upcast bool_ pieces to int64 when concatenating.
         var data = List[Int64]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            if pieces[i]._data.isa[List[Int64]]():
-                for k in range(len(pieces[i]._data[List[Int64]])):
-                    data.append(pieces[i]._data[List[Int64]][k])
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-            else:  # bool_
-                for k in range(len(pieces[i]._data[List[Bool]])):
-                    data.append(
-                        Int64(1) if pieces[i]._data[List[Bool]][k] else Int64(0)
-                    )
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-        var col = Column(col_name, ColumnData(data^), int64)
+            _promote_piece_to_int64(pieces[i], data)
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, int64)
         if need_mask:
             col._null_mask = mask^
         return col^
@@ -317,29 +339,13 @@ def _vstack(pieces: List[Column]) raises -> Column:
         # or object_ columns with mixed List[String]/List[PythonObject] backing.
         # _promote_dtype already validated that all pieces share the same dtype.
         var py_builtins = Python.import_module("builtins")
+        var py_str = py_builtins.str
         var data = List[PythonObject]()
         var mask = List[Bool]()
         for i in range(len(pieces)):
-            var has_m = len(pieces[i]._null_mask) > 0
-            if pieces[i]._data.isa[List[String]]():
-                for k in range(len(pieces[i]._data[List[String]])):
-                    data.append(
-                        py_builtins.str(pieces[i]._data[List[String]][k])
-                    )
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-            else:
-                for k in range(len(pieces[i]._data[List[PythonObject]])):
-                    data.append(pieces[i]._data[List[PythonObject]][k])
-                    if need_mask:
-                        if has_m:
-                            mask.append(pieces[i]._null_mask[k])
-                        else:
-                            mask.append(False)
-        var col = Column(col_name, ColumnData(data^), target_dtype)
+            _promote_piece_to_object(pieces[i], data, py_str)
+            _append_piece_mask(mask, pieces[i], need_mask)
+        var col = Column(col_name, data^, target_dtype)
         if need_mask:
             col._null_mask = mask^
         return col^

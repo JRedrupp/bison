@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from .._errors import _not_implemented
-from ..column import Column, ColumnData
+from ..column import Column
 from ..dtypes import BisonDtype, object_, bool_, int64
 
 
@@ -45,7 +45,7 @@ struct StringMethods:
                 result.append(String(""))
             else:
                 result.append(self._data[i].upper())
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -56,7 +56,7 @@ struct StringMethods:
                 result.append(String(""))
             else:
                 result.append(self._data[i].lower())
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -73,7 +73,7 @@ struct StringMethods:
                 result.append(String(self._data[i].strip()))
             else:
                 result.append(String(self._data[i].strip(to_strip)))
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -86,7 +86,7 @@ struct StringMethods:
                 result.append(String(self._data[i].lstrip()))
             else:
                 result.append(String(self._data[i].lstrip(to_strip)))
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -99,7 +99,7 @@ struct StringMethods:
                 result.append(String(self._data[i].rstrip()))
             else:
                 result.append(String(self._data[i].rstrip(to_strip)))
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -122,7 +122,7 @@ struct StringMethods:
                 else:
                     result.append(self._data[i].lower().find(pat.lower()) != -1)
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), bool_)
+        var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
 
@@ -136,7 +136,7 @@ struct StringMethods:
             else:
                 result.append(self._data[i].startswith(pat))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), bool_)
+        var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
 
@@ -150,7 +150,7 @@ struct StringMethods:
             else:
                 result.append(self._data[i].endswith(pat))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), bool_)
+        var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
 
@@ -172,7 +172,7 @@ struct StringMethods:
                 result.append(String(sub_result))
             else:
                 result.append(self._data[i].replace(pat, repl))
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = self._null_mask.copy()
         return col^
 
@@ -213,7 +213,7 @@ struct StringMethods:
             else:
                 result.append(Int64(len(self._data[i])))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
+        var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
@@ -231,7 +231,7 @@ struct StringMethods:
                     pos = -1
                 result.append(Int64(pos))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
+        var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
@@ -248,7 +248,7 @@ struct StringMethods:
                 var matches = re_mod.findall(pat, py_s)
                 result.append(Int64(Int(py=matches.__len__())))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
+        var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
@@ -278,7 +278,7 @@ struct StringMethods:
                         j += 1
                     result.append(char_val)
                     new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
 
@@ -305,7 +305,7 @@ struct StringMethods:
                     j += 1
                 result.append(sub)
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
 
@@ -342,6 +342,6 @@ struct StringMethods:
                 var m = re_mod.match(pat, py_s)
                 result.append(Bool(m.__bool__()))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), bool_)
+        var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^

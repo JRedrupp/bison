@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column, ColumnData
+from ..column import Column
 from ..dtypes import int64, float64, object_, bool_
 
 
@@ -42,7 +42,7 @@ def _infer_and_build_column(
     var n = len(raw)
 
     if n == 0:
-        return Column(name, ColumnData(List[String]()), object_)
+        return Column(name, List[String](), object_)
 
     # ------------------------------------------------------------------
     # Try Bool — "true" / "false" (case-insensitive).
@@ -67,8 +67,7 @@ def _infer_and_build_column(
             else:
                 data.append(_parse_bool_value(raw[i]))
                 null_mask.append(False)
-        var col_data = ColumnData(data^)
-        var col = Column(name, col_data^, bool_)
+        var col = Column(name, data^, bool_)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -98,8 +97,7 @@ def _infer_and_build_column(
             else:
                 data.append(Int64(atol(raw[i])))
                 null_mask.append(False)
-        var col_data = ColumnData(data^)
-        var col = Column(name, col_data^, int64)
+        var col = Column(name, data^, int64)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -129,8 +127,7 @@ def _infer_and_build_column(
             else:
                 data.append(atof(raw[i]))
                 null_mask.append(False)
-        var col_data = ColumnData(data^)
-        var col = Column(name, col_data^, float64)
+        var col = Column(name, data^, float64)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -149,8 +146,7 @@ def _infer_and_build_column(
         else:
             data.append(raw[i])
             null_mask.append(False)
-    var col_data = ColumnData(data^)
-    var col = Column(name, col_data^, object_)
+    var col = Column(name, data^, object_)
     if has_null:
         col._null_mask = null_mask^
     return col^
