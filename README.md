@@ -108,25 +108,46 @@ history across commits.
 
 ## Known limitations
 
-### `apply` and `map` require compile-time functions
+### `apply`, `applymap`, and `pipe` have two calling conventions
 
-`Series.apply` and `Series.map` accept a function parameter at compile time
-only. Runtime closures that capture variables are not supported:
+These methods each provide two overloads:
+
+**String-based** dispatches known function names to native methods. Unknown
+names raise an error listing the supported set:
 
 ```mojo
-# Works — function is known at compile time
-fn double(v: Float64) -> Float64: return v * 2.0
-var result = s.apply[double]()
-
-# Does not work — threshold is a runtime value
-var threshold = 1.5
-fn clip_fn(v: Float64) -> Float64: return v if v > threshold else 0.0
-var result = s.apply[clip_fn]()  # compile error
+var totals = df.apply("sum", axis=0)       # -> Series (delegates to agg)
+var row_sums = df.apply("sum", axis=1)     # -> Series (row-wise)
+var abs_df = df.applymap("abs")            # -> DataFrame (element-wise)
+var piped = df.pipe("abs")                 # -> DataFrame
 ```
 
-This is a current limitation of Mojo's parametric function support
-(tracked in [modularml/mojo#6130](https://github.com/modularml/mojo/issues/6130)).
-Use `clip()` or `where()` for threshold-style operations in the meantime.
+**Compile-time** accepts a user-defined function as a type parameter. This is
+fully native Mojo with no string dispatch:
+
+```mojo
+def double(v: Float64) -> Float64:
+    return v * 2.0
+
+var result = df.apply[double]()            # element-wise on numeric columns
+var mapped = df.applymap[double]()         # same as apply[double]()
+
+def add_rank(d: DataFrame) raises -> DataFrame:
+    # whole-DataFrame transform
+    return d.abs()
+
+var piped = df.pipe[add_rank]()
+```
+
+`Series.apply` and `Series.map` also accept compile-time functions:
+
+```mojo
+var result = s.apply[double]()
+```
+
+Runtime closures that capture variables are not yet supported in parameter
+type constraints. Use `clip()` or `where()` for threshold-style operations
+in the meantime.
 
 ### Native query/eval subset
 
