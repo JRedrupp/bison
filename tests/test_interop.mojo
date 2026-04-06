@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, TestSuite
-from bison import DataFrame, Series, Column, ColumnData, int64, object_
+from bison import DataFrame, Series, Column, ColumnData, int64, float64, object_
 from _helpers import assert_frame_equal, assert_series_equal
 
 
@@ -85,11 +85,12 @@ def test_column_typed_storage() raises:
     assert_true(col_bool._data.isa[List[Bool]](), "bool column should use List[Bool]")
     assert_equal(col_bool.__len__(), 2)
 
-    # object column -> List[PythonObject] arm
+    # pure-string object column -> List[String] arm (promoted)
     var s_obj = pd.Series(Python.evaluate("['x', 'y']"), dtype="object", name="o")
     var col_obj = Column.from_pandas(s_obj, "o")
-    assert_true(col_obj._data.isa[List[PythonObject]](), "object column should use List[PythonObject]")
+    assert_true(col_obj._data.isa[List[String]](), "pure-string object column should be promoted to List[String]")
     assert_equal(col_obj.__len__(), 2)
+    assert_equal(col_obj.dtype.name, "object")
 
 
 def test_series_index_roundtrip() raises:
@@ -220,6 +221,110 @@ def test_obj_column_with_null_mask_to_pandas() raises:
     assert_equal(String(py=back[0]), "apple")
     assert_true(Bool(py=pd.isna(back[1])), "masked position must be NaN, not the stored value")
     assert_equal(String(py=back[2]), "cherry")
+
+
+def test_string_promotion_from_pandas() raises:
+    """Pure-string object columns from pandas should be stored as List[String]."""
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'name': ['alice', 'bob', 'carol'], 'val': [1, 2, 3]}")
+    )
+    var df = DataFrame.from_pandas(pd_df)
+    # 'name' column should be promoted to List[String]
+    ref name_col = df._cols[0]
+    assert_true(
+        name_col._data.isa[List[String]](),
+        "pure-string column should be promoted to List[String]",
+    )
+    assert_equal(name_col.dtype.name, "object")
+    # 'val' column should remain List[Int64]
+    ref val_col = df._cols[1]
+    assert_true(
+        val_col._data.isa[List[Int64]](),
+        "int column should remain List[Int64]",
+    )
+
+
+def test_mixed_object_column_not_promoted() raises:
+    """Object columns with mixed types must stay as List[PythonObject]."""
+    var pd = Python.import_module("pandas")
+    var s = pd.Series(Python.evaluate("['hello', 42, 3.14]"), dtype="object", name="mix")
+    var col = Column.from_pandas(s, "mix")
+    assert_true(
+        col._data.isa[List[PythonObject]](),
+        "mixed-type object column must remain List[PythonObject]",
+    )
+
+
+def test_string_promotion_with_nulls() raises:
+    """String object columns with NaN/None should still promote, with null mask."""
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var s = pd.Series(
+        Python.evaluate("['a', None, 'c']"), dtype="object", name="s"
+    )
+    var col = Column.from_pandas(s, "s")
+    assert_true(
+        col._data.isa[List[String]](),
+        "string column with nulls should promote to List[String]",
+    )
+    assert_equal(col.__len__(), 3)
+    # Null mask: position 1 should be null
+    assert_true(not col._null_mask[0], "position 0 should not be null")
+    assert_true(col._null_mask[1], "position 1 should be null")
+    assert_true(not col._null_mask[2], "position 2 should not be null")
+
+
+def test_string_promotion_roundtrip() raises:
+    """Promoted string columns must round-trip through to_pandas correctly."""
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'city': ['NYC', 'LA', 'SF'], 'pop': [8.3, 3.9, 0.87]}")
+    )
+    var df = DataFrame.from_pandas(pd_df)
+    # Verify promotion happened
+    assert_true(
+        df._cols[0]._data.isa[List[String]](),
+        "city column should be promoted to List[String]",
+    )
+    # Round-trip back to pandas — verify values match
+    var back = df.to_pandas()
+    assert_equal(Int(py=back.shape[0]), 3)
+    assert_equal(Int(py=back.shape[1]), 2)
+    assert_equal(String(py=back["city"][0]), "NYC")
+    assert_equal(String(py=back["city"][1]), "LA")
+    assert_equal(String(py=back["city"][2]), "SF")
+    # Numeric column must also round-trip
+    assert_frame_equal(pd_df[["pop"]], back[["pop"]])
+
+
+def test_string_promotion_with_nulls_roundtrip() raises:
+    """String columns with nulls must round-trip through to_pandas correctly."""
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(
+        Python.evaluate("['x', None, 'z']"), dtype="object", name="s"
+    )
+    var s = Series.from_pandas(pd_s)
+    assert_true(
+        s._col._data.isa[List[String]](),
+        "string series with nulls should promote to List[String]",
+    )
+    var back = s.to_pandas()
+    assert_equal(String(py=back[0]), "x")
+    assert_true(Bool(py=pd.isna(back[1])), "null should round-trip as NaN")
+    assert_equal(String(py=back[2]), "z")
+
+
+def test_empty_object_column_promoted() raises:
+    """An empty object column should promote to List[String] (vacuously all-string)."""
+    var pd = Python.import_module("pandas")
+    var s = pd.Series(Python.evaluate("[]"), dtype="object", name="e")
+    var col = Column.from_pandas(s, "e")
+    assert_true(
+        col._data.isa[List[String]](),
+        "empty object column should promote to List[String]",
+    )
+    assert_equal(col.__len__(), 0)
 
 
 def main() raises:
