@@ -4425,6 +4425,97 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = String("")
 
     # ------------------------------------------------------------------
+    # Typed-list constructor overloads — let callers pass typed lists
+    # directly without wrapping in ColumnData(). Each pair forwards to
+    # the canonical ColumnData-taking constructors above.
+    # ------------------------------------------------------------------
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Int64],
+        dtype: BisonDtype,
+    ):
+        self = Self(name, ColumnData(data^), dtype)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Int64],
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self = Self(name, ColumnData(data^), dtype, index^)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Float64],
+        dtype: BisonDtype,
+    ):
+        self = Self(name, ColumnData(data^), dtype)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Float64],
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self = Self(name, ColumnData(data^), dtype, index^)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Bool],
+        dtype: BisonDtype,
+    ):
+        self = Self(name, ColumnData(data^), dtype)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[Bool],
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self = Self(name, ColumnData(data^), dtype, index^)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[String],
+        dtype: BisonDtype,
+    ):
+        self = Self(name, ColumnData(data^), dtype)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[String],
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self = Self(name, ColumnData(data^), dtype, index^)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[PythonObject],
+        dtype: BisonDtype,
+    ):
+        self = Self(name, ColumnData(data^), dtype)
+
+    def __init__(
+        out self,
+        name: Optional[String],
+        var data: List[PythonObject],
+        dtype: BisonDtype,
+        var index: ColumnIndex,
+    ):
+        self = Self(name, ColumnData(data^), dtype, index^)
+
+    # ------------------------------------------------------------------
     # Traits
     # NOTE: ColumnData and ColumnIndex are Variant types. Nightly Mojo no
     # longer allows implicit copies of Variant, so both require explicit
