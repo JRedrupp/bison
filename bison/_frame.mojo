@@ -27,6 +27,7 @@ from .column import (
     _col_cell_str,
     _col_cell_pyobj,
     _scalar_from_col,
+    _series_scalar_at,
     _SetScalarInColMutVisitor,
     ColumnDataVisitorRaises,
     _FillnaVisitor,
@@ -46,6 +47,74 @@ from marrow.dtypes import (
     float64 as _m_float64,
 )
 from marrow.kernels.groupby import groupby as _marrow_groupby
+
+
+# ------------------------------------------------------------------
+# Visitors — centralize ColumnData type dispatch for _frame.mojo
+# ------------------------------------------------------------------
+
+
+struct _RankVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Assign average ranks into a pre-allocated Float64 list.
+
+    For each tied group of elements in sorted order, compute
+    avg = (start + end + 2) / 2 and write that rank at the permuted index.
+    """
+
+    var perm: List[Int]
+    var n_non_null: Int
+    var ranks: List[Float64]
+
+    def __init__(
+        out self,
+        perm: List[Int],
+        n_non_null: Int,
+        ranks: List[Float64],
+    ):
+        self.perm = perm.copy()
+        self.n_non_null = n_non_null
+        self.ranks = ranks.copy()
+
+    def _rank_numeric[
+        T: Comparable & Copyable & Movable
+    ](mut self, data: List[T]) raises:
+        var i = 0
+        while i < self.n_non_null:
+            var j = i
+            while (
+                j < self.n_non_null - 1
+                and data[self.perm[j]] == data[self.perm[j + 1]]
+            ):
+                j += 1
+            var avg_rank = Float64(i + j + 2) / Float64(2)
+            for k in range(i, j + 1):
+                self.ranks[self.perm[k]] = avg_rank
+            i = j + 1
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self._rank_numeric(data)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self._rank_numeric(data)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self._rank_numeric(data)
+
+    def on_str(mut self, data: List[String]) raises:
+        self._rank_numeric(data)
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        var i = 0
+        while i < self.n_non_null:
+            var j = i
+            while j < self.n_non_null - 1 and Bool(
+                data[self.perm[j]] == data[self.perm[j + 1]]
+            ):
+                j += 1
+            var avg_rank = Float64(i + j + 2) / Float64(2)
+            for k in range(i, j + 1):
+                self.ranks[self.perm[k]] = avg_rank
+            i = j + 1
 
 
 struct Series(Copyable, ImplicitlyCopyable, Movable):
@@ -154,16 +223,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
                 + " is out of bounds for Series of length "
                 + String(size)
             )
-        if self._col._data.isa[List[Int64]]():
-            return SeriesScalar(self._col._data[List[Int64]][idx])
-        elif self._col._data.isa[List[Float64]]():
-            return SeriesScalar(self._col._data[List[Float64]][idx])
-        elif self._col._data.isa[List[Bool]]():
-            return SeriesScalar(self._col._data[List[Bool]][idx])
-        elif self._col._data.isa[List[String]]():
-            return SeriesScalar(self._col._data[List[String]][idx])
-        else:
-            return SeriesScalar(self._col._data[List[PythonObject]][idx])
+        return _series_scalar_at(self._col, idx)
 
     def at(self, label: String) raises -> SeriesScalar:
         var n = self._col._index_len()
@@ -372,7 +432,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """Element-wise ``==`` against a string scalar, returning a boolean Series.
         """
         var n = len(self._col)
-        if self._col._data.isa[List[String]]():
+        if self._col.is_string():
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
@@ -380,8 +440,8 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             return Series(self._col._cmp_eq(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
-        if self._col._data.isa[List[PythonObject]]():
-            ref d = self._col._data[List[PythonObject]]
+        if self._col.is_object():
+            ref d = self._col._obj_data()
             for i in range(n):
                 if has_mask and self._col._null_mask[i]:
                     result.append(False)
@@ -397,7 +457,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """Element-wise ``!=`` against a string scalar, returning a boolean Series.
         """
         var n = len(self._col)
-        if self._col._data.isa[List[String]]():
+        if self._col.is_string():
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
@@ -405,8 +465,8 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             return Series(self._col._cmp_ne(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
-        if self._col._data.isa[List[PythonObject]]():
-            ref d = self._col._data[List[PythonObject]]
+        if self._col.is_object():
+            ref d = self._col._obj_data()
             for i in range(n):
                 if has_mask and self._col._null_mask[i]:
                     result.append(True)
@@ -777,63 +837,11 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if has_mask:
             for i in range(n_non_null, n):
                 rank_mask[perm[i]] = True
-        # Assign average ranks for each tied group (type-dispatch).
+        # Assign average ranks for each tied group (type-dispatch via visitor).
         # avg = ((i+1) + (j+1)) / 2 where i..j is the 0-based sorted range.
-        if self._col._data.isa[List[Int64]]():
-            ref d = self._col._data[List[Int64]]
-            var i = 0
-            while i < n_non_null:
-                var j = i
-                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
-                    j += 1
-                var avg_rank = Float64(i + j + 2) / Float64(2)
-                for k in range(i, j + 1):
-                    ranks[perm[k]] = avg_rank
-                i = j + 1
-        elif self._col._data.isa[List[Float64]]():
-            ref d = self._col._data[List[Float64]]
-            var i = 0
-            while i < n_non_null:
-                var j = i
-                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
-                    j += 1
-                var avg_rank = Float64(i + j + 2) / Float64(2)
-                for k in range(i, j + 1):
-                    ranks[perm[k]] = avg_rank
-                i = j + 1
-        elif self._col._data.isa[List[Bool]]():
-            ref d = self._col._data[List[Bool]]
-            var i = 0
-            while i < n_non_null:
-                var j = i
-                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
-                    j += 1
-                var avg_rank = Float64(i + j + 2) / Float64(2)
-                for k in range(i, j + 1):
-                    ranks[perm[k]] = avg_rank
-                i = j + 1
-        elif self._col._data.isa[List[String]]():
-            ref d = self._col._data[List[String]]
-            var i = 0
-            while i < n_non_null:
-                var j = i
-                while j < n_non_null - 1 and d[perm[j]] == d[perm[j + 1]]:
-                    j += 1
-                var avg_rank = Float64(i + j + 2) / Float64(2)
-                for k in range(i, j + 1):
-                    ranks[perm[k]] = avg_rank
-                i = j + 1
-        else:
-            ref d = self._col._data[List[PythonObject]]
-            var i = 0
-            while i < n_non_null:
-                var j = i
-                while j < n_non_null - 1 and Bool(d[perm[j]] == d[perm[j + 1]]):
-                    j += 1
-                var avg_rank = Float64(i + j + 2) / Float64(2)
-                for k in range(i, j + 1):
-                    ranks[perm[k]] = avg_rank
-                i = j + 1
+        var rank_visitor = _RankVisitor(perm, n_non_null, ranks)
+        visit_col_data_raises(rank_visitor, self._col._data)
+        ranks = rank_visitor.ranks.copy()
         var idx = self._col._index.copy()
         var col = Column(self._col.name, ColumnData(ranks^), float64, idx^)
         # n_non_null < n iff there are nulls — no need to re-scan the mask.
@@ -941,38 +949,11 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """
         var result = List[DFScalar]()
         ref col = self._col
-        var has_mask = len(col._null_mask) > 0
-        var n = col.__len__()
-        if col._data.isa[List[Int64]]():
-            ref data = col._data[List[Int64]]
-            for i in range(n):
-                if has_mask and col._null_mask[i]:
-                    result.append(DFScalar.null())
-                else:
-                    result.append(DFScalar(data[i]))
-        elif col._data.isa[List[Float64]]():
-            ref data = col._data[List[Float64]]
-            for i in range(n):
-                if has_mask and col._null_mask[i]:
-                    result.append(DFScalar.null())
-                else:
-                    result.append(DFScalar(data[i]))
-        elif col._data.isa[List[Bool]]():
-            ref data = col._data[List[Bool]]
-            for i in range(n):
-                if has_mask and col._null_mask[i]:
-                    result.append(DFScalar.null())
-                else:
-                    result.append(DFScalar(data[i]))
-        elif col._data.isa[List[String]]():
-            ref data = col._data[List[String]]
-            for i in range(n):
-                if has_mask and col._null_mask[i]:
-                    result.append(DFScalar.null())
-                else:
-                    result.append(DFScalar(data[i]))
-        else:
+        if col.is_object():
             raise Error("Series.to_list: object dtype is not supported")
+        var n = col.__len__()
+        for i in range(n):
+            result.append(_scalar_from_col(col, i))
         return result^
 
     def to_numpy(self) raises -> List[Float64]:
@@ -986,22 +967,22 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var has_mask = len(col._null_mask) > 0
         var nan = Float64(0) / Float64(0)
         var n = col.__len__()
-        if col._data.isa[List[Int64]]():
-            ref data = col._data[List[Int64]]
+        if col.is_int():
+            ref data = col._int64_data()
             for i in range(n):
                 if has_mask and col._null_mask[i]:
                     result.append(nan)
                 else:
                     result.append(Float64(data[i]))
-        elif col._data.isa[List[Float64]]():
-            ref data = col._data[List[Float64]]
+        elif col.is_float():
+            ref data = col._float64_data()
             for i in range(n):
                 if has_mask and col._null_mask[i]:
                     result.append(nan)
                 else:
                     result.append(data[i])
-        elif col._data.isa[List[Bool]]():
-            ref data = col._data[List[Bool]]
+        elif col.is_bool():
+            ref data = col._bool_data()
             for i in range(n):
                 if has_mask and col._null_mask[i]:
                     result.append(nan)
@@ -1107,7 +1088,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     # ------------------------------------------------------------------
 
     def str(self) raises -> StringMethods:
-        if not self._col._data.isa[List[String]]():
+        if not self._col.is_string():
             raise Error("Series.str: accessor requires a string Series")
         ref d = self._col._data[List[String]]
         var data = d.copy()
@@ -1659,8 +1640,8 @@ struct DataFrame(Copyable, Movable):
             )
         var indices = List[Int]()
         var has_mask = len(mask._col._null_mask) > 0
-        if mask._col._data.isa[List[Bool]]():
-            ref d = mask._col._data[List[Bool]]
+        if mask._col.is_bool():
+            ref d = mask._col._bool_data()
             for i in range(mask_len):
                 var is_null = has_mask and mask._col._null_mask[i]
                 if not is_null and d[i]:
@@ -4290,11 +4271,9 @@ struct DataFrame(Copyable, Movable):
 
                 ref vcol = self._cols[name_to_ci[val_names[vi]]]
                 var is_null = len(vcol._null_mask) > 0 and vcol._null_mask[r]
-                if not is_null and vcol._data.isa[List[PythonObject]]():
+                if not is_null and vcol.is_object():
                     is_null = (
-                        String(
-                            vcol._data[List[PythonObject]][r].__class__.__name__
-                        )
+                        String(vcol._obj_data()[r].__class__.__name__)
                         == "NoneType"
                     )
                 if is_null:
@@ -4304,12 +4283,12 @@ struct DataFrame(Copyable, Movable):
                     counts[rk][out_pos] += 1
                     continue
 
-                if vcol._data.isa[List[Int64]]():
-                    sums[rk][out_pos] += Float64(vcol._data[List[Int64]][r])
-                elif vcol._data.isa[List[Float64]]():
-                    sums[rk][out_pos] += vcol._data[List[Float64]][r]
-                elif vcol._data.isa[List[Bool]]():
-                    if vcol._data[List[Bool]][r]:
+                if vcol.is_int():
+                    sums[rk][out_pos] += Float64(vcol._int64_data()[r])
+                elif vcol.is_float():
+                    sums[rk][out_pos] += vcol._float64_data()[r]
+                elif vcol.is_bool():
+                    if vcol._bool_data()[r]:
                         sums[rk][out_pos] += Float64(1.0)
                 else:
                     raise Error(
@@ -4860,8 +4839,8 @@ struct DataFrame(Copyable, Movable):
                 continue
             # Try to treat the cell as an iterable list.
             var expanded = False
-            if exp_col._data.isa[List[PythonObject]]():
-                var cell = exp_col._data[List[PythonObject]][r]
+            if exp_col.is_object():
+                var cell = exp_col._obj_data()[r]
                 try:
                     var cell_len = Int(cell.__len__())
                     for sub in range(cell_len):
@@ -5264,50 +5243,35 @@ struct DataFrame(Copyable, Movable):
                     for j in range(len(right._cols)):
                         if right._cols[j].name == lkeys[k]:
                             ref rk = right._cols[j]
-                            if (
-                                key_col._data.isa[List[Int64]]()
-                                and rk._data.isa[List[Int64]]()
-                            ):
+                            if key_col.is_int() and rk.is_int():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._int64_data()[
                                             r
                                         ] = rk._int64_data()[out_right[r]]
                                         key_col._null_mask[r] = False
-                            elif (
-                                key_col._data.isa[List[Float64]]()
-                                and rk._data.isa[List[Float64]]()
-                            ):
+                            elif key_col.is_float() and rk.is_float():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._float64_data()[
                                             r
                                         ] = rk._float64_data()[out_right[r]]
                                         key_col._null_mask[r] = False
-                            elif (
-                                key_col._data.isa[List[Bool]]()
-                                and rk._data.isa[List[Bool]]()
-                            ):
+                            elif key_col.is_bool() and rk.is_bool():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._bool_data()[
                                             r
                                         ] = rk._bool_data()[out_right[r]]
                                         key_col._null_mask[r] = False
-                            elif (
-                                key_col._data.isa[List[String]]()
-                                and rk._data.isa[List[String]]()
-                            ):
+                            elif key_col.is_string() and rk.is_string():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._str_data()[r] = rk._str_data()[
                                             out_right[r]
                                         ]
                                         key_col._null_mask[r] = False
-                            elif (
-                                key_col._data.isa[List[PythonObject]]()
-                                and rk._data.isa[List[PythonObject]]()
-                            ):
+                            elif key_col.is_object() and rk.is_object():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._obj_data()[r] = rk._obj_data()[
@@ -5936,11 +5900,7 @@ struct DataFrame(Copyable, Movable):
         var nan = Float64(0) / Float64(0)
         for ci in range(ncols):
             ref col = self._cols[ci]
-            if not (
-                col._data.isa[List[Int64]]()
-                or col._data.isa[List[Float64]]()
-                or col._data.isa[List[Bool]]()
-            ):
+            if not (col.is_numeric() or col.is_bool()):
                 raise Error(
                     "DataFrame.to_numpy: column '"
                     + col.name.value()
@@ -5954,15 +5914,13 @@ struct DataFrame(Copyable, Movable):
                 var has_mask = len(col._null_mask) > 0
                 if has_mask and ri < len(col._null_mask) and col._null_mask[ri]:
                     row.append(nan)
-                elif col._data.isa[List[Int64]]():
-                    row.append(Float64(col._data[List[Int64]][ri]))
-                elif col._data.isa[List[Float64]]():
-                    row.append(col._data[List[Float64]][ri])
+                elif col.is_int():
+                    row.append(Float64(col._int64_data()[ri]))
+                elif col.is_float():
+                    row.append(col._float64_data()[ri])
                 else:
                     row.append(
-                        Float64(1.0) if col._data[List[Bool]][ri] else Float64(
-                            0.0
-                        )
+                        Float64(1.0) if col._bool_data()[ri] else Float64(0.0)
                     )
             result.append(row^)
         return result^
@@ -6280,36 +6238,35 @@ def _groupby_row_less(
                 continue
             return not left_is_null and right_is_null
 
-        ref col_data = col._data
-        if col_data.isa[List[Int64]]():
-            var left_val = col_data[List[Int64]][left_row]
-            var right_val = col_data[List[Int64]][right_row]
+        if col.is_int():
+            var left_val = col._int64_data()[left_row]
+            var right_val = col._int64_data()[right_row]
             if left_val < right_val:
                 return True
             if left_val > right_val:
                 return False
-        elif col_data.isa[List[Float64]]():
-            var left_val = col_data[List[Float64]][left_row]
-            var right_val = col_data[List[Float64]][right_row]
+        elif col.is_float():
+            var left_val = col._float64_data()[left_row]
+            var right_val = col._float64_data()[right_row]
             if left_val < right_val:
                 return True
             if left_val > right_val:
                 return False
-        elif col_data.isa[List[Bool]]():
-            var left_val = col_data[List[Bool]][left_row]
-            var right_val = col_data[List[Bool]][right_row]
+        elif col.is_bool():
+            var left_val = col._bool_data()[left_row]
+            var right_val = col._bool_data()[right_row]
             if left_val != right_val:
                 return not left_val and right_val
-        elif col_data.isa[List[String]]():
-            var left_val = col_data[List[String]][left_row]
-            var right_val = col_data[List[String]][right_row]
+        elif col.is_string():
+            var left_val = col._str_data()[left_row]
+            var right_val = col._str_data()[right_row]
             if left_val < right_val:
                 return True
             if left_val > right_val:
                 return False
         else:
-            var left_val = String(col_data[List[PythonObject]][left_row])
-            var right_val = String(col_data[List[PythonObject]][right_row])
+            var left_val = String(col._obj_data()[left_row])
+            var right_val = String(col._obj_data()[right_row])
             if left_val < right_val:
                 return True
             if left_val > right_val:
@@ -6390,14 +6347,14 @@ def _groupby_indices(
                 # numeric keys (e.g. 1, 2, 10) are ordered naturally rather than
                 # lexicographically ("1", "10", "2").
                 var ci = col_idx[by[0]]
-                ref col_data = df._cols[ci]._data
-                if col_data.isa[List[Int64]]():
+                ref col = df._cols[ci]
+                if col.is_int():
                     _insertion_sort_keys_by[Int64](
-                        group_keys, group_map, col_data[List[Int64]]
+                        group_keys, group_map, col._int64_data()
                     )
-                elif col_data.isa[List[Float64]]():
+                elif col.is_float():
                     _insertion_sort_keys_by[Float64](
-                        group_keys, group_map, col_data[List[Float64]]
+                        group_keys, group_map, col._float64_data()
                     )
                 else:
                     _sort_list(group_keys)
@@ -6506,14 +6463,14 @@ struct DataFrameGroupBy:
         if len(self._by) == 1:
             var col_idx = self._col_name_index()
             var ci = col_idx.get(self._by[0], -1)
-            if ci >= 0 and self._df._cols[ci]._data.isa[List[Int64]]():
-                ref d = self._df._cols[ci]._data[List[Int64]]
+            if ci >= 0 and self._df._cols[ci].is_int():
+                ref d = self._df._cols[ci]._int64_data()
                 var int_keys = List[Int64]()
                 for i in range(len(self._group_keys)):
                     int_keys.append(d[self._group_map[self._group_keys[i]][0]])
                 return ColumnIndex(int_keys^)
-            elif ci >= 0 and self._df._cols[ci]._data.isa[List[Float64]]():
-                ref d = self._df._cols[ci]._data[List[Float64]]
+            elif ci >= 0 and self._df._cols[ci].is_float():
+                ref d = self._df._cols[ci]._float64_data()
                 var flt_keys = List[Float64]()
                 for i in range(len(self._group_keys)):
                     flt_keys.append(d[self._group_map[self._group_keys[i]][0]])
@@ -6532,25 +6489,7 @@ struct DataFrameGroupBy:
             var items = builtins.list()
             for k in range(len(key_col_indices)):
                 var ci = key_col_indices[k]
-                ref col_data = self._df._cols[ci]._data
-                if col_data.isa[List[Int64]]():
-                    _ = items.append(
-                        PythonObject(Int(col_data[List[Int64]][first_row]))
-                    )
-                elif col_data.isa[List[Float64]]():
-                    _ = items.append(
-                        PythonObject(col_data[List[Float64]][first_row])
-                    )
-                elif col_data.isa[List[Bool]]():
-                    _ = items.append(
-                        PythonObject(col_data[List[Bool]][first_row])
-                    )
-                elif col_data.isa[List[String]]():
-                    _ = items.append(
-                        PythonObject(col_data[List[String]][first_row])
-                    )
-                else:
-                    _ = items.append(col_data[List[PythonObject]][first_row])
+                _ = items.append(_col_cell_pyobj(self._df._cols[ci], first_row))
             multi_idx.append(builtins.tuple(items))
         return ColumnIndex(multi_idx^)
 
@@ -6637,7 +6576,7 @@ struct DataFrameGroupBy:
         # Key column must be Arrow-convertible (not List[PythonObject]).
         for i in range(len(self._df._cols)):
             if self._df._cols[i].name.value() == self._by[0]:
-                if self._df._cols[i]._data.isa[List[PythonObject]]():
+                if self._df._cols[i].is_object():
                     return False
                 break
         return True
@@ -6679,7 +6618,7 @@ struct DataFrameGroupBy:
             # For count, include all convertible columns.
             # For other aggs, only numeric columns.
             if agg == "count":
-                if col._data.isa[List[PythonObject]]():
+                if col.is_object():
                     continue
             else:
                 if not (col.dtype.is_integer() or col.dtype.is_float()):
@@ -7974,8 +7913,8 @@ def _set_series_scalar_in_col(
 ) raises:
     """Write a ``SeriesScalar`` cell into *col* at position *row*."""
     if value.isa[PythonObject]():
-        if col._data.isa[List[PythonObject]]():
-            col._data[List[PythonObject]][row] = value[PythonObject]
+        if col.is_object():
+            col._obj_data()[row] = value[PythonObject]
         else:
             raise Error("iloc: cannot assign PythonObject to typed column")
         return

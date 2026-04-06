@@ -3525,6 +3525,35 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # ------------------------------------------------------------------
 
 
+struct _SeriesScalarAtVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that extracts one cell at *row* as a ``SeriesScalar``.
+
+    Does not check the null mask — callers must check before dispatching.
+    """
+
+    var row: Int
+    var result: SeriesScalar
+
+    def __init__(out self, row: Int):
+        self.row = row
+        self.result = SeriesScalar(Int64(0))
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self.result = SeriesScalar(data[self.row])
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self.result = SeriesScalar(data[self.row])
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self.result = SeriesScalar(data[self.row])
+
+    def on_str(mut self, data: List[String]) raises:
+        self.result = SeriesScalar(data[self.row])
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        self.result = SeriesScalar(data[self.row])
+
+
 struct _CellToPyObjVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Visitor that extracts one cell at *row* as a ``PythonObject``.
 
@@ -4439,6 +4468,35 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
     def _obj_data(ref self) -> ref[self._data] List[PythonObject]:
         return self._data[List[PythonObject]]
+
+    # ------------------------------------------------------------------
+    # Type-predicate helpers — canonical abstraction over _data.isa checks.
+    # Callers in _frame.mojo should use these instead of raw Variant queries.
+    # ------------------------------------------------------------------
+
+    def is_object(self) -> Bool:
+        """Return True if the active storage arm is ``List[PythonObject]``."""
+        return self._data.isa[List[PythonObject]]()
+
+    def is_numeric(self) -> Bool:
+        """Return True if the active storage arm is int64 or float64."""
+        return self._data.isa[List[Int64]]() or self._data.isa[List[Float64]]()
+
+    def is_int(self) -> Bool:
+        """Return True if the active storage arm is ``List[Int64]``."""
+        return self._data.isa[List[Int64]]()
+
+    def is_float(self) -> Bool:
+        """Return True if the active storage arm is ``List[Float64]``."""
+        return self._data.isa[List[Float64]]()
+
+    def is_bool(self) -> Bool:
+        """Return True if the active storage arm is ``List[Bool]``."""
+        return self._data.isa[List[Bool]]()
+
+    def is_string(self) -> Bool:
+        """Return True if the active storage arm is ``List[String]``."""
+        return self._data.isa[List[String]]()
 
     # ------------------------------------------------------------------
     # Explicit copy helper (used by Series / DataFrame __copyinit__)
@@ -6426,5 +6484,17 @@ def _col_cell_str(col: Column, row: Int) raises -> String:
     if has_mask and row < len(col._null_mask) and col._null_mask[row]:
         return String("")
     var visitor = _CellToStrVisitor(row)
+    visit_col_data_raises(visitor, col._data)
+    return visitor.result
+
+
+def _series_scalar_at(col: Column, row: Int) raises -> SeriesScalar:
+    """Extract cell (*row*) from *col* as a ``SeriesScalar``.
+
+    Unlike ``_scalar_from_col`` (which returns ``DFScalar`` and stringifies
+    ``PythonObject`` cells), this preserves the original typed arm including
+    ``PythonObject``.
+    """
+    var visitor = _SeriesScalarAtVisitor(row)
     visit_col_data_raises(visitor, col._data)
     return visitor.result
