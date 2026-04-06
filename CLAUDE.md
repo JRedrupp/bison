@@ -308,6 +308,23 @@ tokenizer/parser unit tests in `test_expr.mojo`.
 **Workaround**: all query/eval conformance tests live in `tests/test_expr.mojo`,
 not in a separate file. If you add new query/eval tests, add them there.
 
+### Compile-time function types for `apply`, `applymap`, `pipe`
+
+Mojo supports compile-time function types via `comptime`:
+
+```mojo
+comptime FloatTransformFn = def(Float64) -> Float64
+```
+
+These are used in `Column._apply[F]`, `Series.apply[F]`, `DataFrame.apply[F]`,
+`DataFrame.applymap[F]`, and `DataFrame.pipe[F]`. The function must be known at
+compile time — either a module-level `def` or an `@parameter` local function.
+
+**Limitation**: `capturing [_]` is not yet supported in parameter type constraints.
+`pipe[F]` requires `fn(DataFrame) raises -> DataFrame` (non-capturing). The
+`capturing` syntax works in other contexts (`fn call_it[f: fn() capturing [_] -> None]()`)
+but not when the captured function takes a struct argument in a parameter list.
+
 ### `fn` is deprecated on nightly — use `def` everywhere
 
 Nightly Mojo deprecated the `fn` keyword (warning today, error soon). All function
