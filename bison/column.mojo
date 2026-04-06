@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.utils import Variant
 from std.memory import bitcast
 from std.collections import Dict, Set, Optional
-from std.math import sqrt, floor
+from std.math import sqrt, floor, ceil, exp, log, log10
 from marrow.arrays import AnyArray
 from marrow.builders import array as _marrow_array
 from marrow.dtypes import (
@@ -3002,6 +3002,35 @@ struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
 comptime FloatTransformFn = def(Float64) -> Float64
 
 
+# Element-wise FloatTransformFn definitions for _apply[F] (#606)
+def _sqrt_fn(v: Float64) -> Float64:
+    return sqrt(v)
+
+
+def _exp_fn(v: Float64) -> Float64:
+    return exp(v)
+
+
+def _log_fn(v: Float64) -> Float64:
+    return log(v)
+
+
+def _log10_fn(v: Float64) -> Float64:
+    return log10(v)
+
+
+def _ceil_fn(v: Float64) -> Float64:
+    return ceil(v)
+
+
+def _floor_fn(v: Float64) -> Float64:
+    return floor(v)
+
+
+def _neg_fn(v: Float64) -> Float64:
+    return -v
+
+
 # ------------------------------------------------------------------
 # Shared preamble holder for binary element-wise operations.
 # Returned by Column._binary_op_prepare_unchecked; avoids duplicating the
@@ -5287,6 +5316,36 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._build_result_col(
             ColumnData(result^), result_mask^, has_any_null
         )
+
+    # ------------------------------------------------------------------
+    # Element-wise math transforms via _apply[F]  (see #606, #607)
+    # ------------------------------------------------------------------
+    # NOTE: _abs and _round use dedicated visitors instead of _apply[F]
+    # because they preserve input dtype (Int64 in -> Int64 out for _abs,
+    # identity for Int64/Bool in _round). _apply[F] always returns
+    # Float64.  New element-wise transforms that produce Float64 should
+    # use _apply[F] — see the methods below.
+
+    def _sqrt(self) raises -> Column:
+        return self._apply[_sqrt_fn]()
+
+    def _exp(self) raises -> Column:
+        return self._apply[_exp_fn]()
+
+    def _log(self) raises -> Column:
+        return self._apply[_log_fn]()
+
+    def _log10(self) raises -> Column:
+        return self._apply[_log10_fn]()
+
+    def _ceil(self) raises -> Column:
+        return self._apply[_ceil_fn]()
+
+    def _floor(self) raises -> Column:
+        return self._apply[_floor_fn]()
+
+    def _neg(self) raises -> Column:
+        return self._apply[_neg_fn]()
 
     def _isin_kernel[
         T: Comparable & Copyable & Movable

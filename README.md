@@ -119,8 +119,13 @@ names raise an error listing the supported set:
 var totals = df.apply("sum", axis=0)       # -> Series (delegates to agg)
 var row_sums = df.apply("sum", axis=1)     # -> Series (row-wise)
 var abs_df = df.applymap("abs")            # -> DataFrame (element-wise)
+var log_df = df.applymap("log")            # -> DataFrame (element-wise)
 var piped = df.pipe("abs")                 # -> DataFrame
 ```
+
+Supported element-wise string names for `applymap`, `transform`, and `pipe`:
+`abs`, `round`, `sqrt`, `exp`, `log`, `log10`, `ceil`, `floor`, `neg`.
+`transform` additionally supports `cumsum`, `cumprod`, `cummin`, `cummax`.
 
 **Compile-time** accepts a user-defined function as a type parameter. This is
 fully native Mojo with no string dispatch:

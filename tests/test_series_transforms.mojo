@@ -671,5 +671,88 @@ def test_pct_change_null_propagation() raises:
     assert_true(r.isna().iloc(2)[Bool])
 
 
+# ---------------------------------------------------------------------------
+# Element-wise math operations (#606)
+# ---------------------------------------------------------------------------
+
+def test_sqrt() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 4.0, 9.0, 16.0]")))
+    var r = s.sqrt()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+    assert_true(r.iloc(3)[Float64] == 4.0)
+
+
+def test_exp() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[0.0, 1.0]")))
+    var r = s.exp()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    var e_val = r.iloc(1)[Float64]
+    assert_true(e_val > 2.718 and e_val < 2.719)
+
+
+def test_log() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 2.718281828459045]")))
+    var r = s.log()
+    assert_true(r.iloc(0)[Float64] == 0.0)
+    var ln_e = r.iloc(1)[Float64]
+    assert_true(ln_e > 0.999 and ln_e < 1.001)
+
+
+def test_log10() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, 10.0, 100.0, 1000.0]")))
+    var r = s.log10()
+    assert_true(r.iloc(0)[Float64] == 0.0)
+    assert_true(r.iloc(1)[Float64] == 1.0)
+    assert_true(r.iloc(2)[Float64] == 2.0)
+    assert_true(r.iloc(3)[Float64] == 3.0)
+
+
+def test_ceil() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.1, 2.5, -1.1, -2.5]")))
+    var r = s.ceil()
+    assert_true(r.iloc(0)[Float64] == 2.0)
+    assert_true(r.iloc(1)[Float64] == 3.0)
+    assert_true(r.iloc(2)[Float64] == -1.0)
+    assert_true(r.iloc(3)[Float64] == -2.0)
+
+
+def test_floor() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.1, 2.5, -1.1, -2.5]")))
+    var r = s.floor()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == -2.0)
+    assert_true(r.iloc(3)[Float64] == -3.0)
+
+
+def test_neg() raises:
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1.0, -2.0, 3.0, 0.0]")))
+    var r = s.neg()
+    assert_true(r.iloc(0)[Float64] == -1.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == -3.0)
+    assert_true(r.iloc(3)[Float64] == 0.0)
+
+
+def test_sqrt_int_column() raises:
+    """Sqrt on int column should convert to float64."""
+    var pd = Python.import_module("pandas")
+    var s = Series(pd.Series(Python.evaluate("[1, 4, 9]"), dtype="int64"))
+    var r = s.sqrt()
+    assert_true(r.iloc(0)[Float64] == 1.0)
+    assert_true(r.iloc(1)[Float64] == 2.0)
+    assert_true(r.iloc(2)[Float64] == 3.0)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
