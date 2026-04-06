@@ -35,6 +35,14 @@ from .column import (
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
 from .expr import parse as _parse_expr, eval_expr as _eval_expr
+from .arrow import column_to_marrow_array, marrow_array_to_column
+from marrow.arrays import AnyArray
+from marrow.builders import StringBuilder as _MarrowStringBuilder
+from marrow.dtypes import (
+    int64 as _m_int64,
+    float64 as _m_float64,
+)
+from marrow.kernels.groupby import groupby as _marrow_groupby
 
 
 struct Series(Copyable, ImplicitlyCopyable, Movable):
@@ -6800,7 +6808,251 @@ struct DataFrameGroupBy:
             final_cols.append(c^)
         return DataFrame(final_cols^)
 
+    def _can_use_marrow_agg(self, agg: String) -> Bool:
+        """Check if marrow hash-aggregate fast path can be used."""
+        if len(self._by) != 1 or not self._as_index:
+            return False
+        if not (
+            agg == "sum"
+            or agg == "mean"
+            or agg == "min"
+            or agg == "max"
+            or agg == "count"
+        ):
+            return False
+        # Key column must be Arrow-convertible (not List[PythonObject]).
+        for i in range(len(self._df._cols)):
+            if self._df._cols[i].name.value() == self._by[0]:
+                if self._df._cols[i]._data.isa[List[PythonObject]]():
+                    return False
+                break
+        return True
+
+    def _marrow_agg(self, agg: String) raises -> DataFrame:
+        """Run aggregation via marrow's fused hash-aggregate kernel.
+
+        Converts key + value columns to marrow arrays, calls the kernel,
+        then post-processes: dropna filter, sort, dtype cast-back, and
+        index construction.
+        """
+        var key_col_name = self._by[0]
+
+        # Find key column.
+        var key_col_idx = -1
+        for i in range(len(self._df._cols)):
+            if self._df._cols[i].name.value() == key_col_name:
+                key_col_idx = i
+                break
+        if key_col_idx < 0:
+            raise Error(
+                "DataFrameGroupBy._marrow_agg: key column not found: "
+                + key_col_name
+            )
+
+        # Convert key column to marrow array.
+        var key_arr = column_to_marrow_array(self._df._cols[key_col_idx])
+
+        # Collect value columns and their original dtypes.
+        var value_names = List[String]()
+        var value_dtypes = List[BisonDtype]()
+        var marrow_values = List[AnyArray]()
+        var marrow_aggs = List[String]()
+
+        for i in range(len(self._df._cols)):
+            if i == key_col_idx:
+                continue
+            ref col = self._df._cols[i]
+            # For count, include all convertible columns.
+            # For other aggs, only numeric columns.
+            if agg == "count":
+                if col._data.isa[List[PythonObject]]():
+                    continue
+            else:
+                if not (col.dtype.is_integer() or col.dtype.is_float()):
+                    continue
+            marrow_values.append(column_to_marrow_array(col))
+            marrow_aggs.append(agg)
+            value_names.append(col.name.value())
+            value_dtypes.append(col.dtype)
+
+        if len(marrow_values) == 0:
+            return DataFrame(List[Column]())
+
+        # Call marrow groupby kernel.
+        var rb = _marrow_groupby(key_arr, marrow_values, marrow_aggs)
+        var num_groups = rb.num_rows()
+
+        if num_groups == 0:
+            return DataFrame(List[Column]())
+
+        # Extract key column from result (column 0).
+        var result_key = rb.column(0).copy()
+
+        # Determine valid (non-null key) row mask for dropna.
+        var keep = List[Int]()
+        for i in range(num_groups):
+            if self._dropna and not rb.column(0).is_valid(i):
+                continue
+            keep.append(i)
+
+        # Sort by key if requested.
+        if self._sort and len(keep) > 1:
+            # Build sortable key values from the marrow result key column.
+            var sort_vals = List[Float64]()
+            var sort_strs = List[String]()
+            var use_numeric = result_key.dtype().is_numeric()
+            if use_numeric:
+                for i in range(num_groups):
+                    if result_key.dtype() == _m_float64:
+                        sort_vals.append(
+                            rebind[Float64](
+                                result_key.as_primitive[
+                                    _m_float64
+                                ]().unsafe_get(i)
+                            )
+                        )
+                    else:
+                        sort_vals.append(
+                            Float64(
+                                Int(
+                                    result_key.as_primitive[
+                                        _m_int64
+                                    ]().unsafe_get(i)
+                                )
+                            )
+                        )
+            else:
+                for i in range(num_groups):
+                    sort_strs.append(
+                        String(result_key.as_string().unsafe_get(UInt(i)))
+                    )
+
+            # Insertion sort on keep indices — G is typically small.
+            for i in range(1, len(keep)):
+                var j = i
+                while j > 0:
+                    var a = keep[j - 1]
+                    var b = keep[j]
+                    var should_swap = (
+                        sort_vals[a]
+                        > sort_vals[b] if use_numeric else sort_strs[a]
+                        > sort_strs[b]
+                    )
+                    if should_swap:
+                        keep[j - 1] = b
+                        keep[j] = a
+                        j -= 1
+                    else:
+                        break
+
+        var n_keep = len(keep)
+
+        # Build ColumnIndex from the key column.
+        var idx: ColumnIndex
+        if result_key.dtype() == _m_int64:
+            var int_keys = List[Int64]()
+            for i in range(n_keep):
+                int_keys.append(
+                    rebind[Int64](
+                        result_key.as_primitive[_m_int64]().unsafe_get(keep[i])
+                    )
+                )
+            idx = ColumnIndex(int_keys^)
+        elif result_key.dtype() == _m_float64:
+            var flt_keys = List[Float64]()
+            for i in range(n_keep):
+                flt_keys.append(
+                    rebind[Float64](
+                        result_key.as_primitive[_m_float64]().unsafe_get(
+                            keep[i]
+                        )
+                    )
+                )
+            idx = ColumnIndex(flt_keys^)
+        else:
+            var str_keys = List[String]()
+            for i in range(n_keep):
+                str_keys.append(
+                    String(result_key.as_string().unsafe_get(UInt(keep[i])))
+                )
+            idx = ColumnIndex(Index(str_keys^))
+
+        # Build result columns.
+        var result_cols = List[Column]()
+        for v in range(len(value_names)):
+            var rb_col = rb.column(v + 1).copy()  # +1 to skip key column.
+            var is_count = agg == "count"
+            var orig_is_int = value_dtypes[v].is_integer()
+
+            # Determine whether to produce int64 or float64 result.
+            if is_count or (orig_is_int and agg != "mean"):
+                # int64 result: count always int64; sum/min/max of int -> int64.
+                var vals = List[Int64]()
+                var null_mask = List[Bool]()
+                var has_null = False
+                for i in range(n_keep):
+                    var ri = keep[i]
+                    if not rb_col.is_valid(ri):
+                        vals.append(Int64(0))
+                        null_mask.append(True)
+                        has_null = True
+                    elif is_count:
+                        vals.append(
+                            rebind[Int64](
+                                rb_col.as_primitive[_m_int64]().unsafe_get(ri)
+                            )
+                        )
+                        null_mask.append(False)
+                    else:
+                        # sum/min/max of integer col: marrow stores as float64.
+                        vals.append(
+                            Int64(
+                                Float64(
+                                    rb_col.as_primitive[
+                                        _m_float64
+                                    ]().unsafe_get(ri)
+                                )
+                            )
+                        )
+                        null_mask.append(False)
+                var col = Column(
+                    value_names[v], ColumnData(vals^), int64, idx.copy()
+                )
+                col._index_name = key_col_name
+                if has_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+            else:
+                # float64 result: mean, or float col sum/min/max.
+                var vals = List[Float64]()
+                var null_mask = List[Bool]()
+                var has_null = False
+                for i in range(n_keep):
+                    var ri = keep[i]
+                    if not rb_col.is_valid(ri):
+                        vals.append(Float64(0))
+                        null_mask.append(True)
+                        has_null = True
+                    else:
+                        vals.append(
+                            rebind[Float64](
+                                rb_col.as_primitive[_m_float64]().unsafe_get(ri)
+                            )
+                        )
+                        null_mask.append(False)
+                var col = Column(
+                    value_names[v], ColumnData(vals^), float64, idx.copy()
+                )
+                col._index_name = key_col_name
+                if has_null:
+                    col._null_mask = null_mask^
+                result_cols.append(col^)
+
+        return DataFrame(result_cols^)
+
     def sum(self) raises -> DataFrame:
+        if self._can_use_marrow_agg("sum"):
+            return self._marrow_agg("sum")
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6830,6 +7082,8 @@ struct DataFrameGroupBy:
         return self._wrap_agg_result(result_cols^)
 
     def mean(self) raises -> DataFrame:
+        if self._can_use_marrow_agg("mean"):
+            return self._marrow_agg("mean")
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6849,6 +7103,8 @@ struct DataFrameGroupBy:
         return self._wrap_agg_result(result_cols^)
 
     def min(self) raises -> DataFrame:
+        if self._can_use_marrow_agg("min"):
+            return self._marrow_agg("min")
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6878,6 +7134,8 @@ struct DataFrameGroupBy:
         return self._wrap_agg_result(result_cols^)
 
     def max(self) raises -> DataFrame:
+        if self._can_use_marrow_agg("max"):
+            return self._marrow_agg("max")
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6945,6 +7203,8 @@ struct DataFrameGroupBy:
         return self._wrap_agg_result(result_cols^)
 
     def count(self) raises -> DataFrame:
+        if self._can_use_marrow_agg("count"):
+            return self._marrow_agg("count")
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -7292,7 +7552,165 @@ struct SeriesGroupBy:
             dropna=self._dropna,
         )
 
+    def _can_use_marrow_agg(self, agg: String) -> Bool:
+        """Check if marrow hash-aggregate fast path can be used."""
+        if not self._as_index:
+            return False
+        if not (
+            agg == "sum"
+            or agg == "mean"
+            or agg == "min"
+            or agg == "max"
+            or agg == "count"
+        ):
+            return False
+        # For non-count aggs, value column must be numeric.
+        if agg != "count" and not (
+            self._series._col.dtype.is_integer()
+            or self._series._col.dtype.is_float()
+        ):
+            return False
+        return True
+
+    def _marrow_agg(self, agg: String) raises -> Series:
+        """Run aggregation via marrow's fused hash-aggregate kernel.
+
+        Converts labels to a StringArray key and the series column to a
+        marrow array, calls the kernel, then post-processes.
+        """
+        # Build key array from group labels.
+        var n = len(self._by)
+        var sb = _MarrowStringBuilder(capacity=n)
+        var has_null_mask = len(self._by_null_mask) > 0
+        for i in range(n):
+            if has_null_mask and self._by_null_mask[i]:
+                sb.append_null()
+            else:
+                sb.append(self._by[i])
+        var key_arr = AnyArray(sb.finish())
+
+        # Convert value column.
+        var val_arr = column_to_marrow_array(self._series._col)
+
+        # Call marrow groupby kernel.
+        var values = List[AnyArray]()
+        values.append(val_arr^)
+        var aggs = List[String]()
+        aggs.append(agg)
+        var rb = _marrow_groupby(key_arr, values, aggs)
+        var num_groups = rb.num_rows()
+
+        if num_groups == 0:
+            return Series(
+                Column(
+                    self._series.name,
+                    ColumnData(List[Float64]()),
+                    float64,
+                    ColumnIndex(Index(List[String]())),
+                )
+            )
+
+        # Extract key column from result (column 0) — always string.
+        var result_key = rb.column(0).copy()
+
+        # Determine valid (non-null key) row mask for dropna.
+        var keep = List[Int]()
+        for i in range(num_groups):
+            if self._dropna and not rb.column(0).is_valid(i):
+                continue
+            keep.append(i)
+
+        # Sort by key if requested.
+        if self._sort and len(keep) > 1:
+            var sort_strs = List[String]()
+            for i in range(num_groups):
+                sort_strs.append(
+                    String(result_key.as_string().unsafe_get(UInt(i)))
+                )
+            for i in range(1, len(keep)):
+                var j = i
+                while j > 0:
+                    var a = keep[j - 1]
+                    var b = keep[j]
+                    if sort_strs[a] > sort_strs[b]:
+                        keep[j - 1] = b
+                        keep[j] = a
+                        j -= 1
+                    else:
+                        break
+
+        var n_keep = len(keep)
+
+        # Build index from sorted/filtered key strings.
+        var idx_keys = List[String]()
+        for i in range(n_keep):
+            idx_keys.append(
+                String(result_key.as_string().unsafe_get(UInt(keep[i])))
+            )
+        var idx = ColumnIndex(Index(idx_keys^))
+
+        # Build result values.
+        var rb_col = rb.column(1).copy()
+        var is_count = agg == "count"
+        var orig_is_int = self._series._col.dtype.is_integer()
+
+        if is_count or (orig_is_int and agg != "mean"):
+            var vals = List[Int64]()
+            var null_mask = List[Bool]()
+            var has_null = False
+            for i in range(n_keep):
+                var ri = keep[i]
+                if not rb_col.is_valid(ri):
+                    vals.append(Int64(0))
+                    null_mask.append(True)
+                    has_null = True
+                elif is_count:
+                    vals.append(
+                        rebind[Int64](
+                            rb_col.as_primitive[_m_int64]().unsafe_get(ri)
+                        )
+                    )
+                    null_mask.append(False)
+                else:
+                    vals.append(
+                        Int64(
+                            Float64(
+                                rb_col.as_primitive[_m_float64]().unsafe_get(ri)
+                            )
+                        )
+                    )
+                    null_mask.append(False)
+            var col = Column(self._series.name, ColumnData(vals^), int64, idx^)
+            if has_null:
+                col._null_mask = null_mask^
+            return Series(col^)
+        else:
+            var vals = List[Float64]()
+            var null_mask = List[Bool]()
+            var has_null = False
+            for i in range(n_keep):
+                var ri = keep[i]
+                if not rb_col.is_valid(ri):
+                    vals.append(Float64(0))
+                    null_mask.append(True)
+                    has_null = True
+                else:
+                    vals.append(
+                        rebind[Float64](
+                            rb_col.as_primitive[_m_float64]().unsafe_get(ri)
+                        )
+                    )
+                    null_mask.append(False)
+            var col = Column(
+                self._series.name, ColumnData(vals^), float64, idx^
+            )
+            if has_null:
+                col._null_mask = null_mask^
+            return Series(col^)
+
     def sum(self) raises -> Series:
+        if self._can_use_marrow_agg("sum"):
+            return self._marrow_agg("sum")
         var idx = ColumnIndex(Index(self._group_keys.copy()))
         if self._series._col.dtype.is_integer():
             var result_vals = List[Int64]()
@@ -7315,6 +7733,8 @@ struct SeriesGroupBy:
         )
 
     def mean(self) raises -> Series:
+        if self._can_use_marrow_agg("mean"):
+            return self._marrow_agg("mean")
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
@@ -7327,6 +7747,8 @@ struct SeriesGroupBy:
         )
 
     def min(self) raises -> Series:
+        if self._can_use_marrow_agg("min"):
+            return self._marrow_agg("min")
         var idx = ColumnIndex(Index(self._group_keys.copy()))
         if self._series._col.dtype.is_integer():
             var result_vals = List[Int64]()
@@ -7349,6 +7771,8 @@ struct SeriesGroupBy:
         )
 
     def max(self) raises -> Series:
+        if self._can_use_marrow_agg("max"):
+            return self._marrow_agg("max")
         var idx = ColumnIndex(Index(self._group_keys.copy()))
         if self._series._col.dtype.is_integer():
             var result_vals = List[Int64]()
@@ -7371,6 +7795,8 @@ struct SeriesGroupBy:
         )
 
     def count(self) raises -> Series:
+        if self._can_use_marrow_agg("count"):
+            return self._marrow_agg("count")
         var result_vals = List[Int64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]

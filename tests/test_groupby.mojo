@@ -1,7 +1,9 @@
 """Tests for DataFrame.groupby(), DataFrameGroupBy, and SeriesGroupBy."""
 from std.python import Python, PythonObject
+from std.collections import Dict
 from std.testing import assert_equal, TestSuite
-from bison import DataFrame, Series
+from bison import DataFrame, Series, ColumnData, Column
+from bison.dtypes import int64 as _bison_int64, float64 as _bison_float64
 from _helpers import assert_frame_equal, assert_series_equal
 
 
@@ -769,6 +771,263 @@ def test_groupby_multikey_delimiter_only_values() raises:
     var result_pd = result.to_pandas()
     var expected = pd_df.groupby(Python.evaluate("['k1', 'k2']")).sum()
     assert_frame_equal(result_pd, expected)
+
+
+# ------------------------------------------------------------------
+# Marrow hash-aggregate fast-path tests
+# ------------------------------------------------------------------
+
+
+def _make_native_df() raises -> DataFrame:
+    """Create a DataFrame with native int64 key column (not PythonObject).
+
+    This triggers the marrow groupby fast path since the key column is
+    List[Int64], not List[PythonObject].
+    """
+    var d = Dict[String, ColumnData]()
+    var grp = List[Int64]()
+    grp.append(1)
+    grp.append(1)
+    grp.append(2)
+    grp.append(2)
+    d["grp"] = ColumnData(grp^)
+    var val = List[Int64]()
+    val.append(10)
+    val.append(20)
+    val.append(30)
+    val.append(40)
+    d["val"] = ColumnData(val^)
+    var x = List[Float64]()
+    x.append(1.5)
+    x.append(2.5)
+    x.append(3.5)
+    x.append(4.5)
+    d["x"] = ColumnData(x^)
+    return DataFrame.from_dict(d)
+
+
+def _native_to_pandas() raises -> PythonObject:
+    """Create the equivalent pandas DataFrame for comparison."""
+    var pd = Python.import_module("pandas")
+    return pd.DataFrame(
+        Python.evaluate(
+            "{'grp': [1, 1, 2, 2], 'val': [10, 20, 30, 40],"
+            " 'x': [1.5, 2.5, 3.5, 4.5]}"
+        )
+    )
+
+
+def test_marrow_sum() raises:
+    """Marrow fast path: sum with int64 key preserves int64 for int columns."""
+    var df = _make_native_df()
+    var pd_df = _native_to_pandas()
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    var expected = pd_df.groupby("grp").sum()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_mean() raises:
+    """Marrow fast path: mean with int64 key returns float64."""
+    var df = _make_native_df()
+    var pd_df = _native_to_pandas()
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).mean().to_pandas()
+    var expected = pd_df.groupby("grp").mean()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_min() raises:
+    """Marrow fast path: min with int64 key preserves int64 for int columns."""
+    var df = _make_native_df()
+    var pd_df = _native_to_pandas()
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).min().to_pandas()
+    var expected = pd_df.groupby("grp").min()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_max() raises:
+    """Marrow fast path: max with int64 key preserves int64 for int columns."""
+    var df = _make_native_df()
+    var pd_df = _native_to_pandas()
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).max().to_pandas()
+    var expected = pd_df.groupby("grp").max()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_count() raises:
+    """Marrow fast path: count with int64 key returns int64."""
+    var df = _make_native_df()
+    var pd_df = _native_to_pandas()
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).count().to_pandas()
+    var expected = pd_df.groupby("grp").count()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_float_key() raises:
+    """Marrow fast path: groupby on a float64 key column."""
+    var d = Dict[String, ColumnData]()
+    var grp = List[Float64]()
+    grp.append(1.0)
+    grp.append(1.0)
+    grp.append(2.0)
+    grp.append(2.0)
+    d["grp"] = ColumnData(grp^)
+    var val = List[Int64]()
+    val.append(10)
+    val.append(20)
+    val.append(30)
+    val.append(40)
+    d["val"] = ColumnData(val^)
+    var df = DataFrame.from_dict(d)
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': [1.0, 1.0, 2.0, 2.0], 'val': [10, 20, 30, 40]}"
+        )
+    )
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    var expected = pd_df.groupby("grp").sum()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_string_key() raises:
+    """Marrow fast path: groupby on a native List[String] key column."""
+    var d = Dict[String, ColumnData]()
+    var grp = List[String]()
+    grp.append("a")
+    grp.append("a")
+    grp.append("b")
+    grp.append("b")
+    d["grp"] = ColumnData(grp^)
+    var val = List[Int64]()
+    val.append(10)
+    val.append(20)
+    val.append(30)
+    val.append(40)
+    d["val"] = ColumnData(val^)
+    var df = DataFrame.from_dict(d)
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': ['a', 'a', 'b', 'b'], 'val': [10, 20, 30, 40]}"
+        )
+    )
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    var expected = pd_df.groupby("grp").sum()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_unsorted_keys() raises:
+    """Marrow fast path: keys not in order are sorted correctly."""
+    var d = Dict[String, ColumnData]()
+    var grp = List[Int64]()
+    grp.append(3)
+    grp.append(1)
+    grp.append(2)
+    grp.append(1)
+    grp.append(3)
+    grp.append(2)
+    d["grp"] = ColumnData(grp^)
+    var val = List[Int64]()
+    val.append(10)
+    val.append(20)
+    val.append(30)
+    val.append(40)
+    val.append(50)
+    val.append(60)
+    d["val"] = ColumnData(val^)
+    var df = DataFrame.from_dict(d)
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate(
+            "{'grp': [3, 1, 2, 1, 3, 2], 'val': [10, 20, 30, 40, 50, 60]}"
+        )
+    )
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by).sum().to_pandas()
+    var expected = pd_df.groupby("grp").sum()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_fallback_multikey() raises:
+    """Multi-key groupby should fall back to existing path, not marrow."""
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    by.append("val")
+    var result = df.groupby(by).sum().to_pandas()
+    var expected = pd_df.groupby(Python.evaluate("['grp', 'val']")).sum()
+    assert_frame_equal(result, expected)
+
+
+def test_marrow_fallback_as_index_false() raises:
+    """The as_index=False option should fall back to existing path."""
+    var pd_df = _make_pd_df()
+    var df = DataFrame(pd_df)
+    var by = List[String]()
+    by.append("grp")
+    var result = df.groupby(by, as_index=False).sum().to_pandas()
+    var expected = pd_df.groupby("grp", as_index=False).sum()
+    assert_frame_equal(result, expected, check_dtype=False)
+
+
+def test_marrow_series_sum() raises:
+    """Marrow fast path for SeriesGroupBy.sum()."""
+    var vals = List[Int64]()
+    vals.append(10)
+    vals.append(20)
+    vals.append(30)
+    vals.append(40)
+    var s = Series(Column("val", ColumnData(vals^), _bison_int64))
+    var labels = List[String]()
+    labels.append("a")
+    labels.append("a")
+    labels.append("b")
+    labels.append("b")
+    var result = s.groupby(labels).sum()
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(
+        Python.evaluate("[10, 20, 30, 40]"), name="val"
+    )
+    var expected = pd_s.groupby(Python.evaluate("['a', 'a', 'b', 'b']")).sum()
+    assert_series_equal(result.to_pandas(), expected)
+
+
+def test_marrow_series_mean() raises:
+    """Marrow fast path for SeriesGroupBy.mean()."""
+    var vals = List[Float64]()
+    vals.append(1.0)
+    vals.append(3.0)
+    vals.append(5.0)
+    vals.append(7.0)
+    var s = Series(Column("val", ColumnData(vals^), _bison_float64))
+    var labels = List[String]()
+    labels.append("a")
+    labels.append("a")
+    labels.append("b")
+    labels.append("b")
+    var result = s.groupby(labels).mean()
+    var pd = Python.import_module("pandas")
+    var pd_s = pd.Series(
+        Python.evaluate("[1.0, 3.0, 5.0, 7.0]"), name="val"
+    )
+    var expected = pd_s.groupby(Python.evaluate("['a', 'a', 'b', 'b']")).mean()
+    assert_series_equal(result.to_pandas(), expected)
 
 
 def main() raises:
