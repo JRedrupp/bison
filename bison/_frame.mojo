@@ -3193,13 +3193,69 @@ struct DataFrame(Copyable, Movable):
     def aggregate(self, func: String, axis: Int = 0) raises -> Series:
         return self.agg(func, axis)
 
-    def apply(self, func: String, axis: Int = 0) raises -> DataFrame:
-        _not_implemented("DataFrame.apply")
-        return DataFrame()
+    def apply(self, func: String, axis: Int = 0) raises -> Series:
+        if axis == 0:
+            return self.agg(func)
+        elif axis == 1:
+            if func == "sum":
+                return self.sum(axis=1)
+            elif func == "mean":
+                return self.mean(axis=1)
+            elif func == "median":
+                return self.median(axis=1)
+            elif func == "min":
+                return self.min(axis=1)
+            elif func == "max":
+                return self.max(axis=1)
+            elif func == "std":
+                return self.std(axis=1)
+            elif func == "var":
+                return self.var(axis=1)
+            elif func == "count":
+                return self.count(axis=1)
+            elif func == "nunique":
+                return self.nunique(axis=1)
+            else:
+                raise Error(
+                    "DataFrame.apply: unsupported func '"
+                    + func
+                    + "' for axis=1. Supported: sum, mean, median, min, max,"
+                    " std, var, count, nunique"
+                )
+        else:
+            raise Error(
+                "No axis named " + String(axis) + " for object type DataFrame"
+            )
+
+    def apply[F: FloatTransformFn](self, axis: Int = 0) raises -> DataFrame:
+        if axis != 0:
+            raise Error(
+                "DataFrame.apply[F]: compile-time functions only supported"
+                " for axis=0 (column-wise element-wise transform)"
+            )
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._apply[F]())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
 
     def applymap(self, func: String) raises -> DataFrame:
-        _not_implemented("DataFrame.applymap")
-        return DataFrame()
+        if func == "abs":
+            return self.abs()
+        elif func == "round":
+            return self.round()
+        else:
+            raise Error(
+                "DataFrame.applymap: unsupported func '"
+                + func
+                + "'. Supported: abs, round"
+            )
+
+    def applymap[F: FloatTransformFn](self) raises -> DataFrame:
+        return self.apply[F](axis=0)
 
     def transform(self, func: String, axis: Int = 0) raises -> DataFrame:
         if axis == 1:
@@ -3253,8 +3309,17 @@ struct DataFrame(Copyable, Movable):
         return self[mask]
 
     def pipe(self, func: String) raises -> DataFrame:
-        _not_implemented("DataFrame.pipe")
-        return DataFrame()
+        if func == "abs":
+            return self.abs()
+        else:
+            raise Error(
+                "DataFrame.pipe: unsupported func '"
+                + func
+                + "'. Supported: abs"
+            )
+
+    def pipe[F: fn(DataFrame) raises -> DataFrame](self) raises -> DataFrame:
+        return F(self)
 
     # ------------------------------------------------------------------
     # Missing data
