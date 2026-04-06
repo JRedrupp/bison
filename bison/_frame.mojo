@@ -4202,24 +4202,21 @@ struct DataFrame(Copyable, Movable):
         var n_rk = len(row_keys)
         var n_ck = len(col_keys)
 
-        # Build a dense values table (row_key × col_key).
-        # _table[rk][ck] holds a PythonObject value or Python None.
-        # We also track which cells were filled to detect duplicates.
-        var table = List[List[PythonObject]]()
-        var filled = List[List[Bool]]()
-        for _ in range(n_rk):
-            var row_data = List[PythonObject]()
-            var row_filled = List[Bool]()
-            for _ in range(n_ck):
-                row_data.append(py_none)
-                row_filled.append(False)
-            table.append(row_data^)
-            filled.append(row_filled^)
+        # Build a dense values table (row_key × col_key) using flat lists with
+        # stride arithmetic: cell (rk, ck) lives at index rk * n_ck + ck.
+        # This avoids the double index operation per cell that a
+        # List[List[...]] layout would require.
+        var table = List[PythonObject]()
+        var filled = List[Bool]()
+        for _ in range(n_rk * n_ck):
+            table.append(py_none)
+            filled.append(False)
 
         for r in range(nrows):
             var rk = seen_rows[_frame_cell_as_str(self._cols[idx_ci], r)]
             var ck = seen_cols[_frame_cell_as_str(self._cols[col_ci], r)]
-            if filled[rk][ck]:
+            var cell = rk * n_ck + ck
+            if filled[cell]:
                 raise Error(
                     "DataFrame.pivot: duplicate entry for ("
                     + row_keys[rk]
@@ -4227,8 +4224,8 @@ struct DataFrame(Copyable, Movable):
                     + col_keys[ck]
                     + ")"
                 )
-            table[rk][ck] = _frame_cell_as_python(self._cols[val_ci], r)
-            filled[rk][ck] = True
+            table[cell] = _frame_cell_as_python(self._cols[val_ci], r)
+            filled[cell] = True
 
         # Construct index labels (string Index) shared by all result columns.
         var result_idx = ColumnIndex(Index(row_keys^))
@@ -4240,12 +4237,13 @@ struct DataFrame(Copyable, Movable):
             var null_mask = List[Bool]()
             var any_null = False
             for rk in range(n_rk):
-                if not filled[rk][ck]:
+                var cell = rk * n_ck + ck
+                if not filled[cell]:
                     data.append(py_none)
                     null_mask.append(True)
                     any_null = True
                 else:
-                    data.append(table[rk][ck])
+                    data.append(table[cell])
                     null_mask.append(False)
             var col = Column(col_keys[ck], ColumnData(data^), object_)
             col._index = result_idx.copy()
