@@ -256,7 +256,7 @@ def test_df_transform_unknown_raises() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, 2.0, 3.0]}")))
     var raised = False
     try:
-        _ = df.transform("log")
+        _ = df.transform("sin")
     except:
         raised = True
     if not raised:
@@ -379,6 +379,172 @@ def test_df_pipe_comptime() raises:
     var result_pd = result.to_pandas()
     var expected_pd = df.abs().to_pandas()
     assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+# ---------------------------------------------------------------------------
+# applymap — new element-wise math operations (#606)
+# ---------------------------------------------------------------------------
+
+def test_df_applymap_sqrt() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 4.0, 9.0], 'b': [16.0, 25.0, 36.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("sqrt").to_pandas()
+    var expected_pd = pd_df.apply(np.sqrt)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_applymap_exp() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [0.0, 1.0, 2.0], 'b': [0.0, -1.0, 0.5]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("exp").to_pandas()
+    var expected_pd = pd_df.apply(np.exp)
+    for col_name in ["a", "b"]:
+        assert_true(
+            String(
+                np.allclose(result_pd[col_name].values, expected_pd[col_name].values)
+            )
+            == "True"
+        )
+
+
+def test_df_applymap_log() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 2.718281828459045, 10.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("log").to_pandas()
+    var expected_pd = pd_df.apply(np.log)
+    assert_true(
+        String(
+            np.allclose(result_pd["a"].values, expected_pd["a"].values)
+        )
+        == "True"
+    )
+
+
+def test_df_applymap_log10() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 10.0, 100.0], 'b': [1000.0, 0.1, 0.01]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("log10").to_pandas()
+    var expected_pd = pd_df.apply(np.log10)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_applymap_ceil() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.1, 2.5, 3.9], 'b': [-1.1, -2.5, -3.9]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("ceil").to_pandas()
+    var expected_pd = pd_df.apply(np.ceil)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_applymap_floor() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.1, 2.5, 3.9], 'b': [-1.1, -2.5, -3.9]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("floor").to_pandas()
+    var expected_pd = pd_df.apply(np.floor)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_applymap_neg() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, -2.0, 3.0], 'b': [-4.0, 5.0, -6.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.applymap("neg").to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == -1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 2.0)
+    assert_true(Float64(String(result_pd["b"].iloc[2])) == 6.0)
+
+
+def test_df_applymap_negate_alias() raises:
+    """Verify applymap('negate') is an alias for applymap('neg')."""
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, -2.0, 3.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_neg = df.applymap("neg").to_pandas()
+    var result_negate = df.applymap("negate").to_pandas()
+    assert_true(String(result_neg.equals(result_negate)) == "True")
+
+
+# ---------------------------------------------------------------------------
+# transform — new element-wise math operations (#606)
+# ---------------------------------------------------------------------------
+
+def test_df_transform_sqrt() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 4.0, 9.0], 'b': [16.0, 25.0, 36.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("sqrt").to_pandas()
+    var expected_pd = pd_df.apply(np.sqrt)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_transform_neg() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, -2.0, 3.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.transform("neg").to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == -1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 2.0)
+    assert_true(Float64(String(result_pd["a"].iloc[2])) == -3.0)
+
+
+# ---------------------------------------------------------------------------
+# pipe — new element-wise math operations (#606)
+# ---------------------------------------------------------------------------
+
+def test_df_pipe_sqrt() raises:
+    var pd = Python.import_module("pandas")
+    var np = Python.import_module("numpy")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, 4.0, 9.0], 'b': [16.0, 25.0, 36.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.pipe("sqrt").to_pandas()
+    var expected_pd = pd_df.apply(np.sqrt)
+    assert_true(String(result_pd.equals(expected_pd)) == "True")
+
+
+def test_df_pipe_neg() raises:
+    var pd = Python.import_module("pandas")
+    var pd_df = pd.DataFrame(
+        Python.evaluate("{'a': [1.0, -2.0, 3.0]}")
+    )
+    var df = DataFrame(pd_df)
+    var result_pd = df.pipe("neg").to_pandas()
+    assert_true(Float64(String(result_pd["a"].iloc[0])) == -1.0)
+    assert_true(Float64(String(result_pd["a"].iloc[1])) == 2.0)
 
 
 def main() raises:

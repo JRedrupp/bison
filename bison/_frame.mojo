@@ -1264,6 +1264,27 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     def round(self, decimals: Int = 0) raises -> Series:
         return Series(self._col._round(decimals))
 
+    def sqrt(self) raises -> Series:
+        return Series(self._col._sqrt())
+
+    def exp(self) raises -> Series:
+        return Series(self._col._exp())
+
+    def log(self) raises -> Series:
+        return Series(self._col._log())
+
+    def log10(self) raises -> Series:
+        return Series(self._col._log10())
+
+    def ceil(self) raises -> Series:
+        return Series(self._col._ceil())
+
+    def floor(self) raises -> Series:
+        return Series(self._col._floor())
+
+    def neg(self) raises -> Series:
+        return Series(self._col._neg())
+
     def unique(self) raises -> Series:
         return Series(self._col._unique())
 
@@ -2563,6 +2584,76 @@ struct DataFrame(Copyable, Movable):
             result_cols.append(self._cols[i]._abs())
         return DataFrame(result_cols^)
 
+    def sqrt(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._sqrt())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def exp(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._exp())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def log(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._log())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def log10(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._log10())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def ceil(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._ceil())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def floor(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._floor())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
+    def neg(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._cols)):
+            ref col = self._cols[i]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                result_cols.append(col._neg())
+            else:
+                result_cols.append(col.copy())
+        return DataFrame(result_cols^)
+
     def _cum_axis1[op: Int](self, skipna: Bool) raises -> DataFrame:
         """Shared axis=1 kernel for cumsum, cumprod, cummin, and cummax.
 
@@ -3224,11 +3315,26 @@ struct DataFrame(Copyable, Movable):
             return self.abs()
         elif func == "round":
             return self.round()
+        elif func == "sqrt":
+            return self.sqrt()
+        elif func == "exp":
+            return self.exp()
+        elif func == "log":
+            return self.log()
+        elif func == "log10":
+            return self.log10()
+        elif func == "ceil":
+            return self.ceil()
+        elif func == "floor":
+            return self.floor()
+        elif func == "neg" or func == "negate":
+            return self.neg()
         else:
             raise Error(
                 "DataFrame.applymap: unsupported func '"
                 + func
-                + "'. Supported: abs, round"
+                + "'. Supported: abs, round, sqrt, exp, log, log10, ceil,"
+                " floor, neg"
             )
 
     def applymap[F: FloatTransformFn](self) raises -> DataFrame:
@@ -3262,11 +3368,26 @@ struct DataFrame(Copyable, Movable):
             return self.cummin()
         elif func == "cummax":
             return self.cummax()
+        elif func == "sqrt":
+            return self.sqrt()
+        elif func == "exp":
+            return self.exp()
+        elif func == "log":
+            return self.log()
+        elif func == "log10":
+            return self.log10()
+        elif func == "ceil":
+            return self.ceil()
+        elif func == "floor":
+            return self.floor()
+        elif func == "neg" or func == "negate":
+            return self.neg()
         else:
             raise Error(
                 "DataFrame.transform: unsupported func '"
                 + func
-                + "'. Supported: abs, cumsum, cumprod, cummin, cummax"
+                + "'. Supported: abs, cumsum, cumprod, cummin, cummax, sqrt,"
+                " exp, log, log10, ceil, floor, neg"
             )
 
     def eval(self, expr: String) raises -> Series:
@@ -3288,11 +3409,25 @@ struct DataFrame(Copyable, Movable):
     def pipe(self, func: String) raises -> DataFrame:
         if func == "abs":
             return self.abs()
+        elif func == "sqrt":
+            return self.sqrt()
+        elif func == "exp":
+            return self.exp()
+        elif func == "log":
+            return self.log()
+        elif func == "log10":
+            return self.log10()
+        elif func == "ceil":
+            return self.ceil()
+        elif func == "floor":
+            return self.floor()
+        elif func == "neg" or func == "negate":
+            return self.neg()
         else:
             raise Error(
                 "DataFrame.pipe: unsupported func '"
                 + func
-                + "'. Supported: abs"
+                + "'. Supported: abs, sqrt, exp, log, log10, ceil, floor, neg"
             )
 
     def pipe[F: fn(DataFrame) raises -> DataFrame](self) raises -> DataFrame:
