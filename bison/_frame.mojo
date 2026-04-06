@@ -28,6 +28,8 @@ from .column import (
     _col_cell_pyobj,
     _scalar_from_col,
     _SetScalarInColMutVisitor,
+    ColumnDataVisitorRaises,
+    visit_col_data_raises,
     visit_col_data_mut_raises,
 )
 from .accessors.str_accessor import StringMethods
@@ -1603,6 +1605,35 @@ comptime _CUM_SUM = 0
 comptime _CUM_PROD = 1
 comptime _CUM_MIN = 2
 comptime _CUM_MAX = 3
+
+
+struct _RowKeyVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Visitor that serialises a single row element from a ColumnData arm to a
+    String.  Used by ``DataFrame._row_key_str`` to build per-row hash keys
+    without raw ``isa`` chains.
+    """
+
+    var row: Int
+    var result: String
+
+    def __init__(out self, row: Int):
+        self.row = row
+        self.result = String()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        self.result = String(Int(data[self.row]))
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        self.result = String(data[self.row])
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        self.result = "1" if data[self.row] else "0"
+
+    def on_str(mut self, data: List[String]) raises:
+        self.result = data[self.row]
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        self.result = String(data[self.row])
 
 
 struct DataFrame(Copyable, Movable):
@@ -5508,20 +5539,12 @@ struct DataFrame(Copyable, Movable):
         """
         var n_keys = len(key_cols)
         var key = String()
+        var visitor = _RowKeyVisitor(row)
         for k in range(n_keys):
             var i = col_idx[key_cols[k]]
-            ref col_data = df._cols[i]._data
-            var part: String
-            if col_data.isa[List[Int64]]():
-                part = String(Int(col_data[List[Int64]][row]))
-            elif col_data.isa[List[Float64]]():
-                part = String(col_data[List[Float64]][row])
-            elif col_data.isa[List[Bool]]():
-                part = "1" if col_data[List[Bool]][row] else "0"
-            elif col_data.isa[List[String]]():
-                part = col_data[List[String]][row]
-            else:
-                part = String(col_data[List[PythonObject]][row])
+            visitor.result = String()
+            visit_col_data_raises(visitor, df._cols[i]._data)
+            var part = visitor.result
             if n_keys == 1:
                 return part
             key += String(len(part)) + ":" + part
