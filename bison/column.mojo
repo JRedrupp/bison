@@ -595,6 +595,373 @@ struct _FillScalarVisitor(Copyable, DFScalarVisitorRaises, Movable):
         raise Error("_fill_scalar: fill value cannot be null")
 
 
+struct _FillnaVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Replaces null elements with a typed fill value, producing new ColumnData.
+
+    Type coercion rules per arm:
+    - Int64:   accepts Int64, Float64 (truncated), Bool (0/1).
+    - Float64: accepts Float64, Int64 (widened), Bool (0.0/1.0).
+    - Bool:    accepts Bool, Int64 (!=0), Float64 (!=0.0).
+    - String:  accepts any scalar type via string conversion.
+    - PythonObject: raises (unsupported).
+    After visiting, ``col_data`` holds the filled data with no nulls remaining.
+    """
+
+    var col_data: ColumnData
+    var null_mask: List[Bool]
+    var value: DFScalar
+
+    def __init__(out self, null_mask: List[Bool], value: DFScalar):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.null_mask = null_mask.copy()
+        self.value = value
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var fill_val: Int64
+        if self.value.isa[Int64]():
+            fill_val = self.value[Int64]
+        elif self.value.isa[Float64]():
+            fill_val = Int64(Int(self.value[Float64]))
+        elif self.value.isa[Bool]():
+            fill_val = Int64(1) if self.value[Bool] else Int64(0)
+        else:
+            raise Error("fillna: cannot fill Int64 column with String value")
+        var result = List[Int64]()
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                result.append(fill_val)
+            else:
+                result.append(data[i])
+        self.col_data = ColumnData(result^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var fill_val: Float64
+        if self.value.isa[Float64]():
+            fill_val = self.value[Float64]
+        elif self.value.isa[Int64]():
+            fill_val = Float64(self.value[Int64])
+        elif self.value.isa[Bool]():
+            fill_val = Float64(1.0) if self.value[Bool] else Float64(0.0)
+        else:
+            raise Error("fillna: cannot fill Float64 column with String value")
+        var result = List[Float64]()
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                result.append(fill_val)
+            else:
+                result.append(data[i])
+        self.col_data = ColumnData(result^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var fill_val: Bool
+        if self.value.isa[Bool]():
+            fill_val = self.value[Bool]
+        elif self.value.isa[Int64]():
+            fill_val = self.value[Int64] != Int64(0)
+        elif self.value.isa[Float64]():
+            fill_val = self.value[Float64] != Float64(0.0)
+        else:
+            raise Error("fillna: cannot fill Bool column with String value")
+        var result = List[Bool]()
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                result.append(fill_val)
+            else:
+                result.append(data[i])
+        self.col_data = ColumnData(result^)
+
+    def on_str(mut self, data: List[String]) raises:
+        var fill_val: String
+        if self.value.isa[String]():
+            fill_val = self.value[String]
+        elif self.value.isa[Int64]():
+            fill_val = String(Int(self.value[Int64]))
+        elif self.value.isa[Float64]():
+            fill_val = String(self.value[Float64])
+        else:
+            fill_val = String("True") if self.value[Bool] else String("False")
+        var result = List[String]()
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                result.append(fill_val)
+            else:
+                result.append(data[i])
+        self.col_data = ColumnData(result^)
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        raise Error("fillna: PythonObject columns are not supported")
+
+
+struct _FfillVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Forward-fill: propagate the last non-null value forward over nulls.
+
+    Produces ``col_data`` (filled), ``result_mask``, and ``has_any_null``.
+    Leading nulls (before any non-null value) remain null.
+    """
+
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+
+    def __init__(out self, null_mask: List[Bool]):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var result = List[Int64]()
+        var last_val = Int64(0)
+        var found = False
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                if found:
+                    result.append(last_val)
+                    self.result_mask.append(False)
+                else:
+                    result.append(Int64(0))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+            else:
+                last_val = data[i]
+                found = True
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var result = List[Float64]()
+        var last_val = Float64(0)
+        var found = False
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                if found:
+                    result.append(last_val)
+                    self.result_mask.append(False)
+                else:
+                    result.append(Float64(0))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+            else:
+                last_val = data[i]
+                found = True
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var result = List[Bool]()
+        var last_val = False
+        var found = False
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                if found:
+                    result.append(last_val)
+                    self.result_mask.append(False)
+                else:
+                    result.append(False)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+            else:
+                last_val = data[i]
+                found = True
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    def on_str(mut self, data: List[String]) raises:
+        var result = List[String]()
+        var last_val = String("")
+        var found = False
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                if found:
+                    result.append(last_val)
+                    self.result_mask.append(False)
+                else:
+                    result.append(String(""))
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+            else:
+                last_val = data[i]
+                found = True
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        var none_val = Python.evaluate("None")
+        var result = List[PythonObject]()
+        var last_val = none_val
+        var found = False
+        for i in range(len(data)):
+            if self.null_mask[i]:
+                if found:
+                    result.append(last_val)
+                    self.result_mask.append(False)
+                else:
+                    result.append(none_val)
+                    self.result_mask.append(True)
+                    self.has_any_null = True
+            else:
+                last_val = data[i]
+                found = True
+                result.append(data[i])
+                self.result_mask.append(False)
+        self.col_data = ColumnData(result^)
+
+
+struct _BfillVisitor(ColumnDataVisitorRaises, Copyable, Movable):
+    """Backward-fill: propagate the next non-null value backward over nulls.
+
+    Produces ``col_data`` (filled), ``result_mask``, and ``has_any_null``.
+    Trailing nulls (after the last non-null value) remain null.
+    """
+
+    var col_data: ColumnData
+    var result_mask: List[Bool]
+    var has_any_null: Bool
+    var null_mask: List[Bool]
+
+    def __init__(out self, null_mask: List[Bool]):
+        self.col_data = ColumnData(List[PythonObject]())
+        self.result_mask = List[Bool]()
+        self.has_any_null = False
+        self.null_mask = null_mask.copy()
+
+    def on_int64(mut self, data: List[Int64]) raises:
+        var n = len(data)
+        var rev_data = List[Int64]()
+        var rev_mask = List[Bool]()
+        var next_val = Int64(0)
+        var found = False
+        for ri in range(n):
+            var i = n - 1 - ri
+            if not self.null_mask[i]:
+                next_val = data[i]
+                found = True
+                rev_data.append(data[i])
+                rev_mask.append(False)
+            elif found:
+                rev_data.append(next_val)
+                rev_mask.append(False)
+            else:
+                rev_data.append(Int64(0))
+                rev_mask.append(True)
+                self.has_any_null = True
+        var result = List[Int64]()
+        for ri in range(n):
+            result.append(rev_data[n - 1 - ri])
+            self.result_mask.append(rev_mask[n - 1 - ri])
+        self.col_data = ColumnData(result^)
+
+    def on_float64(mut self, data: List[Float64]) raises:
+        var n = len(data)
+        var rev_data = List[Float64]()
+        var rev_mask = List[Bool]()
+        var next_val = Float64(0)
+        var found = False
+        for ri in range(n):
+            var i = n - 1 - ri
+            if not self.null_mask[i]:
+                next_val = data[i]
+                found = True
+                rev_data.append(data[i])
+                rev_mask.append(False)
+            elif found:
+                rev_data.append(next_val)
+                rev_mask.append(False)
+            else:
+                rev_data.append(Float64(0))
+                rev_mask.append(True)
+                self.has_any_null = True
+        var result = List[Float64]()
+        for ri in range(n):
+            result.append(rev_data[n - 1 - ri])
+            self.result_mask.append(rev_mask[n - 1 - ri])
+        self.col_data = ColumnData(result^)
+
+    def on_bool(mut self, data: List[Bool]) raises:
+        var n = len(data)
+        var rev_data = List[Bool]()
+        var rev_mask = List[Bool]()
+        var next_val = False
+        var found = False
+        for ri in range(n):
+            var i = n - 1 - ri
+            if not self.null_mask[i]:
+                next_val = data[i]
+                found = True
+                rev_data.append(data[i])
+                rev_mask.append(False)
+            elif found:
+                rev_data.append(next_val)
+                rev_mask.append(False)
+            else:
+                rev_data.append(False)
+                rev_mask.append(True)
+                self.has_any_null = True
+        var result = List[Bool]()
+        for ri in range(n):
+            result.append(rev_data[n - 1 - ri])
+            self.result_mask.append(rev_mask[n - 1 - ri])
+        self.col_data = ColumnData(result^)
+
+    def on_str(mut self, data: List[String]) raises:
+        var n = len(data)
+        var rev_data = List[String]()
+        var rev_mask = List[Bool]()
+        var next_val = String("")
+        var found = False
+        for ri in range(n):
+            var i = n - 1 - ri
+            if not self.null_mask[i]:
+                next_val = data[i]
+                found = True
+                rev_data.append(data[i])
+                rev_mask.append(False)
+            elif found:
+                rev_data.append(next_val)
+                rev_mask.append(False)
+            else:
+                rev_data.append(String(""))
+                rev_mask.append(True)
+                self.has_any_null = True
+        var result = List[String]()
+        for ri in range(n):
+            result.append(rev_data[n - 1 - ri])
+            self.result_mask.append(rev_mask[n - 1 - ri])
+        self.col_data = ColumnData(result^)
+
+    def on_obj(mut self, data: List[PythonObject]) raises:
+        var n = len(data)
+        var none_val = Python.evaluate("None")
+        var rev_data = List[PythonObject]()
+        var rev_mask = List[Bool]()
+        var next_val = none_val
+        var found = False
+        for ri in range(n):
+            var i = n - 1 - ri
+            if not self.null_mask[i]:
+                next_val = data[i]
+                found = True
+                rev_data.append(data[i])
+                rev_mask.append(False)
+            elif found:
+                rev_data.append(next_val)
+                rev_mask.append(False)
+            else:
+                rev_data.append(none_val)
+                rev_mask.append(True)
+                self.has_any_null = True
+        var result = List[PythonObject]()
+        for ri in range(n):
+            result.append(rev_data[n - 1 - ri])
+            self.result_mask.append(rev_mask[n - 1 - ri])
+        self.col_data = ColumnData(result^)
+
+
 struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Visitor that appends each element of the active ColumnData arm to a
     Python list, respecting a parallel null mask.
@@ -749,102 +1116,63 @@ struct _SumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("sum: non-numeric column type")
 
 
-struct _MinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Finds the minimum value as Float64, skipping masked nulls."""
+struct _ExtremumVisitor[find_min: Bool](
+    ColumnDataVisitorRaises, Copyable, Movable
+):
+    """Finds the minimum (find_min=True) or maximum (find_min=False) value as
+    Float64, skipping masked nulls.  Unifies the former _MinVisitor/_MaxVisitor.
+    """
 
     var result: Float64
     var found: Bool
     var null_mask: List[Bool]
+    var _label: String
 
     def __init__(out self, null_mask: List[Bool]):
         self.result = Float64(0)
         self.found = False
         self.null_mask = null_mask.copy()
+        comptime if Self.find_min:
+            self._label = "min"
+        else:
+            self._label = "max"
+
+    def _update(mut self, v: Float64):
+        comptime if Self.find_min:
+            if not self.found or v < self.result:
+                self.result = v
+                self.found = True
+        else:
+            if not self.found or v > self.result:
+                self.result = v
+                self.found = True
 
     def on_int64(mut self, data: List[Int64]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = Float64(data[i])
-            if not self.found or v < self.result:
-                self.result = v
-                self.found = True
+            self._update(Float64(data[i]))
 
     def on_float64(mut self, data: List[Float64]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = data[i]
-            if not self.found or v < self.result:
-                self.result = v
-                self.found = True
+            self._update(data[i])
 
     def on_bool(mut self, data: List[Bool]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = Float64(1.0) if data[i] else Float64(0.0)
-            if not self.found or v < self.result:
-                self.result = v
-                self.found = True
+            self._update(Float64(1.0) if data[i] else Float64(0.0))
 
     def on_str(mut self, data: List[String]) raises:
-        raise Error("min: non-numeric column type")
+        raise Error(self._label + ": non-numeric column type")
 
     def on_obj(mut self, data: List[PythonObject]) raises:
-        raise Error("min: non-numeric column type")
-
-
-struct _MaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Finds the maximum value as Float64, skipping masked nulls."""
-
-    var result: Float64
-    var found: Bool
-    var null_mask: List[Bool]
-
-    def __init__(out self, null_mask: List[Bool]):
-        self.result = Float64(0)
-        self.found = False
-        self.null_mask = null_mask.copy()
-
-    def on_int64(mut self, data: List[Int64]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = Float64(data[i])
-            if not self.found or v > self.result:
-                self.result = v
-                self.found = True
-
-    def on_float64(mut self, data: List[Float64]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = data[i]
-            if not self.found or v > self.result:
-                self.result = v
-                self.found = True
-
-    def on_bool(mut self, data: List[Bool]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = Float64(1.0) if data[i] else Float64(0.0)
-            if not self.found or v > self.result:
-                self.result = v
-                self.found = True
-
-    def on_str(mut self, data: List[String]) raises:
-        raise Error("max: non-numeric column type")
-
-    def on_obj(mut self, data: List[PythonObject]) raises:
-        raise Error("max: non-numeric column type")
+        raise Error(self._label + ": non-numeric column type")
 
 
 struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
@@ -950,112 +1278,68 @@ struct _MomentVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         raise Error("skew/kurt: non-numeric column type")
 
 
-struct _ArgMinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Finds the positional index of the minimum value, skipping null values."""
+struct _ArgExtremumVisitor[find_min: Bool](
+    ColumnDataVisitorRaises, Copyable, Movable
+):
+    """Finds the positional index of the minimum (find_min=True) or maximum
+    (find_min=False) value, skipping null values.  Unifies the former
+    _ArgMinVisitor/_ArgMaxVisitor.
+    """
 
     var result: Int
     var found: Bool
-    var min_val: Float64
+    var best_val: Float64
     var null_mask: List[Bool]
+    var _label: String
 
     def __init__(out self, null_mask: List[Bool]):
         self.result = 0
         self.found = False
-        self.min_val = Float64(0)
+        self.best_val = Float64(0)
         self.null_mask = null_mask.copy()
+        comptime if Self.find_min:
+            self._label = "idxmin"
+        else:
+            self._label = "idxmax"
+
+    def _update(mut self, v: Float64, i: Int):
+        comptime if Self.find_min:
+            if not self.found or v < self.best_val:
+                self.best_val = v
+                self.result = i
+                self.found = True
+        else:
+            if not self.found or v > self.best_val:
+                self.best_val = v
+                self.result = i
+                self.found = True
 
     def on_int64(mut self, data: List[Int64]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = Float64(data[i])
-            if not self.found or v < self.min_val:
-                self.min_val = v
-                self.result = i
-                self.found = True
+            self._update(Float64(data[i]), i)
 
     def on_float64(mut self, data: List[Float64]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = data[i]
-            if not self.found or v < self.min_val:
-                self.min_val = v
-                self.result = i
-                self.found = True
+            self._update(data[i], i)
 
     def on_bool(mut self, data: List[Bool]) raises:
         var has_mask = len(self.null_mask) > 0
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
                 continue
-            var v = Float64(1.0) if data[i] else Float64(0.0)
-            if not self.found or v < self.min_val:
-                self.min_val = v
-                self.result = i
-                self.found = True
+            self._update(Float64(1.0) if data[i] else Float64(0.0), i)
 
     def on_str(mut self, data: List[String]) raises:
-        raise Error("idxmin: non-numeric column type")
+        raise Error(self._label + ": non-numeric column type")
 
     def on_obj(mut self, data: List[PythonObject]) raises:
-        raise Error("idxmin: non-numeric column type")
-
-
-struct _ArgMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Finds the positional index of the maximum value, skipping null values."""
-
-    var result: Int
-    var found: Bool
-    var max_val: Float64
-    var null_mask: List[Bool]
-
-    def __init__(out self, null_mask: List[Bool]):
-        self.result = 0
-        self.found = False
-        self.max_val = Float64(0)
-        self.null_mask = null_mask.copy()
-
-    def on_int64(mut self, data: List[Int64]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = Float64(data[i])
-            if not self.found or v > self.max_val:
-                self.max_val = v
-                self.result = i
-                self.found = True
-
-    def on_float64(mut self, data: List[Float64]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = data[i]
-            if not self.found or v > self.max_val:
-                self.max_val = v
-                self.result = i
-                self.found = True
-
-    def on_bool(mut self, data: List[Bool]) raises:
-        var has_mask = len(self.null_mask) > 0
-        for i in range(len(data)):
-            if has_mask and self.null_mask[i]:
-                continue
-            var v = Float64(1.0) if data[i] else Float64(0.0)
-            if not self.found or v > self.max_val:
-                self.max_val = v
-                self.result = i
-                self.found = True
-
-    def on_str(mut self, data: List[String]) raises:
-        raise Error("idxmax: non-numeric column type")
-
-    def on_obj(mut self, data: List[PythonObject]) raises:
-        raise Error("idxmax: non-numeric column type")
+        raise Error(self._label + ": non-numeric column type")
 
 
 struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
@@ -4466,7 +4750,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var arr = _to_numeric_marrow_array(self)
             return _marrow_scalar_to_float64(_marrow_min(arr))
         # Fall back to visitor for Bool/String/PythonObject.
-        var visitor = _MinVisitor(self._null_mask)
+        var visitor = _ExtremumVisitor[True](self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
             var zero = Float64(0)
@@ -4490,7 +4774,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var arr = _to_numeric_marrow_array(self)
             return _marrow_scalar_to_float64(_marrow_max(arr))
         # Fall back to visitor for Bool/String/PythonObject.
-        var visitor = _MaxVisitor(self._null_mask)
+        var visitor = _ExtremumVisitor[False](self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
             var zero = Float64(0)
@@ -4620,7 +4904,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             raise Error(
                 "argmin: cannot compute with NaN values when skipna=False"
             )
-        var visitor = _ArgMinVisitor(self._null_mask)
+        var visitor = _ArgExtremumVisitor[True](self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
             return -1
@@ -4636,7 +4920,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             raise Error(
                 "argmax: cannot compute with NaN values when skipna=False"
             )
-        var visitor = _ArgMaxVisitor(self._null_mask)
+        var visitor = _ArgExtremumVisitor[False](self._null_mask)
         visit_col_data_raises(visitor, self._data)
         if not visitor.found:
             return -1
