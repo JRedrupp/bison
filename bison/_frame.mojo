@@ -436,7 +436,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
-            var rhs_col = Column(self._col.name, ColumnData(rhs^), object_)
+            var rhs_col = Column(self._col.name, rhs^, object_)
             return Series(self._col._cmp_eq(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
@@ -450,7 +450,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         else:
             for _ in range(n):
                 result.append(False)
-        var col = Column(self._col.name, ColumnData(result^), bool_)
+        var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
     def __ne__(self, other: String) raises -> Series:
@@ -461,7 +461,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
-            var rhs_col = Column(self._col.name, ColumnData(rhs^), object_)
+            var rhs_col = Column(self._col.name, rhs^, object_)
             return Series(self._col._cmp_ne(rhs_col))
         var result = List[Bool]()
         var has_mask = len(self._col._null_mask) > 0
@@ -475,7 +475,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         else:
             for _ in range(n):
                 result.append(True)
-        var col = Column(self._col.name, ColumnData(result^), bool_)
+        var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
     # ------------------------------------------------------------------
@@ -612,8 +612,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var result = List[Bool]()
         for i in range(n):
             result.append(has_mask and self._col._null_mask[i])
-        var col_data = ColumnData(result^)
-        var col = Column(self._col.name, col_data^, bool_)
+        var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
     def isnull(self) raises -> Series:
@@ -628,8 +627,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var result = List[Bool]()
         for i in range(n):
             result.append(not (has_mask and self._col._null_mask[i]))
-        var col_data = ColumnData(result^)
-        var col = Column(self._col.name, col_data^, bool_)
+        var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
     def notnull(self) raises -> Series:
@@ -791,9 +789,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var result_data = List[Int64]()
             for i in range(n):
                 result_data.append(Int64(perm[i]))
-            var col = Column(
-                self._col.name, ColumnData(result_data^), int64, idx^
-            )
+            var col = Column(self._col.name, result_data^, int64, idx^)
             return Series(col^)
         # Build Float64 result: NaN wherever the sort permutation points to a
         # null element in the original (those positions are at the tail of perm).
@@ -807,9 +803,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             else:
                 result_data.append(Float64(perm[i]))
                 result_mask.append(False)
-        var col = Column(
-            self._col.name, ColumnData(result_data^), float64, idx^
-        )
+        var col = Column(self._col.name, result_data^, float64, idx^)
         col._null_mask = result_mask^
         return Series(col^)
 
@@ -843,7 +837,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         visit_col_data_raises(rank_visitor, self._col._data)
         ranks = rank_visitor.ranks.copy()
         var idx = self._col._index.copy()
-        var col = Column(self._col.name, ColumnData(ranks^), float64, idx^)
+        var col = Column(self._col.name, ranks^, float64, idx^)
         # n_non_null < n iff there are nulls — no need to re-scan the mask.
         if n_non_null < n:
             col._null_mask = rank_mask^
@@ -1349,7 +1343,7 @@ struct DataFrame(Copyable, Movable):
                 for _ in range(len(records)):
                     data.append(py_none)
                     null_mask.append(True)
-                var col = Column(col_name, ColumnData(data^), object_)
+                var col = Column(col_name, data^, object_)
                 col._null_mask = null_mask^
                 cols.append(col^)
                 continue
@@ -1378,7 +1372,7 @@ struct DataFrame(Copyable, Movable):
                     except:
                         data.append(String(""))
                         null_mask.append(True)
-                var col = Column(col_name, ColumnData(data^), object_)
+                var col = Column(col_name, data^, object_)
                 col._null_mask = null_mask^
                 cols.append(col^)
             elif has_float:
@@ -1403,7 +1397,7 @@ struct DataFrame(Copyable, Movable):
                     except:
                         data.append(Float64(0.0))
                         null_mask.append(True)
-                var col = Column(col_name, ColumnData(data^), float64)
+                var col = Column(col_name, data^, float64)
                 col._null_mask = null_mask^
                 cols.append(col^)
             elif has_int:
@@ -1434,11 +1428,11 @@ struct DataFrame(Copyable, Movable):
                     var fdata = List[Float64]()
                     for i in range(len(data)):
                         fdata.append(Float64(data[i]))
-                    var col = Column(col_name, ColumnData(fdata^), float64)
+                    var col = Column(col_name, fdata^, float64)
                     col._null_mask = null_mask^
                     cols.append(col^)
                     continue
-                var col = Column(col_name, ColumnData(data^), int64)
+                var col = Column(col_name, data^, int64)
                 col._null_mask = null_mask^
                 cols.append(col^)
             else:  # Bool only
@@ -1467,11 +1461,11 @@ struct DataFrame(Copyable, Movable):
                             odata.append(py_none)
                         else:
                             odata.append(PythonObject(data[i]))
-                    var col = Column(col_name, ColumnData(odata^), object_)
+                    var col = Column(col_name, odata^, object_)
                     col._null_mask = null_mask^
                     cols.append(col^)
                     continue
-                var col = Column(col_name, ColumnData(data^), bool_)
+                var col = Column(col_name, data^, bool_)
                 col._null_mask = null_mask^
                 cols.append(col^)
 
@@ -1514,8 +1508,7 @@ struct DataFrame(Copyable, Movable):
         for i in range(n):
             dtype_names.append(self._cols[i].dtype.name)
             idx.append(PythonObject(self._cols[i].name.value()))
-        var col_data = ColumnData(dtype_names^)
-        var result_col = Column(None, col_data^, object_, idx^)
+        var result_col = Column(None, dtype_names^, object_, idx^)
         return Series(result_col^)
 
     def info(self) raises:
@@ -1582,8 +1575,7 @@ struct DataFrame(Copyable, Movable):
                 Int64(len(self._cols[i]) * self._cols[i].dtype.itemsize)
             )
             idx.append(PythonObject(self._cols[i].name.value()))
-        var col_data = ColumnData(values^)
-        var result_col = Column(None, col_data^, int64, idx^)
+        var result_col = Column(None, values^, int64, idx^)
         return Series(result_col^)
 
     # ------------------------------------------------------------------
@@ -1906,18 +1898,13 @@ struct DataFrame(Copyable, Movable):
                 for vi in range(len(vals)):
                     s += vals[vi]
                 results.append(s)
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.sum")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].sum(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def mean(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -1934,18 +1921,13 @@ struct DataFrame(Copyable, Movable):
                 for vi in range(n):
                     s += vals[vi]
                 results.append(s / Float64(n))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.mean")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].mean(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def median(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -1955,10 +1937,7 @@ struct DataFrame(Copyable, Movable):
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].median(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def min(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -1976,18 +1955,13 @@ struct DataFrame(Copyable, Movable):
                     if vals[j] < m:
                         m = vals[j]
                 results.append(m)
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.min")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].min(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def max(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -2005,18 +1979,13 @@ struct DataFrame(Copyable, Movable):
                     if vals[j] > m:
                         m = vals[j]
                 results.append(m)
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.max")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].max(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def std(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
@@ -2040,18 +2009,13 @@ struct DataFrame(Copyable, Movable):
                     var diff = vals[vi] - mean_val
                     sq_sum += diff * diff
                 results.append(sqrt(sq_sum / Float64(n - ddof)))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.std")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].std(ddof, skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def var(
         self, axis: Int = 0, ddof: Int = 1, skipna: Bool = True
@@ -2075,18 +2039,13 @@ struct DataFrame(Copyable, Movable):
                     var diff = vals[vi] - mean_val
                     sq_sum += diff * diff
                 results.append(sq_sum / Float64(n - ddof))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.var")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].var(ddof, skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def count(self, axis: Int = 0) raises -> Series:
         if axis == 1:
@@ -2094,18 +2053,13 @@ struct DataFrame(Copyable, Movable):
             var results = List[Float64]()
             for i in range(nrows):
                 results.append(Float64(self._row_non_null_count(i)))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.count")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(Float64(self._cols[i].count()))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def nunique(self, axis: Int = 0) raises -> Series:
         if axis == 1:
@@ -2132,18 +2086,13 @@ struct DataFrame(Copyable, Movable):
                         key = "o:" + String(cd[List[PythonObject]][i])
                     seen[key] = True
                 results.append(Float64(len(seen)))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.nunique")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(Float64(self._cols[i].nunique()))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def describe(
         self,
@@ -2164,9 +2113,7 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].quantile(0.5, True))
             values.append(self._cols[i].quantile(0.75, True))
             values.append(self._cols[i].max(True))
-            var col_data = ColumnData(values^)
-            var col_dtype = Column._sniff_dtype(col_data)
-            result_cols.append(Column(self._cols[i].name, col_data^, col_dtype))
+            result_cols.append(Column(self._cols[i].name, values^, float64))
         return DataFrame(result_cols^)
 
     def quantile(
@@ -2191,18 +2138,13 @@ struct DataFrame(Copyable, Movable):
                 else:
                     var frac = pos - Float64(lo)
                     results.append(vals[lo] + frac * (vals[hi] - vals[lo]))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             _not_implemented("DataFrame.quantile")
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].quantile(q, skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def abs(self) raises -> DataFrame:
         var result_cols = List[Column]()
@@ -2330,8 +2272,9 @@ struct DataFrame(Copyable, Movable):
                     result_lists[ci].append(nan if propagate_nan else running)
         var result_cols = List[Column]()
         for ci in range(ncols):
-            var cd = ColumnData(result_lists[ci].copy())
-            result_cols.append(Column(self._cols[ci].name, cd^, float64))
+            result_cols.append(
+                Column(self._cols[ci].name, result_lists[ci].copy(), float64)
+            )
         return DataFrame(result_cols^)
 
     def cumsum(self, axis: Int = 0, skipna: Bool = True) raises -> DataFrame:
@@ -2405,9 +2348,7 @@ struct DataFrame(Copyable, Movable):
                     sq_sum += diff * diff
                 var std_val = sqrt(sq_sum / Float64(n - ddof))
                 results.append(std_val / sqrt(Float64(n)))
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             raise Error(
                 "No axis named " + String(axis) + " for object type DataFrame"
@@ -2422,10 +2363,7 @@ struct DataFrame(Copyable, Movable):
                 values.append(
                     self._cols[i].std(ddof, skipna) / sqrt(Float64(n))
                 )
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def skew(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -2461,9 +2399,7 @@ struct DataFrame(Copyable, Movable):
                     * m3
                     / (std_val * std_val * std_val)
                 )
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             raise Error(
                 "No axis named " + String(axis) + " for object type DataFrame"
@@ -2471,10 +2407,7 @@ struct DataFrame(Copyable, Movable):
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].skew(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def kurt(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis == 1:
@@ -2518,9 +2451,7 @@ struct DataFrame(Copyable, Movable):
                     / ((fn_ - 2.0) * (fn_ - 3.0))
                 )
                 results.append(term1 - term2)
-            var col_data = ColumnData(results^)
-            var dtype = Column._sniff_dtype(col_data)
-            return Series(Column(None, col_data^, dtype))
+            return Series(Column(None, results^, float64))
         elif axis != 0:
             raise Error(
                 "No axis named " + String(axis) + " for object type DataFrame"
@@ -2528,10 +2459,7 @@ struct DataFrame(Copyable, Movable):
         var values = List[Float64]()
         for i in range(len(self._cols)):
             values.append(self._cols[i].kurt(skipna))
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def idxmin(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
@@ -2552,10 +2480,7 @@ struct DataFrame(Copyable, Movable):
                     )
                 else:
                     _not_implemented("DataFrame.idxmin with non-integer index")
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def idxmax(self, axis: Int = 0, skipna: Bool = True) raises -> Series:
         if axis != 0:
@@ -2576,10 +2501,7 @@ struct DataFrame(Copyable, Movable):
                     )
                 else:
                     _not_implemented("DataFrame.idxmax with non-integer index")
-        var col_data = ColumnData(values^)
-        var dtype = Column._sniff_dtype(col_data)
-        var result_col = Column(None, col_data^, dtype)
-        return Series(result_col^)
+        return Series(Column(None, values^, float64))
 
     def corr(
         self, method: String = "pearson", min_periods: Int = 1
@@ -2592,9 +2514,7 @@ struct DataFrame(Copyable, Movable):
             var values = List[Float64]()
             for i in range(n):
                 values.append(self._cols[i].corr(self._cols[j]))
-            var col_data = ColumnData(values^)
-            var dtype = Column._sniff_dtype(col_data)
-            result_cols.append(Column(self._cols[j].name, col_data^, dtype))
+            result_cols.append(Column(self._cols[j].name, values^, float64))
         return DataFrame(result_cols^)
 
     def cov(self, min_periods: Int = 1, ddof: Int = 1) raises -> DataFrame:
@@ -2604,9 +2524,7 @@ struct DataFrame(Copyable, Movable):
             var values = List[Float64]()
             for i in range(n):
                 values.append(self._cols[i].cov(self._cols[j], ddof))
-            var col_data = ColumnData(values^)
-            var dtype = Column._sniff_dtype(col_data)
-            result_cols.append(Column(self._cols[j].name, col_data^, dtype))
+            result_cols.append(Column(self._cols[j].name, values^, float64))
         return DataFrame(result_cols^)
 
     def shift(self, periods: Int = 1, axis: Int = 0) raises -> DataFrame:
@@ -2658,9 +2576,7 @@ struct DataFrame(Copyable, Movable):
                         else:
                             values.append(src_col._float64_data()[i])
                             null_mask.append(False)
-                var col_data = ColumnData(values^)
-                var dtype = Column._sniff_dtype(col_data)
-                var col = Column(self._cols[j].name, col_data^, dtype)
+                var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
                 result_cols.append(col^)
@@ -2735,9 +2651,7 @@ struct DataFrame(Copyable, Movable):
                                 src_val = src_col._float64_data()[i]
                             values.append(cur_val - src_val)
                             null_mask.append(False)
-                var col_data = ColumnData(values^)
-                var dtype = Column._sniff_dtype(col_data)
-                var col = Column(self._cols[j].name, col_data^, dtype)
+                var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
                 result_cols.append(col^)
@@ -2815,9 +2729,7 @@ struct DataFrame(Copyable, Movable):
                                 src_val = src_col._float64_data()[i]
                             values.append((cur_val - src_val) / src_val)
                             null_mask.append(False)
-                var col_data = ColumnData(values^)
-                var dtype = Column._sniff_dtype(col_data)
-                var col = Column(self._cols[j].name, col_data^, dtype)
+                var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
                 result_cols.append(col^)
@@ -3272,10 +3184,7 @@ struct DataFrame(Copyable, Movable):
                             data[k] = v0 + t * (v1 - v0)
                             new_mask[k] = False
                     seg_start = j
-            var col_data = ColumnData(data^)
-            var new_col = Column(
-                col.name, col_data^, col.dtype, col._index.copy()
-            )
+            var new_col = Column(col.name, data^, col.dtype, col._index.copy())
             result_cols.append(new_col^)
         return DataFrame(result_cols^)
 
@@ -3466,9 +3375,7 @@ struct DataFrame(Copyable, Movable):
                 for i in range(n_idx):
                     str_data.append(str_idx[i])
                 new_cols.append(
-                    Column(
-                        "index", ColumnData(str_data^), object_, empty_col_idx^
-                    )
+                    Column("index", str_data^, object_, empty_col_idx^)
                 )
             elif self._cols[0]._index.isa[List[Int64]]():
                 ref int_idx = self._cols[0]._index[List[Int64]]
@@ -3476,9 +3383,7 @@ struct DataFrame(Copyable, Movable):
                 for i in range(n_idx):
                     int_data.append(int_idx[i])
                 new_cols.append(
-                    Column(
-                        "index", ColumnData(int_data^), int64, empty_col_idx^
-                    )
+                    Column("index", int_data^, int64, empty_col_idx^)
                 )
             else:
                 ref obj_idx = self._cols[0]._index[List[PythonObject]]
@@ -3494,7 +3399,7 @@ struct DataFrame(Copyable, Movable):
                         new_cols.append(
                             Column(
                                 idx_names[k],
-                                ColumnData(level_data^),
+                                level_data^,
                                 object_,
                                 empty2^,
                             )
@@ -3506,7 +3411,7 @@ struct DataFrame(Copyable, Movable):
                         obj_data.append(obj_idx[i])
                     var empty2 = ColumnIndex(List[PythonObject]())
                     new_cols.append(
-                        Column("index", ColumnData(obj_data^), object_, empty2^)
+                        Column("index", obj_data^, object_, empty2^)
                     )
         for i in range(ncols):
             var c = self._cols[i].copy()
@@ -3972,7 +3877,7 @@ struct DataFrame(Copyable, Movable):
                 "DataFrame.duplicated: keep must be 'first', 'last', or 'False'"
             )
 
-        var col = Column(None, ColumnData(result^), bool_)
+        var col = Column(None, result^, bool_)
         return Series(col^)
 
     def pivot(
@@ -4071,7 +3976,7 @@ struct DataFrame(Copyable, Movable):
                 else:
                     data.append(table[cell])
                     null_mask.append(False)
-            var col = Column(col_keys[ck], ColumnData(data^), object_)
+            var col = Column(col_keys[ck], data^, object_)
             col._index = result_idx.copy()
             if any_null:
                 col._null_mask = null_mask^
@@ -4325,7 +4230,7 @@ struct DataFrame(Copyable, Movable):
                             sums[rk][out_i] / Float64(counts[rk][out_i])
                         )
                     )
-            var col = Column(out_names[out_i], ColumnData(data^), object_)
+            var col = Column(out_names[out_i], data^, object_)
             col._index = result_idx.copy()
             if any_null:
                 col._null_mask = null_mask^
@@ -4397,7 +4302,7 @@ struct DataFrame(Copyable, Movable):
         for v in range(n_val):
             for _ in range(nrows):
                 var_data.append(val_names[v])
-        result_cols.append(Column(var_name, ColumnData(var_data^), object_))
+        result_cols.append(Column(var_name, var_data^, object_))
 
         # Value column: concat all value columns row-by-row.
         var val_data = List[PythonObject]()
@@ -4423,7 +4328,7 @@ struct DataFrame(Copyable, Movable):
                 else:
                     val_null_mask.append(False)
                     val_data.append(_frame_cell_as_python(vcol, r))
-        var val_col = Column(value_name, ColumnData(val_data^), object_)
+        var val_col = Column(value_name, val_data^, object_)
         if any_null:
             val_col._null_mask = val_null_mask^
         result_cols.append(val_col^)
@@ -4473,9 +4378,7 @@ struct DataFrame(Copyable, Movable):
                     null_mask.append(False)
                     val_data.append(_frame_cell_as_python(col, r))
 
-        var result_col = Column(
-            "", ColumnData(val_data^), object_, ColumnIndex(idx_objs^)
-        )
+        var result_col = Column("", val_data^, object_, ColumnIndex(idx_objs^))
         if any_null:
             result_col._null_mask = null_mask^
         return Series(result_col^)
@@ -4612,7 +4515,7 @@ struct DataFrame(Copyable, Movable):
                         data.append(table[rk][out])
                         null_mask.append(False)
 
-                var col = Column(out_name, ColumnData(data^), object_)
+                var col = Column(out_name, data^, object_)
                 col._index = result_idx.copy()
                 if len(rem_idx_names) > 1:
                     col._index_names = rem_idx_names.copy()
@@ -4673,9 +4576,7 @@ struct DataFrame(Copyable, Movable):
                     null_mask.append(False)
                     val_data.append(_frame_cell_as_python(col, r))
 
-        var result_col = Column(
-            "", ColumnData(val_data^), object_, ColumnIndex(idx_objs^)
-        )
+        var result_col = Column("", val_data^, object_, ColumnIndex(idx_objs^))
         if any_null:
             result_col._null_mask = null_mask^
         return Series(result_col^)
@@ -4724,7 +4625,7 @@ struct DataFrame(Copyable, Movable):
                     null_mask.append(False)
                     data.append(_frame_cell_as_python(col, r))
 
-            var new_col = Column(col_name, ColumnData(data^), object_)
+            var new_col = Column(col_name, data^, object_)
             new_col._index = shared_idx.copy()
             if any_null:
                 new_col._null_mask = null_mask^
@@ -4882,7 +4783,7 @@ struct DataFrame(Copyable, Movable):
                         var cell = exp_col._data[List[PythonObject]][r]
                         data.append(cell[sub])
                         null_mask.append(False)
-                var new_col = Column(column, ColumnData(data^), object_)
+                var new_col = Column(column, data^, object_)
                 if any_null:
                     new_col._null_mask = null_mask^
                 result_cols.append(new_col^)
@@ -5049,9 +4950,7 @@ struct DataFrame(Copyable, Movable):
                 var false_data = List[Bool]()
                 for _ in range(nrows):
                     false_data.append(False)
-                result_cols.append(
-                    Column(col_name, ColumnData(false_data^), bool_)
-                )
+                result_cols.append(Column(col_name, false_data^, bool_))
             else:
                 var result_col = self._cols[i]._isin_scalars(values[col_name])
                 result_col.name = col_name
@@ -6154,9 +6053,7 @@ struct DataFrame(Copyable, Movable):
             for j in range(ncols):
                 row_data.append(_col_cell_pyobj(self._cols[j], i))
             var idx_copy = col_idx.copy()
-            var row_col = Column(
-                String(i), ColumnData(row_data^), object_, idx_copy^
-            )
+            var row_col = Column(String(i), row_data^, object_, idx_copy^)
             result.append(Series(row_col^))
         return result^
 
@@ -6184,9 +6081,7 @@ struct DataFrame(Copyable, Movable):
             for j in range(ncols):
                 row_data.append(_col_cell_pyobj(self._cols[j], i))
             var idx_copy = col_idx.copy()
-            var row_col = Column(
-                name, ColumnData(row_data^), object_, idx_copy^
-            )
+            var row_col = Column(name, row_data^, object_, idx_copy^)
             result.append(Series(row_col^))
         return result^
 
@@ -6498,7 +6393,7 @@ struct DataFrameGroupBy:
     ) raises -> Column:
         """Build a float64 result Column with group keys as index."""
         var idx = self._build_group_index()
-        var col = Column(name, ColumnData(vals^), float64, idx^)
+        var col = Column(name, vals^, float64, idx^)
         if len(self._by) == 1:
             col._index_name = self._by[0]
         else:
@@ -6510,7 +6405,7 @@ struct DataFrameGroupBy:
     ) raises -> Column:
         """Build an int64 result Column with group keys as index."""
         var idx = self._build_group_index()
-        var col = Column(name, ColumnData(vals^), int64, idx^)
+        var col = Column(name, vals^, int64, idx^)
         if len(self._by) == 1:
             col._index_name = self._by[0]
         else:
@@ -6768,9 +6663,7 @@ struct DataFrameGroupBy:
                             )
                         )
                         null_mask.append(False)
-                var col = Column(
-                    value_names[v], ColumnData(vals^), int64, idx.copy()
-                )
+                var col = Column(value_names[v], vals^, int64, idx.copy())
                 col._index_name = key_col_name
                 if has_null:
                     col._null_mask = null_mask^
@@ -6793,9 +6686,7 @@ struct DataFrameGroupBy:
                             )
                         )
                         null_mask.append(False)
-                var col = Column(
-                    value_names[v], ColumnData(vals^), float64, idx.copy()
-                )
+                var col = Column(value_names[v], vals^, float64, idx.copy())
                 col._index_name = key_col_name
                 if has_null:
                     col._null_mask = null_mask^
@@ -7061,7 +6952,7 @@ struct DataFrameGroupBy:
             vals.append(Int64(len(self._group_map[self._group_keys[i]])))
         var idx = self._build_group_index()
         # pandas groupby().size() returns a Series with name=None
-        var col = Column(None, ColumnData(vals^), int64, idx^)
+        var col = Column(None, vals^, int64, idx^)
         if len(self._by) == 1:
             col._index_name = self._by[0]
         else:
@@ -7197,9 +7088,7 @@ struct DataFrameGroupBy:
                 var int_vals = List[Int64]()
                 for r in range(n_rows):
                     int_vals.append(key_to_int[row_key[r]])
-                result_cols.append(
-                    Column(col.name, ColumnData(int_vals^), int64)
-                )
+                result_cols.append(Column(col.name, int_vals^, int64))
                 continue
             var key_to_val = Dict[String, Float64]()
             for j in range(len(self._group_keys)):
@@ -7233,7 +7122,7 @@ struct DataFrameGroupBy:
                     vals.append(nan)
                     null_mask.append(True)
                     any_null = True
-            var result_col = Column(col.name, ColumnData(vals^), float64)
+            var result_col = Column(col.name, vals^, float64)
             if any_null:
                 result_col._null_mask = null_mask^
             result_cols.append(result_col^)
@@ -7357,7 +7246,7 @@ struct SeriesGroupBy:
             return Series(
                 Column(
                     self._series.name,
-                    ColumnData(List[Float64]()),
+                    List[Float64](),
                     float64,
                     ColumnIndex(Index(List[String]())),
                 )
@@ -7433,7 +7322,7 @@ struct SeriesGroupBy:
                         )
                     )
                     null_mask.append(False)
-            var col = Column(self._series.name, ColumnData(vals^), int64, idx^)
+            var col = Column(self._series.name, vals^, int64, idx^)
             if has_null:
                 col._null_mask = null_mask^
             return Series(col^)
@@ -7454,9 +7343,7 @@ struct SeriesGroupBy:
                         )
                     )
                     null_mask.append(False)
-            var col = Column(
-                self._series.name, ColumnData(vals^), float64, idx^
-            )
+            var col = Column(self._series.name, vals^, float64, idx^)
             if has_null:
                 col._null_mask = null_mask^
             return Series(col^)
@@ -7472,18 +7359,14 @@ struct SeriesGroupBy:
                 result_vals.append(
                     self._series._col.take(self._group_map[key]).sum_int64()
                 )
-            return Series(
-                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-            )
+            return Series(Column(self._series.name, result_vals^, int64, idx^))
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).sum()
             )
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def mean(self) raises -> Series:
         if self._can_use_marrow_agg("mean"):
@@ -7495,9 +7378,7 @@ struct SeriesGroupBy:
                 self._series._col.take(self._group_map[key]).mean()
             )
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def min(self) raises -> Series:
         if self._can_use_marrow_agg("min"):
@@ -7510,18 +7391,14 @@ struct SeriesGroupBy:
                 result_vals.append(
                     self._series._col.take(self._group_map[key]).min_int64()
                 )
-            return Series(
-                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-            )
+            return Series(Column(self._series.name, result_vals^, int64, idx^))
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).min()
             )
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def max(self) raises -> Series:
         if self._can_use_marrow_agg("max"):
@@ -7534,18 +7411,14 @@ struct SeriesGroupBy:
                 result_vals.append(
                     self._series._col.take(self._group_map[key]).max_int64()
                 )
-            return Series(
-                Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-            )
+            return Series(Column(self._series.name, result_vals^, int64, idx^))
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
             result_vals.append(
                 self._series._col.take(self._group_map[key]).max()
             )
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def count(self) raises -> Series:
         if self._can_use_marrow_agg("count"):
@@ -7557,9 +7430,7 @@ struct SeriesGroupBy:
                 Int64(self._series._col.take(self._group_map[key]).count())
             )
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, int64, idx^))
 
     def nunique(self) raises -> Series:
         var result_vals = List[Int64]()
@@ -7569,9 +7440,7 @@ struct SeriesGroupBy:
                 Int64(self._series._col.take(self._group_map[key]).nunique())
             )
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, int64, idx^))
 
     def first(self) raises -> Series:
         var selected = List[Int]()
@@ -7612,9 +7481,7 @@ struct SeriesGroupBy:
         for i in range(len(self._group_keys)):
             result_vals.append(Int64(len(self._group_map[self._group_keys[i]])))
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), int64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, int64, idx^))
 
     def std(self, ddof: Int = 1) raises -> Series:
         var result_vals = List[Float64]()
@@ -7624,9 +7491,7 @@ struct SeriesGroupBy:
                 self._series._col.take(self._group_map[key]).std(ddof)
             )
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def var(self, ddof: Int = 1) raises -> Series:
         var result_vals = List[Float64]()
@@ -7636,9 +7501,7 @@ struct SeriesGroupBy:
                 self._series._col.take(self._group_map[key]).var(ddof)
             )
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(
-            Column(self._series.name, ColumnData(result_vals^), float64, idx^)
-        )
+        return Series(Column(self._series.name, result_vals^, float64, idx^))
 
     def agg(self, func: String) raises -> Series:
         if func == "sum":
@@ -7708,9 +7571,7 @@ struct SeriesGroupBy:
             var int_vals = List[Int64]()
             for i in range(n):
                 int_vals.append(key_to_int[row_key[i]])
-            var result_col = Column(
-                self._series.name, ColumnData(int_vals^), int64
-            )
+            var result_col = Column(self._series.name, int_vals^, int64)
             result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
@@ -7750,9 +7611,7 @@ struct SeriesGroupBy:
                 else:
                     result_vals.append(key_to_agg[row_key[i]])
                     null_mask.append(False)
-            var result_col = Column(
-                self._series.name, ColumnData(result_vals^), float64
-            )
+            var result_col = Column(self._series.name, result_vals^, float64)
             if any_null:
                 result_col._null_mask = null_mask^
             result_col._index = self._series._col._index.copy()
@@ -7779,7 +7638,7 @@ struct SeriesGroupBy:
                         result_vals.append(Float64(key_to_agg[row_key[i]]))
                         null_mask.append(False)
                 var result_col = Column(
-                    self._series.name, ColumnData(result_vals^), float64
+                    self._series.name, result_vals^, float64
                 )
                 result_col._null_mask = null_mask^
                 result_col._index = self._series._col._index.copy()
@@ -7788,9 +7647,7 @@ struct SeriesGroupBy:
             var result_vals = List[Int64]()
             for i in range(n):
                 result_vals.append(key_to_agg[row_key[i]])
-            var result_col = Column(
-                self._series.name, ColumnData(result_vals^), int64
-            )
+            var result_col = Column(self._series.name, result_vals^, int64)
             result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
@@ -7944,7 +7801,7 @@ def _row_as_series(df: DataFrame, row: Int) raises -> Series:
     for ci in range(ncols):
         index.append(PythonObject(df._cols[ci].name.value()))
         data.append(_col_cell_pyobj(df._cols[ci], row))
-    var result_col = Column(None, ColumnData(data^), object_, index^)
+    var result_col = Column(None, data^, object_, index^)
     return Series(result_col^)
 
 
