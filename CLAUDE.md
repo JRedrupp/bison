@@ -65,6 +65,23 @@ ColumnData = List[Int64] | List[Float64] | List[Bool] | List[String] | List[Pyth
 
 Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null mask. Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 column). GroupBy key columns may promote to `List[Float64]` to unify key types.
 
+#### Column type predicates and visitor dispatch
+
+**Never use `_data.isa[...]()` directly in `_frame.mojo`.** Instead use the `Column` predicate methods:
+
+| Predicate | Replaces |
+|-----------|----------|
+| `col.is_int()` | `col._data.isa[List[Int64]]()` |
+| `col.is_float()` | `col._data.isa[List[Float64]]()` |
+| `col.is_bool()` | `col._data.isa[List[Bool]]()` |
+| `col.is_string()` | `col._data.isa[List[String]]()` |
+| `col.is_object()` | `col._data.isa[List[PythonObject]]()` |
+| `col.is_numeric()` | `col._data.isa[List[Int64]]() or col._data.isa[List[Float64]]()` |
+
+For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)`. For multi-arm algorithmic dispatch (where each arm runs the same algorithm on a different type), write a visitor struct implementing `ColumnDataVisitorRaises` and call `visit_col_data_raises()`. See `_RankVisitor` in `_frame.mojo` for an example.
+
+After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`.
+
 ### Core types
 
 | Type | File | Notes |
