@@ -12,8 +12,9 @@ bison/
 │   ├── __init__.mojo   — public API exports
 │   ├── _errors.mojo    — _not_implemented() helper
 │   ├── _version.mojo   — AUTO-GENERATED; never edit by hand
-│   ├── _frame.mojo     — core DataFrame, Series, GroupBy (~6,346 lines)
-│   ├── column.mojo     — Column storage & ColumnData variant (~4,972 lines)
+│   ├── _frame.mojo     — core DataFrame, Series, GroupBy (~8,000 lines)
+│   ├── column.mojo     — Column storage & ColumnData variant (~5,000 lines)
+│   ├── arrow.mojo      — Arrow ↔ Column conversion (marrow interop)
 │   ├── dataframe.mojo  — re-exports from _frame
 │   ├── series.mojo     — re-exports from _frame
 │   ├── groupby.mojo    — re-exports from _frame
@@ -26,7 +27,7 @@ bison/
 │   ├── io/
 │   │   ├── csv.mojo            — read_csv (native; dtype inference)
 │   │   ├── json.mojo           — read_json (native; type inference)
-│   │   ├── parquet.mojo        — read_parquet (stub → pandas)
+│   │   ├── parquet.mojo        — read_parquet / to_parquet (native via marrow)
 │   │   └── excel.mojo          — read_excel (stub → pandas/openpyxl)
 │   └── reshape/
 │       └── _concat.mojo        — concat axis=0 with dtype promotion
@@ -70,7 +71,7 @@ Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null m
 |------|------|-------|
 | `DataFrame` | `_frame.mojo` | `Dict[String, Column]` backing, ordered columns |
 | `Series` | `_frame.mojo` | Wraps `Column` + optional name |
-| `DataFrameGroupBy` / `SeriesGroupBy` | `_frame.mojo` | Supports agg, sum, mean, count, first, last |
+| `DataFrameGroupBy` / `SeriesGroupBy` | `_frame.mojo` | Supports agg, sum, mean, count, first, last; single-key numeric aggs use marrow hash-aggregate kernel |
 | `Index` | `index.mojo` | `List[String]` backed with name attribute |
 | `RangeIndex` | `index.mojo` | `start, stop, step` — like pandas |
 | `ColumnIndex` | `index.mojo` | Variant: `Index | List[Int64] | List[Float64] | List[PythonObject]` |
@@ -80,7 +81,17 @@ Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null m
 
 - **CSV / JSON**: `bool` > `int64` > `float64` > `String`
 - Null values tracked via `na_set` parameter and null mask
-- `read_parquet` and `read_excel` delegate to pandas (stubs)
+- `read_parquet` / `to_parquet` use marrow's native Parquet I/O; falls back to pandas for object columns
+- `read_excel` delegates to pandas (stub)
+
+### Marrow integration
+
+Marrow (Apache Arrow for Mojo) is vendored at `vendor/marrow/` as a git submodule. Built via `pixi run build-marrow`. The integration provides:
+
+- **Arrow conversion layer** (`bison/arrow.mojo`): `column_to_marrow_array`, `marrow_array_to_column`, `dataframe_to_record_batch`, `record_batch_to_dataframe`, `dataframe_to_table`, `table_to_dataframe`. Supports int64, float64, bool, string columns. `List[PythonObject]` columns cannot be converted.
+- **SIMD aggregation kernels** (`column.mojo`): `Column.sum/min/max` use `marrow.kernels.aggregate` for int64/float64.
+- **Hash-aggregate GroupBy** (`_frame.mojo`): Single-key numeric GroupBy aggregations (sum, mean, min, max, count) use `marrow.kernels.groupby` for fused O(N) hash-aggregate when: `len(by) == 1`, `as_index=True`, and key column is Arrow-convertible (not `List[PythonObject]`).
+- **Parquet I/O** (`io/parquet.mojo`): Native read/write via `marrow.parquet`.
 
 ### Accessors
 
@@ -143,6 +154,8 @@ Test files by feature area:
 | `test_index.mojo` | Index operations |
 | `test_concat.mojo` | concat-specific cases |
 | `test_transform.mojo` | transformation tests |
+| `test_arrow.mojo` | Arrow ↔ Column round-trip conversion |
+| `test_expr.mojo` | query/eval tokenizer, parser, evaluator |
 
 Helper utilities live in `tests/_helpers.mojo`: `assert_frame_equal`, `assert_series_equal`, `make_simple_df`.
 
