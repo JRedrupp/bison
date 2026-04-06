@@ -29,8 +29,6 @@ from .column import (
     _scalar_from_col,
     _SetScalarInColMutVisitor,
     visit_col_data_mut_raises,
-    _merge_sort_perm_comparable,
-    _merge_sort_perm_pyobj,
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -1033,34 +1031,13 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     ) raises -> List[Int]:
         """Return a stable merge-sort permutation over the column values.
 
-        perm[i] = original index of the i-th element in sorted order.
-        When na_last is True (default), null elements are placed at the end.
-        When na_last is False, null elements are placed at the beginning.
+        ``perm[i]`` is the original index of the *i*-th element in sorted
+        order.  When *na_last* is ``True`` (default), null elements are placed
+        at the end; when ``False``, at the beginning.
+
+        Delegates to ``Column.sort_perm`` so the logic lives in one place.
         """
-        var n = len(self._col)
-        var perm = List[Int]()
-        for i in range(n):
-            perm.append(i)
-        if n <= 1:
-            return perm^
-        # ref binding avoids copying the null mask (which may be O(n) bytes).
-        ref null_mask = self._col._null_mask
-        if self._col._data.isa[List[Int64]]():
-            ref d = self._col._data[List[Int64]]
-            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
-        elif self._col._data.isa[List[Float64]]():
-            ref d = self._col._data[List[Float64]]
-            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
-        elif self._col._data.isa[List[Bool]]():
-            ref d = self._col._data[List[Bool]]
-            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
-        elif self._col._data.isa[List[String]]():
-            ref d = self._col._data[List[String]]
-            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
-        else:
-            ref d = self._col._data[List[PythonObject]]
-            _merge_sort_perm_pyobj(perm, d, null_mask, ascending, na_last)
-        return perm^
+        return self._col.sort_perm(ascending, na_last)
 
     def sort_values(
         self, ascending: Bool = True, na_position: String = "last"
@@ -3532,9 +3509,11 @@ struct DataFrame(Copyable, Movable):
         var k = len(by) - 1
         while k >= 0:
             var asc = ascending[k] if k < len(ascending) else True
-            var key_col = self[by[k]]
-            var sub_perm = Series(key_col._col.take(perm))._sort_perm(
-                asc, na_position == "last"
+            var col_idx = _df_col_index(self, by[k])
+            var sub_perm = (
+                self._cols[col_idx]
+                .take(perm)
+                .sort_perm(asc, na_position == "last")
             )
             var new_perm = List[Int]()
             for j in range(n_rows):

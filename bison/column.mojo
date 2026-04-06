@@ -4203,6 +4203,42 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 objs.append(old[perm[k]])
             return ColumnIndex(objs^)
 
+    def sort_perm(
+        self, ascending: Bool, na_last: Bool = True
+    ) raises -> List[Int]:
+        """Return a stable merge-sort permutation over the column data values.
+
+        ``perm[i]`` is the original index of the *i*-th element in sorted
+        order.  When *na_last* is ``True`` (default), null elements are placed
+        at the end; when ``False``, at the beginning.
+
+        This is the canonical argsort helper shared by ``Series.sort_values``
+        and ``DataFrame.sort_values``.
+        """
+        var n = self.__len__()
+        var perm = List[Int]()
+        for i in range(n):
+            perm.append(i)
+        if n <= 1:
+            return perm^
+        ref null_mask = self._null_mask
+        if self._data.isa[List[Int64]]():
+            ref d = self._data[List[Int64]]
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
+        elif self._data.isa[List[Float64]]():
+            ref d = self._data[List[Float64]]
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
+        elif self._data.isa[List[Bool]]():
+            ref d = self._data[List[Bool]]
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
+        elif self._data.isa[List[String]]():
+            ref d = self._data[List[String]]
+            _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
+        else:
+            ref d = self._data[List[PythonObject]]
+            _merge_sort_perm_pyobj(perm, d, null_mask, ascending, na_last)
+        return perm^
+
     def _sort_perm_by_index(self, ascending: Bool) raises -> List[Int]:
         """Return a stable merge-sort permutation over the current index labels.
 
