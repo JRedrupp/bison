@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column, ColumnData
+from ..column import Column
 from ..dtypes import int64, float64, object_, bool_
 
 
@@ -74,7 +74,7 @@ def _json_build_column(
             else:
                 data.append(Bool(val.__bool__()))
                 null_mask.append(False)
-        var col = Column(name, ColumnData(data^), bool_)
+        var col = Column(name, data^, bool_)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -92,7 +92,7 @@ def _json_build_column(
             else:
                 data.append(Int64(Int(py=val)))
                 null_mask.append(False)
-        var col = Column(name, ColumnData(data^), int64)
+        var col = Column(name, data^, int64)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -110,7 +110,7 @@ def _json_build_column(
             else:
                 data.append(atof(String(val)))
                 null_mask.append(False)
-        var col = Column(name, ColumnData(data^), float64)
+        var col = Column(name, data^, float64)
         if has_null:
             col._null_mask = null_mask^
         return col^
@@ -128,7 +128,7 @@ def _json_build_column(
             else:
                 data.append(String(val))
                 null_mask.append(False)
-        var col = Column(name, ColumnData(data^), object_)
+        var col = Column(name, data^, object_)
         if has_null:
             col._null_mask = null_mask^
         return col^

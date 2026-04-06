@@ -1,6 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
-from ..column import Column, ColumnData
+from ..column import Column
 from ..dtypes import int64, object_, datetime64_ns
 
 
@@ -53,7 +53,7 @@ struct DatetimeMethods:
             else:
                 result.append(Int64(Int(py=self._data[i].__getattr__(attr))))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), int64)
+        var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
@@ -98,7 +98,7 @@ struct DatetimeMethods:
             else:
                 result.append(self._data[i].date())
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
 
@@ -112,7 +112,7 @@ struct DatetimeMethods:
             else:
                 result.append(self._data[i].time())
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), object_)
+        var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
 
@@ -138,7 +138,7 @@ struct DatetimeMethods:
             else:
                 result.append(self._data[i].__getattr__(method)(arg))
                 new_mask.append(False)
-        var col = Column(self._name, ColumnData(result^), datetime64_ns)
+        var col = Column(self._name, result^, datetime64_ns)
         col._null_mask = new_mask^
         return col^
 
