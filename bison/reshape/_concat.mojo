@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame, _sort_col_names
-from ..column import Column
+from ..column import Column, NullMask
 from ..dtypes import BisonDtype, int64, float64, bool_, object_
 from .._errors import _not_implemented
 

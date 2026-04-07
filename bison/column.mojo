@@ -4378,9 +4378,10 @@ struct NullMask(Copyable, Movable, Sized):
         self._mask = List[Bool]()
 
     @implicit
-    def __init__(out self, var mask: List[Bool]):
-        """Construct from an existing ``List[Bool]`` (implicit conversion)."""
-        self._mask = mask^
+    def __init__(out self, read mask: List[Bool]):
+        """Construct from a ``List[Bool]`` (implicit conversion, copies the list).
+        """
+        self._mask = mask.copy()
 
     def __init__(out self, *, copy: Self):
         self._mask = copy._mask.copy()
@@ -4396,6 +4397,18 @@ struct NullMask(Copyable, Movable, Sized):
 
     def __setitem__(mut self, index: Int, value: Bool):
         self._mask[index] = value
+
+    def append(mut self, value: Bool):
+        """Append a null (``True``) or valid (``False``) entry to the mask."""
+        self._mask.append(value)
+
+    def append_null(mut self):
+        """Append a null marker (``True``) to the mask."""
+        self._mask.append(True)
+
+    def append_valid(mut self):
+        """Append a valid marker (``False``) to the mask."""
+        self._mask.append(False)
 
     def has_nulls(self) -> Bool:
         """Return ``True`` if any element is marked null."""
