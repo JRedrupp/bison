@@ -4366,22 +4366,30 @@ struct NullMask(Copyable, Movable, Sized):
 
     Bit semantics are bison-native: a *set* bit means *null*, a *cleared*
     bit means *valid*.  This matches today's ``List[Bool]`` semantics
-    (``True`` = null) and lets the common "no nulls" case skip allocation
-    entirely, since ``BitmapBuilder.alloc()`` is zero-filled.  The
-    Arrow-style inversion to validity bits happens at the conversion
+    (``True`` = null) and lets the common "no nulls" case skip the cost
+    of writing any bits, since ``BitmapBuilder.alloc()`` is zero-filled.
+    The Arrow-style inversion to validity bits happens at the conversion
     boundary in ``arrow.mojo``.
 
     ``BitmapBuilder`` is ``Movable`` only, so the manual ``copy``/``take``
     initialisers below are required for ``NullMask`` to satisfy the
     ``Copyable`` trait that ``Column`` relies on.
 
+    The builder is always allocated to at least one bit because nightly
+    Mojo's ``UnsafePointer.alloc(0, alignment=64)`` aborts on a null
+    return; ``BitmapBuilder.alloc(_EMPTY_ALLOC_BITS)`` produces a real
+    64-byte aligned allocation that's safe to free and never read from
+    on the no-nulls fast path.
+
     Subscript access (``mask[i]`` / ``mask[i] = v``) and ``len(mask)`` are
     supported directly so that call sites can be migrated incrementally.
     Prefer ``is_null`` / ``is_valid`` / ``has_nulls`` over raw subscripting.
     """
 
+    comptime _EMPTY_ALLOC_BITS = 1
+
     # Always-allocated bit-packed buffer.  When ``_capacity == 0`` the
-    # builder owns no memory and the buffer pointer is not touched.
+    # builder owns a sentinel allocation but its bytes are not read.
     var _builder: BitmapBuilder
     # Logical number of entries tracked (matches today's ``len`` semantics).
     var _length: Int
@@ -4392,8 +4400,8 @@ struct NullMask(Copyable, Movable, Sized):
     var _has_nulls: Bool
 
     def __init__(out self):
-        """Empty mask — no nulls, no allocation."""
-        self._builder = BitmapBuilder.alloc(0)
+        """Empty mask — no nulls."""
+        self._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
         self._length = 0
         self._capacity = 0
         self._has_nulls = False
@@ -4426,7 +4434,7 @@ struct NullMask(Copyable, Movable, Sized):
                     self._builder.set_bit(i, True)
         else:
             self._capacity = 0
-            self._builder = BitmapBuilder.alloc(0)
+            self._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
 
     def __init__(out self, *, copy: Self):
         self._length = copy._length
@@ -4434,7 +4442,12 @@ struct NullMask(Copyable, Movable, Sized):
         self._has_nulls = copy._has_nulls
         # Allocate the final size directly — avoids calling the raising
         # ``BitmapBuilder.resize`` from this non-raising copy constructor.
-        self._builder = BitmapBuilder.alloc(copy._capacity)
+        # Floor at ``_EMPTY_ALLOC_BITS`` so we never hit nightly Mojo's
+        # zero-size alloc abort.
+        var alloc_bits = (
+            copy._capacity if copy._capacity > 0 else Self._EMPTY_ALLOC_BITS
+        )
+        self._builder = BitmapBuilder.alloc(alloc_bits)
         if copy._capacity > 0 and copy._has_nulls and copy._length > 0:
             self._builder.copy_bits(
                 copy._builder.unsafe_ptr(), 0, 0, copy._length
