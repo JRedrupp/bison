@@ -4,6 +4,7 @@ from std.memory import bitcast
 from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor, ceil, exp, log, log10
 from marrow.arrays import AnyArray
+from marrow.bitmap import BitmapBuilder
 from marrow.builders import array as _marrow_array
 from marrow.dtypes import (
     int64 as _m_int64,
@@ -4358,112 +4359,222 @@ def _merge_sort_perm_pyobj(
 struct NullMask(Copyable, Movable, Sized):
     """Tracks which elements of a ``Column`` are null/NaN.
 
-    Wraps a ``List[Bool]`` where ``True`` marks a null element.  An empty
-    mask (``len == 0``) means no nulls are present and ``has_nulls()``
-    returns ``False``.
+    Backed by marrow's bit-packed ``BitmapBuilder`` (1 bit per element)
+    rather than a ``List[Bool]``, for an 8x reduction in null-tracking
+    memory.  An empty mask (``_length == 0`` or ``_has_nulls == False``)
+    means no nulls are present and ``has_nulls()`` returns ``False``.
 
-    All null-mask operations on ``Column`` go through this API so that the
-    internal representation can be swapped (e.g. to a marrow ``Bitmap``)
-    without touching call sites.
+    Bit semantics are bison-native: a *set* bit means *null*, a *cleared*
+    bit means *valid*.  This matches today's ``List[Bool]`` semantics
+    (``True`` = null) and lets the common "no nulls" case skip the cost
+    of writing any bits, since ``BitmapBuilder.alloc()`` is zero-filled.
+    The Arrow-style inversion to validity bits happens at the conversion
+    boundary in ``arrow.mojo``.
+
+    ``BitmapBuilder`` is ``Movable`` only, so the manual ``copy``/``take``
+    initialisers below are required for ``NullMask`` to satisfy the
+    ``Copyable`` trait that ``Column`` relies on.
+
+    The builder is always allocated to at least one bit because nightly
+    Mojo's ``UnsafePointer.alloc(0, alignment=64)`` aborts on a null
+    return; ``BitmapBuilder.alloc(_EMPTY_ALLOC_BITS)`` produces a real
+    64-byte aligned allocation that's safe to free and never read from
+    on the no-nulls fast path.
 
     Subscript access (``mask[i]`` / ``mask[i] = v``) and ``len(mask)`` are
     supported directly so that call sites can be migrated incrementally.
     Prefer ``is_null`` / ``is_valid`` / ``has_nulls`` over raw subscripting.
     """
 
-    var _mask: List[Bool]
+    comptime _EMPTY_ALLOC_BITS = 1
+
+    # Always-allocated bit-packed buffer.  When ``_capacity == 0`` the
+    # builder owns a sentinel allocation but its bytes are not read.
+    var _builder: BitmapBuilder
+    # Logical number of entries tracked (matches today's ``len`` semantics).
+    var _length: Int
+    # Number of bits the builder can currently hold (>= _length when set).
+    var _capacity: Int
+    # Cached "any bit set" flag — preserves the existing fast path where
+    # ``has_nulls()`` short-circuits on the no-nulls case.
+    var _has_nulls: Bool
 
     def __init__(out self):
         """Empty mask — no nulls."""
-        self._mask = List[Bool]()
+        self._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
+        self._length = 0
+        self._capacity = 0
+        self._has_nulls = False
 
     @implicit
     def __init__(out self, read mask: List[Bool]):
-        """Construct from a ``List[Bool]`` (implicit conversion, copies the list).
+        """Construct from a ``List[Bool]`` (implicit conversion).
+
+        Backwards-compatibility bridge for call sites that still build a
+        ``List[Bool]`` and assign it directly to ``col._null_mask``
+        (notably ``arrow.mojo``, ``reshape/_concat.mojo``, and several
+        ``Column`` helpers like ``take`` / ``take_with_nulls``).  Must be
+        non-raising because most of those callers run in non-raising
+        contexts; we therefore use ``BitmapBuilder.alloc`` directly at the
+        final size and avoid the raising ``resize`` path.
         """
-        self._mask = mask.copy()
+        var n = len(mask)
+        var any_null = False
+        for i in range(n):
+            if mask[i]:
+                any_null = True
+                break
+        self._length = n
+        self._has_nulls = any_null
+        if any_null:
+            self._capacity = n
+            self._builder = BitmapBuilder.alloc(n)
+            for i in range(n):
+                if mask[i]:
+                    self._builder.set_bit(i, True)
+        else:
+            self._capacity = 0
+            self._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
 
     def __init__(out self, *, copy: Self):
-        self._mask = copy._mask.copy()
+        self._length = copy._length
+        self._capacity = copy._capacity
+        self._has_nulls = copy._has_nulls
+        # Allocate the final size directly — avoids calling the raising
+        # ``BitmapBuilder.resize`` from this non-raising copy constructor.
+        # Floor at ``_EMPTY_ALLOC_BITS`` so we never hit nightly Mojo's
+        # zero-size alloc abort.
+        var alloc_bits = (
+            copy._capacity if copy._capacity > 0 else Self._EMPTY_ALLOC_BITS
+        )
+        self._builder = BitmapBuilder.alloc(alloc_bits)
+        if copy._capacity > 0 and copy._has_nulls and copy._length > 0:
+            self._builder.copy_bits(
+                copy._builder.unsafe_ptr(), 0, 0, copy._length
+            )
 
     def __init__(out self, *, deinit take: Self):
-        self._mask = take._mask^
+        self._builder = take._builder^
+        self._length = take._length
+        self._capacity = take._capacity
+        self._has_nulls = take._has_nulls
+
+    def _ensure_capacity(mut self, min_bits: Int) raises:
+        """Grow ``_builder`` so it can hold at least ``min_bits`` bits.
+
+        New bytes are zero-filled by ``BufferBuilder.resize`` (and by the
+        initial ``alloc``), so newly tracked entries default to *valid*.
+        """
+        if min_bits <= self._capacity:
+            return
+        var new_cap = self._capacity * 2 if self._capacity > 0 else 64
+        if new_cap < min_bits:
+            new_cap = min_bits
+        self._builder.resize(new_cap)
+        self._capacity = new_cap
+
+    @always_inline
+    def _bit_at(self, index: Int) -> Bool:
+        var ptr = self._builder.unsafe_ptr()
+        return Bool((ptr[index >> 3] >> UInt8(index & 7)) & 1)
 
     def __len__(self) -> Int:
-        return len(self._mask)
+        return self._length
 
     def __getitem__(self, index: Int) -> Bool:
-        return self._mask[index]
+        return self.is_null(index)
 
-    def __setitem__(mut self, index: Int, value: Bool):
-        self._mask[index] = value
+    def __setitem__(mut self, index: Int, value: Bool) raises:
+        if value:
+            self.set_null(index)
+        else:
+            self.set_valid(index)
 
-    def append(mut self, value: Bool):
+    def append(mut self, value: Bool) raises:
         """Append a null (``True``) or valid (``False``) entry to the mask."""
-        self._mask.append(value)
+        self._length += 1
+        if value:
+            self._ensure_capacity(self._length)
+            self._builder.set_bit(self._length - 1, True)
+            self._has_nulls = True
+        elif self._has_nulls:
+            # Already allocated — must explicitly write a 0 bit so a
+            # previously-set bit at this index doesn't leak through after
+            # a resize.  ``resize`` zero-fills new bytes so growing alone
+            # is safe; this only matters when ``_length`` was reduced and
+            # is now growing back into reused capacity, but we keep the
+            # branch defensive.
+            if self._length <= self._capacity:
+                self._builder.set_bit(self._length - 1, False)
 
-    def append_null(mut self):
-        """Append a null marker (``True``) to the mask."""
-        self._mask.append(True)
+    def append_null(mut self) raises:
+        """Append a null marker to the mask."""
+        self.append(True)
 
-    def append_valid(mut self):
-        """Append a valid marker (``False``) to the mask."""
-        self._mask.append(False)
+    def append_valid(mut self) raises:
+        """Append a valid marker to the mask."""
+        self.append(False)
 
     def has_nulls(self) -> Bool:
         """Return ``True`` if any element is marked null."""
-        return len(self._mask) > 0
+        return self._has_nulls
 
     def is_null(self, index: Int) -> Bool:
         """Return ``True`` if the element at *index* is null.
 
         Returns ``False`` when the mask is empty or *index* is out of bounds.
         """
-        return index < len(self._mask) and self._mask[index]
+        if not self._has_nulls or index < 0 or index >= self._length:
+            return False
+        return self._bit_at(index)
 
     def is_valid(self, index: Int) -> Bool:
         """Return ``True`` if the element at *index* is not null."""
         return not self.is_null(index)
 
-    def set_null(mut self, index: Int):
+    def set_null(mut self, index: Int) raises:
         """Mark the element at *index* as null."""
-        self._mask[index] = True
+        self._ensure_capacity(index + 1)
+        self._builder.set_bit(index, True)
+        self._has_nulls = True
 
     def set_valid(mut self, index: Int):
         """Mark the element at *index* as valid (not null)."""
-        self._mask[index] = False
+        if not self._has_nulls:
+            return
+        self._builder.set_bit(index, False)
 
     def len(self) -> Int:
         """Return the number of elements tracked by this mask."""
-        return len(self._mask)
+        return self._length
 
     def count_valid(self) -> Int:
         """Return the number of non-null elements."""
+        if not self._has_nulls:
+            return self._length
         var count = 0
-        for i in range(len(self._mask)):
-            if not self._mask[i]:
+        for i in range(self._length):
+            if not self._bit_at(i):
                 count += 1
         return count
-
-    def copy(self) -> Self:
-        """Return an independent copy of this mask."""
-        return Self(self._mask.copy())
 
     @staticmethod
     def all_valid(n: Int) -> Self:
         """Return a mask of length *n* with all elements valid (not null)."""
-        var m = List[Bool]()
-        for _ in range(n):
-            m.append(False)
-        return Self(m^)
+        var m = Self()
+        m._length = n
+        return m^
 
     @staticmethod
-    def all_null(n: Int) -> Self:
+    def all_null(n: Int) raises -> Self:
         """Return a mask of length *n* with all elements null."""
-        var m = List[Bool]()
-        for _ in range(n):
-            m.append(True)
-        return Self(m^)
+        var m = Self()
+        m._length = n
+        if n > 0:
+            m._ensure_capacity(n)
+            m._builder.set_range(0, n, True)
+            m._has_nulls = True
+        return m^
 
 
 struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
