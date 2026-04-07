@@ -25,6 +25,7 @@ from .column import (
     DFScalar,
     SeriesScalar,
     DictSplitResult,
+    NullMask,
     FloatTransformFn,
 )
 from .series import Series

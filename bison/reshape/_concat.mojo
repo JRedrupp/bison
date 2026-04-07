@@ -81,7 +81,7 @@ def _append_piece_mask(
 ) raises:
     if not need_mask:
         return
-    var has_m = len(piece._null_mask) > 0
+    var has_m = piece._null_mask.has_nulls()
     var n = len(piece)
     for k in range(n):
         if has_m:
@@ -257,7 +257,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
     # Detect whether any piece has a null mask.
     var need_mask = False
     for i in range(len(pieces)):
-        if len(pieces[i]._null_mask) > 0:
+        if pieces[i]._null_mask.has_nulls():
             need_mask = True
 
     # Check if all pieces share the same typed arm (no promotion needed).

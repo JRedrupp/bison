@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from .._errors import _not_implemented
-from ..column import Column
+from ..column import Column, NullMask
 from ..dtypes import BisonDtype, object_, bool_, int64
 
 
@@ -9,7 +9,7 @@ struct StringMethods:
     """Vectorized string operations on a Series (.str accessor)."""
 
     var _data: List[String]
-    var _null_mask: List[Bool]
+    var _null_mask: NullMask
     var _name: Optional[String]
 
     def __init__(out self):
@@ -20,7 +20,7 @@ struct StringMethods:
     def __init__(
         out self,
         var data: List[String],
-        var null_mask: List[Bool],
+        var null_mask: NullMask,
         name: Optional[String],
     ):
         self._data = data^
@@ -32,7 +32,7 @@ struct StringMethods:
     # ------------------------------------------------------------------
 
     def _is_null(self, i: Int) -> Bool:
-        return len(self._null_mask) > i and self._null_mask[i]
+        return self._null_mask.is_null(i)
 
     # ------------------------------------------------------------------
     # Case / transform
