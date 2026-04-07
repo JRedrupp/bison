@@ -31,20 +31,26 @@ jobs:
         continue-on-error: true
         run: pixi run bench
 
+      - name: Stash dashboard HTML from main
+        run: cp docs/index.html /tmp/dashboard-index.html
+
       - name: Checkout gh-pages into docs/
         uses: actions/checkout@v6
         with:
           ref: gh-pages
           path: docs
 
+      - name: Restore dashboard HTML over gh-pages copy
+        run: cp /tmp/dashboard-index.html docs/index.html
+
       - name: Generate report
         run: pixi run gen-report
 
-      - name: Push updated dashboard data
+      - name: Push updated dashboard
         working-directory: docs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data.json
-          git diff --cached --quiet || git commit -m "perf: update benchmark data [skip ci]"
+          git add data.json index.html
+          git diff --cached --quiet || git commit -m "perf: update benchmark dashboard [skip ci]"
           git push origin gh-pages
