@@ -4484,12 +4484,6 @@ struct NullMask(Copyable, Movable, Sized):
     def __getitem__(self, index: Int) -> Bool:
         return self.is_null(index)
 
-    def __setitem__(mut self, index: Int, value: Bool) raises:
-        if value:
-            self.set_null(index)
-        else:
-            self.set_valid(index)
-
     def append(mut self, value: Bool) raises:
         """Append a null (``True``) or valid (``False``) entry to the mask."""
         self._length += 1
