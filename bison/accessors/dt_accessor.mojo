@@ -1,6 +1,6 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
-from ..column import Column
+from ..column import Column, NullMask
 from ..dtypes import int64, object_, datetime64_ns
 
 
@@ -8,7 +8,7 @@ struct DatetimeMethods:
     """Accessor for datetime properties on a Series (.dt accessor)."""
 
     var _data: List[PythonObject]
-    var _null_mask: List[Bool]
+    var _null_mask: NullMask
     var _name: Optional[String]
 
     def __init__(out self):
@@ -19,7 +19,7 @@ struct DatetimeMethods:
     def __init__(
         out self,
         var data: List[PythonObject],
-        var null_mask: List[Bool],
+        var null_mask: NullMask,
         name: Optional[String],
     ):
         self._data = data^
@@ -31,7 +31,7 @@ struct DatetimeMethods:
     # ------------------------------------------------------------------
 
     def _is_null(self, i: Int) -> Bool:
-        return len(self._null_mask) > i and self._null_mask[i]
+        return self._null_mask.is_null(i)
 
     # ------------------------------------------------------------------
     # Integer properties

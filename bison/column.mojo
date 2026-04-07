@@ -608,10 +608,10 @@ struct _FillnaVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var col_data: ColumnData
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var value: DFScalar
 
-    def __init__(out self, null_mask: List[Bool], value: DFScalar):
+    def __init__(out self, null_mask: NullMask, value: DFScalar):
         self.col_data = ColumnData(List[PythonObject]())
         self.null_mask = null_mask.copy()
         self.value = value
@@ -702,9 +702,9 @@ struct _FfillVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -822,9 +822,9 @@ struct _BfillVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -973,13 +973,13 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     var py_list: PythonObject
     var py_none: PythonObject
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
     def __init__(
         out self,
         py_list: PythonObject,
         py_none: PythonObject,
-        null_mask: List[Bool],
+        null_mask: NullMask,
     ):
         self.py_list = py_list
         self.py_none = py_none
@@ -1038,7 +1038,7 @@ def _to_numeric_marrow_array(col: Column) raises -> AnyArray:
     Null mask entries become Arrow null values. Raises for non-numeric types.
     """
     var n = len(col)
-    var has_mask = len(col._null_mask) > 0
+    var has_mask = col._null_mask.has_nulls()
 
     if col._data.isa[List[Int64]]():
         ref src = col._data[List[Int64]]
@@ -1081,9 +1081,9 @@ struct _SumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Accumulates element-wise sum into Float64, skipping masked nulls."""
 
     var result: Float64
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.result = Float64(0)
         self.null_mask = null_mask.copy()
 
@@ -1125,10 +1125,10 @@ struct _ExtremumVisitor[find_min: Bool](
 
     var result: Float64
     var found: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var _label: String
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.result = Float64(0)
         self.found = False
         self.null_mask = null_mask.copy()
@@ -1180,9 +1180,9 @@ struct _VarVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     var total: Float64
     var mean: Float64
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, mean: Float64, null_mask: List[Bool]):
+    def __init__(out self, mean: Float64, null_mask: NullMask):
         self.total = Float64(0)
         self.mean = mean
         self.null_mask = null_mask.copy()
@@ -1229,9 +1229,9 @@ struct _MomentVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var total: Float64
     var mean: Float64
     var k: Int
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, mean: Float64, k: Int, null_mask: List[Bool]):
+    def __init__(out self, mean: Float64, k: Int, null_mask: NullMask):
         self.total = Float64(0)
         self.mean = mean
         self.k = k
@@ -1289,10 +1289,10 @@ struct _ArgExtremumVisitor[find_min: Bool](
     var result: Int
     var found: Bool
     var best_val: Float64
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var _label: String
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.result = 0
         self.found = False
         self.best_val = Float64(0)
@@ -1346,9 +1346,9 @@ struct _NuniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """Counts unique non-null values across all supported column types."""
 
     var result: Int
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.result = 0
         self.null_mask = null_mask.copy()
 
@@ -1397,9 +1397,9 @@ struct _QuantileCollectVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var vals: List[Float64]
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.vals = List[Float64]()
         self.null_mask = null_mask.copy()
 
@@ -1447,11 +1447,11 @@ struct _AbsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var is_identity: Bool
     var dtype_name: String
 
-    def __init__(out self, null_mask: List[Bool], dtype_name: String):
+    def __init__(out self, null_mask: NullMask, dtype_name: String):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -1502,13 +1502,13 @@ struct _RoundVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var decimals: Int
     var is_identity: Bool
     var dtype_name: String
 
     def __init__(
-        out self, null_mask: List[Bool], decimals: Int, dtype_name: String
+        out self, null_mask: NullMask, decimals: Int, dtype_name: String
     ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
@@ -1558,14 +1558,14 @@ struct _ClipVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var lower: Optional[Float64]
     var upper: Optional[Float64]
     var dtype_name: String
 
     def __init__(
         out self,
-        null_mask: List[Bool],
+        null_mask: NullMask,
         lower: Optional[Float64],
         upper: Optional[Float64],
         dtype_name: String,
@@ -1653,17 +1653,17 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var self_null_mask: List[Bool]
+    var self_null_mask: NullMask
     var cond_data: List[Bool]
-    var cond_null_mask: List[Bool]
+    var cond_null_mask: NullMask
     var keep_on_true: Bool
     var other: Optional[DFScalar]
 
     def __init__(
         out self,
-        self_null_mask: List[Bool],
+        self_null_mask: NullMask,
         cond_data: List[Bool],
-        cond_null_mask: List[Bool],
+        cond_null_mask: NullMask,
         keep_on_true: Bool,
         other: Optional[DFScalar] = None,
     ):
@@ -1677,8 +1677,8 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.other = other
 
     def on_int64(mut self, data: List[Int64]) raises:
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_cond_mask = self.cond_null_mask.has_nulls()
         var has_other = self.other.__bool__()
         var other_val: Int64 = 0
         var other_is_null = True
@@ -1715,8 +1715,8 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.col_data = ColumnData(result^)
 
     def on_float64(mut self, data: List[Float64]) raises:
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_cond_mask = self.cond_null_mask.has_nulls()
         var nan = Float64(0) / Float64(0)
         var has_other = self.other.__bool__()
         var other_val: Float64 = nan
@@ -1754,8 +1754,8 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.col_data = ColumnData(result^)
 
     def on_bool(mut self, data: List[Bool]) raises:
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_cond_mask = self.cond_null_mask.has_nulls()
         var has_other = self.other.__bool__()
         var other_val: Bool = False
         var other_is_null = True
@@ -1789,8 +1789,8 @@ struct _WhereMaskVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.col_data = ColumnData(result^)
 
     def on_str(mut self, data: List[String]) raises:
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_cond_mask = len(self.cond_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_cond_mask = self.cond_null_mask.has_nulls()
         var has_other = self.other.__bool__()
         var other_val: String = ""
         var other_is_null = True
@@ -1836,15 +1836,15 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var self_null_mask: List[Bool]
+    var self_null_mask: NullMask
     var other_data: ColumnData
-    var other_null_mask: List[Bool]
+    var other_null_mask: NullMask
 
     def __init__(
         out self,
-        self_null_mask: List[Bool],
+        self_null_mask: NullMask,
         other_data: ColumnData,
-        other_null_mask: List[Bool],
+        other_null_mask: NullMask,
     ):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
@@ -1866,8 +1866,8 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if not self.other_data.isa[List[Int64]]():
             raise Error("combine_first: dtype mismatch between columns")
         ref od = self.other_data[List[Int64]]
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_other_mask = len(self.other_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_other_mask = self.other_null_mask.has_nulls()
         var result = List[Int64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
@@ -1898,8 +1898,8 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         else:
             raise Error("combine_first: dtype mismatch between columns")
         var nan = Float64(0) / Float64(0)
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_other_mask = len(self.other_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_other_mask = self.other_null_mask.has_nulls()
         var result = List[Float64]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
@@ -1921,8 +1921,8 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if not self.other_data.isa[List[Bool]]():
             raise Error("combine_first: dtype mismatch between columns")
         ref od = self.other_data[List[Bool]]
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_other_mask = len(self.other_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_other_mask = self.other_null_mask.has_nulls()
         var result = List[Bool]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
@@ -1944,8 +1944,8 @@ struct _CombineFirstVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         if not self.other_data.isa[List[String]]():
             raise Error("combine_first: dtype mismatch between columns")
         ref od = self.other_data[List[String]]
-        var has_self_mask = len(self.self_null_mask) > 0
-        var has_other_mask = len(self.other_null_mask) > 0
+        var has_self_mask = self.self_null_mask.has_nulls()
+        var has_other_mask = self.other_null_mask.has_nulls()
         var result = List[String]()
         for i in range(len(data)):
             var self_null = has_self_mask and self.self_null_mask[i]
@@ -1978,10 +1978,10 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var scalars: List[DFScalar]
 
-    def __init__(out self, null_mask: List[Bool], scalars: List[DFScalar]):
+    def __init__(out self, null_mask: NullMask, scalars: List[DFScalar]):
         # Initialised with the fallback arm (List[PythonObject]) so that the
         # field is always valid.  on_* immediately replaces it with the Bool result.
         self.col_data = ColumnData(List[PythonObject]())
@@ -2101,9 +2101,9 @@ struct _UniqueVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.col_data = ColumnData(List[PythonObject]())
         self.result_mask = List[Bool]()
         self.has_any_null = False
@@ -2197,7 +2197,7 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var is_identity: Bool
     var to_int: Bool
     var to_float: Bool
@@ -2207,7 +2207,7 @@ struct _AstypeVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     def __init__(
         out self,
-        null_mask: List[Bool],
+        null_mask: NullMask,
         to_int: Bool,
         to_float: Bool,
         to_bool: Bool,
@@ -2490,11 +2490,11 @@ struct _TakeWithNullsVisitor(ColumnDataVisitor, Copyable, Movable):
     """Like _TakeVisitor but index -1 emits a null placeholder row."""
 
     var indices: List[Int]
-    var src_mask: List[Bool]
+    var src_mask: NullMask
     var out_mask: List[Bool]
     var result: ColumnData
 
-    def __init__(out self, indices: List[Int], src_mask: List[Bool]):
+    def __init__(out self, indices: List[Int], src_mask: NullMask):
         self.indices = indices.copy()
         self.src_mask = src_mask.copy()
         self.out_mask = List[Bool]()
@@ -2579,11 +2579,11 @@ struct _ValueCountsCountVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var has_mask: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var unique_keys: List[String]
     var counts_dict: Dict[String, Int]
 
-    def __init__(out self, has_mask: Bool, null_mask: List[Bool]):
+    def __init__(out self, has_mask: Bool, null_mask: NullMask):
         self.has_mask = has_mask
         self.null_mask = null_mask.copy()
         self.unique_keys = List[String]()
@@ -2807,8 +2807,8 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     folds the branch at compile time so each specialisation is a tight loop.
     """
 
-    var self_null_mask: List[Bool]
-    var other_null_mask: List[Bool]
+    var self_null_mask: NullMask
+    var other_null_mask: NullMask
     var other_bool: List[Bool]  # Bool RHS data; non-empty iff other_is_bool
     var other_float: List[
         Float64
@@ -2820,7 +2820,7 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, self_null_mask: List[Bool], other: Column) raises:
+    def __init__(out self, self_null_mask: NullMask, other: Column) raises:
         self.self_null_mask = self_null_mask.copy()
         self.other_null_mask = other._null_mask.copy()
         self.result = List[Bool]()
@@ -2850,8 +2850,8 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     def _run_float64(mut self, a: List[Float64]):
         """Inner loop: compare ``a`` against ``other_float`` with null propagation.
         """
-        var has_a_mask = len(self.self_null_mask) > 0
-        var has_b_mask = len(self.other_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
+        var has_b_mask = self.other_null_mask.has_nulls()
         for i in range(len(a)):
             var is_null = (has_a_mask and self.self_null_mask[i]) or (
                 has_b_mask and self.other_null_mask[i]
@@ -2891,8 +2891,8 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     def on_bool(mut self, data: List[Bool]) raises:
         # `data` is guaranteed to be List[Bool] by the visitor dispatch.
         # The isa check below resolves only the RHS arm.
-        var has_a_mask = len(self.self_null_mask) > 0
-        var has_b_mask = len(self.other_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
+        var has_b_mask = self.other_null_mask.has_nulls()
         if self.other_is_bool:
             # Bool-Bool fast path: compare directly without a Float64 round-trip.
             ref db = self.other_bool
@@ -2934,8 +2934,8 @@ struct _CmpOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
             raise Error(
                 "cmp: cannot compare string column with non-string column"
             )
-        var has_a_mask = len(self.self_null_mask) > 0
-        var has_b_mask = len(self.other_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
+        var has_b_mask = self.other_null_mask.has_nulls()
         ref ds = self.other_str
         for i in range(len(data)):
             var is_null = (has_a_mask and self.self_null_mask[i]) or (
@@ -2980,13 +2980,13 @@ struct _CmpScalarVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     folds the branch at compile time so each specialisation is a tight loop.
     """
 
-    var self_null_mask: List[Bool]
+    var self_null_mask: NullMask
     var scalar: Float64
     var result: List[Bool]
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, self_null_mask: List[Bool], scalar: Float64):
+    def __init__(out self, self_null_mask: NullMask, scalar: Float64):
         self.self_null_mask = self_null_mask.copy()
         self.scalar = scalar
         self.result = List[Bool]()
@@ -2996,7 +2996,7 @@ struct _CmpScalarVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     def _run_float64(mut self, a: List[Float64]):
         """Inner loop: compare ``a`` against the scalar with null propagation.
         """
-        var has_a_mask = len(self.self_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
         for i in range(len(a)):
             var is_null = has_a_mask and self.self_null_mask[i]
             if is_null:
@@ -3065,13 +3065,13 @@ struct _CmpScalarInt64Visitor[op: Int](
     folds the branch at compile time so each specialisation is a tight loop.
     """
 
-    var self_null_mask: List[Bool]
+    var self_null_mask: NullMask
     var scalar: Int64
     var result: List[Bool]
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, self_null_mask: List[Bool], scalar: Int64):
+    def __init__(out self, self_null_mask: NullMask, scalar: Int64):
         self.self_null_mask = self_null_mask.copy()
         self.scalar = scalar
         self.result = List[Bool]()
@@ -3081,7 +3081,7 @@ struct _CmpScalarInt64Visitor[op: Int](
     def _run_int64(mut self, a: List[Int64]):
         """Inner loop: compare ``a`` against the Int64 scalar with null propagation.
         """
-        var has_a_mask = len(self.self_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
         for i in range(len(a)):
             var is_null = has_a_mask and self.self_null_mask[i]
             if is_null:
@@ -3111,7 +3111,7 @@ struct _CmpScalarInt64Visitor[op: Int](
         """Inner loop: widen scalar to Float64 and compare with null propagation.
         """
         var scalar_f = Float64(self.scalar)
-        var has_a_mask = len(self.self_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
         for i in range(len(a)):
             var is_null = has_a_mask and self.self_null_mask[i]
             if is_null:
@@ -3183,14 +3183,14 @@ struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
     and OR, and standard (either-null → null) propagation for XOR.
     """
 
-    var self_null_mask: List[Bool]
-    var other_null_mask: List[Bool]
+    var self_null_mask: NullMask
+    var other_null_mask: NullMask
     var other_bool: List[Bool]
     var result: List[Bool]
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, self_null_mask: List[Bool], other: Column) raises:
+    def __init__(out self, self_null_mask: NullMask, other: Column) raises:
         if not other._data.isa[List[Bool]]():
             raise Error("bool_op: non-bool column type on right-hand side")
         self.self_null_mask = self_null_mask.copy()
@@ -3201,8 +3201,8 @@ struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
         self.has_any_null = False
 
     def on_bool(mut self, data: List[Bool]) raises:
-        var has_a_mask = len(self.self_null_mask) > 0
-        var has_b_mask = len(self.other_null_mask) > 0
+        var has_a_mask = self.self_null_mask.has_nulls()
+        var has_b_mask = self.other_null_mask.has_nulls()
         ref ob = self.other_bool
         for i in range(len(data)):
             var a_null = has_a_mask and self.self_null_mask[i]
@@ -3351,7 +3351,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     var indices: List[Int]
     var fill_value: Optional[DFScalar]
-    var src_null_mask: List[Bool]
+    var src_null_mask: NullMask
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
@@ -3360,7 +3360,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         out self,
         indices: List[Int],
         fill_value: Optional[DFScalar],
-        src_null_mask: List[Bool],
+        src_null_mask: NullMask,
     ):
         self.indices = indices.copy()
         self.fill_value = fill_value
@@ -3383,7 +3383,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif fv.isa[Bool]():
                 fill = Int64(1) if fv[Bool] else Int64(0)
                 is_null_fill = False
-        var has_src_mask = len(self.src_null_mask) > 0
+        var has_src_mask = self.src_null_mask.has_nulls()
         var result = List[Int64]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
@@ -3414,7 +3414,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif fv.isa[Bool]():
                 fill = 1.0 if fv[Bool] else 0.0
                 is_null_fill = False
-        var has_src_mask = len(self.src_null_mask) > 0
+        var has_src_mask = self.src_null_mask.has_nulls()
         var result = List[Float64]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
@@ -3442,7 +3442,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif fv.isa[Int64]():
                 fill = fv[Int64] != 0
                 is_null_fill = False
-        var has_src_mask = len(self.src_null_mask) > 0
+        var has_src_mask = self.src_null_mask.has_nulls()
         var result = List[Bool]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
@@ -3467,7 +3467,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             if fv.isa[String]():
                 fill = fv[String]
                 is_null_fill = False
-        var has_src_mask = len(self.src_null_mask) > 0
+        var has_src_mask = self.src_null_mask.has_nulls()
         var result = List[String]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
@@ -3502,7 +3502,7 @@ struct _ReindexRowsVisitor(ColumnDataVisitorRaises, Copyable, Movable):
             elif fv.isa[Bool]():
                 fill = PythonObject(fv[Bool])
                 is_null_fill = False
-        var has_src_mask = len(self.src_null_mask) > 0
+        var has_src_mask = self.src_null_mask.has_nulls()
         var result = List[PythonObject]()
         for i in range(len(self.indices)):
             var idx = self.indices[i]
@@ -3720,12 +3720,12 @@ struct _CumSumVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var skipna: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+    def __init__(out self, skipna: Bool, null_mask: NullMask):
         self.skipna = skipna
         self.null_mask = null_mask.copy()
         self.col_data = ColumnData(List[PythonObject]())
@@ -3819,12 +3819,12 @@ struct _CumProdVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var skipna: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+    def __init__(out self, skipna: Bool, null_mask: NullMask):
         self.skipna = skipna
         self.null_mask = null_mask.copy()
         self.col_data = ColumnData(List[PythonObject]())
@@ -3918,12 +3918,12 @@ struct _CumMinVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var skipna: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+    def __init__(out self, skipna: Bool, null_mask: NullMask):
         self.skipna = skipna
         self.null_mask = null_mask.copy()
         self.col_data = ColumnData(List[PythonObject]())
@@ -4029,12 +4029,12 @@ struct _CumMaxVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     """
 
     var skipna: Bool
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var col_data: ColumnData
     var result_mask: List[Bool]
     var has_any_null: Bool
 
-    def __init__(out self, skipna: Bool, null_mask: List[Bool]):
+    def __init__(out self, skipna: Bool, null_mask: NullMask):
         self.skipna = skipna
         self.null_mask = null_mask.copy()
         self.col_data = ColumnData(List[PythonObject]())
@@ -4144,10 +4144,10 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
     respecting the null mask.
     """
 
-    var null_mask: List[Bool]
+    var null_mask: NullMask
     var result: ColumnIndex
 
-    def __init__(out self, null_mask: List[Bool]):
+    def __init__(out self, null_mask: NullMask):
         self.null_mask = null_mask.copy()
         self.result = ColumnIndex(List[PythonObject]())
 
@@ -4205,7 +4205,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 # _merge_sort_perm_comparable  — Int64, Float64, Bool, String (native </>)
 # _merge_sort_perm_pyobj       — PythonObject (Python comparison, raises)
 #
-# Both accept an optional null_mask.  Pass List[Bool]() and na_last=True
+# Both accept an optional null_mask.  Pass NullMask() and na_last=True
 # when null handling is not required (e.g. for index sorts).
 
 
@@ -4214,7 +4214,7 @@ def _merge_sort_perm_comparable[
 ](
     mut perm: List[Int],
     data: List[T],
-    null_mask: List[Bool],
+    null_mask: NullMask,
     ascending: Bool,
     na_last: Bool,
 ) raises:
@@ -4290,7 +4290,7 @@ def _merge_sort_perm_comparable[
 def _merge_sort_perm_pyobj(
     mut perm: List[Int],
     data: List[PythonObject],
-    null_mask: List[Bool],
+    null_mask: NullMask,
     ascending: Bool,
     na_last: Bool,
 ) raises:
@@ -4355,6 +4355,117 @@ def _merge_sort_perm_pyobj(
         width *= 2
 
 
+struct NullMask(Copyable, Movable, Sized):
+    """Tracks which elements of a ``Column`` are null/NaN.
+
+    Wraps a ``List[Bool]`` where ``True`` marks a null element.  An empty
+    mask (``len == 0``) means no nulls are present and ``has_nulls()``
+    returns ``False``.
+
+    All null-mask operations on ``Column`` go through this API so that the
+    internal representation can be swapped (e.g. to a marrow ``Bitmap``)
+    without touching call sites.
+
+    Subscript access (``mask[i]`` / ``mask[i] = v``) and ``len(mask)`` are
+    supported directly so that call sites can be migrated incrementally.
+    Prefer ``is_null`` / ``is_valid`` / ``has_nulls`` over raw subscripting.
+    """
+
+    var _mask: List[Bool]
+
+    def __init__(out self):
+        """Empty mask — no nulls."""
+        self._mask = List[Bool]()
+
+    @implicit
+    def __init__(out self, read mask: List[Bool]):
+        """Construct from a ``List[Bool]`` (implicit conversion, copies the list).
+        """
+        self._mask = mask.copy()
+
+    def __init__(out self, *, copy: Self):
+        self._mask = copy._mask.copy()
+
+    def __init__(out self, *, deinit take: Self):
+        self._mask = take._mask^
+
+    def __len__(self) -> Int:
+        return len(self._mask)
+
+    def __getitem__(self, index: Int) -> Bool:
+        return self._mask[index]
+
+    def __setitem__(mut self, index: Int, value: Bool):
+        self._mask[index] = value
+
+    def append(mut self, value: Bool):
+        """Append a null (``True``) or valid (``False``) entry to the mask."""
+        self._mask.append(value)
+
+    def append_null(mut self):
+        """Append a null marker (``True``) to the mask."""
+        self._mask.append(True)
+
+    def append_valid(mut self):
+        """Append a valid marker (``False``) to the mask."""
+        self._mask.append(False)
+
+    def has_nulls(self) -> Bool:
+        """Return ``True`` if any element is marked null."""
+        return len(self._mask) > 0
+
+    def is_null(self, index: Int) -> Bool:
+        """Return ``True`` if the element at *index* is null.
+
+        Returns ``False`` when the mask is empty or *index* is out of bounds.
+        """
+        return index < len(self._mask) and self._mask[index]
+
+    def is_valid(self, index: Int) -> Bool:
+        """Return ``True`` if the element at *index* is not null."""
+        return not self.is_null(index)
+
+    def set_null(mut self, index: Int):
+        """Mark the element at *index* as null."""
+        self._mask[index] = True
+
+    def set_valid(mut self, index: Int):
+        """Mark the element at *index* as valid (not null)."""
+        self._mask[index] = False
+
+    def len(self) -> Int:
+        """Return the number of elements tracked by this mask."""
+        return len(self._mask)
+
+    def count_valid(self) -> Int:
+        """Return the number of non-null elements."""
+        var count = 0
+        for i in range(len(self._mask)):
+            if not self._mask[i]:
+                count += 1
+        return count
+
+    def copy(self) -> Self:
+        """Return an independent copy of this mask."""
+        return Self(self._mask.copy())
+
+    @staticmethod
+    def all_valid(n: Int) -> Self:
+        """Return a mask of length *n* with all elements valid (not null)."""
+        var m = List[Bool]()
+        for _ in range(n):
+            m.append(False)
+        return Self(m^)
+
+    @staticmethod
+    def all_null(n: Int) -> Self:
+        """Return a mask of length *n* with all elements null."""
+        var m = List[Bool]()
+        for _ in range(n):
+            m.append(True)
+        return Self(m^)
+
+
 struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     """A single typed array representing one column of a DataFrame or a Series.
 
@@ -4364,7 +4475,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     pandas-compatible dtype string so that round-trips through ``to_pandas``
     preserve the original dtype.
 
-    Null tracking: ``_null_mask`` is a parallel ``List[Bool]`` where ``True``
+    Null tracking: ``_null_mask`` is a ``NullMask`` where each ``True`` entry
     marks a null/NaN element.  An empty mask means no nulls are present.
     """
 
@@ -4372,7 +4483,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     var dtype: BisonDtype
     var _data: ColumnData
     var _index: ColumnIndex
-    var _null_mask: List[Bool]
+    var _null_mask: NullMask
     # Level names for a multi-key index set via DataFrame.set_index.
     # Empty when the index is a single-key or default RangeIndex.
     var _index_names: List[String]
@@ -4391,7 +4502,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self.dtype = object_
         self._data = ColumnData(List[PythonObject]())
         self._index = ColumnIndex(List[PythonObject]())
-        self._null_mask = List[Bool]()
+        self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
 
@@ -4405,7 +4516,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self.dtype = dtype
         self._data = data^
         self._index = ColumnIndex(List[PythonObject]())
-        self._null_mask = List[Bool]()
+        self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
 
@@ -4420,7 +4531,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self.dtype = dtype
         self._data = data^
         self._index = index^
-        self._null_mask = List[Bool]()
+        self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
 
@@ -4519,7 +4630,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # Traits
     # NOTE: ColumnData and ColumnIndex are Variant types. Nightly Mojo no
     # longer allows implicit copies of Variant, so both require explicit
-    # .copy() calls. _null_mask: List[Bool] also requires explicit .copy().
+    # .copy() calls. _null_mask: NullMask also requires explicit .copy().
     # ------------------------------------------------------------------
 
     def __init__(out self, *, copy: Self):
@@ -4714,7 +4825,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         for i in range(n):
             perm.append(i)
         # Index labels are never null, so pass an empty mask.
-        var no_mask = List[Bool]()
+        var no_mask = NullMask()
         if self._index.isa[Index]():
             ref idx = self._index[Index]
             _merge_sort_perm_comparable(
@@ -4766,7 +4877,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if e > n:
             e = n
         var new_mask = List[Bool]()
-        if len(self._null_mask) > 0:
+        if self._null_mask.has_nulls():
             for i in range(s, e):
                 new_mask.append(self._null_mask[i])
         var visitor = _SliceVisitor(s, e)
@@ -4779,7 +4890,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def take(self, indices: List[Int]) -> Column:
         """Return a new Column with rows selected by *indices* (arbitrary order).
         """
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var new_mask = List[Bool]()
         if has_mask:
             for k in range(len(indices)):
@@ -4813,14 +4924,18 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         visit_col_data_raises(visitor, self._data)
         var col = Column(self.name, visitor^.result.copy(), self.dtype)
         # Merge null masks only when at least one side has nulls
-        if len(self._null_mask) > 0 or len(other._null_mask) > 0:
+        if self._null_mask.has_nulls() or other._null_mask.has_nulls():
             var n_self = len(self)
             var n_other = len(other)
             var merged = List[Bool]()
             for i in range(n_self):
-                merged.append(len(self._null_mask) > 0 and self._null_mask[i])
+                merged.append(
+                    self._null_mask.has_nulls() and self._null_mask[i]
+                )
             for i in range(n_other):
-                merged.append(len(other._null_mask) > 0 and other._null_mask[i])
+                merged.append(
+                    other._null_mask.has_nulls() and other._null_mask[i]
+                )
             col._null_mask = merged^
         return col^
 
@@ -4862,7 +4977,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def count(self) -> Int:
         """Return the number of non-null elements."""
         var n = len(self)
-        if len(self._null_mask) == 0:
+        if not self._null_mask.has_nulls():
             return n
         var result = 0
         for i in range(n):
@@ -4933,7 +5048,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def sum_int64(self) raises -> Int64:
         """Return the sum of an Int64 column as Int64, skipping nulls."""
         ref data = self._int64_data()
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var result = Int64(0)
         for i in range(len(data)):
             if has_mask and self._null_mask[i]:
@@ -4944,7 +5059,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def min_int64(self) raises -> Int64:
         """Return the minimum of an Int64 column as Int64, skipping nulls."""
         ref data = self._int64_data()
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var found = False
         var result = Int64(0)
         for i in range(len(data)):
@@ -4958,7 +5073,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def max_int64(self) raises -> Int64:
         """Return the maximum of an Int64 column as Int64, skipping nulls."""
         ref data = self._int64_data()
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var found = False
         var result = Int64(0)
         for i in range(len(data)):
@@ -5092,8 +5207,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         visit_col_data_raises(y_vis, other._data)
         var xs = x_vis.result.copy()
         var ys = y_vis.result.copy()
-        var has_x_mask = len(self._null_mask) > 0
-        var has_y_mask = len(other._null_mask) > 0
+        var has_x_mask = self._null_mask.has_nulls()
+        var has_y_mask = other._null_mask.has_nulls()
         var sum_x = Float64(0)
         var sum_y = Float64(0)
         var count = 0
@@ -5137,8 +5252,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         visit_col_data_raises(y_vis, other._data)
         var xs = x_vis.result.copy()
         var ys = y_vis.result.copy()
-        var has_x_mask = len(self._null_mask) > 0
-        var has_y_mask = len(other._null_mask) > 0
+        var has_x_mask = self._null_mask.has_nulls()
+        var has_y_mask = other._null_mask.has_nulls()
         var sum_x = Float64(0)
         var sum_y = Float64(0)
         var count = 0
@@ -5264,7 +5379,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         sort=True (default) orders results by count descending.
         Raises for object/datetime column types.
         """
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
 
         # Phase 1: count unique values (raises for unsupported arms).
         var count_visitor = _ValueCountsCountVisitor(has_mask, self._null_mask)
@@ -5349,7 +5464,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var a = self._to_float64_list()
         var b = other._to_float64_list()
         return _BinOpInputs(
-            a^, b^, len(self._null_mask) > 0, len(other._null_mask) > 0
+            a^, b^, self._null_mask.has_nulls(), other._null_mask.has_nulls()
         )
 
     def _arith_op[
@@ -5381,8 +5496,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             if self.dtype == int64 and other.dtype == int64:
                 ref a = self._int64_data()
                 ref b = other._int64_data()
-                var has_a_mask = len(self._null_mask) > 0
-                var has_b_mask = len(other._null_mask) > 0
+                var has_a_mask = self._null_mask.has_nulls()
+                var has_b_mask = other._null_mask.has_nulls()
                 var result = List[Int64]()
                 var result_mask = List[Bool]()
                 var has_any_null = False
@@ -5651,7 +5766,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
-        var has_input_mask = len(self._null_mask) > 0
+        var has_input_mask = self._null_mask.has_nulls()
         for i in range(len(src)):
             if has_input_mask and self._null_mask[i]:
                 result.append(False)
@@ -5733,7 +5848,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         Call as ``col._apply[my_fn]()``.
         """
         var data = self._to_float64_list()
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var result = List[Float64]()
         var result_mask = List[Bool]()
         var has_any_null = False
@@ -5788,7 +5903,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         Builds a Bool Column: True where element is in ``values``.
         Nulls propagate as null.
         """
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
@@ -5873,7 +5988,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         Raises for String/Object columns (via _to_float64_list).
         """
         var data = self._to_float64_list()
-        var has_mask = len(self._null_mask) > 0
+        var has_mask = self._null_mask.has_nulls()
         var result = List[Bool]()
         var result_mask = List[Bool]()
         var has_any_null = False
@@ -6544,7 +6659,7 @@ def _col_cell_pyobj(col: Column, row: Int) raises -> PythonObject:
 
     Null cells (masked entries) are returned as Python ``None``.
     """
-    var has_mask = len(col._null_mask) > 0
+    var has_mask = col._null_mask.has_nulls()
     if has_mask and row < len(col._null_mask) and col._null_mask[row]:
         return Python.evaluate("None")
     var visitor = _CellToPyObjVisitor(row)
@@ -6559,7 +6674,7 @@ def _scalar_from_col(col: Column, row: Int) raises -> DFScalar:
     ``List[PythonObject]`` cells are stringified since ``DFScalar`` has no
     ``PythonObject`` arm.
     """
-    if len(col._null_mask) > 0 and col._null_mask[row]:
+    if col._null_mask.has_nulls() and col._null_mask[row]:
         return DFScalar.null()
     var visitor = _ScalarFromColVisitor(row)
     visit_col_data_raises(visitor, col._data)
@@ -6571,7 +6686,7 @@ def _col_cell_str(col: Column, row: Int) raises -> String:
 
     Null cells (masked entries) are returned as an empty string.
     """
-    var has_mask = len(col._null_mask) > 0
+    var has_mask = col._null_mask.has_nulls()
     if has_mask and row < len(col._null_mask) and col._null_mask[row]:
         return String("")
     var visitor = _CellToStrVisitor(row)
