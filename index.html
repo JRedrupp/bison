@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>bison performance vs pandas</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
   <style>
     :root {
       --bg: #ffffff;
@@ -45,7 +47,7 @@
       background: var(--bg);
       color: var(--text);
       padding: 2rem 1.5rem;
-      max-width: 1100px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
@@ -87,6 +89,12 @@
       font-weight: 600;
     }
 
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
     tr:nth-child(even) td { background: var(--bg-alt); }
 
     td.skipped { color: var(--text-muted); font-style: italic; }
@@ -99,46 +107,76 @@
     .trend-down { color: var(--red-text);   font-weight: 600; }
     .trend-flat { color: var(--text-muted); }
 
-    /* Chart */
-    #chart-wrapper {
-      position: relative;
-      background: var(--bg-alt);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1rem;
-    }
-
-    /* Toggles */
-    #op-toggles {
+    /* Controls bar */
+    #controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
     }
 
-    .toggle-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 4px;
+    #range-selector {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .range-btn, #reset-zoom {
+      padding: 0.35rem 0.75rem;
       border: 1px solid var(--border);
       background: var(--bg-alt);
       color: var(--text);
+      border-radius: 4px;
       font-size: 0.8rem;
       cursor: pointer;
       user-select: none;
     }
 
-    .toggle-btn .swatch {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
+    .range-btn:hover, #reset-zoom:hover {
+      border-color: var(--text-muted);
     }
 
-    .toggle-btn.hidden-op {
-      opacity: 0.4;
+    .range-btn.active {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+
+    #reset-zoom { margin-left: auto; }
+
+    #range-info {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    /* Chart grid */
+    #chart-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    @media (max-width: 800px) {
+      #chart-grid { grid-template-columns: 1fr; }
+    }
+
+    .category-card {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 0.9rem 0.9rem;
+    }
+
+    .category-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      height: 260px;
     }
 
     #no-data {
@@ -175,14 +213,31 @@
 
     <section>
       <h2>Ratio over time (bison / pandas)</h2>
-      <div id="op-toggles"></div>
-      <div id="chart-wrapper">
-        <canvas id="ratio-chart"></canvas>
+
+      <div id="controls">
+        <div id="range-selector" role="group" aria-label="Commit range">
+          <button class="range-btn" data-range="20" type="button">Last 20</button>
+          <button class="range-btn" data-range="50" type="button">Last 50</button>
+          <button class="range-btn" data-range="100" type="button">Last 100</button>
+          <button class="range-btn" data-range="all" type="button">All</button>
+        </div>
+        <span id="range-info"></span>
+        <button id="reset-zoom" type="button">Reset zoom</button>
       </div>
+
+      <div id="chart-grid"></div>
     </section>
   </div>
 
   <script>
+    // ---------------------------------------------------------------------------
+    // Register the zoom plugin once Chart.js is on the page.
+    // ---------------------------------------------------------------------------
+    if (typeof Chart !== "undefined") {
+      const zoomPlugin = window["chartjs-plugin-zoom"] || window.ChartZoom;
+      if (zoomPlugin) Chart.register(zoomPlugin);
+    }
+
     // ---------------------------------------------------------------------------
     // Colour palette — 10 distinct colours readable on both light and dark
     // ---------------------------------------------------------------------------
@@ -192,10 +247,38 @@
     ];
 
     // ---------------------------------------------------------------------------
+    // Benchmark categories — declarative mapping from category to operation.
+    // Unknown operations (present in data.json but not listed here) fall into
+    // a catch-all "Other" card, so new benchmarks are never silently dropped.
+    // ---------------------------------------------------------------------------
+    const CATEGORIES = [
+      { key: "aggregation", label: "Aggregation",
+        ops: ["series_sum", "series_mean"] },
+      { key: "groupby", label: "GroupBy",
+        ops: ["groupby_sum"] },
+      { key: "query", label: "Query / Eval",
+        ops: ["query_simple", "query_and", "query_or", "eval_expr",
+              "query_size_1k", "query_size_10k"] },
+      { key: "indexing", label: "Indexing",
+        ops: ["iloc_row", "loc_slice"] },
+      { key: "sorting", label: "Sorting",
+        ops: ["sort_values"] },
+      { key: "merging", label: "Merging",
+        ops: ["merge"] },
+      { key: "transform", label: "Transform",
+        ops: ["fillna", "series_apply"] },
+      { key: "io", label: "I/O",
+        ops: ["csv_roundtrip"] },
+    ];
+
+    const GITHUB_COMMIT_URL = (sha) =>
+      `https://github.com/jredrupp/bison/commit/${sha}`;
+
+    // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
     function fmt(v, digits = 3) {
-      return v == null ? "\u2014" : v.toFixed(digits);
+      return v == null ? "—" : v.toFixed(digits);
     }
 
     function ratioClass(ratio) {
@@ -206,12 +289,66 @@
     }
 
     function trendArrow(latestRatio, oldRatio) {
-      if (latestRatio == null || oldRatio == null) return { text: "\u2014", cls: "trend-flat" };
+      if (latestRatio == null || oldRatio == null) return { text: "—", cls: "trend-flat" };
       const delta = latestRatio - oldRatio;
-      if (delta < -0.05) return { text: "\u2191", cls: "trend-up" };   // improved
-      if (delta >  0.05) return { text: "\u2193", cls: "trend-down" }; // degraded
-      return { text: "\u2192", cls: "trend-flat" };
+      if (delta < -0.05) return { text: "↑", cls: "trend-up" };   // improved
+      if (delta >  0.05) return { text: "↓", cls: "trend-down" }; // degraded
+      return { text: "→", cls: "trend-flat" };
     }
+
+    // Stable per-op colour — indexed by position in data.operations so a given
+    // op keeps the same colour across every category chart and across sessions.
+    function colorFor(op, allOps) {
+      const i = allOps.indexOf(op);
+      return PALETTE[((i < 0 ? 0 : i) % PALETTE.length)];
+    }
+
+    // Build the categories that will actually render for this dataset, plus a
+    // catch-all "Other" card for any op not already claimed.
+    function resolveCategories(allOps) {
+      const claimed = new Set(CATEGORIES.flatMap(c => c.ops));
+      const leftover = allOps.filter(op => !claimed.has(op));
+      const cats = CATEGORIES
+        .map(c => ({ ...c, ops: c.ops.filter(op => allOps.includes(op)) }))
+        .filter(c => c.ops.length > 0);
+      if (leftover.length) {
+        cats.push({ key: "other", label: "Other", ops: leftover });
+      }
+      return cats;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Parity-line plugin — shared by every category chart. Bails out when y=1.0
+    // is off-screen, which is the correct behaviour for auto-scaled charts.
+    // ---------------------------------------------------------------------------
+    const parityLinePlugin = {
+      id: "parityLine",
+      afterDraw(chart) {
+        const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+        const yPx = y.getPixelForValue(1.0);
+        if (yPx < chart.chartArea.top || yPx > chart.chartArea.bottom) return;
+        ctx.save();
+        ctx.strokeStyle = "rgba(128,128,128,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(left, yPx);
+        ctx.lineTo(right, yPx);
+        ctx.stroke();
+        ctx.restore();
+      },
+    };
+
+    // ---------------------------------------------------------------------------
+    // Dashboard state
+    // ---------------------------------------------------------------------------
+    const STATE = {
+      allRuns: [],    // chronological (oldest first)
+      allOps: [],
+      categories: [],
+      range: 50,      // "all" or a positive integer
+      charts: {},     // { [category.key]: Chart instance }
+    };
 
     // ---------------------------------------------------------------------------
     // Main
@@ -242,7 +379,7 @@
         ? new Date(latest.timestamp).toUTCString()
         : "unknown";
       document.getElementById("subtitle").textContent =
-        `Last updated: ${ts} \u2014 commit ${latest.short_commit} (${latest.ref})`;
+        `Last updated: ${ts} — commit ${latest.short_commit} (${latest.ref}) — ${runs.length} run(s) in history`;
 
       // ------------------------------------------------------------------
       // Summary table
@@ -251,6 +388,7 @@
       const oldRun = runs.length > 10 ? runs[10] : runs[runs.length - 1];
 
       const tbody = document.getElementById("summary-body");
+      tbody.innerHTML = "";
       for (const op of ops) {
         const res = latest.results[op];
         const oldRes = oldRun.results ? oldRun.results[op] : null;
@@ -276,105 +414,182 @@
       }
 
       // ------------------------------------------------------------------
-      // Chart \u2014 ratio over time
+      // Category charts
       // ------------------------------------------------------------------
-      // X-axis: oldest \u2192 newest (reverse the newest-first array)
-      const chronological = [...runs].reverse();
-      const labels = chronological.map(r => r.short_commit);
+      STATE.allRuns    = [...runs].reverse();  // oldest -> newest
+      STATE.allOps     = ops;
+      STATE.categories = resolveCategories(ops);
 
-      const datasets = ops.map((op, i) => ({
-        label: op,
-        data: chronological.map(r => {
-          const res = r.results ? r.results[op] : null;
-          return res ? res.ratio : null;
-        }),
-        borderColor: PALETTE[i % PALETTE.length],
-        backgroundColor: PALETTE[i % PALETTE.length] + "33",
-        borderWidth: 2,
-        pointRadius: chronological.length > 30 ? 2 : 4,
-        pointHoverRadius: 5,
-        tension: 0.2,
-        spanGaps: true,
-      }));
+      // If we have fewer than 50 runs, default the active range to "all" so a
+      // first-time viewer sees the whole history.
+      if (STATE.allRuns.length <= 50) STATE.range = "all";
 
-      // Operation toggle buttons
-      const togglesEl = document.getElementById("op-toggles");
-      const chart = buildChart(labels, datasets, chronological);
+      buildChartGrid();
+      wireControls();
+      renderCharts();
+    }
 
-      datasets.forEach((ds, i) => {
-        const btn = document.createElement("button");
-        btn.className = "toggle-btn";
-        btn.innerHTML = `<span class="swatch" style="background:${PALETTE[i % PALETTE.length]}"></span>${ops[i]}`;
+    function buildChartGrid() {
+      const grid = document.getElementById("chart-grid");
+      grid.innerHTML = "";
+      for (const cat of STATE.categories) {
+        const card = document.createElement("div");
+        card.className = "category-card";
+        card.innerHTML = `
+          <h3>${cat.label}</h3>
+          <div class="canvas-wrap"><canvas id="chart-${cat.key}"></canvas></div>`;
+        grid.appendChild(card);
+      }
+    }
+
+    function wireControls() {
+      const buttons = document.querySelectorAll(".range-btn");
+      buttons.forEach(btn => {
+        const r = btn.dataset.range;
+        const isActive =
+          (r === "all" && STATE.range === "all") ||
+          (r !== "all" && STATE.range === parseInt(r, 10));
+        btn.classList.toggle("active", isActive);
+
         btn.addEventListener("click", () => {
-          const meta = chart.getDatasetMeta(i);
-          meta.hidden = !meta.hidden;
-          btn.classList.toggle("hidden-op", meta.hidden);
-          chart.update();
+          STATE.range = r === "all" ? "all" : parseInt(r, 10);
+          buttons.forEach(b => b.classList.toggle("active", b === btn));
+          renderCharts();
         });
-        togglesEl.appendChild(btn);
+      });
+
+      document.getElementById("reset-zoom").addEventListener("click", () => {
+        Object.values(STATE.charts).forEach(c => {
+          if (typeof c.resetZoom === "function") c.resetZoom();
+        });
       });
     }
 
-    function buildChart(labels, datasets, chronological) {
+    function visibleRuns() {
+      if (STATE.range === "all") return STATE.allRuns;
+      return STATE.allRuns.slice(-STATE.range);
+    }
+
+    function renderCharts() {
+      const runs   = visibleRuns();
+      const labels = runs.map(r => r.short_commit);
+
+      // Update the "showing N of M" caption
+      const info = document.getElementById("range-info");
+      if (runs.length > 0) {
+        const first = runs[0].timestamp ? runs[0].timestamp.slice(0, 10) : "?";
+        const last  = runs[runs.length - 1].timestamp
+          ? runs[runs.length - 1].timestamp.slice(0, 10)
+          : "?";
+        info.textContent =
+          `showing ${runs.length} of ${STATE.allRuns.length} (${first} → ${last})`;
+      } else {
+        info.textContent = "";
+      }
+
+      for (const cat of STATE.categories) {
+        const datasets = cat.ops.map(op => ({
+          label: op,
+          data: runs.map(r => {
+            const res = r.results ? r.results[op] : null;
+            return (res && res.bison_ms != null) ? res.ratio : null;
+          }),
+          borderColor: colorFor(op, STATE.allOps),
+          backgroundColor: colorFor(op, STATE.allOps) + "33",
+          borderWidth: 2,
+          pointRadius: runs.length > 40 ? 1.5 : 3,
+          pointHoverRadius: 5,
+          tension: 0.2,
+          spanGaps: true,
+        }));
+
+        // Destroy + rebuild on every render: cheap (<=8 charts, <=200 points)
+        // and sidesteps stale zoom state after label swaps.
+        if (STATE.charts[cat.key]) STATE.charts[cat.key].destroy();
+        STATE.charts[cat.key] = buildCategoryChart(cat, labels, datasets, runs);
+      }
+    }
+
+    function buildCategoryChart(cat, labels, datasets, runs) {
       const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const gridColor  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
       const labelColor = isDark ? "#8b949e" : "#656d76";
 
-      return new Chart(document.getElementById("ratio-chart"), {
+      return new Chart(document.getElementById(`chart-${cat.key}`), {
         type: "line",
         data: { labels, datasets },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           interaction: { mode: "index", intersect: false },
+          onClick: (evt, elements, chart) => {
+            let idx = null;
+            if (elements && elements.length) {
+              idx = elements[0].index;
+            } else {
+              const near = chart.getElementsAtEventForMode(
+                evt, "nearest", { intersect: false }, true
+              );
+              if (near.length) idx = near[0].index;
+            }
+            if (idx == null) return;
+            const run = runs[idx];
+            if (run && run.commit) {
+              window.open(GITHUB_COMMIT_URL(run.commit), "_blank", "noopener");
+            }
+          },
           plugins: {
-            legend: { display: false },
+            legend: {
+              display: true,
+              position: "top",
+              labels: {
+                color: labelColor,
+                boxWidth: 10,
+                font: { size: 11 },
+                padding: 8,
+              },
+            },
             tooltip: {
               callbacks: {
                 title: (items) => {
-                  const idx = items[0].dataIndex;
-                  const r = chronological[idx];
-                  return `${r.short_commit}  ${r.timestamp ? r.timestamp.slice(0, 10) : ""}`;
+                  const r = runs[items[0].dataIndex];
+                  const ts = r.timestamp
+                    ? new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19) + " UTC"
+                    : "";
+                  return `${r.short_commit} (${r.ref || "?"})\n${ts}`;
                 },
                 label: (item) => {
                   const v = item.raw;
                   if (v == null) return `${item.dataset.label}: skipped`;
                   return `${item.dataset.label}: ${v.toFixed(3)}x`;
                 },
+                footer: () => "Click point to open commit on GitHub",
               },
             },
-            annotation: { /* parity line drawn via afterDraw plugin below */ },
+            zoom: {
+              pan:  { enabled: true, mode: "x", modifierKey: "shift" },
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                drag:  { enabled: true, backgroundColor: "rgba(100,100,100,0.15)" },
+                mode: "x",
+              },
+            },
           },
           scales: {
             x: {
-              ticks: { color: labelColor, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 },
+              ticks: { color: labelColor, maxRotation: 45, autoSkip: true, maxTicksLimit: 12 },
               grid:  { color: gridColor },
             },
             y: {
               title: { display: true, text: "ratio (bison / pandas)", color: labelColor },
               ticks: { color: labelColor },
               grid:  { color: gridColor },
-              min: 0,
+              // No `min: 0` — per-category auto-scaling reveals small regressions.
             },
           },
         },
-        plugins: [{
-          // Draw a dashed parity line at y = 1.0
-          id: "parityLine",
-          afterDraw(chart) {
-            const { ctx, chartArea: { left, right }, scales: { y } } = chart;
-            const yPx = y.getPixelForValue(1.0);
-            if (yPx < chart.chartArea.top || yPx > chart.chartArea.bottom) return;
-            ctx.save();
-            ctx.strokeStyle = "rgba(128,128,128,0.55)";
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([6, 4]);
-            ctx.beginPath();
-            ctx.moveTo(left, yPx);
-            ctx.lineTo(right, yPx);
-            ctx.stroke();
-            ctx.restore();
-          },
-        }],
+        plugins: [parityLinePlugin],
       });
     }
   </script>
