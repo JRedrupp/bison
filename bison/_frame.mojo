@@ -440,11 +440,10 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs_col = Column(self._col.name, rhs^, object_)
             return Series(self._col._cmp_eq(rhs_col))
         var result = List[Bool]()
-        var has_mask = self._col._null_mask.has_nulls()
         if self._col.is_object():
             ref d = self._col._obj_data()
             for i in range(n):
-                if has_mask and self._col._null_mask[i]:
+                if self._col._null_mask.is_null(i):
                     result.append(False)
                 else:
                     result.append(String(d[i]) == other)
@@ -465,11 +464,10 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs_col = Column(self._col.name, rhs^, object_)
             return Series(self._col._cmp_ne(rhs_col))
         var result = List[Bool]()
-        var has_mask = self._col._null_mask.has_nulls()
         if self._col.is_object():
             ref d = self._col._obj_data()
             for i in range(n):
-                if has_mask and self._col._null_mask[i]:
+                if self._col._null_mask.is_null(i):
                     result.append(True)
                 else:
                     result.append(String(d[i]) != other)
@@ -609,10 +607,9 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     def isna(self) raises -> Series:
         """Return a boolean Series that is True where values are null/NaN."""
         var n = len(self._col)
-        var has_mask = self._col._null_mask.has_nulls()
         var result = List[Bool]()
         for i in range(n):
-            result.append(has_mask and self._col._null_mask[i])
+            result.append(self._col._null_mask.is_null(i))
         var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
@@ -624,10 +621,9 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """Return a boolean Series that is True where values are not null/NaN.
         """
         var n = len(self._col)
-        var has_mask = self._col._null_mask.has_nulls()
         var result = List[Bool]()
         for i in range(n):
-            result.append(not (has_mask and self._col._null_mask[i]))
+            result.append(self._col._null_mask.is_valid(i))
         var col = Column(self._col.name, result^, bool_)
         return Series(col^)
 
@@ -658,7 +654,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             return Series(self._col.copy())
         var keep = List[Int]()
         for i in range(len(self._col._null_mask)):
-            if not self._col._null_mask[i]:
+            if self._col._null_mask.is_valid(i):
                 keep.append(i)
         var result_col = self._col.take(keep)
         # All kept elements are non-null; clear the mask.
@@ -777,14 +773,12 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if n == 0:
             return Series(self._col.copy())
         var perm = self._sort_perm(True)
-        var has_mask = self._col._null_mask.has_nulls()
         # Determine whether any element is actually null; only then use Float64.
         var has_any_null = False
-        if has_mask:
-            for i in range(n):
-                if self._col._null_mask[i]:
-                    has_any_null = True
-                    break
+        for i in range(n):
+            if self._col._null_mask.is_null(i):
+                has_any_null = True
+                break
         var idx = self._col._index.copy()
         if not has_any_null:
             var result_data = List[Int64]()
@@ -798,7 +792,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var result_mask = List[Bool]()
         for i in range(n):
             var orig_pos = perm[i]
-            if self._col._null_mask[orig_pos]:
+            if self._col._null_mask.is_null(orig_pos):
                 result_data.append(Float64(0))
                 result_mask.append(True)
             else:
@@ -821,7 +815,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if has_mask:
             n_non_null = 0
             for i in range(n):
-                if not self._col._null_mask[i]:
+                if self._col._null_mask.is_valid(i):
                     n_non_null += 1
         # Prepare Float64 result; null slots are marked in rank_mask.
         var ranks = List[Float64]()
@@ -959,27 +953,26 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         """
         var result = List[Float64]()
         ref col = self._col
-        var has_mask = col._null_mask.has_nulls()
         var nan = Float64(0) / Float64(0)
         var n = col.__len__()
         if col.is_int():
             ref data = col._int64_data()
             for i in range(n):
-                if has_mask and col._null_mask[i]:
+                if col._null_mask.is_null(i):
                     result.append(nan)
                 else:
                     result.append(Float64(data[i]))
         elif col.is_float():
             ref data = col._float64_data()
             for i in range(n):
-                if has_mask and col._null_mask[i]:
+                if col._null_mask.is_null(i):
                     result.append(nan)
                 else:
                     result.append(data[i])
         elif col.is_bool():
             ref data = col._bool_data()
             for i in range(n):
-                if has_mask and col._null_mask[i]:
+                if col._null_mask.is_null(i):
                     result.append(nan)
                 else:
                     result.append(Float64(1.0) if data[i] else Float64(0.0))
@@ -1632,12 +1625,10 @@ struct DataFrame(Copyable, Movable):
                 + String(n)
             )
         var indices = List[Int]()
-        var has_mask = mask._col._null_mask.has_nulls()
         if mask._col.is_bool():
             ref d = mask._col._bool_data()
             for i in range(mask_len):
-                var is_null = has_mask and mask._col._null_mask[i]
-                if not is_null and d[i]:
+                if mask._col._null_mask.is_valid(i) and d[i]:
                     indices.append(i)
         else:
             raise Error(
@@ -1866,7 +1857,7 @@ struct DataFrame(Copyable, Movable):
             ref col = self._cols[ci]
             if not (col.dtype.is_integer() or col.dtype.is_float()):
                 continue
-            if col._null_mask[row]:
+            if col._null_mask.is_null(row):
                 if not skipna:
                     vals.append(nan)
                 continue
@@ -1881,7 +1872,7 @@ struct DataFrame(Copyable, Movable):
         """
         var cnt = 0
         for ci in range(len(self._cols)):
-            if not self._cols[ci]._null_mask[row]:
+            if self._cols[ci]._null_mask.is_valid(row):
                 cnt += 1
         return cnt
 
@@ -2070,7 +2061,7 @@ struct DataFrame(Copyable, Movable):
                 var seen = Dict[String, Bool]()
                 for ci in range(len(self._cols)):
                     ref col = self._cols[ci]
-                    if col._null_mask[i]:
+                    if col._null_mask.is_null(i):
                         continue
                     var key: String
                     ref cd = col._data
@@ -2244,7 +2235,7 @@ struct DataFrame(Copyable, Movable):
             var propagate_nan = False
             for ci in range(ncols):
                 ref col = self._cols[ci]
-                if col._null_mask[i] or not (
+                if col._null_mask.is_null(i) or not (
                     col.dtype.is_integer() or col.dtype.is_float()
                 ):
                     if not skipna:
@@ -2564,9 +2555,8 @@ struct DataFrame(Copyable, Movable):
                         raise Error(
                             "DataFrame.shift(axis=1) requires numeric columns"
                         )
-                    var has_src_mask = src_col._null_mask.has_nulls()
                     for i in range(nrows):
-                        var is_null = has_src_mask and src_col._null_mask[i]
+                        var is_null = src_col._null_mask.is_null(i)
                         if is_null:
                             values.append(nan)
                             null_mask.append(True)
@@ -2630,11 +2620,9 @@ struct DataFrame(Copyable, Movable):
                         raise Error(
                             "DataFrame.diff(axis=1) requires numeric columns"
                         )
-                    var has_cur_mask = cur_col._null_mask.has_nulls()
-                    var has_src_mask = src_col._null_mask.has_nulls()
                     for i in range(nrows):
-                        var cur_null = has_cur_mask and cur_col._null_mask[i]
-                        var src_null = has_src_mask and src_col._null_mask[i]
+                        var cur_null = cur_col._null_mask.is_null(i)
+                        var src_null = src_col._null_mask.is_null(i)
                         if cur_null or src_null:
                             values.append(nan)
                             null_mask.append(True)
@@ -2708,11 +2696,9 @@ struct DataFrame(Copyable, Movable):
                             "DataFrame.pct_change(axis=1) requires numeric"
                             " columns"
                         )
-                    var has_cur_mask = cur_col._null_mask.has_nulls()
-                    var has_src_mask = src_col._null_mask.has_nulls()
                     for i in range(nrows):
-                        var cur_null = has_cur_mask and cur_col._null_mask[i]
-                        var src_null = has_src_mask and src_col._null_mask[i]
+                        var cur_null = cur_col._null_mask.is_null(i)
+                        var src_null = src_col._null_mask.is_null(i)
                         if cur_null or src_null:
                             values.append(nan)
                             null_mask.append(True)
@@ -3042,13 +3028,13 @@ struct DataFrame(Copyable, Movable):
                         # Drop only when every value is null.
                         var all_null = True
                         for j in range(mask_len):
-                            if not col._null_mask[j]:
+                            if col._null_mask.is_valid(j):
                                 all_null = False
                                 break
                         has_null = all_null
                     else:
                         for j in range(mask_len):
-                            if col._null_mask[j]:
+                            if col._null_mask.is_null(j):
                                 has_null = True
                                 break
                 if not has_null:
@@ -3081,8 +3067,7 @@ struct DataFrame(Copyable, Movable):
             var check_count = len(check_indices)
             for ki in range(check_count):
                 var ci = check_indices[ki]
-                var mask_len = len(self._cols[ci]._null_mask)
-                if mask_len > r and self._cols[ci]._null_mask[r]:
+                if self._cols[ci]._null_mask.is_null(r):
                     null_count += 1
 
             var keep: Bool
@@ -3149,7 +3134,7 @@ struct DataFrame(Copyable, Movable):
             var new_mask = List[Bool]()
             for j in range(n):
                 data.append(d[j])
-                new_mask.append(col._null_mask[j])
+                new_mask.append(col._null_mask.is_null(j))
             # Fill leading nulls with the first non-null value.
             var first_valid = -1
             for j in range(n):
@@ -4176,7 +4161,7 @@ struct DataFrame(Copyable, Movable):
                         out_pos = vi * n_ck + ck
 
                 ref vcol = self._cols[name_to_ci[val_names[vi]]]
-                var is_null = vcol._null_mask.has_nulls() and vcol._null_mask[r]
+                var is_null = vcol._null_mask.is_null(r)
                 if not is_null and vcol.is_object():
                     is_null = (
                         String(vcol._obj_data()[r].__class__.__name__)
@@ -4321,7 +4306,7 @@ struct DataFrame(Copyable, Movable):
                 )
             ref vcol = self._cols[val_ci]
             for r in range(nrows):
-                var is_null = vcol._null_mask.has_nulls() and vcol._null_mask[r]
+                var is_null = vcol._null_mask.is_null(r)
                 if is_null:
                     val_data.append(py_none)
                     val_null_mask.append(True)
@@ -4365,7 +4350,7 @@ struct DataFrame(Copyable, Movable):
                 row_label = PythonObject(r)
             for j in range(ncols):
                 ref col = self._cols[j]
-                var is_null = col._null_mask.has_nulls() and col._null_mask[r]
+                var is_null = col._null_mask.is_null(r)
                 var tup_items = py.list()
                 _ = tup_items.append(row_label)
                 _ = tup_items.append(PythonObject(col.name.value()))
@@ -4564,7 +4549,7 @@ struct DataFrame(Copyable, Movable):
                     row_label = PythonObject(self._cols[0]._index_label(r))
                 else:
                     row_label = PythonObject(r)
-                var is_null = col._null_mask.has_nulls() and col._null_mask[r]
+                var is_null = col._null_mask.is_null(r)
                 var tup_items = py.list()
                 _ = tup_items.append(col_label)
                 _ = tup_items.append(row_label)
@@ -4617,7 +4602,7 @@ struct DataFrame(Copyable, Movable):
             var any_null = False
             for j in range(ncols):
                 ref col = self._cols[j]
-                var is_null = col._null_mask.has_nulls() and col._null_mask[r]
+                var is_null = col._null_mask.is_null(r)
                 if is_null:
                     data.append(py_none)
                     null_mask.append(True)
@@ -4734,9 +4719,7 @@ struct DataFrame(Copyable, Movable):
         ]()  # position within expanded cell (-1 = scalar)
         ref exp_col = self._cols[col_ci]
         for r in range(nrows):
-            var is_null = (
-                exp_col._null_mask.has_nulls() and exp_col._null_mask[r]
-            )
+            var is_null = exp_col._null_mask.is_null(r)
             if is_null:
                 src_indices.append(r)
                 sub_indices.append(-1)
@@ -4770,9 +4753,7 @@ struct DataFrame(Copyable, Movable):
                 for k in range(n_out):
                     var r = src_indices[k]
                     var sub = sub_indices[k]
-                    var is_null = (
-                        exp_col._null_mask.has_nulls() and exp_col._null_mask[r]
-                    )
+                    var is_null = exp_col._null_mask.is_null(r)
                     if is_null:
                         data.append(py_none)
                         null_mask.append(True)
@@ -5151,35 +5132,35 @@ struct DataFrame(Copyable, Movable):
                                         key_col._int64_data()[
                                             r
                                         ] = rk._int64_data()[out_right[r]]
-                                        key_col._null_mask[r] = False
+                                        key_col._null_mask.set_valid(r)
                             elif key_col.is_float() and rk.is_float():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._float64_data()[
                                             r
                                         ] = rk._float64_data()[out_right[r]]
-                                        key_col._null_mask[r] = False
+                                        key_col._null_mask.set_valid(r)
                             elif key_col.is_bool() and rk.is_bool():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._bool_data()[
                                             r
                                         ] = rk._bool_data()[out_right[r]]
-                                        key_col._null_mask[r] = False
+                                        key_col._null_mask.set_valid(r)
                             elif key_col.is_string() and rk.is_string():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._str_data()[r] = rk._str_data()[
                                             out_right[r]
                                         ]
-                                        key_col._null_mask[r] = False
+                                        key_col._null_mask.set_valid(r)
                             elif key_col.is_object() and rk.is_object():
                                 for r in range(len(out_left)):
                                     if out_left[r] < 0:
                                         key_col._obj_data()[r] = rk._obj_data()[
                                             out_right[r]
                                         ]
-                                        key_col._null_mask[r] = False
+                                        key_col._null_mask.set_valid(r)
                             break
                     result_cols.append(key_col^)
                     break
@@ -5813,8 +5794,7 @@ struct DataFrame(Copyable, Movable):
             var row = List[Float64]()
             for ci in range(ncols):
                 ref col = self._cols[ci]
-                var has_mask = col._null_mask.has_nulls()
-                if has_mask and ri < len(col._null_mask) and col._null_mask[ri]:
+                if col._null_mask.is_null(ri):
                     row.append(nan)
                 elif col.is_int():
                     row.append(Float64(col._int64_data()[ri]))
@@ -6127,12 +6107,8 @@ def _groupby_row_less(
     for key_i in range(len(by)):
         var ci = col_idx[by[key_i]]
         ref col = df._cols[ci]
-        var left_is_null = (
-            col._null_mask.has_nulls() and col._null_mask[left_row]
-        )
-        var right_is_null = (
-            col._null_mask.has_nulls() and col._null_mask[right_row]
-        )
+        var left_is_null = col._null_mask.is_null(left_row)
+        var right_is_null = col._null_mask.is_null(right_row)
         if left_is_null or right_is_null:
             if left_is_null and right_is_null:
                 continue
@@ -6227,7 +6203,7 @@ def _groupby_indices(
             for j in range(len(by)):
                 var ci = col_idx[by[j]]
                 ref col = df._cols[ci]
-                if col._null_mask.has_nulls() and col._null_mask[i]:
+                if col._null_mask.is_null(i):
                     skip = True
                     break
             if skip:
@@ -6277,9 +6253,8 @@ def _label_groupby_indices(
     Mirrors DataFrame groupby index construction semantics for dropna/sort,
     including explicit handling for externally supplied null-label masks.
     """
-    var has_null_mask = by_null_mask.has_nulls()
     for i in range(len(by)):
-        if has_null_mask and by_null_mask[i]:
+        if by_null_mask.is_null(i):
             if dropna:
                 continue
             var null_key = String("")
@@ -6901,12 +6876,11 @@ struct DataFrameGroupBy:
             if col.name.value() in skip:
                 continue
             var selected = List[Int]()
-            var has_mask = col._null_mask.has_nulls()
             for j in range(len(self._group_keys)):
                 ref indices = self._group_map[self._group_keys[j]]
                 var found = -1
                 for k in range(len(indices)):
-                    if not has_mask or not col._null_mask[indices[k]]:
+                    if col._null_mask.is_valid(indices[k]):
                         found = indices[k]
                         break
                 selected.append(found)
@@ -6930,12 +6904,11 @@ struct DataFrameGroupBy:
             if col.name.value() in skip:
                 continue
             var selected = List[Int]()
-            var has_mask = col._null_mask.has_nulls()
             for j in range(len(self._group_keys)):
                 ref indices = self._group_map[self._group_keys[j]]
                 var found = -1
                 for k in range(len(indices) - 1, -1, -1):
-                    if not has_mask or not col._null_mask[indices[k]]:
+                    if col._null_mask.is_valid(indices[k]):
                         found = indices[k]
                         break
                 selected.append(found)
@@ -7026,7 +6999,6 @@ struct DataFrameGroupBy:
                 ref col = self._df._cols[i]
                 if col.name.value() in skip:
                     continue
-                var has_mask = col._null_mask.has_nulls()
                 var key_to_idx = Dict[String, Int]()
                 for j in range(len(self._group_keys)):
                     var key = self._group_keys[j]
@@ -7037,7 +7009,7 @@ struct DataFrameGroupBy:
                     var step = 1 if want_first else -1
                     var ii = start
                     while ii != stop:
-                        if not has_mask or not col._null_mask[indices[ii]]:
+                        if col._null_mask.is_valid(indices[ii]):
                             found = indices[ii]
                             break
                         ii += step
@@ -7228,9 +7200,8 @@ struct SeriesGroupBy:
         # Build key array from group labels.
         var n = len(self._by)
         var sb = _MarrowStringBuilder(capacity=n)
-        var has_null_mask = self._by_null_mask.has_nulls()
         for i in range(n):
-            if has_null_mask and self._by_null_mask[i]:
+            if self._by_null_mask.is_null(i):
                 sb.append_null()
             else:
                 sb.append(self._by[i])
@@ -7450,12 +7421,11 @@ struct SeriesGroupBy:
     def first(self) raises -> Series:
         var selected = List[Int]()
         ref col = self._series._col
-        var has_mask = col._null_mask.has_nulls()
         for i in range(len(self._group_keys)):
             ref indices = self._group_map[self._group_keys[i]]
             var found = -1
             for j in range(len(indices)):
-                if not has_mask or not col._null_mask[indices[j]]:
+                if col._null_mask.is_valid(indices[j]):
                     found = indices[j]
                     break
             selected.append(found)
@@ -7467,12 +7437,11 @@ struct SeriesGroupBy:
     def last(self) raises -> Series:
         var selected = List[Int]()
         ref col = self._series._col
-        var has_mask = col._null_mask.has_nulls()
         for i in range(len(self._group_keys)):
             ref indices = self._group_map[self._group_keys[i]]
             var found = -1
             for j in range(len(indices) - 1, -1, -1):
-                if not has_mask or not col._null_mask[indices[j]]:
+                if col._null_mask.is_valid(indices[j]):
                     found = indices[j]
                     break
             selected.append(found)
@@ -7538,13 +7507,12 @@ struct SeriesGroupBy:
 
     def transform(self, func: String) raises -> Series:
         var n = len(self._series._col)
-        var has_null_mask = self._by_null_mask.has_nulls()
         var nan = Float64(0) / Float64(0)
         # Detect whether any row is null-labelled and excluded by dropna.
         var any_excluded_row = False
-        if has_null_mask and self._dropna:
+        if self._dropna:
             for i in range(n):
-                if self._by_null_mask[i]:
+                if self._by_null_mask.is_null(i):
                     any_excluded_row = True
                     break
         # Build row → group_key mapping by inverting _group_map.
@@ -7609,7 +7577,7 @@ struct SeriesGroupBy:
             var null_mask = List[Bool]()
             var any_null = False
             for i in range(n):
-                if has_null_mask and self._by_null_mask[i] and self._dropna:
+                if self._by_null_mask.is_null(i) and self._dropna:
                     result_vals.append(nan)
                     null_mask.append(True)
                     any_null = True
@@ -7636,7 +7604,7 @@ struct SeriesGroupBy:
                 var result_vals = List[Float64]()
                 var null_mask = List[Bool]()
                 for i in range(n):
-                    if self._by_null_mask[i] and self._dropna:
+                    if self._by_null_mask.is_null(i) and self._dropna:
                         result_vals.append(nan)
                         null_mask.append(True)
                     else:
@@ -7659,7 +7627,6 @@ struct SeriesGroupBy:
         # Dtype-preserving broadcast functions (first/last)
         if func == "first" or func == "last":
             ref col = self._series._col
-            var has_mask = col._null_mask.has_nulls()
             var want_first = func == "first"
             var key_to_idx = Dict[String, Int]()
             for i in range(len(self._group_keys)):
@@ -7671,14 +7638,14 @@ struct SeriesGroupBy:
                 var step = 1 if want_first else -1
                 var j = start
                 while j != stop:
-                    if not has_mask or not col._null_mask[indices[j]]:
+                    if col._null_mask.is_valid(indices[j]):
                         found = indices[j]
                         break
                     j += step
                 key_to_idx[key] = found
             var selected = List[Int]()
             for i in range(n):
-                if has_null_mask and self._by_null_mask[i] and self._dropna:
+                if self._by_null_mask.is_null(i) and self._dropna:
                     selected.append(-1)
                 else:
                     selected.append(key_to_idx[row_key[i]])
