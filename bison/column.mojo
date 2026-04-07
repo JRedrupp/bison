@@ -4799,6 +4799,41 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._data.isa[List[String]]()
 
     # ------------------------------------------------------------------
+    # Index-arm predicates and unsafe accessors — canonical abstraction
+    # over ``self._index.isa[...]`` checks.  Mirror the data-arm helpers
+    # above so callers never need to query the ColumnIndex variant
+    # directly.
+    # ------------------------------------------------------------------
+
+    def is_str_index(self) -> Bool:
+        """Return True if the active index arm is ``Index`` (string labels)."""
+        return self._index.isa[Index]()
+
+    def is_int_index(self) -> Bool:
+        """Return True if the active index arm is ``List[Int64]``."""
+        return self._index.isa[List[Int64]]()
+
+    def is_float_index(self) -> Bool:
+        """Return True if the active index arm is ``List[Float64]``."""
+        return self._index.isa[List[Float64]]()
+
+    def is_obj_index(self) -> Bool:
+        """Return True if the active index arm is ``List[PythonObject]``."""
+        return self._index.isa[List[PythonObject]]()
+
+    def _str_index(ref self) -> ref[self._index] Index:
+        return self._index[Index]
+
+    def _int_index_data(ref self) -> ref[self._index] List[Int64]:
+        return self._index[List[Int64]]
+
+    def _float_index_data(ref self) -> ref[self._index] List[Float64]:
+        return self._index[List[Float64]]
+
+    def _obj_index_data(ref self) -> ref[self._index] List[PythonObject]:
+        return self._index[List[PythonObject]]
+
+    # ------------------------------------------------------------------
     # Explicit copy helper (used by Series / DataFrame __copyinit__)
     # ------------------------------------------------------------------
 
@@ -4924,20 +4959,20 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             perm.append(i)
         # Index labels are never null, so pass an empty mask.
         var no_mask = NullMask()
-        if self._index.isa[Index]():
-            ref idx = self._index[Index]
+        if self.is_str_index():
+            ref idx = self._str_index()
             _merge_sort_perm_comparable(
                 perm, idx._data, no_mask, ascending, True
             )
-        elif self._index.isa[List[Int64]]():
-            ref idx = self._index[List[Int64]]
+        elif self.is_int_index():
+            ref idx = self._int_index_data()
             _merge_sort_perm_comparable(perm, idx, no_mask, ascending, True)
-        elif self._index.isa[List[Float64]]():
-            ref idx = self._index[List[Float64]]
+        elif self.is_float_index():
+            ref idx = self._float_index_data()
             _merge_sort_perm_comparable(perm, idx, no_mask, ascending, True)
         else:
             # PythonObject fallback: use Python comparison (may raise).
-            ref idx = self._index[List[PythonObject]]
+            ref idx = self._obj_index_data()
             _merge_sort_perm_pyobj(perm, idx, no_mask, ascending, True)
         return perm^
 
