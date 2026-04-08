@@ -28,8 +28,22 @@ jobs:
         run: pixi run gen-version
 
       - name: Run benchmarks
-        continue-on-error: true
         run: pixi run bench
+
+      - name: Verify benchmark results were recorded
+        run: |
+          COMMIT="$(git rev-parse HEAD)"
+          RESULT_FILE="results/${COMMIT}.json"
+          if [ ! -f "$RESULT_FILE" ]; then
+            echo "::error::benchmark result file $RESULT_FILE not found — run_benchmarks.sh did not complete"
+            exit 1
+          fi
+          COUNT=$(python3 -c "import json, sys; print(len(json.load(open('$RESULT_FILE'))['results']))")
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::benchmark result file $RESULT_FILE contains zero entries — every bench_*.mojo process crashed"
+            exit 1
+          fi
+          echo "OK: $COUNT benchmark entries recorded in $RESULT_FILE"
 
       - name: Stash dashboard HTML from main
         run: cp docs/index.html /tmp/dashboard-index.html
