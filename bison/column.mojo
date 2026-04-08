@@ -3,12 +3,25 @@ from std.utils import Variant
 from std.memory import bitcast
 from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor, ceil, exp, log, log10
-from marrow.arrays import AnyArray
+from marrow.arrays import (
+    AnyArray,
+    BoolArray,
+    Float64Array,
+    Int64Array,
+    PrimitiveArray,
+    StringArray,
+)
 from marrow.bitmap import BitmapBuilder
-from marrow.builders import array as _marrow_array
+from marrow.builders import (
+    PrimitiveBuilder,
+    StringBuilder,
+    array as _marrow_array,
+)
 from marrow.dtypes import (
-    int64 as _m_int64,
+    bool_ as _m_bool_,
     float64 as _m_float64,
+    int64 as _m_int64,
+    string as _m_string,
 )
 from marrow.kernels.aggregate import (
     sum_ as _marrow_sum,
@@ -49,6 +62,68 @@ comptime ColumnData = Variant[
     List[String],
     List[PythonObject],
 ]
+
+
+# ------------------------------------------------------------------
+# Dual-backend storage scaffolding (issue #619, Phase 1)
+# ------------------------------------------------------------------
+# These types introduce the new storage representation alongside the
+# existing ``ColumnData`` Variant.  They are wired through ``Column._storage``
+# but every Column constructed in Phase 1 keeps an *empty* ``LegacyObjectData``
+# arm in the new field — all behaviour is still driven by ``_data`` and
+# ``_null_mask``.  Phase 2 reshapes the visitor traits to operate on
+# ``ColumnStorage`` directly; Phase 3 starts populating ``_storage`` from
+# the construction paths (``from_pandas``, ``from_records`` …).
+#
+# Final shape (after Phase 6):
+#
+#   * int64 / float64 / bool / string columns → ``AnyArray`` arm.  Validity
+#     lives inside the marrow array's bitmap (Arrow semantics — set bit =
+#     valid).  No separate ``NullMask`` is stored on the Column.
+#   * object / datetime64 / timedelta64 columns → ``LegacyObjectData`` arm,
+#     which keeps the existing ``List[PythonObject]`` + ``NullMask`` pair.
+#
+# During Phases 1-3 the ``_storage_active`` Bool flag on ``Column`` records
+# whether the new field has been populated by a construction path; helpers
+# like ``Column.is_null`` consult that flag to choose between the new
+# storage backend and the legacy ``_data`` / ``_null_mask`` fields.
+struct LegacyObjectData(Copyable, Movable):
+    """Wrapper for ``List[PythonObject]`` columns under the new storage model.
+
+    Holds both the data list and the null mask together, so the
+    ``ColumnStorage`` Variant has a single arm carrying everything an
+    object-typed column needs.  Once the migration is complete this is
+    the only arm that retains a side-table NullMask — marrow-backed arms
+    keep validity inside the array bitmap.
+    """
+
+    var data: List[PythonObject]
+    var null_mask: NullMask
+
+    def __init__(out self):
+        """Empty object data — used as the Phase 1 placeholder."""
+        self.data = List[PythonObject]()
+        self.null_mask = NullMask()
+
+    def __init__(
+        out self, var data: List[PythonObject], var null_mask: NullMask
+    ):
+        self.data = data^
+        self.null_mask = null_mask^
+
+    def __init__(out self, *, copy: Self):
+        self.data = copy.data.copy()
+        self.null_mask = copy.null_mask.copy()
+
+    def __init__(out self, *, deinit take: Self):
+        self.data = take.data^
+        self.null_mask = take.null_mask^
+
+
+# New storage Variant — Phase 2+ visitor dispatch will branch on this.
+# Variant is non-trivially copyable, so callers must use explicit ``.copy()``
+# (matches ``ColumnData`` and ``ColumnIndex`` conventions).
+comptime ColumnStorage = Variant[AnyArray, LegacyObjectData]
 
 
 # Sentinel type for a null / missing cell in DFScalar.
@@ -358,6 +433,262 @@ def visit_col_data_mut_raises[
         visitor.on_str(data[List[String]])
     else:
         visitor.on_obj(data[List[PythonObject]])
+
+
+# ==================================================================
+# Dual-backend storage visitors (#619, Phase 2)
+# ==================================================================
+# The traits and dispatchers below are the *new* visitor API for the
+# dual-backend storage model.  They take typed marrow arrays
+# (``PrimitiveArray[_m_int64]``, ``BoolArray``, ``StringArray``) for the
+# AnyArray-backed arms and ``(List[PythonObject], NullMask)`` for the
+# LegacyObjectData arm — matching the post-migration storage shape.
+#
+# During Phases 2-5 these run *alongside* the legacy ``ColumnDataVisitor``
+# infrastructure.  The new dispatcher takes a ``Column`` reference and:
+#
+#   * If ``col._storage_active`` is True and the active arm is
+#     ``AnyArray``, it downcasts to the matching typed marrow array and
+#     calls the visitor's ``on_int64`` / ``on_float64`` / ``on_bool`` /
+#     ``on_str`` overload.  No copy is involved — the typed view borrows
+#     from the inner ArcPointer.
+#   * If ``col._storage_active`` is True and the active arm is
+#     ``LegacyObjectData``, it calls ``on_obj`` with the data list and
+#     null mask.
+#   * If ``col._storage_active`` is False (the Phase 1-2 transitional
+#     state), it builds a transient ``PrimitiveArray[T]`` / ``StringArray``
+#     from the legacy ``col._data`` arm via a marrow builder and calls
+#     the visitor with that.  This adds an O(N) conversion per visit on
+#     unmigrated columns; Phase 3 eliminates it by populating
+#     ``_storage`` directly in the construction paths.
+#
+# Visitors are migrated from ``ColumnDataVisitor`` /
+# ``ColumnDataVisitorRaises`` to ``ColumnStorageVisitor`` /
+# ``ColumnStorageVisitorRaises`` one at a time.  When the last migration
+# lands, the legacy traits and dispatchers are deleted in Phase 6.
+#
+# The mutable variant (``visit_col_data_mut_raises``) is intentionally
+# NOT migrated here — its single user is the merge writeback loop, which
+# Phase 5 reworks to use builder-driven construction instead of in-place
+# writes.  Marrow arrays are immutable, so a "mutable visitor" semantic
+# does not survive the migration.
+
+
+trait ColumnStorageVisitor:
+    """Non-raising visitor for the dual-backend storage model.
+
+    Implement one ``on_*`` method per logical arm.  The marrow-typed
+    arms (``PrimitiveArray[_m_int64]`` etc.) cover all primitive,
+    boolean, and string columns; the ``on_obj`` arm receives the
+    legacy ``List[PythonObject]`` data plus its companion ``NullMask``
+    so visitors can perform null-aware iteration without depending on
+    a side-table on ``Column``.
+    """
+
+    def on_int64(mut self, arr: Int64Array):
+        ...
+
+    def on_float64(mut self, arr: Float64Array):
+        ...
+
+    def on_bool(mut self, arr: BoolArray):
+        ...
+
+    def on_str(mut self, arr: StringArray):
+        ...
+
+    def on_obj(mut self, data: List[PythonObject], mask: NullMask):
+        ...
+
+
+def visit_col_storage[V: ColumnStorageVisitor](mut visitor: V, col: Column):
+    """Dispatch *visitor* to the active arm of *col*'s storage (non-raises).
+
+    Handles both backends: when ``col._storage_active`` is True the active
+    ``ColumnStorage`` arm is used directly (zero-copy borrow into the
+    marrow ``AnyArray``); otherwise the legacy ``col._data`` arm is
+    converted to a transient typed marrow array via a builder and the
+    visitor sees the same shape.
+
+    The conversion path uses ``try`` because marrow's builder ``finish()``
+    is ``raises`` — but ``ColumnStorageVisitor`` is the non-raising
+    contract, so any builder error here is fatal and we abort.  In
+    practice the conversion never raises for the inputs we hand it
+    (no allocation failures on small in-memory builds).
+    """
+    if col._storage_active:
+        if col._storage.isa[AnyArray]():
+            ref arr = col._storage[AnyArray]
+            var dt = arr.dtype()
+            if dt == _m_int64:
+                visitor.on_int64(arr.as_primitive[_m_int64]())
+            elif dt == _m_float64:
+                visitor.on_float64(arr.as_primitive[_m_float64]())
+            elif dt == _m_bool_:
+                visitor.on_bool(arr.as_primitive[_m_bool_]())
+            elif dt == _m_string:
+                visitor.on_str(arr.as_string())
+            else:
+                # Should never happen — marrow arrays in bison are int64/
+                # float64/bool/string.  Falling through to on_obj keeps the
+                # dispatch total without raising in a non-raises context.
+                var empty_data = List[PythonObject]()
+                var empty_mask = NullMask()
+                visitor.on_obj(empty_data, empty_mask)
+        else:
+            ref legacy = col._storage[LegacyObjectData]
+            visitor.on_obj(legacy.data, legacy.null_mask)
+        return
+    # ----- legacy path: convert ColumnData arm to a transient marrow array -----
+    try:
+        if col._data.isa[List[Int64]]():
+            visitor.on_int64(_legacy_to_int64_array(col))
+        elif col._data.isa[List[Float64]]():
+            visitor.on_float64(_legacy_to_float64_array(col))
+        elif col._data.isa[List[Bool]]():
+            visitor.on_bool(_legacy_to_bool_array(col))
+        elif col._data.isa[List[String]]():
+            visitor.on_str(_legacy_to_string_array(col))
+        else:
+            visitor.on_obj(col._data[List[PythonObject]], col._null_mask)
+    except:
+        # The transient builder paths only fail on allocation errors,
+        # which are fatal anyway.  Re-emit through the obj arm so the
+        # non-raising contract is preserved.
+        var empty_data = List[PythonObject]()
+        var empty_mask = NullMask()
+        visitor.on_obj(empty_data, empty_mask)
+
+
+trait ColumnStorageVisitorRaises:
+    """Raises-capable counterpart to ``ColumnStorageVisitor``.
+
+    Use when ``on_*`` methods must call Python APIs or otherwise raise.
+    """
+
+    def on_int64(mut self, arr: Int64Array) raises:
+        ...
+
+    def on_float64(mut self, arr: Float64Array) raises:
+        ...
+
+    def on_bool(mut self, arr: BoolArray) raises:
+        ...
+
+    def on_str(mut self, arr: StringArray) raises:
+        ...
+
+    def on_obj(mut self, data: List[PythonObject], mask: NullMask) raises:
+        ...
+
+
+def visit_col_storage_raises[
+    V: ColumnStorageVisitorRaises
+](mut visitor: V, col: Column) raises:
+    """Raises-capable dispatch — see ``visit_col_storage`` for semantics."""
+    if col._storage_active:
+        if col._storage.isa[AnyArray]():
+            ref arr = col._storage[AnyArray]
+            var dt = arr.dtype()
+            if dt == _m_int64:
+                visitor.on_int64(arr.as_primitive[_m_int64]())
+            elif dt == _m_float64:
+                visitor.on_float64(arr.as_primitive[_m_float64]())
+            elif dt == _m_bool_:
+                visitor.on_bool(arr.as_primitive[_m_bool_]())
+            elif dt == _m_string:
+                visitor.on_str(arr.as_string())
+            else:
+                raise Error(
+                    "visit_col_storage_raises: unsupported AnyArray dtype"
+                )
+        else:
+            ref legacy = col._storage[LegacyObjectData]
+            visitor.on_obj(legacy.data, legacy.null_mask)
+        return
+    # ----- legacy path -----
+    if col._data.isa[List[Int64]]():
+        visitor.on_int64(_legacy_to_int64_array(col))
+    elif col._data.isa[List[Float64]]():
+        visitor.on_float64(_legacy_to_float64_array(col))
+    elif col._data.isa[List[Bool]]():
+        visitor.on_bool(_legacy_to_bool_array(col))
+    elif col._data.isa[List[String]]():
+        visitor.on_str(_legacy_to_string_array(col))
+    else:
+        visitor.on_obj(col._data[List[PythonObject]], col._null_mask)
+
+
+# ------------------------------------------------------------------
+# Legacy → marrow array conversion helpers used by visit_col_storage*
+# ------------------------------------------------------------------
+# These build a transient marrow array from a column's legacy ColumnData
+# arm, propagating the legacy NullMask into the marrow bitmap.  The
+# resulting array is intended to be passed straight into a
+# ColumnStorageVisitor and dropped at the end of the visit; it is not
+# stored on the Column.  Phase 3 makes them go away by populating
+# ``_storage`` directly from the construction paths.
+def _legacy_to_int64_array(col: Column) raises -> Int64Array:
+    ref src = col._data[List[Int64]]
+    var n = len(src)
+    var b = PrimitiveBuilder[_m_int64](capacity=n)
+    b.reserve(n)
+    var has_mask = col._null_mask.has_nulls()
+    for i in range(n):
+        if has_mask and col._null_mask.is_null(i):
+            b.unsafe_append_null()
+        else:
+            b.unsafe_append(rebind[Scalar[_m_int64.native]](src[i]))
+    return b.finish()
+
+
+def _legacy_to_float64_array(col: Column) raises -> Float64Array:
+    ref src = col._data[List[Float64]]
+    var n = len(src)
+    var b = PrimitiveBuilder[_m_float64](capacity=n)
+    b.reserve(n)
+    var has_mask = col._null_mask.has_nulls()
+    for i in range(n):
+        if has_mask and col._null_mask.is_null(i):
+            b.unsafe_append_null()
+        else:
+            b.unsafe_append(rebind[Scalar[_m_float64.native]](src[i]))
+    return b.finish()
+
+
+def _legacy_to_bool_array(col: Column) raises -> BoolArray:
+    ref src = col._data[List[Bool]]
+    var n = len(src)
+    var b = PrimitiveBuilder[_m_bool_](capacity=n)
+    b.reserve(n)
+    var has_mask = col._null_mask.has_nulls()
+    for i in range(n):
+        if has_mask and col._null_mask.is_null(i):
+            b.unsafe_append_null()
+        else:
+            b.unsafe_append(
+                rebind[Scalar[_m_bool_.native]](Scalar[DType.bool](src[i]))
+            )
+    return b.finish()
+
+
+def _legacy_to_string_array(col: Column) raises -> StringArray:
+    ref src = col._data[List[String]]
+    var n = len(src)
+    # Pre-compute total UTF-8 bytes to avoid the upstream marrow
+    # ``reserve_bytes`` quadratic-allocation bug surfaced by Phase 0
+    # (#637).  Then ``unsafe_append`` skips ``reserve_bytes`` entirely.
+    var total_bytes = 0
+    for i in range(n):
+        total_bytes += len(src[i])
+    var b = StringBuilder(capacity=n, bytes_capacity=total_bytes)
+    var has_mask = col._null_mask.has_nulls()
+    for i in range(n):
+        if has_mask and col._null_mask.is_null(i):
+            b.unsafe_append_null()
+        else:
+            b.unsafe_append(StringSlice(src[i]))
+    return b.finish()
 
 
 # ------------------------------------------------------------------
@@ -4596,6 +4927,20 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # Set by from_pandas and written back in to_pandas.  Also updated by
     # DataFrame.rename_axis / Series.rename_axis.
     var _index_name: String
+    # ------------------------------------------------------------------
+    # Dual-backend storage scaffolding (#619, Phase 1)
+    # ------------------------------------------------------------------
+    # ``_storage`` is the *new* representation that will eventually replace
+    # ``_data`` + ``_null_mask`` (see the LegacyObjectData / ColumnStorage
+    # comment block at the top of this file).  In Phase 1 every Column is
+    # constructed with an empty ``LegacyObjectData()`` arm and the
+    # ``_storage_active`` flag is False, so all behaviour is still driven by
+    # the legacy fields.  Phase 3 starts populating ``_storage`` from the
+    # construction paths and flipping ``_storage_active`` to True;
+    # ``Column.is_null`` / ``is_valid`` / ``has_nulls`` already consult the
+    # flag and dispatch to the right backend.
+    var _storage: ColumnStorage
+    var _storage_active: Bool
 
     # ------------------------------------------------------------------
     # Constructors
@@ -4610,6 +4955,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
+        self._storage = ColumnStorage(LegacyObjectData())
+        self._storage_active = False
 
     def __init__(
         out self,
@@ -4624,6 +4971,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
+        self._storage = ColumnStorage(LegacyObjectData())
+        self._storage_active = False
 
     def __init__(
         out self,
@@ -4639,6 +4988,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._null_mask = NullMask()
         self._index_names = List[String]()
         self._index_name = String("")
+        self._storage = ColumnStorage(LegacyObjectData())
+        self._storage_active = False
 
     # ------------------------------------------------------------------
     # Typed-list constructor overloads — let callers pass typed lists
@@ -4746,6 +5097,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._null_mask = copy._null_mask.copy()
         self._index_names = copy._index_names.copy()
         self._index_name = copy._index_name
+        self._storage = copy._storage.copy()
+        self._storage_active = copy._storage_active
 
     def __init__(out self, *, deinit take: Self):
         self.name = take.name^
@@ -4755,6 +5108,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._null_mask = take._null_mask^
         self._index_names = take._index_names^
         self._index_name = take._index_name^
+        self._storage = take._storage^
+        self._storage_active = take._storage_active
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
@@ -4775,6 +5130,48 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
     def _obj_data(ref self) -> ref[self._data] List[PythonObject]:
         return self._data[List[PythonObject]]
+
+    # ------------------------------------------------------------------
+    # New typed accessor helpers (#619, Phase 1) — read from the dual-
+    # backend storage field when ``_storage_active`` is True.
+    #
+    # In Phase 1 these are unused (``_storage_active`` is always False),
+    # but defining them now lets Phase 2 swap visitor dispatch to the new
+    # representation without touching the trait declarations.  Each
+    # ``_*_array`` accessor returns a borrow of the typed marrow array
+    # held inside ``_storage[AnyArray]``; the caller is responsible for
+    # checking the active arm and dtype before calling.
+    # ------------------------------------------------------------------
+
+    def _storage_any_array(self) -> AnyArray:
+        """Return a copy of the AnyArray arm of the new storage Variant.
+
+        AnyArray copies are O(1) ref-bumps on the inner ArcPointer.
+        Caller must verify ``_storage_active`` and ``_storage.isa[AnyArray]``.
+        """
+        return self._storage[AnyArray].copy()
+
+    def _storage_legacy(ref self) -> ref[self._storage] LegacyObjectData:
+        """Return a borrow of the LegacyObjectData arm of the new storage."""
+        return self._storage[LegacyObjectData]
+
+    # The four typed-array accessors below return a *copy* of the typed
+    # marrow array held in ``_storage[AnyArray]``.  ``PrimitiveArray[T]`` and
+    # ``StringArray`` both wrap ref-counted ``Buffer`` / ``Bitmap`` instances,
+    # so a copy is O(1) (just an ArcPointer ref-bump).  Returning by value
+    # avoids the nested-origin path that Mojo cannot express for chained
+    # ``Variant[...]`` + ``AnyArray.as_*`` reference returns.
+    def _int64_array(self) -> Int64Array:
+        return self._storage[AnyArray].as_primitive[_m_int64]().copy()
+
+    def _float64_array(self) -> Float64Array:
+        return self._storage[AnyArray].as_primitive[_m_float64]().copy()
+
+    def _bool_array(self) -> BoolArray:
+        return self._storage[AnyArray].as_primitive[_m_bool_]().copy()
+
+    def _string_array(self) -> StringArray:
+        return self._storage[AnyArray].as_string().copy()
 
     # ------------------------------------------------------------------
     # Type-predicate helpers — canonical abstraction over _data.isa checks.
@@ -4804,6 +5201,30 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     def is_string(self) -> Bool:
         """Return True if the active storage arm is ``List[String]``."""
         return self._data.isa[List[String]]()
+
+    # ------------------------------------------------------------------
+    # Dual-backend null/validity helpers (#619, Phase 1)
+    # ------------------------------------------------------------------
+    # ``has_nulls`` is defined further down in the "Null tracking" section;
+    # ``is_null`` and ``is_valid`` below are new public API points that
+    # consult ``_storage_active`` and dispatch to either the marrow array's
+    # bitmap (set bit = valid, Arrow semantics) or the legacy ``_null_mask``
+    # field (set bit = null, bison semantics).  In Phase 1 every Column has
+    # ``_storage_active == False`` so all calls fall through to the legacy
+    # path; Phase 3 starts populating ``_storage`` and the dispatch goes
+    # live without any caller-side changes.
+
+    def is_null(self, index: Int) -> Bool:
+        """Return True if element at *index* is null."""
+        if self._storage_active:
+            if self._storage.isa[AnyArray]():
+                return not self._storage[AnyArray].is_valid(index)
+            return self._storage[LegacyObjectData].null_mask.is_null(index)
+        return self._null_mask.is_null(index)
+
+    def is_valid(self, index: Int) -> Bool:
+        """Return True if element at *index* is non-null."""
+        return not self.is_null(index)
 
     # ------------------------------------------------------------------
     # Index-arm predicates and unsafe accessors — canonical abstraction
@@ -4988,9 +5409,30 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def __len__(self) -> Int:
-        var visitor = _LenVisitor()
-        visit_col_data(visitor, self._data)
-        return visitor.result
+        # Workaround for #638: directly dispatch on the active arm
+        # instead of routing through `visit_col_storage`.  The generic
+        # dispatcher's comptime downcast chain (Variant[AnyArray,
+        # LegacyObjectData] → PrimitiveArray[T] / StringArray) deadlocks
+        # the Mojo compiler when combined with `df.query()` in the same
+        # compilation unit, which blocks migrating hot-path methods to
+        # the new visitor.  `__len__` only needs `AnyArray.length()` or
+        # `List.len()` — no typed-array downcast is required, so a
+        # hand-written if/isa chain both skips the pathological
+        # monomorphisation path and reads the dual-backend storage
+        # correctly under Phase 2+.
+        if self._storage_active:
+            if self._storage.isa[AnyArray]():
+                return self._storage[AnyArray].length()
+            return len(self._storage[LegacyObjectData].data)
+        if self._data.isa[List[Int64]]():
+            return len(self._data[List[Int64]])
+        if self._data.isa[List[Float64]]():
+            return len(self._data[List[Float64]])
+        if self._data.isa[List[Bool]]():
+            return len(self._data[List[Bool]])
+        if self._data.isa[List[String]]():
+            return len(self._data[List[String]])
+        return len(self._data[List[PythonObject]])
 
     def len(self) -> Int:
         """Return the number of elements in this column."""
@@ -5084,11 +5526,18 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def has_nulls(self) -> Bool:
-        """Return True if any element is marked null/NaN."""
-        for i in range(len(self._null_mask)):
-            if self._null_mask[i]:
-                return True
-        return False
+        """Return True if any element is marked null/NaN.
+
+        Dispatches on ``_storage_active``: when True it consults the active
+        ``ColumnStorage`` arm (marrow array bitmap or LegacyObjectData mask);
+        when False it falls through to the legacy ``_null_mask`` field.
+        See the dual-backend block above ``is_null`` for context.
+        """
+        if self._storage_active:
+            if self._storage.isa[AnyArray]():
+                return self._storage[AnyArray].null_count() > 0
+            return self._storage[LegacyObjectData].null_mask.has_nulls()
+        return self._null_mask.has_nulls()
 
     # ------------------------------------------------------------------
     # Aggregation
