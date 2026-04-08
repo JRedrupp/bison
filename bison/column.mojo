@@ -5409,9 +5409,30 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def __len__(self) -> Int:
-        var visitor = _LenVisitor()
-        visit_col_data(visitor, self._data)
-        return visitor.result
+        # Workaround for #638: directly dispatch on the active arm
+        # instead of routing through `visit_col_storage`.  The generic
+        # dispatcher's comptime downcast chain (Variant[AnyArray,
+        # LegacyObjectData] → PrimitiveArray[T] / StringArray) deadlocks
+        # the Mojo compiler when combined with `df.query()` in the same
+        # compilation unit, which blocks migrating hot-path methods to
+        # the new visitor.  `__len__` only needs `AnyArray.length()` or
+        # `List.len()` — no typed-array downcast is required, so a
+        # hand-written if/isa chain both skips the pathological
+        # monomorphisation path and reads the dual-backend storage
+        # correctly under Phase 2+.
+        if self._storage_active:
+            if self._storage.isa[AnyArray]():
+                return self._storage[AnyArray].length()
+            return len(self._storage[LegacyObjectData].data)
+        if self._data.isa[List[Int64]]():
+            return len(self._data[List[Int64]])
+        if self._data.isa[List[Float64]]():
+            return len(self._data[List[Float64]])
+        if self._data.isa[List[Bool]]():
+            return len(self._data[List[Bool]])
+        if self._data.isa[List[String]]():
+            return len(self._data[List[String]])
+        return len(self._data[List[PythonObject]])
 
     def len(self) -> Int:
         """Return the number of elements in this column."""
