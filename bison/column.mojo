@@ -820,6 +820,38 @@ struct _LenVisitor(ColumnDataVisitor, Copyable, Movable):
         self.result = len(data)
 
 
+# Probe visitor for the #619 Phase 2-3 transition: a minimal
+# ColumnStorageVisitor implementation used to isolate the Mojo nightly
+# compiler-recursion bug that triggered when `_LenVisitor` was migrated
+# to the new trait.  `_LenProbeVisitor` and `Column._storage_len` are
+# dead code from the test suite's point of view; they exist only to let
+# `test_expr.mojo` compile exercise the new dispatcher path in
+# isolation.  If this probe compiles + runs test_expr cleanly, migrating
+# visitors one-by-one is viable; if it hangs, no visitor can be moved to
+# `ColumnStorageVisitor` yet and we are blocked on the upstream compiler
+# fix.  Delete this probe once the real visitor migrations start.
+struct _LenProbeVisitor(ColumnStorageVisitor, Copyable, Movable):
+    var result: Int
+
+    def __init__(out self):
+        self.result = 0
+
+    def on_int64(mut self, arr: Int64Array):
+        self.result = len(arr)
+
+    def on_float64(mut self, arr: Float64Array):
+        self.result = len(arr)
+
+    def on_bool(mut self, arr: BoolArray):
+        self.result = len(arr)
+
+    def on_str(mut self, arr: StringArray):
+        self.result = len(arr)
+
+    def on_obj(mut self, data: List[PythonObject], mask: NullMask):
+        self.result = len(data)
+
+
 struct _DtypeSniffVisitor(ColumnDataVisitor, Copyable, Movable):
     """Visitor that maps the active ColumnData arm to its BisonDtype."""
 
@@ -5409,8 +5441,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def __len__(self) -> Int:
-        var visitor = _LenVisitor()
-        visit_col_data(visitor, self._data)
+        # REPRO: this body triggers Mojo nightly 26.2 compiler-recursion
+        # on tests/test_expr.mojo.  Reverting to `visit_col_data(visitor,
+        # self._data)` makes test_expr.mojo build in ~33s; with
+        # visit_col_storage the build never finishes (≥3 min real time
+        # with ~10s CPU — deadlock signature).
+        var visitor = _LenProbeVisitor()
+        visit_col_storage(visitor, self)
         return visitor.result
 
     def len(self) -> Int:
