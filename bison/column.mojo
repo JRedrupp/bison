@@ -4739,6 +4739,12 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # flag and dispatch to the right backend.
     var _storage: ColumnStorage
     var _storage_active: Bool
+    # Pre-extracted Float64 view of the storage data, populated at
+    # construction time by ``_try_activate_storage``.  Avoids typed
+    # downcasts (``arr.as_int64()`` etc.) on the query evaluation path,
+    # which trigger a compiler deadlock (#642).  Empty for non-numeric
+    # and non-storage-active columns.
+    var _f64_cache: List[Float64]
 
     # ------------------------------------------------------------------
     # Constructors
@@ -4755,6 +4761,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = String("")
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
+        self._f64_cache = List[Float64]()
 
     def __init__(
         out self,
@@ -4771,6 +4778,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = String("")
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
+        self._f64_cache = List[Float64]()
 
     def __init__(
         out self,
@@ -4788,6 +4796,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = String("")
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
+        self._f64_cache = List[Float64]()
 
     # ------------------------------------------------------------------
     # Typed-list constructor overloads — let callers pass typed lists
@@ -4907,6 +4916,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = copy._index_name
         self._storage = copy._storage.copy()
         self._storage_active = copy._storage_active
+        self._f64_cache = copy._f64_cache.copy()
 
     def __init__(out self, *, deinit take: Self):
         self.name = take.name^
@@ -4918,6 +4928,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = take._index_name^
         self._storage = take._storage^
         self._storage_active = take._storage_active
+        self._f64_cache = take._f64_cache^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
@@ -5070,10 +5081,18 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         (they stay readable via the legacy fields).
         """
         self._storage_active = False
+        self._f64_cache = List[Float64]()
         try:
             var arr = _column_to_marrow_array(self)
             self._storage = ColumnStorage(arr^)
             self._storage_active = True
+            # Pre-extract Float64 cache for numeric columns (#642).
+            # This avoids typed downcasts (arr.as_int64() etc.) on the
+            # query evaluation path, which would deadlock the compiler.
+            if self.is_int() or self.is_float() or self.is_bool():
+                var visitor = _ToFloat64Visitor()
+                visit_col_data_raises(visitor, self._data)
+                self._f64_cache = visitor.result.copy()
         except:
             # Object arm, string-with-nulls, or a marrow builder error —
             # leave the column in legacy-only mode.  Downstream readers
@@ -6125,6 +6144,38 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         ``op`` is a compile-time constant (``_CMP_*``) that selects the
         operation.  Null propagation: null elements produce a null result.
         """
+        # Storage-aware fast path using pre-extracted Float64 cache (#619).
+        # Uses _f64_cache (populated at construction in _try_activate_storage)
+        # to avoid typed downcasts on the query path (#642 compiler deadlock).
+        if self._storage_active and len(self._f64_cache) > 0:
+            var n = len(self._f64_cache)
+            var result = List[Bool](capacity=n)
+            var result_mask = List[Bool]()
+            var has_any_null = self._null_mask.has_nulls()
+            for i in range(n):
+                if has_any_null and self._null_mask.is_null(i):
+                    result.append(False)
+                    result_mask.append(True)
+                else:
+                    var v: Bool
+                    comptime if op == _CMP_EQ:
+                        v = self._f64_cache[i] == scalar
+                    elif op == _CMP_NE:
+                        v = self._f64_cache[i] != scalar
+                    elif op == _CMP_LT:
+                        v = self._f64_cache[i] < scalar
+                    elif op == _CMP_LE:
+                        v = self._f64_cache[i] <= scalar
+                    elif op == _CMP_GT:
+                        v = self._f64_cache[i] > scalar
+                    else:
+                        v = self._f64_cache[i] >= scalar
+                    result.append(v)
+                    if has_any_null:
+                        result_mask.append(False)
+            return self._build_result_col(
+                ColumnData(result^), result_mask^, has_any_null
+            )
         var visitor = _CmpScalarVisitor[op](self._null_mask, scalar)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
