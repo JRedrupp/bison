@@ -5381,9 +5381,37 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if self._null_mask.has_nulls():
             for i in range(s, e):
                 new_mask.append(self._null_mask[i])
-        var visitor = _SliceVisitor(s, e)
-        visit_col_data(visitor, self._data)
-        var col = Column(self.name, visitor^.result.copy(), self.dtype)
+        # Fast path: slice from typed caches when available (#619 Phase 6b).
+        var col: Column
+        if self._storage_active:
+            if len(self._int64_cache) > 0:
+                var result = List[Int64](capacity=e - s)
+                for i in range(s, e):
+                    result.append(self._int64_cache[i])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._bool_cache) > 0:
+                var result = List[Bool](capacity=e - s)
+                for i in range(s, e):
+                    result.append(self._bool_cache[i])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._str_cache) > 0:
+                var result = List[String](capacity=e - s)
+                for i in range(s, e):
+                    result.append(self._str_cache[i])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._f64_cache) > 0:
+                var result = List[Float64](capacity=e - s)
+                for i in range(s, e):
+                    result.append(self._f64_cache[i])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            else:
+                var visitor = _SliceVisitor(s, e)
+                visit_col_data(visitor, self._data)
+                col = Column(self.name, visitor^.result.copy(), self.dtype)
+        else:
+            var visitor = _SliceVisitor(s, e)
+            visit_col_data(visitor, self._data)
+            col = Column(self.name, visitor^.result.copy(), self.dtype)
         if len(new_mask) > 0:
             col._null_mask = new_mask^
         return col^
@@ -5396,9 +5424,37 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if has_mask:
             for k in range(len(indices)):
                 new_mask.append(self._null_mask[indices[k]])
-        var visitor = _TakeVisitor(indices)
-        visit_col_data(visitor, self._data)
-        var col = Column(self.name, visitor^.result.copy(), self.dtype)
+        # Fast path: take from typed caches when available (#619 Phase 6b).
+        var col: Column
+        if self._storage_active:
+            if len(self._int64_cache) > 0:
+                var result = List[Int64](capacity=len(indices))
+                for k in range(len(indices)):
+                    result.append(self._int64_cache[indices[k]])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._bool_cache) > 0:
+                var result = List[Bool](capacity=len(indices))
+                for k in range(len(indices)):
+                    result.append(self._bool_cache[indices[k]])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._str_cache) > 0:
+                var result = List[String](capacity=len(indices))
+                for k in range(len(indices)):
+                    result.append(self._str_cache[indices[k]])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            elif len(self._f64_cache) > 0:
+                var result = List[Float64](capacity=len(indices))
+                for k in range(len(indices)):
+                    result.append(self._f64_cache[indices[k]])
+                col = Column(self.name, ColumnData(result^), self.dtype)
+            else:
+                var visitor = _TakeVisitor(indices)
+                visit_col_data(visitor, self._data)
+                col = Column(self.name, visitor^.result.copy(), self.dtype)
+        else:
+            var visitor = _TakeVisitor(indices)
+            visit_col_data(visitor, self._data)
+            col = Column(self.name, visitor^.result.copy(), self.dtype)
         if len(new_mask) > 0:
             col._null_mask = new_mask^
         # Activate storage on the new column (#619 Phase 4).
