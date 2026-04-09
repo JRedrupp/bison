@@ -1107,34 +1107,91 @@ struct _ToPandasVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 def _to_numeric_marrow_array(col: Column) raises -> AnyArray:
     """Convert an Int64 or Float64 Column to a marrow AnyArray.
 
-    Only handles the two numeric arms needed for SIMD aggregation.
-    Null mask entries become Arrow null values. Raises for non-numeric types.
+    Thin wrapper preserved for the SIMD aggregation call sites in
+    ``Column.sum`` / ``Column.min`` / ``Column.max``.  Numeric-only;
+    raises on any other arm.  New code should call
+    ``_column_to_marrow_array`` instead.
+    """
+    if col.is_int() or col.is_float():
+        return _column_to_marrow_array(col)
+    raise Error("_to_numeric_marrow_array: not a numeric column")
+
+
+def _column_to_marrow_array(col: Column) raises -> AnyArray:
+    """Convert a legacy-backed Column to a marrow ``AnyArray``.
+
+    Handles the four marrow-convertible arms (int64/float64/bool/string)
+    by routing through the pre-existing, known-safe ``_marrow_array``
+    overloads in ``marrow.builders``.  The bison NullMask ("set bit =
+    null") is flipped to Arrow validity semantics ("set bit = valid")
+    element-wise; this is a one-time cost per construction, paid once
+    at Column ingest rather than on every read.
+
+    Must NOT be called on ``List[PythonObject]`` columns — those stay
+    in the ``LegacyObjectData`` arm of ``ColumnStorage``.  Raises for
+    the object arm.
+
+    This helper replaces the Phase 2 ``_legacy_to_{int64,float64,bool,
+    string}_array`` helpers deleted for #638: instead of instantiating
+    ``PrimitiveBuilder[T]`` / ``StringBuilder`` directly inside
+    bison/column.mojo (the monomorphisation pattern that deadlocked
+    the Mojo compiler in combination with ``df.query()``), we delegate
+    to marrow's non-generic ``array(List[Optional[Bool]])`` and
+    ``array(List[String])`` overloads plus the already-proven
+    ``array[_m_int64]`` / ``array[_m_float64]`` specialisations.
     """
     var n = len(col)
     var has_mask = col._null_mask.has_nulls()
 
-    if col._data.isa[List[Int64]]():
-        ref src = col._data[List[Int64]]
-        var vals = List[Optional[Int]]()
+    if col.is_int():
+        ref src = col._int64_data()
+        var vals = List[Optional[Int]](capacity=n)
         for i in range(n):
-            if has_mask and col._null_mask[i]:
+            if has_mask and col._null_mask.is_null(i):
                 vals.append(None)
             else:
                 vals.append(Int(src[i]))
         return AnyArray(_marrow_array[_m_int64](vals^))
 
-    elif col._data.isa[List[Float64]]():
-        ref src = col._data[List[Float64]]
-        var vals = List[Optional[Float64]]()
+    elif col.is_float():
+        ref src = col._float64_data()
+        var vals = List[Optional[Float64]](capacity=n)
         for i in range(n):
-            if has_mask and col._null_mask[i]:
+            if has_mask and col._null_mask.is_null(i):
                 vals.append(None)
             else:
                 vals.append(src[i])
         return AnyArray(_marrow_array[_m_float64](vals^))
 
+    elif col.is_bool():
+        ref src = col._bool_data()
+        var vals = List[Optional[Bool]](capacity=n)
+        for i in range(n):
+            if has_mask and col._null_mask.is_null(i):
+                vals.append(None)
+            else:
+                vals.append(src[i])
+        return AnyArray(_marrow_array(vals^))
+
+    elif col.is_string():
+        ref src = col._str_data()
+        if has_mask:
+            # marrow's ``array(List[String])`` overload has no null
+            # support and there's no public string-with-bitmap
+            # constructor we can lean on without instantiating
+            # ``StringBuilder`` directly (the #638 trigger).  String
+            # columns with nulls are uncommon in practice — callers
+            # should route those through ``LegacyObjectData`` instead.
+            raise Error(
+                "_column_to_marrow_array: string column with nulls not"
+                " supported — use LegacyObjectData fallback"
+            )
+        return AnyArray(_marrow_array(src.copy()))
+
     else:
-        raise Error("_to_numeric_marrow_array: not a numeric column")
+        raise Error(
+            "_column_to_marrow_array: object arm is not marrow-convertible"
+        )
 
 
 def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
