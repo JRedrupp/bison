@@ -25,7 +25,7 @@ from marrow.dtypes import (
 )
 from marrow.schema import Schema as _MarrowSchema
 from marrow.tabular import RecordBatch, Table
-from .column import Column, ColumnData
+from .column import Column, ColumnData, ColumnStorage
 from .dataframe import DataFrame
 from .dtypes import int64, float64, bool_, object_
 
@@ -108,6 +108,12 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
     _null_mask. A fully-valid array leaves _null_mask empty (bison's
     no-nulls sentinel). Only int64, float64, bool, and string Arrow
     types are supported.
+
+    The input ``arr`` is also stored directly on the returned column's
+    ``_storage`` field (zero-copy via ArcPointer ref-bump) so
+    dual-backend readers can use the marrow representation immediately.
+    The legacy ``_data``/``_null_mask`` fields are populated in parallel
+    until the Phase 6-7 cleanup removes them.
     """
     var dt = arr.dtype()
     var n = arr.length()
@@ -128,6 +134,8 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         var col = Column(name, ColumnData(data^), int64)
         if has_null:
             col._null_mask = null_mask^
+        col._storage = ColumnStorage(arr.copy())
+        col._storage_active = True
         return col^
 
     elif dt == _m_float64:
@@ -146,6 +154,8 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         var col = Column(name, ColumnData(data^), float64)
         if has_null:
             col._null_mask = null_mask^
+        col._storage = ColumnStorage(arr.copy())
+        col._storage_active = True
         return col^
 
     elif dt == _m_bool_:
@@ -164,6 +174,8 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         var col = Column(name, ColumnData(data^), bool_)
         if has_null:
             col._null_mask = null_mask^
+        col._storage = ColumnStorage(arr.copy())
+        col._storage_active = True
         return col^
 
     elif dt == _m_string:
@@ -182,6 +194,8 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         var col = Column(name, ColumnData(data^), object_)
         if has_null:
             col._null_mask = null_mask^
+        col._storage = ColumnStorage(arr.copy())
+        col._storage_active = True
         return col^
 
     else:

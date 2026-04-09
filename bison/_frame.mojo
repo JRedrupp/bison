@@ -659,6 +659,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var result_col = self._col.take(keep)
         # All kept elements are non-null; clear the mask.
         result_col._null_mask = List[Bool]()
+        result_col._try_activate_storage()
         return Series(result_col^)
 
     def ffill(self) raises -> Series:
@@ -675,6 +676,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         )
         if visitor.has_any_null:
             col._null_mask = visitor.result_mask.copy()
+            col._try_activate_storage()
         return Series(col^)
 
     def bfill(self) raises -> Series:
@@ -691,6 +693,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         )
         if visitor.has_any_null:
             col._null_mask = visitor.result_mask.copy()
+            col._try_activate_storage()
         return Series(col^)
 
     # ------------------------------------------------------------------
@@ -800,6 +803,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
                 result_mask.append(False)
         var col = Column(self._col.name, result_data^, float64, idx^)
         col._null_mask = result_mask^
+        col._try_activate_storage()
         return Series(col^)
 
     def rank(self) raises -> Series:
@@ -836,6 +840,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         # n_non_null < n iff there are nulls — no need to re-scan the mask.
         if n_non_null < n:
             col._null_mask = rank_mask^
+            col._try_activate_storage()
         return Series(col^)
 
     # ------------------------------------------------------------------
@@ -1339,6 +1344,7 @@ struct DataFrame(Copyable, Movable):
                     null_mask.append(True)
                 var col = Column(col_name, data^, object_)
                 col._null_mask = null_mask^
+                col._try_activate_storage()
                 cols.append(col^)
                 continue
 
@@ -1368,6 +1374,7 @@ struct DataFrame(Copyable, Movable):
                         null_mask.append(True)
                 var col = Column(col_name, data^, object_)
                 col._null_mask = null_mask^
+                col._try_activate_storage()
                 cols.append(col^)
             elif has_float:
                 # Float64 dominates Int64 and Bool
@@ -1393,6 +1400,7 @@ struct DataFrame(Copyable, Movable):
                         null_mask.append(True)
                 var col = Column(col_name, data^, float64)
                 col._null_mask = null_mask^
+                col._try_activate_storage()
                 cols.append(col^)
             elif has_int:
                 # Int64 (Bool values are promoted to Int64)
@@ -1424,10 +1432,12 @@ struct DataFrame(Copyable, Movable):
                         fdata.append(Float64(data[i]))
                     var col = Column(col_name, fdata^, float64)
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                     cols.append(col^)
                     continue
                 var col = Column(col_name, data^, int64)
                 col._null_mask = null_mask^
+                col._try_activate_storage()
                 cols.append(col^)
             else:  # Bool only
                 var data = List[Bool]()
@@ -1457,10 +1467,12 @@ struct DataFrame(Copyable, Movable):
                             odata.append(PythonObject(data[i]))
                     var col = Column(col_name, odata^, object_)
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                     cols.append(col^)
                     continue
                 var col = Column(col_name, data^, bool_)
                 col._null_mask = null_mask^
+                col._try_activate_storage()
                 cols.append(col^)
 
         return DataFrame(cols^)
@@ -2570,6 +2582,7 @@ struct DataFrame(Copyable, Movable):
                 var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
             return DataFrame(result_cols^)
         elif axis != 0:
@@ -2643,6 +2656,7 @@ struct DataFrame(Copyable, Movable):
                 var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
             return DataFrame(result_cols^)
         elif axis != 0:
@@ -2719,6 +2733,7 @@ struct DataFrame(Copyable, Movable):
                 var col = Column(self._cols[j].name, values^, float64)
                 if has_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
             return DataFrame(result_cols^)
         elif axis != 0:
@@ -3966,6 +3981,7 @@ struct DataFrame(Copyable, Movable):
             col._index = result_idx.copy()
             if any_null:
                 col._null_mask = null_mask^
+                col._try_activate_storage()
             result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -4220,6 +4236,7 @@ struct DataFrame(Copyable, Movable):
             col._index = result_idx.copy()
             if any_null:
                 col._null_mask = null_mask^
+                col._try_activate_storage()
             result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -4317,6 +4334,7 @@ struct DataFrame(Copyable, Movable):
         var val_col = Column(value_name, val_data^, object_)
         if any_null:
             val_col._null_mask = val_null_mask^
+            val_col._try_activate_storage()
         result_cols.append(val_col^)
 
         return DataFrame(result_cols^)
@@ -4367,6 +4385,7 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", val_data^, object_, ColumnIndex(idx_objs^))
         if any_null:
             result_col._null_mask = null_mask^
+            result_col._try_activate_storage()
         return Series(result_col^)
 
     def unstack(self, level: Int = -1) raises -> DataFrame:
@@ -4511,6 +4530,7 @@ struct DataFrame(Copyable, Movable):
                     col._index_name = rem_idx_names[0]
                 if any_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -4565,6 +4585,7 @@ struct DataFrame(Copyable, Movable):
         var result_col = Column("", val_data^, object_, ColumnIndex(idx_objs^))
         if any_null:
             result_col._null_mask = null_mask^
+            result_col._try_activate_storage()
         return Series(result_col^)
 
     def transpose(self) raises -> DataFrame:
@@ -4615,6 +4636,7 @@ struct DataFrame(Copyable, Movable):
             new_col._index = shared_idx.copy()
             if any_null:
                 new_col._null_mask = null_mask^
+                new_col._try_activate_storage()
             result_cols.append(new_col^)
 
         return DataFrame(result_cols^)
@@ -4770,6 +4792,7 @@ struct DataFrame(Copyable, Movable):
                 var new_col = Column(column, data^, object_)
                 if any_null:
                     new_col._null_mask = null_mask^
+                    new_col._try_activate_storage()
                 result_cols.append(new_col^)
             else:
                 # Other columns: repeat values by source row index.
@@ -6647,6 +6670,7 @@ struct DataFrameGroupBy:
                 col._index_name = key_col_name
                 if has_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
             else:
                 # float64 result: mean, or float col sum/min/max.
@@ -6670,6 +6694,7 @@ struct DataFrameGroupBy:
                 col._index_name = key_col_name
                 if has_null:
                     col._null_mask = null_mask^
+                    col._try_activate_storage()
                 result_cols.append(col^)
 
         return DataFrame(result_cols^)
@@ -7102,6 +7127,7 @@ struct DataFrameGroupBy:
             var result_col = Column(col.name, vals^, float64)
             if any_null:
                 result_col._null_mask = null_mask^
+                result_col._try_activate_storage()
             result_cols.append(result_col^)
         return DataFrame(result_cols^)
 
@@ -7301,6 +7327,7 @@ struct SeriesGroupBy:
             var col = Column(self._series.name, vals^, int64, idx^)
             if has_null:
                 col._null_mask = null_mask^
+                col._try_activate_storage()
             return Series(col^)
         else:
             var vals = List[Float64]()
@@ -7322,6 +7349,7 @@ struct SeriesGroupBy:
             var col = Column(self._series.name, vals^, float64, idx^)
             if has_null:
                 col._null_mask = null_mask^
+                col._try_activate_storage()
             return Series(col^)
 
     def sum(self) raises -> Series:
@@ -7587,6 +7615,7 @@ struct SeriesGroupBy:
             var result_col = Column(self._series.name, result_vals^, float64)
             if any_null:
                 result_col._null_mask = null_mask^
+                result_col._try_activate_storage()
             result_col._index = self._series._col._index.copy()
             result_col._index_name = self._series._col._index_name
             return Series(result_col^)
@@ -7614,6 +7643,7 @@ struct SeriesGroupBy:
                     self._series.name, result_vals^, float64
                 )
                 result_col._null_mask = null_mask^
+                result_col._try_activate_storage()
                 result_col._index = self._series._col._index.copy()
                 result_col._index_name = self._series._col._index_name
                 return Series(result_col^)

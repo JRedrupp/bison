@@ -42,7 +42,9 @@ def _infer_and_build_column(
     var n = len(raw)
 
     if n == 0:
-        return Column(name, List[String](), object_)
+        var empty = Column(name, List[String](), object_)
+        empty._try_activate_storage()
+        return empty^
 
     # ------------------------------------------------------------------
     # Try Bool — "true" / "false" (case-insensitive).
@@ -70,6 +72,7 @@ def _infer_and_build_column(
         var col = Column(name, data^, bool_)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     # ------------------------------------------------------------------
@@ -100,6 +103,7 @@ def _infer_and_build_column(
         var col = Column(name, data^, int64)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     # ------------------------------------------------------------------
@@ -130,6 +134,7 @@ def _infer_and_build_column(
         var col = Column(name, data^, float64)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     # ------------------------------------------------------------------
@@ -149,6 +154,7 @@ def _infer_and_build_column(
     var col = Column(name, data^, object_)
     if has_null:
         col._null_mask = null_mask^
+    col._try_activate_storage()
     return col^
 
 
