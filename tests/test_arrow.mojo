@@ -210,6 +210,65 @@ def test_python_object_column_raises() raises:
     assert_true(raised)
 
 
+def test_storage_active_int64_no_nulls() raises:
+    """Phase 3: int64 Column constructed via typed-list ctor flips
+    _storage_active = True and populates the AnyArray arm of _storage.
+    """
+    var data = List[Int64]()
+    data.append(1)
+    data.append(2)
+    data.append(3)
+    var col = Column("a", data^, int64)
+    assert_true(col._storage_active)
+    assert_equal(len(col), 3)
+
+
+def test_storage_active_float64_no_nulls() raises:
+    """Phase 3: float64 Column constructed via typed-list ctor flips
+    _storage_active = True.
+    """
+    var data = List[Float64]()
+    data.append(1.5)
+    data.append(2.5)
+    data.append(3.5)
+    var col = Column("b", data^, float64)
+    assert_true(col._storage_active)
+
+
+def test_storage_active_bool_no_nulls() raises:
+    """Phase 3: bool Column constructed via typed-list ctor flips
+    _storage_active = True.
+    """
+    var data = List[Bool]()
+    data.append(True)
+    data.append(False)
+    data.append(True)
+    var col = Column("c", data^, bool_)
+    assert_true(col._storage_active)
+
+
+def test_storage_active_with_null_mask_finalized() raises:
+    """Phase 3: after col._null_mask assignment, _try_activate_storage()
+    re-rebuilds _storage so the marrow bitmap reflects the current mask.
+    """
+    var data = List[Int64]()
+    data.append(10)
+    data.append(0)
+    data.append(30)
+    var col = Column("d", data^, int64)
+    var mask = List[Bool]()
+    mask.append(False)
+    mask.append(True)
+    mask.append(False)
+    col._null_mask = mask^
+    col._try_activate_storage()
+    assert_true(col._storage_active)
+    # has_nulls() should now read True via the marrow bitmap path.
+    assert_true(col.has_nulls())
+    assert_true(col.is_null(1))
+    assert_false(col.is_null(0))
+
+
 def main() raises:
     test_int64_round_trip_no_nulls()
     test_float64_round_trip_no_nulls()
@@ -220,4 +279,8 @@ def main() raises:
     test_dataframe_round_trip()
     test_dataframe_round_trip_with_nulls()
     test_python_object_column_raises()
+    test_storage_active_int64_no_nulls()
+    test_storage_active_float64_no_nulls()
+    test_storage_active_bool_no_nulls()
+    test_storage_active_with_null_mask_finalized()
     print("test_arrow: all tests passed")
