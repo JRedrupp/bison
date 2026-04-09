@@ -5025,6 +5025,48 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return not self.is_null(index)
 
     # ------------------------------------------------------------------
+    # Dual-backend storage activation (#619, Phase 3)
+    # ------------------------------------------------------------------
+    # ``_try_activate_storage`` is the single entry point for populating
+    # the new ``_storage`` field from an already-constructed legacy Column.
+    # Construction paths (``from_pandas``, CSV/JSON readers, ``arrow.mojo``
+    # converters, aggregation-output helpers) call this after writing
+    # ``_data`` and ``_null_mask`` so the marrow backend becomes live.
+    #
+    # For marrow-convertible arms (int64 / float64 / bool / string-no-null)
+    # it routes through ``_column_to_marrow_array`` and stores the resulting
+    # ``AnyArray`` in ``_storage``.  For object arms and the string-with-
+    # nulls edge case (which ``_column_to_marrow_array`` raises on) it
+    # leaves ``_storage_active = False`` — the column stays in legacy mode
+    # and readers will use ``_data`` as before.
+    #
+    # This method is idempotent: calling it on an already-activated column
+    # is a no-op.  It is also best-effort: construction errors surface as
+    # silent legacy-mode fallback rather than propagating, because a
+    # construction-path caller has already built the legacy fields and
+    # can still produce a valid Column.
+
+    def _try_activate_storage(mut self):
+        """Populate ``_storage`` from the legacy ``_data``/``_null_mask``.
+
+        Best-effort: sets ``_storage_active = True`` on marrow-convertible
+        columns and leaves it False on object / string-with-nulls columns
+        (they stay readable via the legacy fields).
+        """
+        if self._storage_active:
+            return
+        try:
+            var arr = _column_to_marrow_array(self)
+            self._storage = ColumnStorage(arr^)
+            self._storage_active = True
+        except:
+            # Object arm, string-with-nulls, or a marrow builder error —
+            # leave the column in legacy-only mode.  Downstream readers
+            # that consult ``_storage_active`` will see False and fall
+            # through to ``_data``/``_null_mask``.
+            pass
+
+    # ------------------------------------------------------------------
     # Index-arm predicates and unsafe accessors — canonical abstraction
     # over ``self._index.isa[...]`` checks.  Mirror the data-arm helpers
     # above so callers never need to query the ColumnIndex variant
@@ -6802,6 +6844,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             col._index_name = idx_name
+            col._try_activate_storage()
             return col^
         elif bison_dtype == float64:
             var data = List[Float64]()
@@ -6820,6 +6863,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             col._index_name = idx_name
+            col._try_activate_storage()
             return col^
         elif bison_dtype == bool_:
             var data = List[Bool]()
@@ -6831,6 +6875,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask.copy()
             col._index_name = idx_name
+            col._try_activate_storage()
             return col^
         elif dtype_str == "string":
             var data = List[String]()
@@ -6842,6 +6887,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var col = Column(name, ColumnData(data^), object_, bison_idx^)
             col._null_mask = null_mask.copy()
             col._index_name = idx_name
+            col._try_activate_storage()
             return col^
         else:
             # Promote pure-string object columns to List[String] so that
@@ -6869,6 +6915,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                     )
                     col._null_mask = null_mask^
                     col._index_name = idx_name
+                    col._try_activate_storage()
                     return col^
             var data = List[PythonObject]()
             for i in range(n):
@@ -6876,6 +6923,16 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var col = Column(name, ColumnData(data^), bison_dtype, bison_idx^)
             col._null_mask = null_mask^
             col._index_name = idx_name
+            # Object-arm columns: populate the LegacyObjectData arm of
+            # _storage so downstream readers can dispatch uniformly on
+            # _storage_active without a separate "legacy-only" branch.
+            col._storage = ColumnStorage(
+                LegacyObjectData(
+                    col._data[List[PythonObject]].copy(),
+                    col._null_mask.copy(),
+                )
+            )
+            col._storage_active = True
             return col^
 
     @staticmethod
