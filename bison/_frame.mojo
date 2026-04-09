@@ -7765,6 +7765,8 @@ def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
     """Write *value* into *col* at integer position *row*."""
     var visitor = _SetScalarInColMutVisitor(row, value)
     visit_col_data_mut_raises(visitor, col._data)
+    # Rebuild typed caches after in-place mutation (#619 Phase 6b).
+    col._try_activate_storage()
 
 
 def _set_series_scalar_in_col(
@@ -7776,6 +7778,7 @@ def _set_series_scalar_in_col(
             col._obj_data()[row] = value[PythonObject]
         else:
             raise Error("iloc: cannot assign PythonObject to typed column")
+        col._try_activate_storage()
         return
     var ds: DFScalar
     if value.isa[Int64]():
