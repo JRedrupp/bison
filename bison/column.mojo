@@ -4802,6 +4802,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
     ):
         self = Self(name, ColumnData(data^), dtype)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4811,6 +4812,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var index: ColumnIndex,
     ):
         self = Self(name, ColumnData(data^), dtype, index^)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4819,6 +4821,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
     ):
         self = Self(name, ColumnData(data^), dtype)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4828,6 +4831,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var index: ColumnIndex,
     ):
         self = Self(name, ColumnData(data^), dtype, index^)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4836,6 +4840,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
     ):
         self = Self(name, ColumnData(data^), dtype)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4845,6 +4850,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var index: ColumnIndex,
     ):
         self = Self(name, ColumnData(data^), dtype, index^)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4853,6 +4859,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
     ):
         self = Self(name, ColumnData(data^), dtype)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4862,6 +4869,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var index: ColumnIndex,
     ):
         self = Self(name, ColumnData(data^), dtype, index^)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4870,6 +4878,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
     ):
         self = Self(name, ColumnData(data^), dtype)
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4879,6 +4888,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var index: ColumnIndex,
     ):
         self = Self(name, ColumnData(data^), dtype, index^)
+        self._try_activate_storage()
 
     # ------------------------------------------------------------------
     # Traits
@@ -5047,14 +5057,19 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # can still produce a valid Column.
 
     def _try_activate_storage(mut self):
-        """Populate ``_storage`` from the legacy ``_data``/``_null_mask``.
+        """Rebuild ``_storage`` from the current ``_data``/``_null_mask``.
+
+        Always resets and re-reads — idempotent-like-rebuild rather than
+        idempotent-no-op.  Callers that mutate ``_null_mask`` or ``_data``
+        after construction must call this again to keep the marrow
+        backend in sync.  Construction paths that never touch the
+        fields post-construction only need to call it once.
 
         Best-effort: sets ``_storage_active = True`` on marrow-convertible
         columns and leaves it False on object / string-with-nulls columns
         (they stay readable via the legacy fields).
         """
-        if self._storage_active:
-            return
+        self._storage_active = False
         try:
             var arr = _column_to_marrow_array(self)
             self._storage = ColumnStorage(arr^)
