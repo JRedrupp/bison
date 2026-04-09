@@ -4739,12 +4739,20 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # flag and dispatch to the right backend.
     var _storage: ColumnStorage
     var _storage_active: Bool
-    # Pre-extracted Float64 view of the storage data, populated at
-    # construction time by ``_try_activate_storage``.  Avoids typed
-    # downcasts (``arr.as_int64()`` etc.) on the query evaluation path,
-    # which trigger a compiler deadlock (#642).  Empty for non-numeric
-    # and non-storage-active columns.
+    # TODO(#642): When the Mojo compiler fixes the typed-downcast deadlock,
+    # replace these per-dtype caches with direct AnyArray typed downcasts:
+    #   ref src = self._storage[AnyArray].as_int64()
+    # This will eliminate the memory duplication between _storage and
+    # caches.  The caches exist solely as a workaround for the compiler
+    # bug.  See: https://github.com/JRedrupp/bison/issues/642
+    #
+    # Pre-extracted typed caches, populated at construction time by
+    # ``_try_activate_storage``.  At most one of the four is non-empty,
+    # matching the active dtype.
     var _f64_cache: List[Float64]
+    var _int64_cache: List[Int64]
+    var _bool_cache: List[Bool]
+    var _str_cache: List[String]
 
     # ------------------------------------------------------------------
     # Constructors
@@ -4762,6 +4770,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
         self._f64_cache = List[Float64]()
+        self._int64_cache = List[Int64]()
+        self._bool_cache = List[Bool]()
+        self._str_cache = List[String]()
 
     def __init__(
         out self,
@@ -4779,6 +4790,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
         self._f64_cache = List[Float64]()
+        self._int64_cache = List[Int64]()
+        self._bool_cache = List[Bool]()
+        self._str_cache = List[String]()
 
     def __init__(
         out self,
@@ -4797,6 +4811,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = ColumnStorage(LegacyObjectData())
         self._storage_active = False
         self._f64_cache = List[Float64]()
+        self._int64_cache = List[Int64]()
+        self._bool_cache = List[Bool]()
+        self._str_cache = List[String]()
 
     # ------------------------------------------------------------------
     # Typed-list constructor overloads — let callers pass typed lists
@@ -4917,6 +4934,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = copy._storage.copy()
         self._storage_active = copy._storage_active
         self._f64_cache = copy._f64_cache.copy()
+        self._int64_cache = copy._int64_cache.copy()
+        self._bool_cache = copy._bool_cache.copy()
+        self._str_cache = copy._str_cache.copy()
 
     def __init__(out self, *, deinit take: Self):
         self.name = take.name^
@@ -4929,6 +4949,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = take._storage^
         self._storage_active = take._storage_active
         self._f64_cache = take._f64_cache^
+        self._int64_cache = take._int64_cache^
+        self._bool_cache = take._bool_cache^
+        self._str_cache = take._str_cache^
 
     # ------------------------------------------------------------------
     # Typed accessor helpers — unsafe direct Variant subscripts; callers
@@ -5082,17 +5105,34 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         """
         self._storage_active = False
         self._f64_cache = List[Float64]()
+        self._int64_cache = List[Int64]()
+        self._bool_cache = List[Bool]()
+        self._str_cache = List[String]()
         try:
             var arr = _column_to_marrow_array(self)
             self._storage = ColumnStorage(arr^)
             self._storage_active = True
-            # Pre-extract Float64 cache for numeric columns (#642).
-            # This avoids typed downcasts (arr.as_int64() etc.) on the
-            # query evaluation path, which would deadlock the compiler.
-            if self.is_int() or self.is_float() or self.is_bool():
+            # Pre-extract typed caches from the legacy _data fields (#642).
+            # TODO(#642): Replace with direct AnyArray typed downcasts once
+            # the Mojo compiler fixes the typed-downcast deadlock.
+            if self.is_int():
+                ref src = self._data[List[Int64]]
+                self._int64_cache = src.copy()
                 var visitor = _ToFloat64Visitor()
                 visit_col_data_raises(visitor, self._data)
                 self._f64_cache = visitor.result.copy()
+            elif self.is_float():
+                ref src = self._data[List[Float64]]
+                self._f64_cache = src.copy()
+            elif self.is_bool():
+                ref src = self._data[List[Bool]]
+                self._bool_cache = src.copy()
+                var visitor = _ToFloat64Visitor()
+                visit_col_data_raises(visitor, self._data)
+                self._f64_cache = visitor.result.copy()
+            elif self.is_string():
+                ref src = self._data[List[String]]
+                self._str_cache = src.copy()
         except:
             # Object arm, string-with-nulls, or a marrow builder error —
             # leave the column in legacy-only mode.  Downstream readers
@@ -5149,10 +5189,14 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         col._null_mask = mask^
         col._index_names = self._index_names.copy()
         col._index_name = self._index_name
-        # Copy storage backend if active (#619 Phase 4).
+        # Copy storage backend and typed caches if active (#619 Phase 4/6).
         if self._storage_active:
             col._storage = self._storage.copy()
             col._storage_active = True
+            col._f64_cache = self._f64_cache.copy()
+            col._int64_cache = self._int64_cache.copy()
+            col._bool_cache = self._bool_cache.copy()
+            col._str_cache = self._str_cache.copy()
         return col^
 
     # ------------------------------------------------------------------
@@ -5588,6 +5632,16 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var zero = Float64(0)
             return zero / zero
         var m = self.mean(skipna)
+        # Fast path: compute variance directly from _f64_cache (#619).
+        if self._storage_active and len(self._f64_cache) > 0:
+            var total = Float64(0)
+            var has_mask = self._null_mask.has_nulls()
+            for i in range(len(self._f64_cache)):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var diff = self._f64_cache[i] - m
+                total += diff * diff
+            return total / Float64(n - ddof)
         var visitor = _VarVisitor(m, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return visitor.total / Float64(n - ddof)
@@ -5611,13 +5665,23 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if s == 0.0:
             var zero = Float64(0)
             return zero / zero
-        var visitor = _MomentVisitor(m, 3, self._null_mask)
-        visit_col_data_raises(visitor, self._data)
+        # Fast path: compute moment directly from _f64_cache (#619).
+        var skew_total: Float64
+        if self._storage_active and len(self._f64_cache) > 0:
+            var total = Float64(0)
+            var has_mask = self._null_mask.has_nulls()
+            for i in range(len(self._f64_cache)):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var diff = self._f64_cache[i] - m
+                total += diff * diff * diff
+            skew_total = total
+        else:
+            var visitor = _MomentVisitor(m, 3, self._null_mask)
+            visit_col_data_raises(visitor, self._data)
+            skew_total = visitor.total
         return (
-            Float64(n)
-            / Float64((n - 1) * (n - 2))
-            * visitor.total
-            / (s * s * s)
+            Float64(n) / Float64((n - 1) * (n - 2)) * skew_total / (s * s * s)
         )
 
     def kurt(self, skipna: Bool = True) raises -> Float64:
@@ -5636,14 +5700,28 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if s == 0.0:
             var zero = Float64(0)
             return zero / zero
-        var visitor = _MomentVisitor(m, 4, self._null_mask)
-        visit_col_data_raises(visitor, self._data)
+        # Fast path: compute moment directly from _f64_cache (#619).
+        var kurt_total: Float64
+        if self._storage_active and len(self._f64_cache) > 0:
+            var total = Float64(0)
+            var has_mask = self._null_mask.has_nulls()
+            for i in range(len(self._f64_cache)):
+                if has_mask and self._null_mask[i]:
+                    continue
+                var diff = self._f64_cache[i] - m
+                var d2 = diff * diff
+                total += d2 * d2
+            kurt_total = total
+        else:
+            var visitor = _MomentVisitor(m, 4, self._null_mask)
+            visit_col_data_raises(visitor, self._data)
+            kurt_total = visitor.total
         var fn_ = Float64(n)
         var term1 = (
             fn_
             * (fn_ + 1.0)
             / ((fn_ - 1.0) * (fn_ - 2.0) * (fn_ - 3.0))
-            * visitor.total
+            * kurt_total
             / (s * s * s * s)
         )
         var term2 = (
@@ -5790,6 +5868,15 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
         Raises for non-numeric and non-string column types.
         """
+        # Fast path: count unique Float64 values from cache (#619).
+        if self._storage_active and len(self._f64_cache) > 0:
+            var has_mask = self._null_mask.has_nulls()
+            var seen = Set[Float64]()
+            for i in range(len(self._f64_cache)):
+                if has_mask and self._null_mask[i]:
+                    continue
+                seen.add(self._f64_cache[i])
+            return len(seen)
         var visitor = _NuniqueVisitor(self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return visitor.result
@@ -5804,9 +5891,19 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if not skipna and self.has_nulls():
             var zero = Float64(0)
             return zero / zero
-        var visitor = _QuantileCollectVisitor(self._null_mask)
-        visit_col_data_raises(visitor, self._data)
-        var vals = visitor.vals.copy()
+        # Fast path: collect non-null Float64 values from cache (#619).
+        var vals: List[Float64]
+        if self._storage_active and len(self._f64_cache) > 0:
+            vals = List[Float64]()
+            var has_mask = self._null_mask.has_nulls()
+            for i in range(len(self._f64_cache)):
+                if has_mask and self._null_mask[i]:
+                    continue
+                vals.append(self._f64_cache[i])
+        else:
+            var visitor = _QuantileCollectVisitor(self._null_mask)
+            visit_col_data_raises(visitor, self._data)
+            vals = visitor.vals.copy()
         if len(vals) == 0:
             var zero = Float64(0)
             return zero / zero
@@ -5926,6 +6023,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
         Raises for non-numeric (String, PythonObject) column types.
         """
+        # Fast path: return pre-extracted cache when available (#619).
+        if self._storage_active and len(self._f64_cache) > 0:
+            return self._f64_cache.copy()
         var visitor = _ToFloat64Visitor()
         visit_col_data_raises(visitor, self._data)
         return visitor.result.copy()
@@ -6107,6 +6207,48 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 + String(len(other))
                 + ")"
             )
+        # Storage-aware fast path using pre-extracted Float64 caches (#619).
+        # When both columns have _f64_cache, skip the visitor dispatch and
+        # the _ToFloat64Visitor conversion on the RHS entirely.
+        if (
+            self._storage_active
+            and other._storage_active
+            and len(self._f64_cache) > 0
+            and len(other._f64_cache) > 0
+        ):
+            var n = len(self._f64_cache)
+            var result = List[Bool](capacity=n)
+            var result_mask = List[Bool]()
+            var has_a_mask = self._null_mask.has_nulls()
+            var has_b_mask = other._null_mask.has_nulls()
+            var has_any_null = False
+            for i in range(n):
+                var is_null = (has_a_mask and self._null_mask[i]) or (
+                    has_b_mask and other._null_mask[i]
+                )
+                if is_null:
+                    result.append(False)
+                    result_mask.append(True)
+                    has_any_null = True
+                else:
+                    var v: Bool
+                    comptime if op == _CMP_EQ:
+                        v = self._f64_cache[i] == other._f64_cache[i]
+                    elif op == _CMP_NE:
+                        v = self._f64_cache[i] != other._f64_cache[i]
+                    elif op == _CMP_LT:
+                        v = self._f64_cache[i] < other._f64_cache[i]
+                    elif op == _CMP_LE:
+                        v = self._f64_cache[i] <= other._f64_cache[i]
+                    elif op == _CMP_GT:
+                        v = self._f64_cache[i] > other._f64_cache[i]
+                    else:
+                        v = self._f64_cache[i] >= other._f64_cache[i]
+                    result.append(v)
+                    result_mask.append(False)
+            return self._build_result_col(
+                ColumnData(result^), result_mask^, has_any_null
+            )
         var visitor = _CmpOpVisitor[op](self._null_mask, other)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
@@ -6213,6 +6355,40 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         ``op`` is a compile-time constant (``_CMP_*``) that selects the
         operation.  Null propagation: null elements produce a null result.
         """
+        # Storage-aware fast path using _f64_cache (#619).  For small
+        # scalars (|v| <= 2**53) the Float64 widening is exact; for
+        # larger values we fall through to the legacy int64 visitor.
+        if self._storage_active and len(self._f64_cache) > 0:
+            var f_scalar = Float64(scalar)
+            if Int64(f_scalar) == scalar:
+                var n = len(self._f64_cache)
+                var result = List[Bool](capacity=n)
+                var result_mask = List[Bool]()
+                var has_any_null = self._null_mask.has_nulls()
+                for i in range(n):
+                    if has_any_null and self._null_mask.is_null(i):
+                        result.append(False)
+                        result_mask.append(True)
+                    else:
+                        var v: Bool
+                        comptime if op == _CMP_EQ:
+                            v = self._f64_cache[i] == f_scalar
+                        elif op == _CMP_NE:
+                            v = self._f64_cache[i] != f_scalar
+                        elif op == _CMP_LT:
+                            v = self._f64_cache[i] < f_scalar
+                        elif op == _CMP_LE:
+                            v = self._f64_cache[i] <= f_scalar
+                        elif op == _CMP_GT:
+                            v = self._f64_cache[i] > f_scalar
+                        else:
+                            v = self._f64_cache[i] >= f_scalar
+                        result.append(v)
+                        if has_any_null:
+                            result_mask.append(False)
+                return self._build_result_col(
+                    ColumnData(result^), result_mask^, has_any_null
+                )
         var visitor = _CmpScalarInt64Visitor[op](self._null_mask, scalar)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
@@ -6357,6 +6533,43 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         Int64 and Float64 arms. Nulls propagate. Raises for String/Object
         columns.
         """
+        # Fast path for float64/bool columns using _f64_cache (#619).
+        # Int64 columns use the legacy visitor to preserve Int64 output.
+        if (
+            self._storage_active
+            and len(self._f64_cache) > 0
+            and self.dtype != int64
+        ):
+            var n = len(self._f64_cache)
+            var has_mask = self._null_mask.has_nulls()
+            var has_lo = lower.__bool__()
+            var has_hi = upper.__bool__()
+            var lo = Float64(0)
+            var hi = Float64(0)
+            if has_lo:
+                lo = lower.value()
+            if has_hi:
+                hi = upper.value()
+            var nan = Float64(0) / Float64(0)
+            var result_data = List[Float64](capacity=n)
+            var result_mask = List[Bool]()
+            var has_any_null = False
+            for i in range(n):
+                if has_mask and self._null_mask[i]:
+                    result_data.append(nan)
+                    result_mask.append(True)
+                    has_any_null = True
+                else:
+                    var v = self._f64_cache[i]
+                    if has_lo and v < lo:
+                        v = lo
+                    if has_hi and v > hi:
+                        v = hi
+                    result_data.append(v)
+                    result_mask.append(False)
+            return self._build_result_col(
+                ColumnData(result_data^), result_mask^, has_any_null
+            )
         var visitor = _ClipVisitor(
             self._null_mask, lower, upper, self.dtype.name
         )
@@ -6759,6 +6972,58 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # Cumulative operations
     # ------------------------------------------------------------------
 
+    def _cumop_f64_cache(self, skipna: Bool, mode: Int) raises -> Column:
+        """Shared cumulative fast path over ``_f64_cache`` (#619).
+
+        ``mode``: 1=sum, 2=prod, 3=min, 4=max.
+        Only called for float64/bool columns (int64 uses the visitor to
+        preserve Int64 output).
+        """
+        var n = len(self._f64_cache)
+        var has_mask = self._null_mask.has_nulls()
+        var propagate_nan = False
+        var nan = Float64(0) / Float64(0)
+        var running: Float64
+        if mode == 2:
+            running = Float64(1)
+        else:
+            running = Float64(0)
+        var first_seen = mode <= 2  # sum/prod: running init is correct
+        var result_data = List[Float64](capacity=n)
+        var result_mask = List[Bool]()
+        var has_any_null = False
+        for i in range(n):
+            var is_null = has_mask and self._null_mask[i]
+            if is_null:
+                if not skipna:
+                    propagate_nan = True
+                result_data.append(nan)
+                result_mask.append(True)
+                has_any_null = True
+            elif propagate_nan:
+                result_data.append(nan)
+                result_mask.append(True)
+                has_any_null = True
+            else:
+                var v = self._f64_cache[i]
+                if mode == 1:
+                    running += v
+                elif mode == 2:
+                    running *= v
+                elif mode == 3:
+                    if not first_seen or v < running:
+                        running = v
+                        first_seen = True
+                else:
+                    if not first_seen or v > running:
+                        running = v
+                        first_seen = True
+                result_data.append(running)
+                result_mask.append(False)
+        return self._build_result_col(
+            ColumnData(result_data^), result_mask^, has_any_null
+        )
+
     def cumsum(self, skipna: Bool = True) raises -> Column:
         """Return a Column of cumulative sums, preserving dtype.
 
@@ -6770,6 +7035,14 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
+        # Fast path for float64/bool columns using _f64_cache (#619).
+        # Int64 columns use the legacy visitor to preserve Int64 output.
+        if (
+            self._storage_active
+            and len(self._f64_cache) > 0
+            and self.dtype != int64
+        ):
+            return self._cumop_f64_cache(skipna, 1)
         var visitor = _CumSumVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
@@ -6787,6 +7060,12 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
+        if (
+            self._storage_active
+            and len(self._f64_cache) > 0
+            and self.dtype != int64
+        ):
+            return self._cumop_f64_cache(skipna, 2)
         var visitor = _CumProdVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
@@ -6804,6 +7083,12 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
+        if (
+            self._storage_active
+            and len(self._f64_cache) > 0
+            and self.dtype != int64
+        ):
+            return self._cumop_f64_cache(skipna, 3)
         var visitor = _CumMinVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
@@ -6821,6 +7106,12 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         subsequent positions.
         Raises for non-numeric column types.
         """
+        if (
+            self._storage_active
+            and len(self._f64_cache) > 0
+            and self.dtype != int64
+        ):
+            return self._cumop_f64_cache(skipna, 4)
         var visitor = _CumMaxVisitor(skipna, self._null_mask)
         visit_col_data_raises(visitor, self._data)
         return self._build_result_col(
