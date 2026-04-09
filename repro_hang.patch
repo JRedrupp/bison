@@ -1,0 +1,64 @@
+diff --git a/bison/column.mojo b/bison/column.mojo
+index 16935fa..7fb00d4 100644
+--- a/bison/column.mojo
++++ b/bison/column.mojo
+@@ -1202,6 +1202,48 @@ def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
+         return Float64(scalar.as_primitive[_m_int64]().value())
+
+
++# ------------------------------------------------------------------
++# REPRO: typed downcasts on AnyArray — triggers compiler deadlock
++# when called from a code path reachable by df.query().
++# ------------------------------------------------------------------
++
++
++def _storage_to_float64_list(arr: AnyArray) raises -> List[Float64]:
++    """Extract Float64 values from a marrow AnyArray (int64/float64/bool).
++
++    The typed downcasts (as_int64, as_float64, as_bool) use rebind on
++    ArcPointer[NoneType], which triggers comptime monomorphisation that
++    deadlocks the compiler when combined with df.query().
++    """
++    var dt = arr.dtype()
++    var n = arr.length()
++    var result = List[Float64](capacity=n)
++    if dt == _m_int64:
++        ref src = arr.as_int64()
++        for i in range(n):
++            if arr.is_valid(i):
++                result.append(Float64(rebind[Int64](src.unsafe_get(i))))
++            else:
++                result.append(Float64(0))
++    elif dt == _m_float64:
++        ref src = arr.as_float64()
++        for i in range(n):
++            if arr.is_valid(i):
++                result.append(rebind[Float64](src.unsafe_get(i)))
++            else:
++                result.append(Float64(0))
++    elif dt == _m_bool_:
++        ref src = arr.as_bool()
++        for i in range(n):
++            if arr.is_valid(i):
++                result.append(1.0 if Bool(src.unsafe_get(i)) else 0.0)
++            else:
++                result.append(Float64(0))
++    else:
++        raise Error("_storage_to_float64_list: non-numeric dtype")
++    return result^
++
++
+ # ------------------------------------------------------------------
+ # Aggregation visitors (issue #81)
+ # ------------------------------------------------------------------
+@@ -6125,6 +6167,10 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
+         ``op`` is a compile-time constant (``_CMP_*``) that selects the
+         operation.  Null propagation: null elements produce a null result.
+         """
++        # TRIGGER: calling _storage_to_float64_list from this query-reachable
++        # method causes the compiler to deadlock.
++        if self._storage_active and self._storage.isa[AnyArray]():
++            var _vals = _storage_to_float64_list(self._storage[AnyArray])
+         var visitor = _CmpScalarVisitor[op](self._null_mask, scalar)
+         visit_col_data_raises(visitor, self._data)
+         return self._build_result_col(
