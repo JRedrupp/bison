@@ -77,6 +77,7 @@ def _json_build_column(
         var col = Column(name, data^, bool_)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     elif dtype_str == "int64":
@@ -95,6 +96,7 @@ def _json_build_column(
         var col = Column(name, data^, int64)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     elif dtype_str == "float64":
@@ -113,6 +115,7 @@ def _json_build_column(
         var col = Column(name, data^, float64)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
     else:  # "string"
@@ -131,6 +134,7 @@ def _json_build_column(
         var col = Column(name, data^, object_)
         if has_null:
             col._null_mask = null_mask^
+        col._try_activate_storage()
         return col^
 
 
