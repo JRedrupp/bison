@@ -57,13 +57,15 @@ Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >=
 
 ### Column storage
 
-`column.mojo` is the storage layer. `ColumnData` is a `Variant`:
+`column.mojo` is the storage layer. Each `Column` has a **dual-backend** architecture (#619):
 
-```
-ColumnData = List[Int64] | List[Float64] | List[Bool] | List[String] | List[PythonObject]
-```
+1. **Legacy backend** (`_data: ColumnData`): A `Variant[List[Int64], List[Float64], List[Bool], List[String], List[PythonObject]]` with a parallel `List[Bool]` null mask.
+2. **Marrow backend** (`_storage: ColumnStorage`): An `AnyArray` (Apache Arrow for Mojo) for SIMD aggregation kernels, or `LegacyObjectData` for `PythonObject` columns.
+3. **Typed caches** (`_int64_cache`, `_f64_cache`, `_bool_cache`, `_str_cache`): Pre-extracted typed lists populated from `_data` at construction time. At most one typed cache plus `_f64_cache` is non-empty.
 
-Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null mask. Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 column). GroupBy key columns may promote to `List[Float64]` to unify key types.
+The typed caches exist as a workaround for the Mojo compiler deadlock (#642): typed `AnyArray` downcasts (`arr.as_int64()` etc.) cannot co-exist on the same call graph as `df.query()` in `column.mojo`. All high-traffic operations (comparison, aggregation, transforms, extraction) read from caches instead of `_data`. See TODO(#642) comments throughout.
+
+Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 column). GroupBy key columns may promote to `List[Float64]` to unify key types.
 
 #### Column type predicates and visitor dispatch
 
@@ -78,9 +80,11 @@ Each `Column` struct holds a `ColumnData` arm and a parallel `List[Bool]` null m
 | `col.is_object()` | `col._data.isa[List[PythonObject]]()` |
 | `col.is_numeric()` | `col._data.isa[List[Int64]]() or col._data.isa[List[Float64]]()` |
 
-For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)`. For multi-arm algorithmic dispatch (where each arm runs the same algorithm on a different type), write a visitor struct implementing `ColumnDataVisitorRaises` and call `visit_col_data_raises()`. See `_RankVisitor` in `_frame.mojo` for an example.
+For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)` — these read from typed caches when available.
 
-After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`.
+For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches when `_storage_active`, falling back to the legacy `visit_col_data_raises()` dispatcher. Visitor structs still implement `ColumnDataVisitorRaises` — the cache dispatch calls their `on_*` methods with cache data instead of `_data`.
+
+After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`. **Important:** These return refs to `_data` (legacy backend). If you mutate values through these refs, call `col._try_activate_storage()` afterward to rebuild caches.
 
 ### Core types
 
