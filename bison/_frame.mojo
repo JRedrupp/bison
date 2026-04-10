@@ -640,7 +640,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var visitor = _FillnaVisitor(self._col._null_mask, value)
-        visit_col_data_raises(visitor, self._col._data)
+        self._col._visit_raises(visitor)
         var dtype = self._col.dtype
         var idx = self._col._index.copy()
         var col_data = visitor.col_data.copy()
@@ -669,7 +669,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var visitor = _FfillVisitor(self._col._null_mask)
-        visit_col_data_raises(visitor, self._col._data)
+        self._col._visit_raises(visitor)
         var idx = self._col._index.copy()
         var col = Column(
             self._col.name, visitor.col_data.copy(), self._col.dtype, idx^
@@ -686,7 +686,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         if not has_mask:
             return Series(self._col.copy())
         var visitor = _BfillVisitor(self._col._null_mask)
-        visit_col_data_raises(visitor, self._col._data)
+        self._col._visit_raises(visitor)
         var idx = self._col._index.copy()
         var col = Column(
             self._col.name, visitor.col_data.copy(), self._col.dtype, idx^
@@ -833,7 +833,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         # Assign average ranks for each tied group (type-dispatch via visitor).
         # avg = ((i+1) + (j+1)) / 2 where i..j is the 0-based sorted range.
         var rank_visitor = _RankVisitor(perm, n_non_null, ranks)
-        visit_col_data_raises(rank_visitor, self._col._data)
+        self._col._visit_raises(rank_visitor)
         ranks = rank_visitor.ranks.copy()
         var idx = self._col._index.copy()
         var col = Column(self._col.name, ranks^, float64, idx^)
@@ -5042,7 +5042,7 @@ struct DataFrame(Copyable, Movable):
         for k in range(n_keys):
             var i = col_idx[key_cols[k]]
             visitor.result = String()
-            visit_col_data_raises(visitor, df._cols[i]._data)
+            df._cols[i]._visit_raises(visitor)
             var part = visitor.result
             if n_keys == 1:
                 return part
@@ -5185,6 +5185,8 @@ struct DataFrame(Copyable, Movable):
                                         ]
                                         key_col._null_mask.set_valid(r)
                             break
+                    # Rebuild caches after in-place key fill (#619 Phase 6b).
+                    key_col._try_activate_storage()
                     result_cols.append(key_col^)
                     break
 
