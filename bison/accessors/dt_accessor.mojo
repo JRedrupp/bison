@@ -13,7 +13,7 @@ struct DatetimeMethods:
 
     def __init__(out self):
         self._data = List[PythonObject]()
-        self._null_mask = List[Bool]()
+        self._null_mask = NullMask()
         self._name = None
 
     def __init__(
@@ -45,14 +45,14 @@ struct DatetimeMethods:
         level without requiring a runtime call to Python's `getattr()`.
         """
         var result = List[Int64]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(Int64(0))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(Int64(Int(py=self._data[i].__getattr__(attr))))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
@@ -90,28 +90,28 @@ struct DatetimeMethods:
 
     def date(self) raises -> Column:
         var result = List[PythonObject]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(PythonObject(None))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(self._data[i].date())
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
 
     def time(self) raises -> Column:
         var result = List[PythonObject]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(PythonObject(None))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(self._data[i].time())
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
@@ -130,14 +130,14 @@ struct DatetimeMethods:
         name at the Python level without a runtime ``getattr()`` call.
         """
         var result = List[PythonObject]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(PythonObject(None))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(self._data[i].__getattr__(method)(arg))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, datetime64_ns)
         col._null_mask = new_mask^
         return col^

@@ -14,7 +14,7 @@ struct StringMethods:
 
     def __init__(out self):
         self._data = List[String]()
-        self._null_mask = List[Bool]()
+        self._null_mask = NullMask()
         self._name = None
 
     def __init__(
@@ -111,45 +111,45 @@ struct StringMethods:
         self, pat: String, `case`: Bool = True, na: Bool = False
     ) raises -> Column:
         var result = List[Bool]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(na)
-                new_mask.append(False)
+                new_mask.append_valid()
             else:
                 if `case`:
                     result.append(self._data[i].find(pat) != -1)
                 else:
                     result.append(self._data[i].lower().find(pat.lower()) != -1)
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
 
     def startswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(False)
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(self._data[i].startswith(pat))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
 
     def endswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(False)
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(self._data[i].endswith(pat))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^
@@ -205,49 +205,49 @@ struct StringMethods:
 
     def len(self) raises -> Column:
         var result = List[Int64]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(Int64(0))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 result.append(Int64(len(self._data[i])))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
     def find(self, sub: String, start: Int = 0, end: Int = -1) raises -> Column:
         var result = List[Int64]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(Int64(-1))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 var s = self._data[i]
                 var pos = s.find(sub, start)
                 if end != -1 and pos >= end:
                     pos = -1
                 result.append(Int64(pos))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
 
     def count(self, pat: String) raises -> Column:
         var result = List[Int64]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         var re_mod = Python.import_module("re")
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(Int64(0))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 var py_s = PythonObject(self._data[i])
                 var matches = re_mod.findall(pat, py_s)
                 result.append(Int64(Int(py=matches.__len__())))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, int64)
         col._null_mask = new_mask^
         return col^
@@ -258,16 +258,16 @@ struct StringMethods:
 
     def get(self, i: Int) raises -> Column:
         var result = List[String]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for idx in range(len(self._data)):
             if self._is_null(idx):
                 result.append(String(""))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 var s = self._data[idx]
                 if i < 0 or i >= len(s):
                     result.append(String(""))
-                    new_mask.append(True)
+                    new_mask.append_null()
                 else:
                     var j = 0
                     var char_val = String("")
@@ -277,7 +277,7 @@ struct StringMethods:
                             break
                         j += 1
                     result.append(char_val)
-                    new_mask.append(False)
+                    new_mask.append_valid()
         var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
@@ -286,11 +286,11 @@ struct StringMethods:
         self, start: Int = 0, stop: Int = -1, step: Int = 1
     ) raises -> Column:
         var result = List[String]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(String(""))
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 var s = self._data[i]
                 var slen = len(s)
@@ -304,7 +304,7 @@ struct StringMethods:
                         sub += String(ch)
                     j += 1
                 result.append(sub)
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, object_)
         col._null_mask = new_mask^
         return col^
@@ -331,17 +331,17 @@ struct StringMethods:
 
     def match(self, pat: String) raises -> Column:
         var result = List[Bool]()
-        var new_mask = List[Bool]()
+        var new_mask = NullMask()
         var re_mod = Python.import_module("re")
         for i in range(len(self._data)):
             if self._is_null(i):
                 result.append(False)
-                new_mask.append(True)
+                new_mask.append_null()
             else:
                 var py_s = PythonObject(self._data[i])
                 var m = re_mod.match(pat, py_s)
                 result.append(Bool(m.__bool__()))
-                new_mask.append(False)
+                new_mask.append_valid()
         var col = Column(self._name, result^, bool_)
         col._null_mask = new_mask^
         return col^

@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, TestSuite
-from bison import DataFrame, Series, Column, ColumnData, int64, float64, object_
+from bison import DataFrame, Series, Column, ColumnData, NullMask, int64, float64, object_
 from _helpers import assert_frame_equal, assert_series_equal
 
 
@@ -185,10 +185,10 @@ def test_int_column_direct_null_mask_to_pandas() raises:
     data.append(0)
     data.append(30)
     var col = Column("x", ColumnData(data^), int64)
-    var mask = List[Bool]()
-    mask.append(False)
-    mask.append(True)
-    mask.append(False)
+    var mask = NullMask()
+    mask.append_valid()
+    mask.append_null()
+    mask.append_valid()
     col._null_mask = mask^
     # Must not raise even though dtype is int64 and mask has True entries.
     var back = col.to_pandas()
@@ -212,10 +212,10 @@ def test_obj_column_with_null_mask_to_pandas() raises:
     raw.append(Python.evaluate("'should-be-null'"))  # stored value, must be masked
     raw.append(Python.evaluate("'cherry'"))
     var col = Column("fruit", ColumnData(raw^), object_)
-    var mask = List[Bool]()
-    mask.append(False)
-    mask.append(True)   # null — must appear as NaN in pandas output
-    mask.append(False)
+    var mask = NullMask()
+    mask.append_valid()
+    mask.append_null()
+    mask.append_valid()
     col._null_mask = mask^
     var back = col.to_pandas()
     assert_equal(String(py=back[0]), "apple")

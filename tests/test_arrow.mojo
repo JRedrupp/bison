@@ -4,6 +4,7 @@ from bison import (
     Column,
     ColumnData,
     DataFrame,
+    NullMask,
     int64,
     float64,
     bool_,
@@ -85,7 +86,7 @@ def test_null_mask_preserved_int64() raises:
     data.append(42)
     data.append(0)
     var col = Column("x", ColumnData(data^), int64)
-    col._null_mask = List[Bool]()
+    col._null_mask = NullMask()
     col._null_mask.append(True)
     col._null_mask.append(False)
     col._null_mask.append(True)
@@ -105,7 +106,7 @@ def test_null_mask_preserved_string() raises:
     data.append("")
     data.append("world")
     var col = Column("s", ColumnData(data^), object_)
-    col._null_mask = List[Bool]()
+    col._null_mask = NullMask()
     col._null_mask.append(False)
     col._null_mask.append(True)
     col._null_mask.append(False)
@@ -164,7 +165,7 @@ def test_dataframe_round_trip_with_nulls() raises:
     d_a.append(0)
     d_a.append(30)
     var col_a = Column("a", ColumnData(d_a^), int64)
-    col_a._null_mask = List[Bool]()
+    col_a._null_mask = NullMask()
     col_a._null_mask.append(False)
     col_a._null_mask.append(True)
     col_a._null_mask.append(False)
@@ -174,7 +175,7 @@ def test_dataframe_round_trip_with_nulls() raises:
     d_b.append("bye")
     d_b.append("")
     var col_b = Column("b", ColumnData(d_b^), object_)
-    col_b._null_mask = List[Bool]()
+    col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(False)
     col_b._null_mask.append(True)
@@ -256,10 +257,10 @@ def test_storage_active_with_null_mask_finalized() raises:
     data.append(0)
     data.append(30)
     var col = Column("d", data^, int64)
-    var mask = List[Bool]()
-    mask.append(False)
-    mask.append(True)
-    mask.append(False)
+    var mask = NullMask()
+    mask.append_valid()
+    mask.append_null()
+    mask.append_valid()
     col._null_mask = mask^
     col._try_activate_storage()
     assert_true(col._storage_active)
