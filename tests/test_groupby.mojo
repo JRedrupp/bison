@@ -2,7 +2,7 @@
 from std.python import Python, PythonObject
 from std.collections import Dict
 from std.testing import assert_equal, TestSuite
-from bison import DataFrame, Series, ColumnData, Column
+from bison import DataFrame, Series, ColumnData, Column, NullMask
 from bison.dtypes import int64 as _bison_int64, float64 as _bison_float64
 from _helpers import assert_frame_equal, assert_series_equal
 
@@ -517,11 +517,11 @@ def test_seriesgroupby_dropna_sum() raises:
     by.append("a")  # string value is ignored because null_mask marks this row as null
     by.append("b")
     by.append("b")
-    var null_mask = List[Bool]()
-    null_mask.append(False)
-    null_mask.append(True)  # row 1 is null-labelled
-    null_mask.append(False)
-    null_mask.append(False)
+    var null_mask = NullMask()
+    null_mask.append_valid()
+    null_mask.append_null()  # row 1 is null-labelled
+    null_mask.append_valid()
+    null_mask.append_valid()
     # dropna=True (the default): null-labelled row should be excluded.
     var result = s.groupby(by, dropna=True, by_null_mask=null_mask).sum()
     var result_pd = result.to_pandas()
@@ -540,11 +540,11 @@ def test_seriesgroupby_dropna_transform_sum() raises:
     by.append("a")
     by.append("b")
     by.append("b")
-    var null_mask = List[Bool]()
-    null_mask.append(False)
-    null_mask.append(True)
-    null_mask.append(False)
-    null_mask.append(False)
+    var null_mask = NullMask()
+    null_mask.append_valid()
+    null_mask.append_null()
+    null_mask.append_valid()
+    null_mask.append_valid()
     var result = s.groupby(by, dropna=True, by_null_mask=null_mask).transform(
         "sum"
     )

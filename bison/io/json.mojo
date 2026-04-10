@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column
+from ..column import Column, NullMask
 from ..dtypes import int64, float64, object_, bool_
 
 
@@ -63,76 +63,68 @@ def _json_build_column(
 
     if dtype_str == "bool":
         var data = List[Bool]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for ri in range(n):
             var val = py_values[ri]
             if _json_py_type(val) == "NoneType":
                 data.append(False)
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(Bool(val.__bool__()))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, bool_)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
 
     elif dtype_str == "int64":
         var data = List[Int64]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for ri in range(n):
             var val = py_values[ri]
             if _json_py_type(val) == "NoneType":
                 data.append(Int64(0))
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(Int64(Int(py=val)))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, int64)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
 
     elif dtype_str == "float64":
         var data = List[Float64]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for ri in range(n):
             var val = py_values[ri]
             if _json_py_type(val) == "NoneType":
                 data.append(Float64(0))
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(atof(String(val)))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, float64)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
 
     else:  # "string"
         var data = List[String]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for ri in range(n):
             var val = py_values[ri]
             if _json_py_type(val) == "NoneType":
                 data.append(String(""))
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(String(val))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, object_)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^

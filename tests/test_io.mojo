@@ -15,6 +15,7 @@ from bison import (
     Series,
     Column,
     ColumnData,
+    NullMask,
     bool_,
     int64,
     float64,
@@ -449,7 +450,7 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_a.append(0)
     d_a.append(30)
     var col_a = Column("a", ColumnData(d_a^), int64)
-    col_a._null_mask = List[Bool]()
+    col_a._null_mask = NullMask()
     col_a._null_mask.append(False)
     col_a._null_mask.append(True)
     col_a._null_mask.append(False)
@@ -459,7 +460,7 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_b.append("")
     d_b.append("bye")
     var col_b = Column("b", ColumnData(d_b^), object_)
-    col_b._null_mask = List[Bool]()
+    col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(True)
     col_b._null_mask.append(False)
@@ -595,7 +596,7 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_a.append(0.0)
     d_a.append(30.0)
     var col_a = Column("a", ColumnData(d_a^), float64)
-    col_a._null_mask = List[Bool]()
+    col_a._null_mask = NullMask()
     col_a._null_mask.append(False)
     col_a._null_mask.append(True)
     col_a._null_mask.append(False)
@@ -605,7 +606,7 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_b.append("")
     d_b.append("bye")
     var col_b = Column("b", ColumnData(d_b^), object_)
-    col_b._null_mask = List[Bool]()
+    col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(True)
     col_b._null_mask.append(False)

@@ -1,7 +1,7 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column
+from ..column import Column, NullMask
 from ..dtypes import int64, float64, object_, bool_
 
 
@@ -59,18 +59,16 @@ def _infer_and_build_column(
 
     if all_bool:
         var data = List[Bool]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for i in range(n):
             if _in_na_set(raw[i], na_set):
                 data.append(False)
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(_parse_bool_value(raw[i]))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, bool_)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
@@ -90,18 +88,16 @@ def _infer_and_build_column(
 
     if all_int:
         var data = List[Int64]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for i in range(n):
             if _in_na_set(raw[i], na_set):
                 data.append(Int64(0))
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(Int64(atol(raw[i])))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, int64)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
@@ -121,18 +117,16 @@ def _infer_and_build_column(
 
     if all_float:
         var data = List[Float64]()
-        var null_mask = List[Bool]()
-        var has_null = False
+        var null_mask = NullMask()
         for i in range(n):
             if _in_na_set(raw[i], na_set):
                 data.append(Float64(0))
-                null_mask.append(True)
-                has_null = True
+                null_mask.append_null()
             else:
                 data.append(atof(raw[i]))
-                null_mask.append(False)
+                null_mask.append_valid()
         var col = Column(name, data^, float64)
-        if has_null:
+        if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()
         return col^
@@ -141,18 +135,16 @@ def _infer_and_build_column(
     # Default: String (stored as List[String] with object_ dtype)
     # ------------------------------------------------------------------
     var data = List[String]()
-    var null_mask = List[Bool]()
-    var has_null = False
+    var null_mask = NullMask()
     for i in range(n):
         if _in_na_set(raw[i], na_set):
             data.append(String(""))
-            null_mask.append(True)
-            has_null = True
+            null_mask.append_null()
         else:
             data.append(raw[i])
-            null_mask.append(False)
+            null_mask.append_valid()
     var col = Column(name, data^, object_)
-    if has_null:
+    if null_mask.has_nulls():
         col._null_mask = null_mask^
     col._try_activate_storage()
     return col^
