@@ -4964,8 +4964,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._str_cache = take._str_cache^
 
     # ------------------------------------------------------------------
-    # Typed accessor helpers — unsafe direct Variant subscripts; callers
-    # are responsible for checking the active arm before calling these.
+    # Typed accessor helpers — return mutable refs to the legacy _data
+    # Variant arms.  Used by mutation paths (merge key fill, set_scalar).
+    # Callers MUST call _try_activate_storage() after mutating through
+    # these refs to rebuild typed caches.
+    #
+    # Read-only access should prefer _visit_raises/_visit (cache-aware)
+    # or the typed caches directly.
     # ------------------------------------------------------------------
 
     def _int64_data(ref self) -> ref[self._data] List[Int64]:
@@ -5036,19 +5041,19 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
     def is_numeric(self) -> Bool:
         """Return True if the active storage arm is int64 or float64."""
-        return self._data.isa[List[Int64]]() or self._data.isa[List[Float64]]()
+        return self.dtype == int64 or self.dtype == float64
 
     def is_int(self) -> Bool:
         """Return True if the active storage arm is ``List[Int64]``."""
-        return self._data.isa[List[Int64]]()
+        return self.dtype == int64
 
     def is_float(self) -> Bool:
         """Return True if the active storage arm is ``List[Float64]``."""
-        return self._data.isa[List[Float64]]()
+        return self.dtype == float64
 
     def is_bool(self) -> Bool:
         """Return True if the active storage arm is ``List[Bool]``."""
-        return self._data.isa[List[Bool]]()
+        return self.dtype == bool_
 
     def is_string(self) -> Bool:
         """Return True if the active storage arm is ``List[String]``."""
@@ -5343,7 +5348,33 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         if n <= 1:
             return perm^
         ref null_mask = self._null_mask
-        if self._data.isa[List[Int64]]():
+        # Prefer typed caches for sorting (#619 Phase 6c).
+        if self._storage_active:
+            if len(self._int64_cache) > 0:
+                _merge_sort_perm_comparable(
+                    perm, self._int64_cache, null_mask, ascending, na_last
+                )
+            elif len(self._bool_cache) > 0:
+                _merge_sort_perm_comparable(
+                    perm, self._bool_cache, null_mask, ascending, na_last
+                )
+            elif len(self._str_cache) > 0:
+                _merge_sort_perm_comparable(
+                    perm, self._str_cache, null_mask, ascending, na_last
+                )
+            elif len(self._f64_cache) > 0:
+                _merge_sort_perm_comparable(
+                    perm, self._f64_cache, null_mask, ascending, na_last
+                )
+            elif self._storage.isa[LegacyObjectData]():
+                _merge_sort_perm_pyobj(
+                    perm,
+                    self._storage[LegacyObjectData].data,
+                    null_mask,
+                    ascending,
+                    na_last,
+                )
+        elif self._data.isa[List[Int64]]():
             ref d = self._data[List[Int64]]
             _merge_sort_perm_comparable(perm, d, null_mask, ascending, na_last)
         elif self._data.isa[List[Float64]]():
@@ -5396,18 +5427,22 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def __len__(self) -> Int:
-        # Hand-written dispatch on the active arm (no generic visitor
-        # machinery — see #638, which forced removal of the Phase 2
-        # ``visit_col_storage`` dispatcher because its comptime downcast
-        # chain deadlocked the Mojo compiler whenever ``df.query()``
-        # appeared in the compilation unit).  The dual-backend state is
-        # temporary: until every construction path populates ``_storage``
-        # (Phases 3-4) and every reader migrates off ``_data``
-        # (Phases 5-7), both arms must be served correctly.
+        # Prefer marrow / cache lengths; legacy _data fallback for
+        # non-activated columns.
         if self._storage_active:
             if self._storage.isa[AnyArray]():
                 return self._storage[AnyArray].length()
             return len(self._storage[LegacyObjectData].data)
+        # Cache lengths (#619 Phase 6c).
+        if len(self._int64_cache) > 0:
+            return len(self._int64_cache)
+        if len(self._f64_cache) > 0:
+            return len(self._f64_cache)
+        if len(self._bool_cache) > 0:
+            return len(self._bool_cache)
+        if len(self._str_cache) > 0:
+            return len(self._str_cache)
+        # Legacy fallback.
         if self._data.isa[List[Int64]]():
             return len(self._data[List[Int64]])
         if self._data.isa[List[Float64]]():
