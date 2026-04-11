@@ -61,7 +61,7 @@ Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >=
 
 1. **Legacy backend** (`_data: ColumnData`): A `Variant[List[Int64], List[Float64], List[Bool], List[String], List[PythonObject]]` with a parallel `List[Bool]` null mask.
 2. **Marrow backend** (`_storage: ColumnStorage`): An `AnyArray` (Apache Arrow for Mojo) for SIMD aggregation kernels, or `LegacyObjectData` for `PythonObject` columns.
-3. **Typed caches** (`_int64_cache`, `_f64_cache`, `_bool_cache`, `_str_cache`): Pre-extracted typed lists populated from `_data` at construction time. At most one typed cache plus `_f64_cache` is non-empty.
+3. **Typed caches** (`_int64_cache`, `_f64_cache`, `_bool_cache`, `_str_cache`): Pre-extracted typed lists populated from `_data` at construction time. At most one typed cache plus `_f64_cache` is non-empty. After #645, caches are also the **write target** for all mutations — `_data` is only written during construction and is stale afterward.
 
 The typed caches exist as a workaround for the Mojo compiler deadlock (#642): typed `AnyArray` downcasts (`arr.as_int64()` etc.) cannot co-exist on the same call graph as `df.query()` in `column.mojo`. All high-traffic operations (comparison, aggregation, transforms, extraction) read from caches instead of `_data`. See TODO(#642) comments throughout.
 
@@ -90,7 +90,7 @@ For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_co
 
 For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches when `_storage_active`, falling back to the legacy `visit_col_data_raises()` dispatcher. Visitor structs still implement `ColumnDataVisitorRaises` — the cache dispatch calls their `on_*` methods with cache data instead of `_data`.
 
-After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`. **Important:** These return refs to `_data` (legacy backend). If you mutate values through these refs, call `col._try_activate_storage()` afterward to rebuild caches.
+After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`. **Important:** After #645, `_int64_data()` / `_float64_data()` / `_bool_data()` / `_str_data()` return refs directly into the typed caches — mutations go to the cache. `_obj_data()` still returns a ref into `_data` (object columns have no typed cache). After any cache mutation call `col._rebuild_marrow_only()` to sync the secondary `_f64_cache` (for int/bool) and rebuild the marrow backend. Do **not** call `_try_activate_storage()` from mutation paths — it reads from `_data` and will overwrite cache mutations.
 
 ### Core types
 

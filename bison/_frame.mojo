@@ -30,13 +30,11 @@ from .column import (
     _col_cell_pyobj,
     _scalar_from_col,
     _series_scalar_at,
-    _SetScalarInColMutVisitor,
     ColumnDataVisitorRaises,
     _FillnaVisitor,
     _FfillVisitor,
     _BfillVisitor,
     visit_col_data_raises,
-    visit_col_data_mut_raises,
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -5126,8 +5124,9 @@ struct DataFrame(Copyable, Movable):
                                         ]
                                         key_col._null_mask.set_valid(r)
                             break
-                    # Rebuild caches after in-place key fill (#619 Phase 6b).
-                    key_col._try_activate_storage()
+                    # Sync secondary caches and rebuild marrow after
+                    # cache-first key fill (#645).
+                    key_col._rebuild_marrow_only()
                     result_cols.append(key_col^)
                     break
 
@@ -7653,11 +7652,45 @@ def _df_row_index(df: DataFrame, label: String) raises -> Int:
 
 
 def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
-    """Write *value* into *col* at integer position *row*."""
-    var visitor = _SetScalarInColMutVisitor(row, value)
-    visit_col_data_mut_raises(visitor, col._data)
-    # Rebuild typed caches after in-place mutation (#619 Phase 6b).
-    col._try_activate_storage()
+    """Write *value* into *col* at integer position *row* via typed caches (#645).
+    """
+    if col.is_int():
+        if value.isa[Int64]():
+            col._int64_cache[row] = value[Int64]
+        elif value.isa[Float64]():
+            col._int64_cache[row] = Int64(Int(value[Float64]))
+        elif value.isa[Bool]():
+            col._int64_cache[row] = Int64(1) if value[Bool] else Int64(0)
+        else:
+            raise Error("iat/at: cannot assign String to int column")
+    elif col.is_float():
+        if value.isa[Float64]():
+            col._f64_cache[row] = value[Float64]
+        elif value.isa[Int64]():
+            col._f64_cache[row] = Float64(Int(value[Int64]))
+        elif value.isa[Bool]():
+            col._f64_cache[row] = Float64(1) if value[Bool] else Float64(0)
+        else:
+            raise Error("iat/at: cannot assign String to float column")
+    elif col.is_bool():
+        if value.isa[Bool]():
+            col._bool_cache[row] = value[Bool]
+        elif value.isa[Int64]():
+            col._bool_cache[row] = value[Int64] != 0
+        elif value.isa[Float64]():
+            col._bool_cache[row] = value[Float64] != 0.0
+        else:
+            raise Error("iat/at: cannot assign String to bool column")
+    elif col.is_string():
+        if value.isa[String]():
+            col._str_cache[row] = value[String]
+        else:
+            raise Error("iat/at: cannot assign non-String to string column")
+    else:
+        raise Error(
+            "iat/at: scalar write not supported for object/datetime columns"
+        )
+    col._rebuild_marrow_only()
 
 
 def _set_series_scalar_in_col(
@@ -7669,7 +7702,7 @@ def _set_series_scalar_in_col(
             col._obj_data()[row] = value[PythonObject]
         else:
             raise Error("iloc: cannot assign PythonObject to typed column")
-        col._try_activate_storage()
+        col._rebuild_marrow_only()
         return
     var ds: DFScalar
     if value.isa[Int64]():

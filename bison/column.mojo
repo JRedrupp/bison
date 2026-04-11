@@ -383,59 +383,6 @@ def visit_col_data_raises[
 
 
 # ------------------------------------------------------------------
-# Mutable raises-capable visitor — for in-place writes to ColumnData
-# ------------------------------------------------------------------
-
-
-trait ColumnDataMutVisitorRaises:
-    """Mutable raises-capable visitor for in-place writes to a ``ColumnData`` arm.
-
-    Implement one ``on_*`` method per arm.  Each method receives a *mutable*
-    reference to the underlying list, allowing O(1) element writes without
-    copying the whole list.  Pass an instance to
-    ``visit_col_data_mut_raises``.
-    """
-
-    def on_int64(mut self, mut data: List[Int64]) raises:
-        ...
-
-    def on_float64(mut self, mut data: List[Float64]) raises:
-        ...
-
-    def on_bool(mut self, mut data: List[Bool]) raises:
-        ...
-
-    def on_str(mut self, mut data: List[String]) raises:
-        ...
-
-    def on_obj(mut self, mut data: List[PythonObject]) raises:
-        ...
-
-
-def visit_col_data_mut_raises[
-    V: ColumnDataMutVisitorRaises
-](mut visitor: V, mut data: ColumnData) raises:
-    """Mutable raises-capable dispatch that passes each arm by mutable reference.
-
-    Because *data* is ``mut``, each ``data[ArmType]`` subscript yields a
-    mutable reference, enabling O(1) in-place element writes inside ``on_*``
-    methods.  Add new ``ColumnData`` arms here, in
-    ``ColumnDataMutVisitorRaises``, ``visit_col_data``, and
-    ``visit_col_data_raises``.
-    """
-    if data.isa[List[Int64]]():
-        visitor.on_int64(data[List[Int64]])
-    elif data.isa[List[Float64]]():
-        visitor.on_float64(data[List[Float64]])
-    elif data.isa[List[Bool]]():
-        visitor.on_bool(data[List[Bool]])
-    elif data.isa[List[String]]():
-        visitor.on_str(data[List[String]])
-    else:
-        visitor.on_obj(data[List[PythonObject]])
-
-
-# ------------------------------------------------------------------
 # DFScalar visit primitive — single canonical dispatch site
 # ------------------------------------------------------------------
 
@@ -3789,66 +3736,6 @@ struct _ScalarFromColVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = DFScalar(String(data[self.row]))
 
 
-struct _SetScalarInColMutVisitor(ColumnDataMutVisitorRaises, Copyable, Movable):
-    """Visitor that writes a ``DFScalar`` in-place at position *row* of a column.
-
-    Mutates the ``ColumnData`` arm directly (O(1)) without copying the list.
-    Type-coercion mirrors pandas ``at`` / ``iat`` behaviour.
-
-    The caller is responsible for bounds-checking *row* before constructing
-    this visitor.  Out-of-bounds access will raise at the list subscript site,
-    which is the same observable behaviour as the previous copy-based approach.
-    """
-
-    var row: Int
-    var value: DFScalar
-
-    def __init__(out self, row: Int, value: DFScalar):
-        self.row = row
-        self.value = value
-
-    def on_int64(mut self, mut data: List[Int64]) raises:
-        if self.value.isa[Int64]():
-            data[self.row] = self.value[Int64]
-        elif self.value.isa[Float64]():
-            data[self.row] = Int64(Int(self.value[Float64]))
-        elif self.value.isa[Bool]():
-            data[self.row] = Int64(1) if self.value[Bool] else Int64(0)
-        else:
-            raise Error("iat/at: cannot assign String to int column")
-
-    def on_float64(mut self, mut data: List[Float64]) raises:
-        if self.value.isa[Float64]():
-            data[self.row] = self.value[Float64]
-        elif self.value.isa[Int64]():
-            data[self.row] = Float64(Int(self.value[Int64]))
-        elif self.value.isa[Bool]():
-            data[self.row] = Float64(1) if self.value[Bool] else Float64(0)
-        else:
-            raise Error("iat/at: cannot assign String to float column")
-
-    def on_bool(mut self, mut data: List[Bool]) raises:
-        if self.value.isa[Bool]():
-            data[self.row] = self.value[Bool]
-        elif self.value.isa[Int64]():
-            data[self.row] = self.value[Int64] != 0
-        elif self.value.isa[Float64]():
-            data[self.row] = self.value[Float64] != 0.0
-        else:
-            raise Error("iat/at: cannot assign String to bool column")
-
-    def on_str(mut self, mut data: List[String]) raises:
-        if self.value.isa[String]():
-            data[self.row] = self.value[String]
-        else:
-            raise Error("iat/at: cannot assign non-String to string column")
-
-    def on_obj(mut self, mut data: List[PythonObject]) raises:
-        raise Error(
-            "iat/at: scalar write not supported for object/datetime columns"
-        )
-
-
 # ------------------------------------------------------------------
 # Cumulative operation visitors
 # ------------------------------------------------------------------
@@ -4979,26 +4866,26 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._str_cache = take._str_cache^
 
     # ------------------------------------------------------------------
-    # Typed accessor helpers — return mutable refs to the legacy _data
-    # Variant arms.  Used by mutation paths (merge key fill, set_scalar).
-    # Callers MUST call _try_activate_storage() after mutating through
-    # these refs to rebuild typed caches.
+    # Typed accessor helpers — return mutable refs to the typed caches
+    # (#645: cache-first writes).  Mutation via these refs targets the
+    # cache directly; callers MUST call _rebuild_marrow_only() afterward
+    # to sync the secondary _f64_cache (for int/bool) and rebuild marrow.
     #
-    # Read-only access should prefer _visit_raises/_visit (cache-aware)
-    # or the typed caches directly.
+    # _obj_data() is unchanged — object columns have no typed cache and
+    # still route through _data.
     # ------------------------------------------------------------------
 
-    def _int64_data(ref self) -> ref[self._data] List[Int64]:
-        return self._data[List[Int64]]
+    def _int64_data(ref self) -> ref[self._int64_cache] List[Int64]:
+        return self._int64_cache
 
-    def _float64_data(ref self) -> ref[self._data] List[Float64]:
-        return self._data[List[Float64]]
+    def _float64_data(ref self) -> ref[self._f64_cache] List[Float64]:
+        return self._f64_cache
 
-    def _bool_data(ref self) -> ref[self._data] List[Bool]:
-        return self._data[List[Bool]]
+    def _bool_data(ref self) -> ref[self._bool_cache] List[Bool]:
+        return self._bool_cache
 
-    def _str_data(ref self) -> ref[self._data] List[String]:
-        return self._data[List[String]]
+    def _str_data(ref self) -> ref[self._str_cache] List[String]:
+        return self._str_cache
 
     def _obj_data(ref self) -> ref[self._data] List[PythonObject]:
         return self._data[List[PythonObject]]
@@ -5186,6 +5073,41 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
         # Marrow activation is best-effort: leaves ``_storage_active`` False
         # on object / string-with-nulls columns or on any builder error.
+        try:
+            var arr = _column_to_marrow_array(self)
+            self._storage = ColumnStorage(arr^)
+            self._storage_active = True
+        except:
+            pass
+
+    def _rebuild_marrow_only(mut self):
+        """Sync secondary caches and rebuild marrow from typed caches (#645).
+
+        Call after any direct in-place mutation of a typed cache field
+        (``_int64_cache``, ``_f64_cache``, ``_bool_cache``, ``_str_cache``).
+        Unlike ``_try_activate_storage()``, this method does NOT read from
+        ``_data`` or reset the typed caches — caches are the source of truth.
+
+        For int/bool columns it rebuilds ``_f64_cache`` from the primary
+        cache, then attempts marrow activation (best-effort, same as
+        ``_try_activate_storage()``).
+        """
+        # Sync secondary _f64_cache for types that populate it.
+        if self.is_int():
+            self._f64_cache = List[Float64]()
+            for i in range(len(self._int64_cache)):
+                self._f64_cache.append(Float64(self._int64_cache[i]))
+        elif self.is_bool():
+            self._f64_cache = List[Float64]()
+            for i in range(len(self._bool_cache)):
+                self._f64_cache.append(
+                    Float64(1.0) if self._bool_cache[i] else Float64(0.0)
+                )
+        # Float: _f64_cache is already the primary cache (mutation went there).
+        # String/Object: no _f64_cache to sync.
+
+        # Rebuild marrow storage (best-effort).
+        self._storage_active = False
         try:
             var arr = _column_to_marrow_array(self)
             self._storage = ColumnStorage(arr^)
