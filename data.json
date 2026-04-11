@@ -1,6 +1,94 @@
 {
   "runs": [
     {
+      "commit": "b829a2dc3006b33409f77ab45a7b3c6c3e556f89",
+      "short_commit": "b829a2d",
+      "timestamp": "2026-04-11T23:42:06Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.6101579699999999,
+          "pandas_ms": 0.0958709799999724,
+          "ratio": 6.364365629726279
+        },
+        "series_mean": {
+          "bison_ms": 0.58133551,
+          "pandas_ms": 0.12975631000003318,
+          "ratio": 4.480209941234082
+        },
+        "groupby_sum": {
+          "bison_ms": 66.34363875,
+          "pandas_ms": 4.419095450000299,
+          "ratio": 15.012945409449237
+        },
+        "query_simple": {
+          "bison_ms": 10.55516935,
+          "pandas_ms": 1.0028993500000638,
+          "ratio": 10.524654692416869
+        },
+        "query_and": {
+          "bison_ms": 14.40134945,
+          "pandas_ms": 0.7914293999995436,
+          "ratio": 18.196631878987947
+        },
+        "query_or": {
+          "bison_ms": 15.58498675,
+          "pandas_ms": 0.9903333000004012,
+          "ratio": 15.737112697304722
+        },
+        "eval_expr": {
+          "bison_ms": 5.373118799999999,
+          "pandas_ms": 0.10007184999949459,
+          "ratio": 53.69260986008689
+        },
+        "query_size_1k": {
+          "bison_ms": 0.0992749,
+          "pandas_ms": 0.307760750000341,
+          "ratio": 0.32257167296313777
+        },
+        "query_size_10k": {
+          "bison_ms": 0.9707201,
+          "pandas_ms": 0.37458035000028644,
+          "ratio": 2.5914869800278035
+        },
+        "iloc_row": {
+          "bison_ms": 0.0011217,
+          "pandas_ms": 0.0420801900000356,
+          "ratio": 0.026656248462733914
+        },
+        "loc_slice": {
+          "bison_ms": 0.01546616,
+          "pandas_ms": 0.03296943000009378,
+          "ratio": 0.46910607796240356
+        },
+        "sort_values": {
+          "bison_ms": 33.817244,
+          "pandas_ms": 5.670577666667971,
+          "ratio": 5.963632982011689
+        },
+        "merge": {
+          "bison_ms": 12.279158333333333,
+          "pandas_ms": 2.0225436666692076,
+          "ratio": 6.071146218343489
+        },
+        "fillna": {
+          "bison_ms": 0.58061386,
+          "pandas_ms": 0.0738083999999617,
+          "ratio": 7.866501102859584
+        },
+        "series_apply": {
+          "bison_ms": 1.30737506,
+          "pandas_ms": 0.2213602799999137,
+          "ratio": 5.906095980726577
+        },
+        "csv_roundtrip": {
+          "bison_ms": 525.384035,
+          "pandas_ms": 347.49803480000026,
+          "ratio": 1.511905053800896
+        }
+      }
+    },
+    {
       "commit": "b4100feefb5a2e0db8dcc6e1707195a2ffaa43eb",
       "short_commit": "b4100fe",
       "timestamp": "2026-04-11T10:58:30Z",
