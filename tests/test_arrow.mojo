@@ -9,6 +9,7 @@ from bison import (
     float64,
     bool_,
     object_,
+    string_,
     column_to_marrow_array,
     marrow_array_to_column,
     dataframe_to_record_batch,
@@ -64,12 +65,12 @@ def test_bool_round_trip_no_nulls() raises:
 
 
 def test_string_round_trip_no_nulls() raises:
-    """String column survives Arrow round-trip (uses object_ dtype)."""
+    """String column survives Arrow round-trip (uses string_ dtype, #644)."""
     var data = List[String]()
     data.append("x")
     data.append("y")
     data.append("z")
-    var col = Column("d", ColumnData(data^), object_)
+    var col = Column("d", ColumnData(data^), string_)
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "d")
     assert_equal(len(col2), 3)
@@ -105,7 +106,7 @@ def test_null_mask_preserved_string() raises:
     data.append("hello")
     data.append("")
     data.append("world")
-    var col = Column("s", ColumnData(data^), object_)
+    var col = Column("s", ColumnData(data^), string_)
     col._null_mask = NullMask()
     col._null_mask.append(False)
     col._null_mask.append(True)
@@ -138,7 +139,7 @@ def test_dataframe_round_trip() raises:
     var cols = List[Column]()
     cols.append(Column("a", ColumnData(d1^), int64))
     cols.append(Column("b", ColumnData(d2^), float64))
-    cols.append(Column("c", ColumnData(d3^), object_))
+    cols.append(Column("c", ColumnData(d3^), string_))
     var df = DataFrame(cols^)
 
     var rb = dataframe_to_record_batch(df)
@@ -174,7 +175,7 @@ def test_dataframe_round_trip_with_nulls() raises:
     d_b.append("hi")
     d_b.append("bye")
     d_b.append("")
-    var col_b = Column("b", ColumnData(d_b^), object_)
+    var col_b = Column("b", ColumnData(d_b^), string_)
     col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(False)

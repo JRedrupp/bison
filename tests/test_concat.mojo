@@ -1,7 +1,7 @@
 """Tests for bison.concat."""
 from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
-from bison import DataFrame, concat, int64, float64
+from bison import DataFrame, Column, concat, int64, float64, string_
 
 
 def test_concat_empty_list() raises:
@@ -276,6 +276,28 @@ def test_concat_dtype_promotion_outer_join() raises:
     # y is only present in df2, so it must be int64 (no promotion needed)
     var s_y = result["y"]
     assert_equal(s_y.iloc(1)[Int64], Int64(10))
+
+
+def test_concat_string_columns_preserves_string_dtype() raises:
+    """Concatenating two string DataFrames produces a string_ column (#644)."""
+    var d1 = List[String]()
+    d1.append("a")
+    d1.append("b")
+    var d2 = List[String]()
+    d2.append("c")
+    d2.append("d")
+    var cols1 = List[Column]()
+    cols1.append(Column("s", d1^, string_))
+    var cols2 = List[Column]()
+    cols2.append(Column("s", d2^, string_))
+    var df1 = DataFrame(cols1^)
+    var df2 = DataFrame(cols2^)
+    var frames = List[DataFrame]()
+    frames.append(df1^)
+    frames.append(df2^)
+    var df3 = concat(frames^)
+    assert_equal(df3._cols[0].dtype.name, "string")
+    assert_equal(df3._cols[0].__len__(), 4)
 
 
 def main() raises:

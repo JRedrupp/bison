@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
 from ..column import Column, NullMask
-from ..dtypes import int64, float64, object_, bool_
+from ..dtypes import int64, float64, object_, bool_, string_
 
 
 # ------------------------------------------------------------------
@@ -123,7 +123,7 @@ def _json_build_column(
             else:
                 data.append(String(val))
                 null_mask.append_valid()
-        var col = Column(name, data^, object_)
+        var col = Column(name, data^, string_)
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._try_activate_storage()

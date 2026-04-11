@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame, _sort_col_names
 from ..column import Column, NullMask
-from ..dtypes import BisonDtype, int64, float64, bool_, object_
+from ..dtypes import BisonDtype, int64, float64, bool_, object_, string_
 from .._errors import _not_implemented
 
 
@@ -123,6 +123,16 @@ def _null_col(
         col._null_mask = NullMask.all_null(n)
         col._try_activate_storage()
         return col^
+    elif dtype == string_:
+        # #644: preserve the string_ ⟺ List[String] invariant for all-null
+        # string columns inserted by outer joins / aligns.
+        var data = List[String]()
+        for _ in range(n):
+            data.append(String(""))
+        var col = Column(name, data^, string_)
+        col._null_mask = NullMask.all_null(n)
+        col._try_activate_storage()
+        return col^
     else:
         var data = List[PythonObject]()
         for _ in range(n):
@@ -140,7 +150,7 @@ def _build_key_col(keys: List[String], counts: List[Int]) raises -> Column:
     for i in range(len(keys)):
         for _ in range(counts[i]):
             data.append(keys[i])
-    var col = Column(Optional[String]("__key__"), data^, object_)
+    var col = Column(Optional[String]("__key__"), data^, string_)
     col._try_activate_storage()
     return col^
 
@@ -206,7 +216,7 @@ def _common_dtype(pieces: List[Column]) -> Optional[BisonDtype]:
     * ``int64``   — every piece holds ``List[Int64]``
     * ``float64`` — every piece holds ``List[Float64]``
     * ``bool_``   — every piece holds ``List[Bool]``
-    * ``object_`` — every piece holds ``List[String]``
+    * ``string_`` — every piece holds ``List[String]``
     """
     if len(pieces) == 0:
         return None
@@ -230,7 +240,7 @@ def _common_dtype(pieces: List[Column]) -> Optional[BisonDtype]:
     if is_bool:
         return bool_
     if is_str:
-        return object_
+        return string_
     return None
 
 
@@ -305,8 +315,8 @@ def _vstack(pieces: List[Column]) raises -> Column:
             col._null_mask = mask^
         col._try_activate_storage()
         return col^
-    elif common and common.value() == object_:
-        # All pieces hold List[String]; keep the string arm intact.
+    elif common and common.value() == string_:
+        # #644: All pieces hold List[String]; keep the string arm intact.
         var data = List[String]()
         var mask = NullMask()
         for i in range(len(pieces)):

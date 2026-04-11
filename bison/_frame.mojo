@@ -11,6 +11,7 @@ from .dtypes import (
     bool_,
     int64,
     float64,
+    string_,
     dtype_from_string,
     datetime64_ns,
 )
@@ -437,7 +438,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
-            var rhs_col = Column(self._col.name, rhs^, object_)
+            var rhs_col = Column(self._col.name, rhs^, string_)
             return Series(self._col._cmp_eq(rhs_col))
         var result = List[Bool]()
         if self._col.is_object():
@@ -461,7 +462,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var rhs = List[String]()
             for _ in range(n):
                 rhs.append(other)
-            var rhs_col = Column(self._col.name, rhs^, object_)
+            var rhs_col = Column(self._col.name, rhs^, string_)
             return Series(self._col._cmp_ne(rhs_col))
         var result = List[Bool]()
         if self._col.is_object():
@@ -1377,7 +1378,7 @@ struct DataFrame(Copyable, Movable):
                         null_mask.append_null()
                     else:
                         null_mask.append_valid()
-                var col = Column(col_name, data^, object_)
+                var col = Column(col_name, data^, string_)
                 col._null_mask = null_mask^
                 col._try_activate_storage()
                 cols.append(col^)
@@ -1522,7 +1523,7 @@ struct DataFrame(Copyable, Movable):
         for i in range(n):
             dtype_names.append(self._cols[i].dtype.name)
             idx.append(PythonObject(self._cols[i].name.value()))
-        var result_col = Column(None, dtype_names^, object_, idx^)
+        var result_col = Column(None, dtype_names^, string_, idx^)
         return Series(result_col^)
 
     def info(self) raises:
@@ -3375,7 +3376,7 @@ struct DataFrame(Copyable, Movable):
                 for i in range(n_idx):
                     str_data.append(str_idx[i])
                 new_cols.append(
-                    Column("index", str_data^, object_, empty_col_idx^)
+                    Column("index", str_data^, string_, empty_col_idx^)
                 )
             elif self._cols[0]._index.isa[List[Int64]]():
                 ref int_idx = self._cols[0]._index[List[Int64]]
@@ -4300,7 +4301,7 @@ struct DataFrame(Copyable, Movable):
         for v in range(n_val):
             for _ in range(nrows):
                 var_data.append(val_names[v])
-        result_cols.append(Column(var_name, var_data^, object_))
+        result_cols.append(Column(var_name, var_data^, string_))
 
         # Value column: concat all value columns row-by-row.
         var val_data = List[PythonObject]()

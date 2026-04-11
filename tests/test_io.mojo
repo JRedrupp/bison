@@ -20,6 +20,7 @@ from bison import (
     int64,
     float64,
     object_,
+    string_,
 )
 
 
@@ -425,7 +426,7 @@ def test_parquet_roundtrip_bool_string() raises:
     d_name.append("carol")
     var cols = List[Column]()
     cols.append(Column("flag", ColumnData(d_flag^), bool_))
-    cols.append(Column("name", ColumnData(d_name^), object_))
+    cols.append(Column("name", ColumnData(d_name^), string_))
     var df = DataFrame(cols^)
 
     df.to_parquet(path)
@@ -459,7 +460,7 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
-    var col_b = Column("b", ColumnData(d_b^), object_)
+    var col_b = Column("b", ColumnData(d_b^), string_)
     col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(True)
@@ -570,7 +571,7 @@ def test_ipc_roundtrip_bool_string() raises:
     d_name.append("carol")
     var cols = List[Column]()
     cols.append(Column("flag", ColumnData(d_flag^), bool_))
-    cols.append(Column("name", ColumnData(d_name^), object_))
+    cols.append(Column("name", ColumnData(d_name^), string_))
     var df = DataFrame(cols^)
 
     write_ipc(df, path)
@@ -605,7 +606,7 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
-    var col_b = Column("b", ColumnData(d_b^), object_)
+    var col_b = Column("b", ColumnData(d_b^), string_)
     col_b._null_mask = NullMask()
     col_b._null_mask.append(False)
     col_b._null_mask.append(True)
