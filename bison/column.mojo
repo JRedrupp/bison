@@ -4803,6 +4803,10 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._int64_cache = List[Int64]()
         self._bool_cache = List[Bool]()
         self._str_cache = List[String]()
+        # Populate typed caches and activate marrow storage (#646). Needed
+        # for read sites that consult ``_int64_cache`` / ``_f64_cache`` etc.
+        # directly rather than going through ``_data``.
+        self._try_activate_storage()
 
     def __init__(
         out self,
@@ -4824,6 +4828,10 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._int64_cache = List[Int64]()
         self._bool_cache = List[Bool]()
         self._str_cache = List[String]()
+        # Populate typed caches and activate marrow storage (#646). Needed
+        # for read sites that consult ``_int64_cache`` / ``_f64_cache`` etc.
+        # directly rather than going through ``_data``.
+        self._try_activate_storage()
 
     # ------------------------------------------------------------------
     # Typed-list constructor overloads — let callers pass typed lists
@@ -5015,7 +5023,14 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._storage[AnyArray].copy()
 
     def _storage_legacy(ref self) -> ref[self._storage] LegacyObjectData:
-        """Return a borrow of the LegacyObjectData arm of the new storage."""
+        """Return a borrow of the LegacyObjectData arm of the new storage.
+
+        Read-side alternative to ``_obj_data()`` for object / datetime /
+        timedelta columns (#646).  Callers access ``.data`` on the result
+        to obtain the underlying ``List[PythonObject]``.  Caller must
+        verify the column is in the LegacyObjectData arm — i.e. the dtype
+        is ``object_``, ``datetime64_ns``, or ``timedelta64_ns``.
+        """
         return self._storage[LegacyObjectData]
 
     # The four typed-array accessors below return a *copy* of the typed
@@ -5124,53 +5139,57 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # can still produce a valid Column.
 
     def _try_activate_storage(mut self):
-        """Rebuild ``_storage`` from the current ``_data``/``_null_mask``.
+        """Rebuild ``_storage`` and the typed caches from ``_data``/``_null_mask``.
 
         Always resets and re-reads — idempotent-like-rebuild rather than
         idempotent-no-op.  Callers that mutate ``_null_mask`` or ``_data``
         after construction must call this again to keep the marrow
-        backend in sync.  Construction paths that never touch the
-        fields post-construction only need to call it once.
+        backend and caches in sync.  Construction paths that never touch
+        the fields post-construction only need to call it once.
 
-        Best-effort: sets ``_storage_active = True`` on marrow-convertible
-        columns and leaves it False on object / string-with-nulls columns
-        (they stay readable via the legacy fields).
+        Typed cache population is **unconditional** (#646): for any
+        non-object column we copy ``_data`` into the cache matching its
+        dtype, independent of whether marrow activation succeeds.  This
+        means ``_frame.mojo`` read sites can use the caches directly
+        without worrying about the string-with-nulls case where marrow
+        conversion raises.  Marrow activation itself remains best-effort
+        and only toggles ``_storage_active``.
         """
         self._storage_active = False
         self._f64_cache = List[Float64]()
         self._int64_cache = List[Int64]()
         self._bool_cache = List[Bool]()
         self._str_cache = List[String]()
+
+        # Unconditional cache population from _data (no marrow dependency).
+        # TODO(#642): Replace with direct AnyArray typed downcasts once
+        # the Mojo compiler fixes the typed-downcast deadlock.
+        if self.is_int():
+            ref src = self._data[List[Int64]]
+            self._int64_cache = src.copy()
+            for i in range(len(src)):
+                self._f64_cache.append(Float64(src[i]))
+        elif self.is_float():
+            ref src = self._data[List[Float64]]
+            self._f64_cache = src.copy()
+        elif self.is_bool():
+            ref src = self._data[List[Bool]]
+            self._bool_cache = src.copy()
+            for i in range(len(src)):
+                self._f64_cache.append(Float64(1.0) if src[i] else Float64(0.0))
+        elif self.is_string():
+            ref src = self._data[List[String]]
+            self._str_cache = src.copy()
+        # Object / datetime / timedelta: caches stay empty; readers use
+        # _storage[LegacyObjectData].data via _obj_storage_data().
+
+        # Marrow activation is best-effort: leaves ``_storage_active`` False
+        # on object / string-with-nulls columns or on any builder error.
         try:
             var arr = _column_to_marrow_array(self)
             self._storage = ColumnStorage(arr^)
             self._storage_active = True
-            # Pre-extract typed caches from the legacy _data fields (#642).
-            # TODO(#642): Replace with direct AnyArray typed downcasts once
-            # the Mojo compiler fixes the typed-downcast deadlock.
-            if self.is_int():
-                ref src = self._data[List[Int64]]
-                self._int64_cache = src.copy()
-                var visitor = _ToFloat64Visitor()
-                self._visit_raises(visitor)
-                self._f64_cache = visitor.result.copy()
-            elif self.is_float():
-                ref src = self._data[List[Float64]]
-                self._f64_cache = src.copy()
-            elif self.is_bool():
-                ref src = self._data[List[Bool]]
-                self._bool_cache = src.copy()
-                var visitor = _ToFloat64Visitor()
-                self._visit_raises(visitor)
-                self._f64_cache = visitor.result.copy()
-            elif self.is_string():
-                ref src = self._data[List[String]]
-                self._str_cache = src.copy()
         except:
-            # Object arm, string-with-nulls, or a marrow builder error —
-            # leave the column in legacy-only mode.  Downstream readers
-            # that consult ``_storage_active`` will see False and fall
-            # through to ``_data``/``_null_mask``.
             pass
 
     # ------------------------------------------------------------------
