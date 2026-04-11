@@ -11,7 +11,7 @@ from marrow.arrays import (
     PrimitiveArray,
     StringArray,
 )
-from marrow.bitmap import BitmapBuilder
+from marrow.buffers import Bitmap
 from marrow.builders import (
     array as _marrow_array,
 )
@@ -19,6 +19,8 @@ from marrow.dtypes import (
     bool_ as _m_bool_,
     float64 as _m_float64,
     int64 as _m_int64,
+    Float64Type,
+    Int64Type,
 )
 from marrow.kernels.aggregate import (
     sum_ as _marrow_sum,
@@ -1152,7 +1154,7 @@ def _column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(Int(src[i]))
-        return AnyArray(_marrow_array[_m_int64](vals^))
+        return AnyArray(_marrow_array[Int64Type](vals^))
 
     elif col.is_float():
         ref src = col._float64_data()
@@ -1162,7 +1164,7 @@ def _column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(src[i])
-        return AnyArray(_marrow_array[_m_float64](vals^))
+        return AnyArray(_marrow_array[Float64Type](vals^))
 
     elif col.is_bool():
         ref src = col._bool_data()
@@ -1198,9 +1200,9 @@ def _column_to_marrow_array(col: Column) raises -> AnyArray:
 def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
     """Extract a Float64 from a marrow AnyScalar (int64 or float64)."""
     if scalar.type() == _m_float64:
-        return Float64(scalar.as_primitive[_m_float64]().value())
+        return Float64(scalar.as_primitive[Float64Type]().value())
     else:
-        return Float64(scalar.as_primitive[_m_int64]().value())
+        return Float64(scalar.as_primitive[Int64Type]().value())
 
 
 # ------------------------------------------------------------------
@@ -4530,7 +4532,7 @@ struct NullMask(Copyable, Movable, Sized):
 
     # Always-allocated bit-packed buffer.  When ``_capacity == 0`` the
     # builder owns a sentinel allocation but its bytes are not read.
-    var _builder: BitmapBuilder
+    var _builder: Bitmap[mut=True]
     # Logical number of entries tracked (matches today's ``len`` semantics).
     var _length: Int
     # Number of bits the builder can currently hold (>= _length when set).
@@ -4541,7 +4543,7 @@ struct NullMask(Copyable, Movable, Sized):
 
     def __init__(out self):
         """Empty mask — no nulls."""
-        self._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
+        self._builder = Bitmap.alloc_zeroed(Self._EMPTY_ALLOC_BITS)
         self._length = 0
         self._capacity = 0
         self._has_nulls = False
@@ -4566,13 +4568,13 @@ struct NullMask(Copyable, Movable, Sized):
         result._has_nulls = any_null
         if any_null:
             result._capacity = n
-            result._builder = BitmapBuilder.alloc(n)
+            result._builder = Bitmap.alloc_zeroed(n)
             for i in range(n):
                 if mask[i]:
-                    result._builder.set_bit(i, True)
+                    result._builder.unsafe_set(i)
         else:
             result._capacity = 0
-            result._builder = BitmapBuilder.alloc(Self._EMPTY_ALLOC_BITS)
+            result._builder = Bitmap.alloc_zeroed(Self._EMPTY_ALLOC_BITS)
         return result^
 
     def __init__(out self, *, copy: Self):
@@ -4586,10 +4588,10 @@ struct NullMask(Copyable, Movable, Sized):
         var alloc_bits = (
             copy._capacity if copy._capacity > 0 else Self._EMPTY_ALLOC_BITS
         )
-        self._builder = BitmapBuilder.alloc(alloc_bits)
+        self._builder = Bitmap.alloc_zeroed(alloc_bits)
         if copy._capacity > 0 and copy._has_nulls and copy._length > 0:
-            self._builder.copy_bits(
-                copy._builder.unsafe_ptr(), 0, 0, copy._length
+            self._builder.extend(
+                copy._builder.view(0, copy._length), 0, copy._length
             )
 
     def __init__(out self, *, deinit take: Self):
@@ -4614,8 +4616,7 @@ struct NullMask(Copyable, Movable, Sized):
 
     @always_inline
     def _bit_at(self, index: Int) -> Bool:
-        var ptr = self._builder.unsafe_ptr()
-        return Bool((ptr[index >> 3] >> UInt8(index & 7)) & 1)
+        return self._builder.unsafe_test(index)
 
     def __len__(self) -> Int:
         return self._length
@@ -4628,7 +4629,7 @@ struct NullMask(Copyable, Movable, Sized):
         self._length += 1
         if value:
             self._ensure_capacity(self._length)
-            self._builder.set_bit(self._length - 1, True)
+            self._builder.unsafe_set(self._length - 1)
             self._has_nulls = True
         elif self._has_nulls:
             # Already allocated — must explicitly write a 0 bit so a
@@ -4638,7 +4639,7 @@ struct NullMask(Copyable, Movable, Sized):
             # is now growing back into reused capacity, but we keep the
             # branch defensive.
             if self._length <= self._capacity:
-                self._builder.set_bit(self._length - 1, False)
+                self._builder.unsafe_clear(self._length - 1)
 
     def append_null(mut self) raises:
         """Append a null marker to the mask."""
@@ -4668,14 +4669,14 @@ struct NullMask(Copyable, Movable, Sized):
     def set_null(mut self, index: Int) raises:
         """Mark the element at *index* as null."""
         self._ensure_capacity(index + 1)
-        self._builder.set_bit(index, True)
+        self._builder.unsafe_set(index)
         self._has_nulls = True
 
     def set_valid(mut self, index: Int):
         """Mark the element at *index* as valid (not null)."""
         if not self._has_nulls:
             return
-        self._builder.set_bit(index, False)
+        self._builder.unsafe_clear(index)
 
     def len(self) -> Int:
         """Return the number of elements tracked by this mask."""
@@ -5040,13 +5041,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # avoids the nested-origin path that Mojo cannot express for chained
     # ``Variant[...]`` + ``AnyArray.as_*`` reference returns.
     def _int64_array(self) -> Int64Array:
-        return self._storage[AnyArray].as_primitive[_m_int64]().copy()
+        return self._storage[AnyArray].as_int64().copy()
 
     def _float64_array(self) -> Float64Array:
-        return self._storage[AnyArray].as_primitive[_m_float64]().copy()
+        return self._storage[AnyArray].as_float64().copy()
 
     def _bool_array(self) -> BoolArray:
-        return self._storage[AnyArray].as_primitive[_m_bool_]().copy()
+        return self._storage[AnyArray].as_bool().copy()
 
     def _string_array(self) -> StringArray:
         return self._storage[AnyArray].as_string().copy()
