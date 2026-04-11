@@ -22,6 +22,8 @@ from marrow.dtypes import (
     string as _m_string,
     DataType as _MarrowDataType,
     Field as _MarrowField,
+    Float64Type,
+    Int64Type,
 )
 from marrow.schema import Schema as _MarrowSchema
 from marrow.tabular import RecordBatch, Table
@@ -62,7 +64,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(Int(src[i]))
-        return AnyArray(array[_m_int64](vals^))
+        return AnyArray(array[Int64Type](vals^))
 
     elif col._data.isa[List[Float64]]():
         ref src = col._data[List[Float64]]
@@ -72,7 +74,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(src[i])
-        return AnyArray(array[_m_float64](vals^))
+        return AnyArray(array[Float64Type](vals^))
 
     elif col._data.isa[List[Bool]]():
         ref src = col._data[List[Bool]]
@@ -163,7 +165,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
                 data.append(False)
                 null_mask.append_null()
             else:
-                data.append(Bool(src.unsafe_get(i)))
+                data.append(src[i].value())
                 null_mask.append_valid()
         var col = Column(name, ColumnData(data^), bool_)
         if null_mask.has_nulls():

@@ -6494,20 +6494,12 @@ struct DataFrameGroupBy:
                     if result_key.dtype() == _m_float64:
                         sort_vals.append(
                             rebind[Float64](
-                                result_key.as_primitive[
-                                    _m_float64
-                                ]().unsafe_get(i)
+                                result_key.as_float64().unsafe_get(i)
                             )
                         )
                     else:
                         sort_vals.append(
-                            Float64(
-                                Int(
-                                    result_key.as_primitive[
-                                        _m_int64
-                                    ]().unsafe_get(i)
-                                )
-                            )
+                            Float64(Int(result_key.as_int64().unsafe_get(i)))
                         )
             else:
                 for i in range(num_groups):
@@ -6541,20 +6533,14 @@ struct DataFrameGroupBy:
             var int_keys = List[Int64]()
             for i in range(n_keep):
                 int_keys.append(
-                    rebind[Int64](
-                        result_key.as_primitive[_m_int64]().unsafe_get(keep[i])
-                    )
+                    rebind[Int64](result_key.as_int64().unsafe_get(keep[i]))
                 )
             idx = ColumnIndex(int_keys^)
         elif result_key.dtype() == _m_float64:
             var flt_keys = List[Float64]()
             for i in range(n_keep):
                 flt_keys.append(
-                    rebind[Float64](
-                        result_key.as_primitive[_m_float64]().unsafe_get(
-                            keep[i]
-                        )
-                    )
+                    rebind[Float64](result_key.as_float64().unsafe_get(keep[i]))
                 )
             idx = ColumnIndex(flt_keys^)
         else:
@@ -6584,21 +6570,13 @@ struct DataFrameGroupBy:
                         null_mask.append_null()
                     elif is_count:
                         vals.append(
-                            rebind[Int64](
-                                rb_col.as_primitive[_m_int64]().unsafe_get(ri)
-                            )
+                            rebind[Int64](rb_col.as_int64().unsafe_get(ri))
                         )
                         null_mask.append_valid()
                     else:
                         # sum/min/max of integer col: marrow stores as float64.
                         vals.append(
-                            Int64(
-                                Float64(
-                                    rb_col.as_primitive[
-                                        _m_float64
-                                    ]().unsafe_get(ri)
-                                )
-                            )
+                            Int64(Float64(rb_col.as_float64().unsafe_get(ri)))
                         )
                         null_mask.append_valid()
                 var col = Column(value_names[v], vals^, int64, idx.copy())
@@ -6618,9 +6596,7 @@ struct DataFrameGroupBy:
                         null_mask.append_null()
                     else:
                         vals.append(
-                            rebind[Float64](
-                                rb_col.as_primitive[_m_float64]().unsafe_get(ri)
-                            )
+                            rebind[Float64](rb_col.as_float64().unsafe_get(ri))
                         )
                         null_mask.append_valid()
                 var col = Column(value_names[v], vals^, float64, idx.copy())
@@ -7238,19 +7214,11 @@ struct SeriesGroupBy:
                     vals.append(Int64(0))
                     null_mask.append_null()
                 elif is_count:
-                    vals.append(
-                        rebind[Int64](
-                            rb_col.as_primitive[_m_int64]().unsafe_get(ri)
-                        )
-                    )
+                    vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
                     null_mask.append_valid()
                 else:
                     vals.append(
-                        Int64(
-                            Float64(
-                                rb_col.as_primitive[_m_float64]().unsafe_get(ri)
-                            )
-                        )
+                        Int64(Float64(rb_col.as_float64().unsafe_get(ri)))
                     )
                     null_mask.append_valid()
             var col = Column(self._series.name, vals^, int64, idx^)
@@ -7268,9 +7236,7 @@ struct SeriesGroupBy:
                     null_mask.append_null()
                 else:
                     vals.append(
-                        rebind[Float64](
-                            rb_col.as_primitive[_m_float64]().unsafe_get(ri)
-                        )
+                        rebind[Float64](rb_col.as_float64().unsafe_get(ri))
                     )
                     null_mask.append_valid()
             var col = Column(self._series.name, vals^, float64, idx^)
