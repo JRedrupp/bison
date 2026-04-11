@@ -2,7 +2,7 @@ from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
 from ..column import Column, NullMask
-from ..dtypes import int64, float64, object_, bool_
+from ..dtypes import int64, float64, object_, bool_, string_
 
 
 # ------------------------------------------------------------------
@@ -42,7 +42,7 @@ def _infer_and_build_column(
     var n = len(raw)
 
     if n == 0:
-        var empty = Column(name, List[String](), object_)
+        var empty = Column(name, List[String](), string_)
         empty._try_activate_storage()
         return empty^
 
@@ -132,7 +132,7 @@ def _infer_and_build_column(
         return col^
 
     # ------------------------------------------------------------------
-    # Default: String (stored as List[String] with object_ dtype)
+    # Default: String (stored as List[String] with string_ dtype, #644)
     # ------------------------------------------------------------------
     var data = List[String]()
     var null_mask = NullMask()
@@ -143,7 +143,7 @@ def _infer_and_build_column(
         else:
             data.append(raw[i])
             null_mask.append_valid()
-    var col = Column(name, data^, object_)
+    var col = Column(name, data^, string_)
     if null_mask.has_nulls():
         col._null_mask = null_mask^
     col._try_activate_storage()

@@ -14,6 +14,7 @@ from .dtypes import (
     float64,
     bool_,
     object_,
+    string_,
     datetime64_ns,
     timedelta64_ns,
     dtype_from_string,

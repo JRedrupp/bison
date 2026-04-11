@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
-from std.testing import assert_equal, assert_true, TestSuite
-from bison import DataFrame, Series, Column, ColumnData, NullMask, int64, float64, object_
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
+from bison import DataFrame, Series, Column, ColumnData, NullMask, int64, float64, object_, string_
 from _helpers import assert_frame_equal, assert_series_equal
 
 
@@ -90,7 +90,8 @@ def test_column_typed_storage() raises:
     var col_obj = Column.from_pandas(s_obj, "o")
     assert_true(col_obj._data.isa[List[String]](), "pure-string object column should be promoted to List[String]")
     assert_equal(col_obj.__len__(), 2)
-    assert_equal(col_obj.dtype.name, "object")
+    # #644: promoted string columns carry string_ dtype (not object_).
+    assert_equal(col_obj.dtype.name, "string")
 
 
 def test_series_index_roundtrip() raises:
@@ -236,7 +237,10 @@ def test_string_promotion_from_pandas() raises:
         name_col._data.isa[List[String]](),
         "pure-string column should be promoted to List[String]",
     )
-    assert_equal(name_col.dtype.name, "object")
+    # #644: promoted string columns now carry string_ dtype.
+    assert_equal(name_col.dtype.name, "string")
+    assert_true(name_col.is_string())
+    assert_false(name_col.is_object())
     # 'val' column should remain List[Int64]
     ref val_col = df._cols[1]
     assert_true(
@@ -268,6 +272,8 @@ def test_string_promotion_with_nulls() raises:
         col._data.isa[List[String]](),
         "string column with nulls should promote to List[String]",
     )
+    # #644: promoted string column carries string_ dtype.
+    assert_equal(col.dtype.name, "string")
     assert_equal(col.__len__(), 3)
     # Null mask: position 1 should be null
     assert_true(not col._null_mask[0], "position 0 should not be null")
@@ -287,6 +293,8 @@ def test_string_promotion_roundtrip() raises:
         df._cols[0]._data.isa[List[String]](),
         "city column should be promoted to List[String]",
     )
+    # #644: promoted string column carries string_ dtype.
+    assert_equal(df._cols[0].dtype.name, "string")
     # Round-trip back to pandas — verify values match
     var back = df.to_pandas()
     assert_equal(Int(py=back.shape[0]), 3)
@@ -324,7 +332,71 @@ def test_empty_object_column_promoted() raises:
         col._data.isa[List[String]](),
         "empty object column should promote to List[String]",
     )
+    # #644: empty promoted string column carries string_ dtype.
+    assert_equal(col.dtype.name, "string")
     assert_equal(col.__len__(), 0)
+
+
+def test_string_dtype_distinct_from_object() raises:
+    """A List[String] column carries string_ dtype, distinct from object_ (#644)."""
+    var data = List[String]()
+    data.append("a")
+    data.append("b")
+    # Note: the dtype arg is intentionally ``object_`` to verify that the
+    # List[String] constructor force-overrides it to ``string_``.
+    var col = Column("x", data^, object_)
+    assert_equal(col.dtype.name, "string")
+    assert_true(col.is_string())
+    assert_false(col.is_object())
+    assert_true(col.dtype == string_)
+    assert_false(col.dtype == object_)
+
+
+def test_object_dtype_distinct_from_string() raises:
+    """A List[PythonObject] column carries object_ dtype, distinct from string_ (#644).
+    """
+    var raw = List[PythonObject]()
+    raw.append(Python.evaluate("'a'"))
+    raw.append(Python.evaluate("42"))
+    var col = Column("x", ColumnData(raw^), object_)
+    assert_equal(col.dtype.name, "object")
+    assert_true(col.is_object())
+    assert_false(col.is_string())
+
+
+def test_string_dtype_round_trip_pandas() raises:
+    """A string_ column round-trips through to_pandas → from_pandas (#644)."""
+    var data = List[String]()
+    data.append("x")
+    data.append("y")
+    data.append("z")
+    var col = Column("s", data^, string_)
+    assert_equal(col.dtype.name, "string")
+    var ser = col.to_pandas()
+    # to_pandas maps string_ → pandas "object" for round-trip stability.
+    assert_equal(String(ser.dtype), "object")
+    var col2 = Column.from_pandas(ser, "s")
+    assert_equal(col2.dtype.name, "string")
+    assert_true(col2.is_string())
+
+
+def test_dataframe_dtypes_renders_string() raises:
+    """DataFrame.dtypes renders string columns as 'string' (#644)."""
+    var d_str = List[String]()
+    d_str.append("a")
+    d_str.append("b")
+    var d_int = List[Int64]()
+    d_int.append(Int64(1))
+    d_int.append(Int64(2))
+    var cols = List[Column]()
+    cols.append(Column("s", d_str^, string_))
+    cols.append(Column("i", d_int^, int64))
+    var df = DataFrame(cols^)
+    var dts = df.dtypes()
+    var back = dts.to_pandas()
+    # back is a pandas Series indexed by column name.
+    assert_equal(String(py=back["s"]), "string")
+    assert_equal(String(py=back["i"]), "int64")
 
 
 def main() raises:

@@ -55,6 +55,7 @@ comptime float32 = BisonDtype("float32", 4)
 comptime float64 = BisonDtype("float64", 8)
 comptime bool_ = BisonDtype("bool", 1)
 comptime object_ = BisonDtype("object", 8)
+comptime string_ = BisonDtype("string", 8)
 comptime datetime64_ns = BisonDtype("datetime64[ns]", 8)
 comptime timedelta64_ns = BisonDtype("timedelta64[ns]", 8)
 
@@ -88,6 +89,8 @@ def dtype_from_string(name: String) raises -> BisonDtype:
         return bool_
     if name == "object":
         return object_
+    if name == "string":
+        return string_
     if name == "datetime64[ns]":
         return datetime64_ns
     if name == "timedelta64[ns]":

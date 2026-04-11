@@ -80,6 +80,12 @@ Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 c
 | `col.is_object()` | `col._data.isa[List[PythonObject]]()` |
 | `col.is_numeric()` | `col._data.isa[List[Int64]]() or col._data.isa[List[Float64]]()` |
 
+After #644, `is_string()` and `is_object()` dispatch on `self.dtype` like the
+other predicates — `is_string()` ⟺ `dtype == string_`, `is_object()` ⟺
+`dtype == object_`. Note that `is_object()` returns `False` for
+`datetime64_ns` / `timedelta64_ns` columns even though they are backed by
+`List[PythonObject]`; this matches pandas `dtype == object` semantics.
+
 For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)` — these read from typed caches when available.
 
 For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches when `_storage_active`, falling back to the legacy `visit_col_data_raises()` dispatcher. Visitor structs still implement `ColumnDataVisitorRaises` — the cache dispatch calls their `on_*` methods with cache data instead of `_data`.
@@ -96,7 +102,7 @@ After a predicate check, access the typed data via the unsafe accessors: `col._i
 | `Index` | `index.mojo` | `List[String]` backed with name attribute |
 | `RangeIndex` | `index.mojo` | `start, stop, step` — like pandas |
 | `ColumnIndex` | `index.mojo` | Variant: `Index | List[Int64] | List[Float64] | List[PythonObject]` |
-| `BisonDtype` | `dtypes.mojo` | 14 comptime constants: `int8` … `uint64`, `float32/64`, `bool_`, `object_`, `datetime64_ns`, `timedelta64_ns` |
+| `BisonDtype` | `dtypes.mojo` | 15 comptime constants: `int8` … `uint64`, `float32/64`, `bool_`, `string_`, `object_`, `datetime64_ns`, `timedelta64_ns` |
 
 ### I/O dtype inference order
 

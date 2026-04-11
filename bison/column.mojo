@@ -41,6 +41,7 @@ from .dtypes import (
     float64,
     bool_,
     object_,
+    string_,
     datetime64_ns,
     timedelta64_ns,
     dtype_from_string,
@@ -566,8 +567,8 @@ struct _DtypeSniffVisitor(ColumnDataVisitor, Copyable, Movable):
 
     var result: BisonDtype
 
-    # object_ is the safe fallback: both List[String] and List[PythonObject]
-    # map to object_.  The field is always overwritten by on_*.
+    # object_ is the safe fallback; the field is always overwritten by on_*.
+    # #644: List[String] → string_, List[PythonObject] → object_.
     def __init__(out self):
         self.result = object_
 
@@ -581,7 +582,7 @@ struct _DtypeSniffVisitor(ColumnDataVisitor, Copyable, Movable):
         self.result = bool_
 
     def on_str(mut self, data: List[String]):
-        self.result = object_
+        self.result = string_
 
     def on_obj(mut self, data: List[PythonObject]):
         self.result = object_
@@ -620,7 +621,7 @@ struct _FillScalarVisitor(Copyable, DFScalarVisitorRaises, Movable):
     After visiting, construct the Column via
     ``Column(name, visitor._col_data^, visitor._dtype, index)``.
     The dtype is inferred from the DFScalar arm: Int64 → int64,
-    Float64 → float64, Bool → bool_, String → object_.
+    Float64 → float64, Bool → bool_, String → string_ (#644).
     ``on_null`` raises because a null fill value is not meaningful here.
     ``_col_data`` is initialised with the List[PythonObject] fallback arm
     (following _CopyDataVisitor), but it is always replaced by an ``on_*``
@@ -662,7 +663,7 @@ struct _FillScalarVisitor(Copyable, DFScalarVisitorRaises, Movable):
         for _ in range(self._n):
             data.append(value)
         self._col_data = ColumnData(data^)
-        self._dtype = object_
+        self._dtype = string_
 
     def on_null(mut self) raises:
         raise Error("_fill_scalar: fill value cannot be null")
@@ -4893,7 +4894,11 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         var data: List[String],
         dtype: BisonDtype,
     ):
-        self = Self(name, ColumnData(data^), dtype)
+        # #644: List[String] columns always carry string_ dtype. The dtype
+        # parameter is preserved for caller compatibility but ignored here
+        # to keep the invariant dtype == string_ ⟺ _data is List[String].
+        _ = dtype
+        self = Self(name, ColumnData(data^), string_)
         self._try_activate_storage()
 
     def __init__(
@@ -4903,7 +4908,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         dtype: BisonDtype,
         var index: ColumnIndex,
     ):
-        self = Self(name, ColumnData(data^), dtype, index^)
+        # #644: see note above — dtype arg is ignored, forced to string_.
+        _ = dtype
+        self = Self(name, ColumnData(data^), string_, index^)
         self._try_activate_storage()
 
     def __init__(
@@ -5035,8 +5042,15 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def is_object(self) -> Bool:
-        """Return True if the active storage arm is ``List[PythonObject]``."""
-        return self._data.isa[List[PythonObject]]()
+        """Return True if this column has ``object_`` dtype.
+
+        After #644, this is a dtype-based check (matching the other
+        type predicates). Note that ``datetime64_ns`` / ``timedelta64_ns``
+        columns are backed by ``List[PythonObject]`` but carry their own
+        dtype, so they return ``False`` here — matching pandas
+        ``dtype == object`` semantics, which also excludes datetimes.
+        """
+        return self.dtype == object_
 
     def is_numeric(self) -> Bool:
         """Return True if the active storage arm is int64 or float64."""
@@ -5055,8 +5069,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self.dtype == bool_
 
     def is_string(self) -> Bool:
-        """Return True if the active storage arm is ``List[String]``."""
-        return self._data.isa[List[String]]()
+        """Return True if this column has ``string_`` dtype.
+
+        After #644, this is a dtype-based check (matching the other
+        type predicates). Equivalent to the active ``_data`` arm being
+        ``List[String]``.
+        """
+        return self.dtype == string_
 
     # ------------------------------------------------------------------
     # Dual-backend null/validity helpers (#619, Phase 1)
@@ -7594,7 +7613,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                     data.append(String(""))  # placeholder for null
                 else:
                     data.append(String(py_list[i]))
-            var col = Column(name, ColumnData(data^), object_, bison_idx^)
+            # #644: string-backed columns carry string_ dtype.
+            var col = Column(name, ColumnData(data^), string_, bison_idx^)
             col._null_mask = null_mask.copy()
             col._index_name = idx_name
             col._try_activate_storage()
@@ -7620,8 +7640,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                             str_data.append(String(""))
                         else:
                             str_data.append(String(py_list[i]))
+                    # #644: promoted string columns carry string_ dtype.
                     var col = Column(
-                        name, ColumnData(str_data^), object_, bison_idx^
+                        name, ColumnData(str_data^), string_, bison_idx^
                     )
                     col._null_mask = null_mask^
                     col._index_name = idx_name
@@ -7682,6 +7703,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             for _ in range(n):
                 data.append(False)
             c = Column(name, ColumnData(data^), bool_, index^)
+        elif dtype == string_:
+            # #644: string_ columns must be backed by List[String] to
+            # preserve the dtype == string_ ⟺ _data is List[String] invariant.
+            var data = List[String]()
+            for _ in range(n):
+                data.append(String(""))
+            c = Column(name, ColumnData(data^), string_, index^)
         else:
             var data = List[PythonObject]()
             var py_none = Python.evaluate("None")
@@ -7698,7 +7726,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         """Create a Column of length *n* with every element equal to *value*.
 
         The dtype is inferred from the DFScalar arm: Int64 → int64, Float64 → float64,
-        Bool → bool_, String → object (matching pandas string storage).
+        Bool → bool_, String → string_ (#644).
         Raises if *value* is null — use the null-mask path instead.
         """
         var visitor = _FillScalarVisitor(n)
@@ -7717,6 +7745,12 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         # corresponding pandas nullable integer dtype (e.g. "Int64") so that
         # the None entries in py_list are accepted without raising.
         var dtype_name = self.dtype.name
+        # #644: map string_ → pandas "object" so to_pandas / from_pandas
+        # round-trips are idempotent. Pandas "string" dtype is the nullable
+        # StringDtype with pd.NA semantics; keeping "object" preserves
+        # existing behaviour.
+        if dtype_name == "string":
+            dtype_name = "object"
         if self.dtype.is_integer():
             var has_nulls = False
             for i in range(len(self._null_mask)):

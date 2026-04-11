@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- New `string_` BisonDtype constant (distinct from `object_`) for columns
+  backed by `List[String]`. `DataFrame.dtypes` and `Series.dtype` now return
+  `"string"` for string columns instead of `"object"`. Round-trips through
+  `to_pandas()` still produce pandas `"object"` dtype for compatibility, and
+  `from_pandas()` ingests pandas string / pure-string-object columns as
+  `string_`. `Column.is_string()` and `Column.is_object()` now dispatch on
+  `dtype` (matching the other type predicates); `is_object()` returns `False`
+  for `datetime64_ns` / `timedelta64_ns` columns, matching pandas
+  `dtype == object` semantics. Closes #644.
 - `DataFrame.query()` and `DataFrame.eval()` are now implemented natively in
   Mojo via the `bison.expr` parser and evaluator. Supported grammar: column
   references, integer/float/bool/string/null literals, comparison operators

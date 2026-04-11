@@ -27,7 +27,7 @@ from marrow.schema import Schema as _MarrowSchema
 from marrow.tabular import RecordBatch, Table
 from .column import Column, ColumnData, ColumnStorage, NullMask
 from .dataframe import DataFrame
-from .dtypes import int64, float64, bool_, object_
+from .dtypes import int64, float64, bool_, object_, string_
 
 
 # ------------------------------------------------------------------
@@ -84,7 +84,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(src[i])
         return AnyArray(array(vals^))
 
-    elif col._data.isa[List[String]]():
+    elif col.is_string():
         ref src = col._data[List[String]]
         var b = StringBuilder(capacity=n)
         for i in range(n):
@@ -183,7 +183,8 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
             else:
                 data.append(String(src.unsafe_get(UInt(i))))
                 null_mask.append_valid()
-        var col = Column(name, ColumnData(data^), object_)
+        # #644: string-backed columns carry string_ dtype.
+        var col = Column(name, ColumnData(data^), string_)
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._storage = ColumnStorage(arr.copy())
