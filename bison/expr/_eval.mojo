@@ -158,12 +158,15 @@ def _parse_int_literal(node: ASTNode) raises -> Int64:
 def _normalize_compare_operands(
     lhs: ASTNode, op: String, rhs: ASTNode
 ) raises -> Tuple[ASTNode, String, ASTNode]:
-    """Normalize a comparison to (col_node, op, lit_node) form.
+    """Normalize a comparison to (col_node, op, rhs_node) form.
 
     If the identifier (column) is already on the left, the triple is returned
-    unchanged.  If the literal is on the left and the identifier on the right,
-    the operands are swapped and *op* is flipped via ``_flip_op`` so the column
-    is always on the left side.  Raises if neither operand is an identifier.
+    unchanged.  If the right operand is the identifier, the operands are
+    swapped and *op* is flipped via ``_flip_op`` so the column is always on
+    the left side.  Raises if neither operand is an identifier.
+
+    The returned *rhs_node* is whatever non-identifier node was paired with the
+    column; callers are responsible for validating its kind.
     """
     if lhs.kind == NK_IDENT:
         return (lhs, op, rhs)
@@ -212,27 +215,29 @@ def _eval_compare(
             raise Error("evaluator: unknown operator '" + op + "'")
 
     # Normalize: ensure the column identifier is on the left, flipping op if
-    # the literal was on the left.  Raises if neither side is an identifier.
+    # the identifier was on the right.  Raises if neither side is an identifier.
     var normalized = _normalize_compare_operands(lhs, op, rhs)
     var col_node = normalized[0]
     var norm_op = normalized[1]
-    var lit_node = normalized[2]
+    var rhs_node = normalized[2]
 
     var col = _resolve_ident(col_node.value, df)
 
-    if lit_node.kind == NK_INT:
-        return _apply_int_op(col, norm_op, _parse_int_literal(lit_node))
-    elif lit_node.kind == NK_FLOAT:
-        return _apply_numeric_op(col, norm_op, _parse_float_literal(lit_node))
-    elif lit_node.kind == NK_STRING:
-        return _apply_string_op(col, norm_op, lit_node.value)
-    elif lit_node.kind == NK_NULL:
+    if rhs_node.kind == NK_INT:
+        return _apply_int_op(col, norm_op, _parse_int_literal(rhs_node))
+    elif rhs_node.kind == NK_FLOAT:
+        return _apply_numeric_op(col, norm_op, _parse_float_literal(rhs_node))
+    elif rhs_node.kind == NK_STRING:
+        return _apply_string_op(col, norm_op, rhs_node.value)
+    elif rhs_node.kind == NK_NULL:
         return _apply_null_op(col, norm_op)
-    elif lit_node.kind == NK_BOOL:
-        return _apply_numeric_op(col, norm_op, _parse_bool_literal(lit_node))
+    elif rhs_node.kind == NK_BOOL:
+        return _apply_numeric_op(col, norm_op, _parse_bool_literal(rhs_node))
     else:
         raise Error(
-            "evaluator: unsupported literal kind " + String(lit_node.kind)
+            "evaluator: unsupported right-hand operand kind "
+            + String(rhs_node.kind)
+            + " (expected INT, FLOAT, STRING, NULL, or BOOL)"
         )
 
 
