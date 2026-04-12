@@ -47,6 +47,8 @@ jobs:
   check-compile:
     name: check-compile (${{ matrix.max-version }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
