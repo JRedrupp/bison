@@ -3,11 +3,12 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # run_profile.sh — build bison with debug symbols and profile under
-# samply (default) or callgrind.
+# perf (default), samply, or callgrind.
 #
 # Usage:
-#   pixi run profile                     # samply, all operations
-#   pixi run profile sort                # samply, just sort_values
+#   pixi run profile                     # perf, all operations
+#   pixi run profile sort                # perf, just sort_values
+#   pixi run profile merge --samply      # samply for merge
 #   pixi run profile merge --callgrind   # callgrind for merge
 #   pixi run profile --help
 # ---------------------------------------------------------------------------
@@ -25,11 +26,11 @@ trap 'rm -f "$BIN_OUT"' EXIT
 # Parse arguments
 # ---------------------------------------------------------------------------
 OP="all"
-TOOL="samply"
+TOOL="perf"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [OPERATION] [--samply | --callgrind]
+Usage: $(basename "$0") [OPERATION] [--perf | --samply | --callgrind]
 
 Profile bison benchmark operations using external profiling tools.
 
@@ -42,15 +43,19 @@ Operations:
   csv       CSV round-trip (to_csv + read_csv)
 
 Tools:
-  --samply      Use samply sampling profiler (default)
+  --perf        Use Linux perf sampling profiler (default)
+                Resolves Mojo symbols reliably via DWARF debug info.
+                Install: apt install linux-perf  (or linux-tools-generic)
+  --samply      Use samply sampling profiler
                 Produces interactive flamegraphs via Firefox Profiler.
                 Install: cargo install samply
   --callgrind   Use valgrind's callgrind for instruction-level profiling
                 Note: may fail if Mojo uses unsupported instructions (AVX-512)
 
 Examples:
-  pixi run profile                   # all ops, samply
+  pixi run profile                   # all ops, perf (default)
   pixi run profile sort              # just sort_values
+  pixi run profile merge --samply    # merge with samply
   pixi run profile merge --callgrind # merge with callgrind
 
 Output is written to profile_results/ in the repo root.
@@ -61,6 +66,7 @@ EOF
 for arg in "$@"; do
     case "$arg" in
         --help|-h) usage ;;
+        --perf) TOOL="perf" ;;
         --samply) TOOL="samply" ;;
         --callgrind) TOOL="callgrind" ;;
         sort|groupby|merge|query|csv|all) OP="$arg" ;;
@@ -71,12 +77,27 @@ done
 # ---------------------------------------------------------------------------
 # Validate tool availability
 # ---------------------------------------------------------------------------
-if [ "$TOOL" = "samply" ]; then
+if [ "$TOOL" = "perf" ]; then
+    if ! command -v perf &>/dev/null; then
+        echo "Error: perf not found." >&2
+        echo "Install with: apt install linux-perf  (or linux-tools-generic)" >&2
+        echo "" >&2
+        echo "Alternatively, use --samply or --callgrind." >&2
+        exit 1
+    fi
+    # perf needs perf_event_paranoid <= 1
+    PARANOID="$(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo 0)"
+    if [ "$PARANOID" -gt 1 ]; then
+        echo "perf requires perf_event_paranoid <= 1 (currently $PARANOID)." >&2
+        echo "Run: echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid" >&2
+        exit 1
+    fi
+elif [ "$TOOL" = "samply" ]; then
     if ! command -v samply &>/dev/null; then
         echo "Error: samply not found." >&2
         echo "Install with: cargo install samply" >&2
         echo "" >&2
-        echo "Alternatively, use --callgrind (may not work with AVX-512)." >&2
+        echo "Alternatively, use --perf (the default) or --callgrind." >&2
         exit 1
     fi
     # samply needs perf_event_paranoid <= 1
@@ -88,11 +109,11 @@ if [ "$TOOL" = "samply" ]; then
     fi
 elif [ "$TOOL" = "callgrind" ]; then
     if ! command -v valgrind &>/dev/null; then
-        echo "Error: valgrind not found. Install it or use --samply." >&2
+        echo "Error: valgrind not found. Install it or use --perf (the default)." >&2
         exit 1
     fi
     echo "WARNING: callgrind may crash on Mojo binaries that use AVX-512."
-    echo "         Use --samply (the default) if you encounter issues."
+    echo "         Use --perf (the default) if you encounter issues."
     echo ""
 fi
 
@@ -120,7 +141,7 @@ fi
 # Compile bench_profile.mojo with debug symbols
 #
 # -g                       Full debug info (function names + line numbers)
-# --debug-info-language C  Makes symbols readable by samply/callgrind/perf
+# --debug-info-language C  Makes symbols readable by perf/callgrind/samply
 # ---------------------------------------------------------------------------
 echo "Compiling bench_profile.mojo with debug symbols ..."
 mojo build \
@@ -136,7 +157,28 @@ echo ""
 # ---------------------------------------------------------------------------
 # Run under profiler
 # ---------------------------------------------------------------------------
-if [ "$TOOL" = "samply" ]; then
+if [ "$TOOL" = "perf" ]; then
+    OUTFILE="$PROFILE_DIR/${OP}.perf.data"
+    echo "Running under perf (op=$OP) ..."
+    echo "  Output: $OUTFILE"
+    echo ""
+
+    BISON_PROFILE_OP="$OP" perf record \
+        -g \
+        --call-graph dwarf \
+        -o "$OUTFILE" \
+        "$BIN_OUT"
+
+    echo ""
+    echo "Profile saved: $OUTFILE"
+    echo ""
+    echo "To view the report:"
+    echo "  perf report -i $OUTFILE"
+    echo ""
+    echo "To generate a flamegraph (requires FlameGraph tools):"
+    echo "  perf script -i $OUTFILE | stackcollapse-perf.pl | flamegraph.pl > flame.svg"
+
+elif [ "$TOOL" = "samply" ]; then
     OUTFILE="$PROFILE_DIR/${OP}.samply.json"
     echo "Running under samply (op=$OP) ..."
     echo "  Output: $OUTFILE"

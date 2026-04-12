@@ -1,8 +1,8 @@
 """Profiling benchmark: runs bison operations in isolation for external profilers.
 
-Designed to be compiled with debug symbols and run under callgrind or samply
-so that function-level and line-level cost attribution is captured by the
-profiling tool — no custom instrumentation needed.
+Designed to be compiled with debug symbols and run under perf, callgrind, or
+samply so that function-level and line-level cost attribution is captured by
+the profiling tool — no custom instrumentation needed.
 
 Each operation runs enough iterations to accumulate ~1-2 seconds of runtime,
 giving sampling profilers good coverage.
@@ -12,14 +12,15 @@ Environment variables:
                       sort, groupby, merge, query, csv, all (default: all)
 
 Usage (via pixi):
-    pixi run profile              # samply, all operations
-    pixi run profile sort         # samply, just sort_values
-    pixi run profile merge --callgrind  # callgrind for merge
+    pixi run profile              # perf, all operations (default)
+    pixi run profile sort         # perf, just sort_values
+    pixi run profile sort --samply       # samply for sort
+    pixi run profile merge --callgrind   # callgrind for merge
 
 Manual usage:
     mojo build -I .bison-cache -I . benchmarks/bench_profile.mojo \\
         -g --debug-info-language C -o /tmp/bison_profile
-    BISON_PROFILE_OP=sort samply record /tmp/bison_profile
+    BISON_PROFILE_OP=sort perf record -g --call-graph dwarf /tmp/bison_profile
 """
 
 from benchmarks._bench_utils import BenchResult, print_json
@@ -179,4 +180,7 @@ def main() raises:
         _profile_csv(df, CSV_ITERS)
 
     print("")
-    print("done — use callgrind_annotate or samply to inspect the profile data")
+    print(
+        "done — use perf report, callgrind_annotate, or samply to inspect the"
+        " profile data"
+    )
