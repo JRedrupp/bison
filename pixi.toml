@@ -26,6 +26,7 @@ fmt           = "mojo format bison/"
 check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
 lint          = "pre-commit run --all-files"
 bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version", "build-marrow"] }
+profile       = { cmd = "bash scripts/run_profile.sh", depends-on = ["gen-version", "build-marrow"] }
 gen-report    = "python scripts/generate_report.py"
 
 [environments]
