@@ -245,6 +245,85 @@ def test_pivot_table_count_matches_pandas_with_nulls() raises:
     assert_true(String(got.iloc[1, 1]) == String(expected.iloc[1, 1]))
 
 
+def test_pivot_table_count_no_columns_object_nulls() raises:
+    """pivot_table count without a columns param on an object-dtype column.
+
+    Regression test for the scenario in issue #680: when the value column
+    carries object dtype (pd.Series([1, None, 2], dtype=object)), count must
+    exclude None cells and match pandas exactly.
+    """
+    var pd = Python.import_module("pandas")
+    var make_df = Python.evaluate(
+        "lambda pd: pd.DataFrame({"
+        "'key': ['a', 'a', 'b'],"
+        " 'val': pd.Series([1, None, 2], dtype=object)"
+        "})"
+    )
+    var pd_df = make_df(pd)
+    var df = DataFrame.from_pandas(pd_df)
+
+    var values = List[String]()
+    values.append("val")
+    var index = List[String]()
+    index.append("key")
+
+    var got = df.pivot_table(
+        values=Optional[List[String]](values^),
+        index=Optional[List[String]](index^),
+        aggfunc="count",
+    ).to_pandas()
+    var expected = pd_df.pivot_table(
+        values=Python.evaluate("['val']"),
+        index=Python.evaluate("['key']"),
+        aggfunc="count",
+    )
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    # key 'a': [1, None] → count=1 (None excluded)
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    # key 'b': [2] → count=1
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+
+
+def test_pivot_table_count_all_null_group_object() raises:
+    """pivot_table count: group with all-null object values must yield count=0.
+
+    Regression test for issue #680: a key group where every value is None must
+    produce count=0, not count>0.
+    """
+    var pd = Python.import_module("pandas")
+    var make_df = Python.evaluate(
+        "lambda pd: pd.DataFrame({"
+        "'key': ['a', 'a', 'b'],"
+        " 'val': pd.Series([None, None, 2], dtype=object)"
+        "})"
+    )
+    var pd_df = make_df(pd)
+    var df = DataFrame.from_pandas(pd_df)
+
+    var values = List[String]()
+    values.append("val")
+    var index = List[String]()
+    index.append("key")
+
+    var got = df.pivot_table(
+        values=Optional[List[String]](values^),
+        index=Optional[List[String]](index^),
+        aggfunc="count",
+    ).to_pandas()
+    var expected = pd_df.pivot_table(
+        values=Python.evaluate("['val']"),
+        index=Python.evaluate("['key']"),
+        aggfunc="count",
+    )
+    assert_true(String(got.shape[0]) == String(expected.shape[0]))
+    assert_true(String(got.shape[1]) == String(expected.shape[1]))
+    # key 'a': [None, None] → count=0
+    assert_true(String(got.iloc[0, 0]) == String(expected.iloc[0, 0]))
+    # key 'b': [2] → count=1
+    assert_true(String(got.iloc[1, 0]) == String(expected.iloc[1, 0]))
+
+
 def test_unstack_matches_pandas() raises:
     var pd = Python.import_module("pandas")
     var pd_df = pd.DataFrame(Python.evaluate(
