@@ -4896,6 +4896,71 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         col._str_cache = str_cache^
         return col^
 
+    @staticmethod
+    def _caches_only_from_col_data(
+        name: Optional[String],
+        dtype: BisonDtype,
+        var result_data: ColumnData,
+    ) raises -> Column:
+        """Build a Column from a ``ColumnData`` value without marrow activation.
+
+        Dispatches on the active ``ColumnData`` arm and populates the
+        appropriate typed caches (including the secondary ``_f64_cache`` for
+        int64/bool arms), then delegates to ``_caches_only``.  The object /
+        datetime / timedelta fallback falls back to the regular Column
+        constructor (marrow activation fails for those types anyway).
+        Used by ``take_with_nulls()`` and ``concat()``.  Issue #659.
+        """
+        if result_data.isa[List[Int64]]():
+            ref src64 = result_data[List[Int64]]
+            var f64 = List[Float64](capacity=len(src64))
+            for i in range(len(src64)):
+                f64.append(Float64(src64[i]))
+            return Column._caches_only(
+                name,
+                dtype,
+                src64.copy(),
+                f64^,
+                List[Bool](),
+                List[String](),
+            )
+        elif result_data.isa[List[Float64]]():
+            return Column._caches_only(
+                name,
+                dtype,
+                List[Int64](),
+                result_data[List[Float64]].copy(),
+                List[Bool](),
+                List[String](),
+            )
+        elif result_data.isa[List[Bool]]():
+            ref srcb = result_data[List[Bool]]
+            var f64 = List[Float64](capacity=len(srcb))
+            for i in range(len(srcb)):
+                f64.append(Float64(1.0) if srcb[i] else Float64(0.0))
+            return Column._caches_only(
+                name,
+                dtype,
+                List[Int64](),
+                f64^,
+                srcb.copy(),
+                List[String](),
+            )
+        elif result_data.isa[List[String]]():
+            return Column._caches_only(
+                name,
+                dtype,
+                List[Int64](),
+                List[Float64](),
+                List[Bool](),
+                result_data[List[String]].copy(),
+            )
+        else:
+            # Object / datetime / timedelta: fall back to Column constructor.
+            # Marrow activation fails for these types anyway, so the overhead
+            # is minimal.
+            return Column(name, result_data.copy(), dtype)
+
     # ------------------------------------------------------------------
     # Typed-array accessor helpers — read from the ``AnyArray`` arm of
     # ``_storage``.  Callers must verify ``_storage.isa[AnyArray]`` and
@@ -5593,56 +5658,11 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._visit_raises(visitor)
         # Save out_mask before consuming visitor to avoid partial-move issues.
         var out_mask = visitor.out_mask.copy()
-        # Use _caches_only to skip marrow AnyArray construction (#659).
-        var result_data = visitor^.result
-        var col: Column
-        if result_data.isa[List[Int64]]():
-            ref src64 = result_data[List[Int64]]
-            var f64 = List[Float64](capacity=len(src64))
-            for i in range(len(src64)):
-                f64.append(Float64(src64[i]))
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                src64.copy(),
-                f64^,
-                List[Bool](),
-                List[String](),
-            )
-        elif result_data.isa[List[Float64]]():
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                result_data[List[Float64]].copy(),
-                List[Bool](),
-                List[String](),
-            )
-        elif result_data.isa[List[Bool]]():
-            ref srcb = result_data[List[Bool]]
-            var f64 = List[Float64](capacity=len(srcb))
-            for i in range(len(srcb)):
-                f64.append(Float64(1.0) if srcb[i] else Float64(0.0))
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                f64^,
-                srcb.copy(),
-                List[String](),
-            )
-        elif result_data.isa[List[String]]():
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                List[Float64](),
-                List[Bool](),
-                result_data[List[String]].copy(),
-            )
-        else:
-            # Object / datetime / timedelta: keep Column constructor path.
-            col = Column(self.name, result_data.copy(), self.dtype)
+        # Use _caches_only_from_col_data to skip marrow AnyArray construction
+        # (#659 perf fix).
+        var col = Column._caches_only_from_col_data(
+            self.name, self.dtype, visitor^.result
+        )
         if out_mask.has_nulls():
             col.set_null_mask(out_mask^)
         return col^
@@ -5651,56 +5671,11 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         """Return a new Column with *other* appended row-wise."""
         var visitor = _ConcatDataVisitor(other._to_col_data())
         self._visit_raises(visitor)
-        # Use _caches_only to skip marrow AnyArray construction (#659).
-        var result_data = visitor^.result
-        var col: Column
-        if result_data.isa[List[Int64]]():
-            ref src64 = result_data[List[Int64]]
-            var f64 = List[Float64](capacity=len(src64))
-            for i in range(len(src64)):
-                f64.append(Float64(src64[i]))
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                src64.copy(),
-                f64^,
-                List[Bool](),
-                List[String](),
-            )
-        elif result_data.isa[List[Float64]]():
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                result_data[List[Float64]].copy(),
-                List[Bool](),
-                List[String](),
-            )
-        elif result_data.isa[List[Bool]]():
-            ref srcb = result_data[List[Bool]]
-            var f64 = List[Float64](capacity=len(srcb))
-            for i in range(len(srcb)):
-                f64.append(Float64(1.0) if srcb[i] else Float64(0.0))
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                f64^,
-                srcb.copy(),
-                List[String](),
-            )
-        elif result_data.isa[List[String]]():
-            col = Column._caches_only(
-                self.name,
-                self.dtype,
-                List[Int64](),
-                List[Float64](),
-                List[Bool](),
-                result_data[List[String]].copy(),
-            )
-        else:
-            # Object / datetime / timedelta: keep Column constructor path.
-            col = Column(self.name, result_data.copy(), self.dtype)
+        # Use _caches_only_from_col_data to skip marrow AnyArray construction
+        # (#659 perf fix).
+        var col = Column._caches_only_from_col_data(
+            self.name, self.dtype, visitor^.result
+        )
         # Merge null masks only when at least one side has nulls
         if self.has_nulls() or other.has_nulls():
             var n_self = len(self)
