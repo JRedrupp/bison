@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# check_compile.sh — verify that all Mojo files with entry points compile.
+#
+# Catches import errors, type errors, and syntax issues in test and benchmark
+# files that `mojo package bison/ --Werror` (the pre-commit check) does not
+# cover, since those files live outside the bison package.
+#
+# Uses `mojo build` to compile each file.  Linker-only failures (missing
+# system libraries) are reported as warnings rather than errors, since those
+# are environment-specific and not source-level bugs.
+#
+# Files are compiled in parallel for speed.
+#
+# Usage:
+#   pixi run check-compile
+# ---------------------------------------------------------------------------
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CACHE_DIR="$REPO_ROOT/.bison-cache"
+PKG_FILE="$CACHE_DIR/bison.mojopkg"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+mkdir -p "$CACHE_DIR"
+
+# Build bison.mojopkg if needed.
+if [ ! -f "$PKG_FILE" ] || \
+   find "$REPO_ROOT/bison" -name "*.mojo" -newer "$PKG_FILE" -print -quit | grep -q .; then
+    echo "Packaging bison/ -> $PKG_FILE ..."
+    TMP_PKG="$TMP_DIR/bison.mojopkg"
+    mojo package "$REPO_ROOT/bison" -o "$TMP_PKG"
+    mv "$TMP_PKG" "$PKG_FILE"
+else
+    echo "Package up to date: bison.mojopkg"
+fi
+
+# Collect all entry-point files: tests and benchmarks.
+FILES=()
+for f in "$REPO_ROOT"/tests/test_*.mojo "$REPO_ROOT"/benchmarks/bench_*.mojo; do
+    [ -f "$f" ] && FILES+=("$f")
+done
+
+echo "Compile-checking ${#FILES[@]} files ..."
+echo ""
+
+BIN_DIR="$TMP_DIR/bin"
+RESULT_DIR="$TMP_DIR/results"
+LOG_DIR="$TMP_DIR/logs"
+mkdir -p "$BIN_DIR" "$RESULT_DIR" "$LOG_DIR"
+
+# Compile in parallel.
+MAX_JOBS=$(( $(nproc) - 1 ))
+[ "$MAX_JOBS" -lt 1 ] && MAX_JOBS=1
+
+pids=()
+running=0
+
+for f in "${FILES[@]}"; do
+    name="$(basename "$f" .mojo)"
+    result_file="$RESULT_DIR/$name"
+    log_file="$LOG_DIR/$name.log"
+    (
+        if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" "$f" -o "$BIN_DIR/$name" >"$log_file" 2>&1; then
+            echo "pass" > "$result_file"
+        elif grep -q "failed to link executable" "$log_file"; then
+            # Linker-only failure (e.g. missing libm on some systems).
+            # The source compiled — the link step failed due to the environment.
+            echo "link" > "$result_file"
+        else
+            echo "fail" > "$result_file"
+        fi
+    ) &
+    pids+=($!)
+    running=$(( running + 1 ))
+
+    if [ "$running" -ge "$MAX_JOBS" ]; then
+        wait "${pids[$(( ${#pids[@]} - running ))]}" || true
+        running=$(( running - 1 ))
+    fi
+done
+
+# Wait for all compile jobs to finish.
+for pid in "${pids[@]}"; do
+    wait "$pid" || true
+done
+
+# Collect results.
+PASS=0
+FAIL=0
+LINK=0
+ERRORS=()
+
+for f in "${FILES[@]}"; do
+    name="$(basename "$f" .mojo)"
+    result_file="$RESULT_DIR/$name"
+    result="$(cat "$result_file" 2>/dev/null || echo fail)"
+    if [ "$result" = "pass" ]; then
+        echo "  OK   $(basename "$f")"
+        PASS=$((PASS + 1))
+    elif [ "$result" = "link" ]; then
+        echo "  WARN $(basename "$f")  (link-only failure)"
+        LINK=$((LINK + 1))
+    else
+        echo "  FAIL $(basename "$f")"
+        FAIL=$((FAIL + 1))
+        ERRORS+=("$f")
+    fi
+done
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed, $LINK link-only warnings"
+
+if [ ${#ERRORS[@]} -gt 0 ]; then
+    echo ""
+    echo "Failed to compile:"
+    for e in "${ERRORS[@]}"; do
+        echo "  $e"
+    done
+    echo ""
+    echo "Re-run individually for detailed error output:"
+    echo "  mojo build -I .bison-cache -I . <file>"
+    exit 1
+fi

@@ -46,6 +46,7 @@ pixi run gen-version    # write bison/_version.mojo from pixi.toml
 pixi run test           # regenerates version then runs all tests
 pixi run fmt            # mojo format bison/
 pixi run check          # mojo package bison/ --Werror (no warnings allowed)
+pixi run check-compile  # compile-check all test and benchmark entry points
 pixi run lint           # pre-commit run --all-files
 pixi run bench          # run benchmarks (depends on gen-version)
 pixi run profile        # profile operations with samply (see docs/profiling.md)
