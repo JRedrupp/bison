@@ -63,12 +63,8 @@ element — observably 571× slower than ``List[String].append`` here.
 """
 
 from benchmarks._bench_utils import BenchResult, print_json
-from marrow.builders import PrimitiveBuilder, StringBuilder
-from marrow.dtypes import (
-    int64 as _m_int64,
-    float64 as _m_float64,
-    bool_ as _m_bool_,
-)
+from marrow.builders import PrimitiveBuilder, BoolBuilder, StringBuilder
+from marrow.dtypes import Int64Type, Float64Type
 from std.time import perf_counter_ns
 
 # Marrow's PrimitiveBuilder[T].append takes ``Scalar[T.native]``, which is
@@ -76,9 +72,8 @@ from std.time import perf_counter_ns
 # ``Scalar[DType.int64]`` etc.) under Mojo's type checker even though the
 # underlying representation is identical.  bison/arrow.mojo:126 uses the
 # same ``rebind`` workaround on the read side.
-comptime _MInt64 = Scalar[_m_int64.native]
-comptime _MFloat64 = Scalar[_m_float64.native]
-comptime _MBool = Scalar[_m_bool_.native]
+comptime _MInt64 = Scalar[Int64Type.native]
+comptime _MFloat64 = Scalar[Float64Type.native]
 
 
 # 10K elements per run, repeated 5x for stable timing.  Each function
@@ -111,7 +106,7 @@ def _bench_int64_list(mut sink: Int) raises -> Float64:
 def _bench_int64_builder_safe(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_int64](capacity=0)
+        var b = PrimitiveBuilder[Int64Type](capacity=0)
         for i in range(N):
             b.append(rebind[_MInt64](Int64(i)))
         var arr = b.finish()
@@ -122,7 +117,7 @@ def _bench_int64_builder_safe(mut sink: Int) raises -> Float64:
 def _bench_int64_builder_fast(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_int64](capacity=N)
+        var b = PrimitiveBuilder[Int64Type](capacity=N)
         b.reserve(N)
         for i in range(N):
             b.unsafe_append(rebind[_MInt64](Int64(i)))
@@ -149,7 +144,7 @@ def _bench_float64_list(mut sink: Int) raises -> Float64:
 def _bench_float64_builder_safe(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_float64](capacity=0)
+        var b = PrimitiveBuilder[Float64Type](capacity=0)
         for i in range(N):
             b.append(rebind[_MFloat64](Float64(i)))
         var arr = b.finish()
@@ -160,7 +155,7 @@ def _bench_float64_builder_safe(mut sink: Int) raises -> Float64:
 def _bench_float64_builder_fast(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_float64](capacity=N)
+        var b = PrimitiveBuilder[Float64Type](capacity=N)
         b.reserve(N)
         for i in range(N):
             b.unsafe_append(rebind[_MFloat64](Float64(i)))
@@ -187,9 +182,8 @@ def _bench_bool_list(mut sink: Int) raises -> Float64:
 def _bench_bool_builder_safe(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_bool_](capacity=0)
+        var b = BoolBuilder(capacity=0)
         for i in range(N):
-            # PrimitiveBuilder[bool_] has a dedicated ``append(Bool)`` overload.
             b.append(i & 1 == 0)
         var arr = b.finish()
         sink += arr.length
@@ -199,10 +193,12 @@ def _bench_bool_builder_safe(mut sink: Int) raises -> Float64:
 def _bench_bool_builder_fast(mut sink: Int) raises -> Float64:
     var t0 = perf_counter_ns()
     for _ in range(REPS):
-        var b = PrimitiveBuilder[_m_bool_](capacity=N)
+        var b = BoolBuilder(capacity=N)
         b.reserve(N)
         for i in range(N):
-            b.unsafe_append(rebind[_MBool](Scalar[DType.bool](i & 1 == 0)))
+            # BoolBuilder is bit-packed and has no unsafe_append;
+            # reserve + append is the fast path.
+            b.append(i & 1 == 0)
         var arr = b.finish()
         sink += arr.length
     return _ms_per_call(perf_counter_ns() - t0, REPS)
