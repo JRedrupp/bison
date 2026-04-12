@@ -41,8 +41,34 @@ jobs:
       - name: Generate version file
         run: pixi run gen-version
 
-      - name: Compile-check all entry points
-        run: pixi run check-compile
-
       - name: Run tests
         run: pixi run test
+
+  check-compile:
+    name: check-compile (${{ matrix.max-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - max-version: locked   # exact versions from pixi.lock
+            pixi-locked: true
+          - max-version: latest   # newest MAX satisfying >=26.1
+            pixi-locked: false
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - uses: prefix-dev/setup-pixi@v0.9.5
+        with:
+          locked: ${{ matrix.pixi-locked }}
+
+      - name: Upgrade MAX to latest
+        if: matrix.max-version == 'latest'
+        run: pixi update max
+
+      - name: Compile-check all entry points
+        run: pixi run check-compile

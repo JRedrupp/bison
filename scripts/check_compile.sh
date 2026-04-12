@@ -2,11 +2,15 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# check_compile.sh — verify that all Mojo files with entry points compile.
+# check_compile.sh — verify that all Mojo benchmark entry points compile.
 #
-# Catches import errors, type errors, and syntax issues in test and benchmark
-# files that `mojo package bison/ --Werror` (the pre-commit check) does not
-# cover, since those files live outside the bison package.
+# Catches import errors, type errors, and syntax issues in benchmark files
+# that `mojo package bison/ --Werror` (the pre-commit check) does not cover,
+# since those files live outside the bison package.
+#
+# Test files are intentionally excluded: they are already compiled and run by
+# the test runner (run_tests.sh), so a separate compile check would be
+# redundant.
 #
 # Uses `mojo build` to compile each file.  `-Xlinker -lm` is passed so that
 # files using math functions (log10, sqrt, etc.) link correctly.  Remaining
@@ -39,9 +43,10 @@ else
     echo "Package up to date: bison.mojopkg"
 fi
 
-# Collect all entry-point files: tests and benchmarks.
+# Collect entry-point files: benchmarks only.
+# Tests are validated by the test runner (run_tests.sh).
 FILES=()
-for f in "$REPO_ROOT"/tests/test_*.mojo "$REPO_ROOT"/benchmarks/bench_*.mojo; do
+for f in "$REPO_ROOT"/benchmarks/bench_*.mojo; do
     [ -f "$f" ] && FILES+=("$f")
 done
 
