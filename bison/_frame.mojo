@@ -5102,7 +5102,7 @@ struct DataFrame(Copyable, Movable):
                             break
                     # Sync secondary caches and rebuild marrow after
                     # cache-first key fill (#645).
-                    key_col._rebuild_marrow_only()
+                    key_col._rebuild_storage()
                     result_cols.append(key_col^)
                     break
 
@@ -7659,7 +7659,7 @@ def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
         raise Error(
             "iat/at: scalar write not supported for object/datetime columns"
         )
-    col._rebuild_marrow_only()
+    col._rebuild_storage()
 
 
 def _set_series_scalar_in_col(
@@ -7671,7 +7671,7 @@ def _set_series_scalar_in_col(
             col._storage_legacy().data[row] = value[PythonObject]
         else:
             raise Error("iloc: cannot assign PythonObject to typed column")
-        col._rebuild_marrow_only()
+        col._rebuild_storage()
         return
     var ds: DFScalar
     if value.isa[Int64]():

@@ -383,7 +383,7 @@ def test_eval_int_gt() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
     var mask = eval_expr(parse("a > 2"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -397,7 +397,7 @@ def test_eval_float_ge() raises:
         pd.DataFrame(Python.evaluate("{'y': [1.0, 2.5, 3.5, 4.0]}"))
     )
     var mask = eval_expr(parse("y >= 3.5"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -413,7 +413,7 @@ def test_eval_string_eq() raises:
         )
     )
     var mask = eval_expr(parse('name == "alice"'), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -429,7 +429,7 @@ def test_eval_string_ne() raises:
         )
     )
     var mask = eval_expr(parse('name != "bob"'), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -454,8 +454,8 @@ def test_eval_literal_left() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 5, 10]}")))
     var mask_normal = eval_expr(parse("a > 5"), df)
     var mask_flipped = eval_expr(parse("5 < a"), df)
-    ref dn = mask_normal._col._data[List[Bool]]
-    ref df2 = mask_flipped._col._data[List[Bool]]
+    ref dn = mask_normal._col._bool_cache
+    ref df2 = mask_flipped._col._bool_cache
     for i in range(3):
         assert_equal(dn[i], df2[i])
 
@@ -466,34 +466,34 @@ def test_eval_all_numeric_ops() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'x': [1, 2, 3]}")))
     # x < 2  → [T, F, F]
     var lt = eval_expr(parse("x < 2"), df)
-    assert_true(lt._col._data[List[Bool]][0])
-    assert_true(not lt._col._data[List[Bool]][1])
-    assert_true(not lt._col._data[List[Bool]][2])
+    assert_true(lt._col._bool_cache[0])
+    assert_true(not lt._col._bool_cache[1])
+    assert_true(not lt._col._bool_cache[2])
     # x <= 2 → [T, T, F]
     var le = eval_expr(parse("x <= 2"), df)
-    assert_true(le._col._data[List[Bool]][0])
-    assert_true(le._col._data[List[Bool]][1])
-    assert_true(not le._col._data[List[Bool]][2])
+    assert_true(le._col._bool_cache[0])
+    assert_true(le._col._bool_cache[1])
+    assert_true(not le._col._bool_cache[2])
     # x > 2  → [F, F, T]
     var gt = eval_expr(parse("x > 2"), df)
-    assert_true(not gt._col._data[List[Bool]][0])
-    assert_true(not gt._col._data[List[Bool]][1])
-    assert_true(gt._col._data[List[Bool]][2])
+    assert_true(not gt._col._bool_cache[0])
+    assert_true(not gt._col._bool_cache[1])
+    assert_true(gt._col._bool_cache[2])
     # x >= 2 → [F, T, T]
     var ge = eval_expr(parse("x >= 2"), df)
-    assert_true(not ge._col._data[List[Bool]][0])
-    assert_true(ge._col._data[List[Bool]][1])
-    assert_true(ge._col._data[List[Bool]][2])
+    assert_true(not ge._col._bool_cache[0])
+    assert_true(ge._col._bool_cache[1])
+    assert_true(ge._col._bool_cache[2])
     # x == 2 → [F, T, F]
     var eq = eval_expr(parse("x == 2"), df)
-    assert_true(not eq._col._data[List[Bool]][0])
-    assert_true(eq._col._data[List[Bool]][1])
-    assert_true(not eq._col._data[List[Bool]][2])
+    assert_true(not eq._col._bool_cache[0])
+    assert_true(eq._col._bool_cache[1])
+    assert_true(not eq._col._bool_cache[2])
     # x != 2 → [T, F, T]
     var ne = eval_expr(parse("x != 2"), df)
-    assert_true(ne._col._data[List[Bool]][0])
-    assert_true(not ne._col._data[List[Bool]][1])
-    assert_true(ne._col._data[List[Bool]][2])
+    assert_true(ne._col._bool_cache[0])
+    assert_true(not ne._col._bool_cache[1])
+    assert_true(ne._col._bool_cache[2])
 
 
 def test_eval_column_vs_column() raises:
@@ -504,37 +504,37 @@ def test_eval_column_vs_column() raises:
     )
     # a < b  → [T, F, F]
     var lt = eval_expr(parse("a < b"), df)
-    ref lt_d = lt._col._data[List[Bool]]
+    ref lt_d = lt._col._bool_cache
     assert_true(lt_d[0])
     assert_true(not lt_d[1])
     assert_true(not lt_d[2])
     # a > b  → [F, T, F]
     var gt = eval_expr(parse("a > b"), df)
-    ref gt_d = gt._col._data[List[Bool]]
+    ref gt_d = gt._col._bool_cache
     assert_true(not gt_d[0])
     assert_true(gt_d[1])
     assert_true(not gt_d[2])
     # a == b → [F, F, T]
     var eq = eval_expr(parse("a == b"), df)
-    ref eq_d = eq._col._data[List[Bool]]
+    ref eq_d = eq._col._bool_cache
     assert_true(not eq_d[0])
     assert_true(not eq_d[1])
     assert_true(eq_d[2])
     # a != b → [T, T, F]
     var ne = eval_expr(parse("a != b"), df)
-    ref ne_d = ne._col._data[List[Bool]]
+    ref ne_d = ne._col._bool_cache
     assert_true(ne_d[0])
     assert_true(ne_d[1])
     assert_true(not ne_d[2])
     # a <= b → [T, F, T]
     var le = eval_expr(parse("a <= b"), df)
-    ref le_d = le._col._data[List[Bool]]
+    ref le_d = le._col._bool_cache
     assert_true(le_d[0])
     assert_true(not le_d[1])
     assert_true(le_d[2])
     # a >= b → [F, T, T]
     var ge = eval_expr(parse("a >= b"), df)
-    ref ge_d = ge._col._data[List[Bool]]
+    ref ge_d = ge._col._bool_cache
     assert_true(not ge_d[0])
     assert_true(ge_d[1])
     assert_true(ge_d[2])
@@ -543,7 +543,7 @@ def test_eval_and() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
     var mask = eval_expr(parse("a > 1 and a < 4"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(d[2])
@@ -555,7 +555,7 @@ def test_eval_or() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4]}")))
     var mask = eval_expr(parse("a < 2 or a > 3"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(not d[2])
@@ -567,7 +567,7 @@ def test_eval_not() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}")))
     var mask = eval_expr(parse("not a > 2"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -578,7 +578,7 @@ def test_eval_chained_and() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [4, 0, 5]}")))
     var mask = eval_expr(parse("a > 0 and b > 0"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -592,7 +592,7 @@ def test_eval_mixed_parens() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [10, 1, 10]}")))
     var mask = eval_expr(parse("a > 1 and (b > 5 or a > 2)"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -608,10 +608,10 @@ def test_eval_null_and() raises:
     var mask = eval_expr(parse("a > 1 and a < 5"), df)
     assert_true(mask._col.has_nulls())
     assert_false(mask._col.is_null(0))
-    assert_true(not mask._col._data[List[Bool]][0])
+    assert_true(not mask._col._bool_cache[0])
     assert_true(mask._col.is_null(1))
     assert_false(mask._col.is_null(2))
-    assert_true(mask._col._data[List[Bool]][2])
+    assert_true(mask._col._bool_cache[2])
 
 
 def test_eval_null_or() raises:
@@ -624,10 +624,10 @@ def test_eval_null_or() raises:
     var mask = eval_expr(parse("a < 2 or a > 5"), df)
     assert_true(mask._col.has_nulls())
     assert_false(mask._col.is_null(0))
-    assert_true(mask._col._data[List[Bool]][0])
+    assert_true(mask._col._bool_cache[0])
     assert_true(mask._col.is_null(1))
     assert_false(mask._col.is_null(2))
-    assert_true(mask._col._data[List[Bool]][2])
+    assert_true(mask._col._bool_cache[2])
 
 
 # ------------------------------------------------------------------
@@ -646,8 +646,8 @@ def test_query_simple_numeric() raises:
     assert_equal(result.shape()[0], 2)
     assert_equal(result.shape()[1], 2)
     var col_a = result["a"]
-    assert_true(col_a._col._data[List[Float64]][0] > 0.5)
-    assert_true(col_a._col._data[List[Float64]][1] > 0.5)
+    assert_true(col_a._col._f64_cache[0] > 0.5)
+    assert_true(col_a._col._f64_cache[1] > 0.5)
 
 
 def test_query_logical_and() raises:
@@ -714,7 +714,7 @@ def test_df_eval_simple_numeric() raises:
         pd.DataFrame(Python.evaluate("{'a': [1, 6, 3, 8], 'b': [10, 20, 30, 40]}"))
     )
     var mask = df.eval("a > 5")
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -728,7 +728,7 @@ def test_df_eval_logical_and() raises:
         pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4], 'b': [10, 3, 5, 2]}"))
     )
     var mask = df.eval("a > 1 and b < 4")
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     # Row 0: a=1 not > 1 → False
     assert_true(not d[0])
     # Row 1: a=2 > 1 and b=3 < 4 → True
@@ -748,7 +748,7 @@ def test_df_eval_string_eq() raises:
         )
     )
     var mask = df.eval('cat == "foo"')
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -789,7 +789,7 @@ def test_df_eval_not() raises:
         pd.DataFrame(Python.evaluate("{'a': [1, 2, 3]}"))
     )
     var mask = df.eval("not a > 2")
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -807,7 +807,7 @@ def test_eval_null_eq() raises:
         pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
     )
     var mask = eval_expr(parse("a == None"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -820,7 +820,7 @@ def test_eval_null_ne() raises:
         pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
     )
     var mask = eval_expr(parse("a != None"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -833,7 +833,7 @@ def test_eval_null_flipped_eq() raises:
         pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}"))
     )
     var mask = eval_expr(parse("None == a"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -865,7 +865,7 @@ def test_eval_bool_eq_true() raises:
         pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
     )
     var mask = eval_expr(parse("flag == True"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -878,7 +878,7 @@ def test_eval_bool_eq_false() raises:
         pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
     )
     var mask = eval_expr(parse("flag == False"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -891,7 +891,7 @@ def test_eval_bool_ne_true() raises:
         pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
     )
     var mask = eval_expr(parse("flag != True"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(not d[0])
     assert_true(d[1])
     assert_true(not d[2])
@@ -904,7 +904,7 @@ def test_eval_bool_flipped_eq() raises:
         pd.DataFrame(Python.evaluate("{'flag': [True, False, True]}"))
     )
     var mask = eval_expr(parse("True == flag"), df)
-    ref d = mask._col._data[List[Bool]]
+    ref d = mask._col._bool_cache
     assert_true(d[0])
     assert_true(not d[1])
     assert_true(d[2])
@@ -937,7 +937,7 @@ def test_conformance_query_scalar_lt() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -955,7 +955,7 @@ def test_conformance_query_scalar_le() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -973,7 +973,7 @@ def test_conformance_query_scalar_gt() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -991,7 +991,7 @@ def test_conformance_query_scalar_ge() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1009,7 +1009,7 @@ def test_conformance_query_scalar_eq() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1027,7 +1027,7 @@ def test_conformance_query_scalar_ne() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1047,7 +1047,7 @@ def test_conformance_query_float_scalar() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["y"].tolist()
     var bs_y_series = bs_result["y"]
-    ref bs_y = bs_y_series._col._data[List[Float64]]
+    ref bs_y = bs_y_series._col._f64_cache
     for i in range(expected_n):
         assert_true(abs(bs_y[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -1069,7 +1069,7 @@ def test_conformance_query_string_eq() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["val"].tolist()
     var bs_val_series = bs_result["val"]
-    ref bs_vals = bs_val_series._col._data[List[Int64]]
+    ref bs_vals = bs_val_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_vals[i]), Int(py=pd_vals[i]))
 
@@ -1091,7 +1091,7 @@ def test_conformance_query_string_ne() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["val"].tolist()
     var bs_val_series = bs_result["val"]
-    ref bs_vals = bs_val_series._col._data[List[Int64]]
+    ref bs_vals = bs_val_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_vals[i]), Int(py=pd_vals[i]))
 
@@ -1116,7 +1116,7 @@ def test_conformance_query_col_vs_col_lt() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1136,7 +1136,7 @@ def test_conformance_query_col_vs_col_eq() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1156,7 +1156,7 @@ def test_conformance_query_col_vs_col_ne() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1181,7 +1181,7 @@ def test_conformance_query_and() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1199,7 +1199,7 @@ def test_conformance_query_or() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1217,7 +1217,7 @@ def test_conformance_query_not() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1237,7 +1237,7 @@ def test_conformance_query_chained_and() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1262,7 +1262,7 @@ def test_conformance_query_parens_override_precedence() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1282,7 +1282,7 @@ def test_conformance_query_not_parens() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Int64]]
+    ref bs_a = bs_a_series._col._int64_cache
     for i in range(expected_n):
         assert_equal(Int(bs_a[i]), Int(py=pd_vals[i]))
 
@@ -1307,7 +1307,7 @@ def test_conformance_query_nulls_excluded() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Float64]]
+    ref bs_a = bs_a_series._col._f64_cache
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -1327,7 +1327,7 @@ def test_conformance_query_nulls_and() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Float64]]
+    ref bs_a = bs_a_series._col._f64_cache
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -1347,7 +1347,7 @@ def test_conformance_query_nulls_or() raises:
     assert_equal(bs_result.shape()[0], expected_n)
     var pd_vals = pd_filtered["a"].tolist()
     var bs_a_series = bs_result["a"]
-    ref bs_a = bs_a_series._col._data[List[Float64]]
+    ref bs_a = bs_a_series._col._f64_cache
     for i in range(expected_n):
         assert_true(abs(bs_a[i] - atof(String(pd_vals[i]))) < 1e-9)
 
@@ -1366,7 +1366,7 @@ def test_conformance_eval_scalar_lt() raises:
     var bs_mask = bs_df.eval("a < 3")
     var pd_bools = (pd_df["a"] < 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1381,7 +1381,7 @@ def test_conformance_eval_scalar_le() raises:
     var bs_mask = bs_df.eval("a <= 3")
     var pd_bools = (pd_df["a"] <= 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1396,7 +1396,7 @@ def test_conformance_eval_scalar_gt() raises:
     var bs_mask = bs_df.eval("a > 3")
     var pd_bools = (pd_df["a"] > 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1411,7 +1411,7 @@ def test_conformance_eval_scalar_ge() raises:
     var bs_mask = bs_df.eval("a >= 3")
     var pd_bools = (pd_df["a"] >= 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1426,7 +1426,7 @@ def test_conformance_eval_scalar_eq() raises:
     var bs_mask = bs_df.eval("a == 3")
     var pd_bools = (pd_df["a"] == 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1441,7 +1441,7 @@ def test_conformance_eval_scalar_ne() raises:
     var bs_mask = bs_df.eval("a != 3")
     var pd_bools = (pd_df["a"] != 3).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1458,7 +1458,7 @@ def test_conformance_eval_float_scalar() raises:
     var bs_mask = bs_df.eval("y >= 2.5")
     var pd_bools = (pd_df["y"] >= 2.5).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1480,7 +1480,7 @@ def test_conformance_eval_col_vs_col_lt() raises:
     var bs_mask = bs_df.eval("a < b")
     var pd_bools = (pd_df["a"] < pd_df["b"]).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1497,7 +1497,7 @@ def test_conformance_eval_col_vs_col_eq() raises:
     var bs_mask = bs_df.eval("a == b")
     var pd_bools = (pd_df["a"] == pd_df["b"]).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1519,7 +1519,7 @@ def test_conformance_eval_and() raises:
     var bs_mask = bs_df.eval("a > 1 and b < 4")
     var pd_bools = ((pd_df["a"] > 1) & (pd_df["b"] < 4)).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 4)
     for i in range(4):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1534,7 +1534,7 @@ def test_conformance_eval_or() raises:
     var bs_mask = bs_df.eval("a < 2 or a > 3")
     var pd_bools = ((pd_df["a"] < 2) | (pd_df["a"] > 3)).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1549,7 +1549,7 @@ def test_conformance_eval_not() raises:
     var bs_mask = bs_df.eval("not a > 3")
     var pd_bools = (~(pd_df["a"] > 3)).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 5)
     for i in range(5):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1566,7 +1566,7 @@ def test_conformance_eval_chained_and() raises:
     var bs_mask = bs_df.eval("a > 0 and b > 0")
     var pd_bools = ((pd_df["a"] > 0) & (pd_df["b"] > 0)).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 3)
     for i in range(3):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1588,7 +1588,7 @@ def test_conformance_eval_parens() raises:
     var bs_mask = bs_df.eval("a > 1 and (b > 5 or a > 2)")
     var pd_bools = ((pd_df["a"] > 1) & ((pd_df["b"] > 5) | (pd_df["a"] > 2))).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 3)
     for i in range(3):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1605,7 +1605,7 @@ def test_conformance_eval_not_parens() raises:
     var bs_mask = bs_df.eval("not (a == 1 or b == 2)")
     var pd_bools = (~((pd_df["a"] == 1) | (pd_df["b"] == 2))).tolist()
 
-    ref bs_d = bs_mask._col._data[List[Bool]]
+    ref bs_d = bs_mask._col._bool_cache
     assert_equal(len(bs_d), 4)
     for i in range(4):
         assert_equal(bs_d[i], Bool(py=pd_bools[i]))
@@ -1639,11 +1639,11 @@ def test_conformance_eval_nulls_simple() raises:
     # Non-null positions must agree with pandas boolean operations.
     var pd_bools = (pd_df["a"] > 1)
     assert_false(bs_mask._col.is_null(0))
-    assert_true(not bs_mask._col._data[List[Bool]][0])
+    assert_true(not bs_mask._col._bool_cache[0])
     assert_false(bs_mask._col.is_null(2))
-    assert_true(bs_mask._col._data[List[Bool]][2])
+    assert_true(bs_mask._col._bool_cache[2])
     assert_false(bs_mask._col.is_null(4))
-    assert_true(bs_mask._col._data[List[Bool]][4])
+    assert_true(bs_mask._col._bool_cache[4])
 
     # query() must exclude null rows; count must match pandas oracle.
     var bs_result = bs_df.query("a > 1")

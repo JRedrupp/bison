@@ -27,7 +27,7 @@ from marrow.dtypes import (
 )
 from marrow.schema import Schema as _MarrowSchema
 from marrow.tabular import RecordBatch, Table
-from .column import Column, ColumnData, ColumnStorage, NullMask
+from .column import Column, ColumnStorage, NullMask
 from .dataframe import DataFrame
 from .dtypes import int64, float64, bool_, object_, string_
 
@@ -55,8 +55,8 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
     """
     var n = len(col)
 
-    if col._data.isa[List[Int64]]():
-        ref src = col._data[List[Int64]]
+    if col.is_int():
+        ref src = col._int64_data()
         var vals = List[Optional[Int]]()
         for i in range(n):
             if _is_null(col, i):
@@ -65,8 +65,8 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(Int(src[i]))
         return AnyArray(array[Int64Type](vals^))
 
-    elif col._data.isa[List[Float64]]():
-        ref src = col._data[List[Float64]]
+    elif col.is_float():
+        ref src = col._float64_data()
         var vals = List[Optional[Float64]]()
         for i in range(n):
             if _is_null(col, i):
@@ -75,8 +75,8 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(src[i])
         return AnyArray(array[Float64Type](vals^))
 
-    elif col._data.isa[List[Bool]]():
-        ref src = col._data[List[Bool]]
+    elif col.is_bool():
+        ref src = col._bool_data()
         var vals = List[Optional[Bool]]()
         for i in range(n):
             if _is_null(col, i):
@@ -86,7 +86,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
         return AnyArray(array(vals^))
 
     elif col.is_string():
-        ref src = col._data[List[String]]
+        ref src = col._str_data()
         var b = StringBuilder(capacity=n)
         for i in range(n):
             if _is_null(col, i):
@@ -128,7 +128,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
             else:
                 data.append(rebind[Int64](src.unsafe_get(i)))
                 null_mask.append_valid()
-        var col = Column(name, ColumnData(data^), int64)
+        var col = Column(name, data^, int64)
         if null_mask.has_nulls():
             col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
@@ -145,7 +145,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
             else:
                 data.append(rebind[Float64](src.unsafe_get(i)))
                 null_mask.append_valid()
-        var col = Column(name, ColumnData(data^), float64)
+        var col = Column(name, data^, float64)
         if null_mask.has_nulls():
             col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
@@ -162,7 +162,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
             else:
                 data.append(src[i].value())
                 null_mask.append_valid()
-        var col = Column(name, ColumnData(data^), bool_)
+        var col = Column(name, data^, bool_)
         if null_mask.has_nulls():
             col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
@@ -180,7 +180,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
                 data.append(String(src.unsafe_get(UInt(i))))
                 null_mask.append_valid()
         # #644: string-backed columns carry string_ dtype.
-        var col = Column(name, ColumnData(data^), string_)
+        var col = Column(name, data^, string_)
         if null_mask.has_nulls():
             col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())

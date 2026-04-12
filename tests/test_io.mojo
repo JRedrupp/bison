@@ -14,7 +14,6 @@ from bison import (
     ToDictResult,
     Series,
     Column,
-    ColumnData,
     NullMask,
     bool_,
     int64,
@@ -96,7 +95,7 @@ def test_read_csv_bool_inference() raises:
     # 'flag' column should be inferred as bool_
     var col = df["flag"]._col
     assert_true(col.dtype == bool_)
-    ref data = col._data[List[Bool]]
+    ref data = col._bool_cache
     assert_true(data[0])
     assert_true(not data[1])
     assert_true(data[2])
@@ -196,8 +195,8 @@ def test_parquet_roundtrip() raises:
     d_b.append(5.0)
     d_b.append(6.0)
     var cols = List[Column]()
-    cols.append(Column("a", ColumnData(d_a^), int64))
-    cols.append(Column("b", ColumnData(d_b^), float64))
+    cols.append(Column("a", d_a^, int64))
+    cols.append(Column("b", d_b^, float64))
     var df = DataFrame(cols^)
 
     df.to_parquet(path)
@@ -210,10 +209,10 @@ def test_parquet_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
     # Verify values round-tripped correctly.
-    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(1))
-    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(3))
-    assert_equal(df2._cols[1]._data[List[Float64]][0], Float64(4.0))
-    assert_equal(df2._cols[1]._data[List[Float64]][2], Float64(6.0))
+    assert_equal(df2._cols[0]._int64_cache[0], Int64(1))
+    assert_equal(df2._cols[0]._int64_cache[2], Int64(3))
+    assert_equal(df2._cols[1]._f64_cache[0], Float64(4.0))
+    assert_equal(df2._cols[1]._f64_cache[2], Float64(6.0))
 
 
 def test_read_json_records() raises:
@@ -401,8 +400,8 @@ def test_to_parquet_writes_file() raises:
     d_b.append(3.0)
     d_b.append(4.0)
     var cols = List[Column]()
-    cols.append(Column("a", ColumnData(d_a^), int64))
-    cols.append(Column("b", ColumnData(d_b^), float64))
+    cols.append(Column("a", d_a^, int64))
+    cols.append(Column("b", d_b^, float64))
     var df = DataFrame(cols^)
 
     df.to_parquet(path)
@@ -425,8 +424,8 @@ def test_parquet_roundtrip_bool_string() raises:
     d_name.append("bob")
     d_name.append("carol")
     var cols = List[Column]()
-    cols.append(Column("flag", ColumnData(d_flag^), bool_))
-    cols.append(Column("name", ColumnData(d_name^), string_))
+    cols.append(Column("flag", d_flag^, bool_))
+    cols.append(Column("name", d_name^, string_))
     var df = DataFrame(cols^)
 
     df.to_parquet(path)
@@ -434,10 +433,10 @@ def test_parquet_roundtrip_bool_string() raises:
 
     assert_equal(df2.shape()[0], 3)
     assert_equal(df2.shape()[1], 2)
-    assert_equal(df2._cols[0]._data[List[Bool]][0], True)
-    assert_equal(df2._cols[0]._data[List[Bool]][1], False)
-    assert_equal(df2._cols[1]._data[List[String]][0], "alice")
-    assert_equal(df2._cols[1]._data[List[String]][2], "carol")
+    assert_equal(df2._cols[0]._bool_cache[0], True)
+    assert_equal(df2._cols[0]._bool_cache[1], False)
+    assert_equal(df2._cols[1]._str_cache[0], "alice")
+    assert_equal(df2._cols[1]._str_cache[2], "carol")
 
 
 def test_parquet_roundtrip_with_nulls() raises:
@@ -450,7 +449,7 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_a.append(10)
     d_a.append(0)
     d_a.append(30)
-    var col_a = Column("a", ColumnData(d_a^), int64)
+    var col_a = Column("a", d_a^, int64)
     var mask_a = NullMask()
     mask_a.append(False)
     mask_a.append(True)
@@ -461,7 +460,7 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
-    var col_b = Column("b", ColumnData(d_b^), string_)
+    var col_b = Column("b", d_b^, string_)
     var mask_b = NullMask()
     mask_b.append(False)
     mask_b.append(True)
@@ -480,10 +479,10 @@ def test_parquet_roundtrip_with_nulls() raises:
     assert_equal(df2.shape()[1], 2)
 
     # Non-null values preserved.
-    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(10))
-    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(30))
-    assert_equal(df2._cols[1]._data[List[String]][0], "hi")
-    assert_equal(df2._cols[1]._data[List[String]][2], "bye")
+    assert_equal(df2._cols[0]._int64_cache[0], Int64(10))
+    assert_equal(df2._cols[0]._int64_cache[2], Int64(30))
+    assert_equal(df2._cols[1]._str_cache[0], "hi")
+    assert_equal(df2._cols[1]._str_cache[2], "bye")
 
     # Null masks preserved.
     assert_false(df2._cols[0].is_null(0))
@@ -509,8 +508,8 @@ def test_parquet_interop_pyarrow() raises:
     d_y.append(1.5)
     d_y.append(2.5)
     var cols = List[Column]()
-    cols.append(Column("x", ColumnData(d_x^), int64))
-    cols.append(Column("y", ColumnData(d_y^), float64))
+    cols.append(Column("x", d_x^, int64))
+    cols.append(Column("y", d_y^, float64))
     var df = DataFrame(cols^)
 
     df.to_parquet(path)
@@ -539,8 +538,8 @@ def test_ipc_roundtrip() raises:
     d_b.append(5.0)
     d_b.append(6.0)
     var cols = List[Column]()
-    cols.append(Column("a", ColumnData(d_a^), int64))
-    cols.append(Column("b", ColumnData(d_b^), float64))
+    cols.append(Column("a", d_a^, int64))
+    cols.append(Column("b", d_b^, float64))
     var df = DataFrame(cols^)
 
     write_ipc(df, path)
@@ -551,10 +550,10 @@ def test_ipc_roundtrip() raises:
     assert_equal(shape[1], 2)
     assert_equal(df2.columns()[0], "a")
     assert_equal(df2.columns()[1], "b")
-    assert_equal(df2._cols[0]._data[List[Int64]][0], Int64(1))
-    assert_equal(df2._cols[0]._data[List[Int64]][2], Int64(3))
-    assert_equal(df2._cols[1]._data[List[Float64]][0], Float64(4.0))
-    assert_equal(df2._cols[1]._data[List[Float64]][2], Float64(6.0))
+    assert_equal(df2._cols[0]._int64_cache[0], Int64(1))
+    assert_equal(df2._cols[0]._int64_cache[2], Int64(3))
+    assert_equal(df2._cols[1]._f64_cache[0], Float64(4.0))
+    assert_equal(df2._cols[1]._f64_cache[2], Float64(6.0))
 
 
 def test_ipc_roundtrip_bool_string() raises:
@@ -572,8 +571,8 @@ def test_ipc_roundtrip_bool_string() raises:
     d_name.append("bob")
     d_name.append("carol")
     var cols = List[Column]()
-    cols.append(Column("flag", ColumnData(d_flag^), bool_))
-    cols.append(Column("name", ColumnData(d_name^), string_))
+    cols.append(Column("flag", d_flag^, bool_))
+    cols.append(Column("name", d_name^, string_))
     var df = DataFrame(cols^)
 
     write_ipc(df, path)
@@ -581,11 +580,11 @@ def test_ipc_roundtrip_bool_string() raises:
 
     assert_equal(df2.shape()[0], 3)
     assert_equal(df2.shape()[1], 2)
-    assert_equal(df2._cols[0]._data[List[Bool]][0], True)
-    assert_equal(df2._cols[0]._data[List[Bool]][1], False)
+    assert_equal(df2._cols[0]._bool_cache[0], True)
+    assert_equal(df2._cols[0]._bool_cache[1], False)
     # Strings come back as List[String] (promoted from object dtype by from_pandas).
-    assert_equal(df2._cols[1]._data[List[String]][0], "alice")
-    assert_equal(df2._cols[1]._data[List[String]][2], "carol")
+    assert_equal(df2._cols[1]._str_cache[0], "alice")
+    assert_equal(df2._cols[1]._str_cache[2], "carol")
 
 
 def test_ipc_roundtrip_with_nulls() raises:
@@ -598,7 +597,7 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_a.append(10.0)
     d_a.append(0.0)
     d_a.append(30.0)
-    var col_a = Column("a", ColumnData(d_a^), float64)
+    var col_a = Column("a", d_a^, float64)
     var mask_a = NullMask()
     mask_a.append(False)
     mask_a.append(True)
@@ -609,7 +608,7 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
-    var col_b = Column("b", ColumnData(d_b^), string_)
+    var col_b = Column("b", d_b^, string_)
     var mask_b = NullMask()
     mask_b.append(False)
     mask_b.append(True)
@@ -628,11 +627,11 @@ def test_ipc_roundtrip_with_nulls() raises:
     assert_equal(df2.shape()[1], 2)
 
     # Non-null values preserved (float64 survives pandas round-trip as Float64).
-    assert_equal(df2._cols[0]._data[List[Float64]][0], Float64(10.0))
-    assert_equal(df2._cols[0]._data[List[Float64]][2], Float64(30.0))
+    assert_equal(df2._cols[0]._f64_cache[0], Float64(10.0))
+    assert_equal(df2._cols[0]._f64_cache[2], Float64(30.0))
     # Strings come back as List[String] (promoted from object dtype by from_pandas).
-    assert_equal(df2._cols[1]._data[List[String]][0], "hi")
-    assert_equal(df2._cols[1]._data[List[String]][2], "bye")
+    assert_equal(df2._cols[1]._str_cache[0], "hi")
+    assert_equal(df2._cols[1]._str_cache[2], "bye")
 
     # Null masks preserved.
     assert_false(df2._cols[0].is_null(0))
@@ -654,7 +653,7 @@ def test_to_ipc_writes_file() raises:
     d_x.append(1)
     d_x.append(2)
     var cols = List[Column]()
-    cols.append(Column("x", ColumnData(d_x^), int64))
+    cols.append(Column("x", d_x^, int64))
     var df = DataFrame(cols^)
 
     df.to_ipc(path)
@@ -675,8 +674,8 @@ def test_ipc_interop_pyarrow() raises:
     d_y.append(1.5)
     d_y.append(2.5)
     var cols = List[Column]()
-    cols.append(Column("x", ColumnData(d_x^), int64))
-    cols.append(Column("y", ColumnData(d_y^), float64))
+    cols.append(Column("x", d_x^, int64))
+    cols.append(Column("y", d_y^, float64))
     var df = DataFrame(cols^)
 
     write_ipc(df, path)

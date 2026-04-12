@@ -146,7 +146,6 @@ def _build_key_col(keys: List[String], counts: List[Int]) raises -> Column:
         for _ in range(counts[i]):
             data.append(keys[i])
     var col = Column(Optional[String]("__key__"), data^, string_)
-    col._try_activate_storage()
     return col^
 
 
