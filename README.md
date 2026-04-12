@@ -197,7 +197,20 @@ well-defined subset of the pandas query/eval grammar:
 The full grammar, precedence table, and null-semantics truth tables are
 documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
 
+## Documentation
+
+- [Getting started](docs/getting-started.md) — installation, first DataFrame, core operations
+- [API reference](docs/api-reference.md) — full method listing with native/stub status
+- [Architecture](docs/architecture.md) — column storage, type predicates, marrow integration
+- [Mojo patterns](docs/mojo-patterns.md) — language-specific tips and pitfalls
+- [Testing](docs/testing.md) — how to run and write tests
+- [CI/CD](docs/ci.md) — GitHub Actions, pre-commit hooks, benchmarks, releasing
+- [Profiling](docs/profiling.md) — perf, samply, and callgrind guides
+- [Query/eval spec](docs/query-eval-spec.md) — grammar and null semantics
+
 ## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 1. Pick a stub method (any `_not_implemented` call in `bison/`).
 2. Replace the `_not_implemented` call with a native Mojo implementation.
