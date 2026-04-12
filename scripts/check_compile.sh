@@ -8,9 +8,11 @@ set -euo pipefail
 # files that `mojo package bison/ --Werror` (the pre-commit check) does not
 # cover, since those files live outside the bison package.
 #
-# Uses `mojo build` to compile each file.  Linker-only failures (missing
-# system libraries) are reported as warnings rather than errors, since those
-# are environment-specific and not source-level bugs.
+# Uses `mojo build` to compile each file.  `-Xlinker -lm` is passed so that
+# files using math functions (log10, sqrt, etc.) link correctly.  Remaining
+# linker-only failures (other missing system libraries) are still reported as
+# warnings rather than errors, since those are environment-specific and not
+# source-level bugs.
 #
 # Files are compiled in parallel for speed.
 #
@@ -63,7 +65,7 @@ for f in "${FILES[@]}"; do
     result_file="$RESULT_DIR/$name"
     log_file="$LOG_DIR/$name.log"
     (
-        if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" "$f" -o "$BIN_DIR/$name" >"$log_file" 2>&1; then
+        if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" -Xlinker -lm "$f" -o "$BIN_DIR/$name" >"$log_file" 2>&1; then
             echo "pass" > "$result_file"
         elif grep -q "failed to link executable" "$log_file"; then
             # Linker-only failure (e.g. missing libm on some systems).
@@ -121,6 +123,6 @@ if [ ${#ERRORS[@]} -gt 0 ]; then
     done
     echo ""
     echo "Re-run individually for detailed error output:"
-    echo "  mojo build -I .bison-cache -I . <file>"
+    echo "  mojo build -I .bison-cache -I . -Xlinker -lm <file>"
     exit 1
 fi
