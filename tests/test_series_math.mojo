@@ -558,7 +558,7 @@ def test_bool_and() raises:
     var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var result = s1.and_(s2)
-    ref d = result._col._data[List[Bool]]
+    ref d = result._col._bool_cache
     assert_true(d[0] == True)
     assert_true(d[1] == False)
     assert_true(d[2] == False)
@@ -572,7 +572,7 @@ def test_bool_and_dunder() raises:
     var s1 = Series(pd.Series(Python.evaluate("[True, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[False, False]"), dtype="bool"))
     var result = s1.__and__(s2)
-    ref d = result._col._data[List[Bool]]
+    ref d = result._col._bool_cache
     assert_true(d[0] == False)
     assert_true(d[1] == False)
 
@@ -583,7 +583,7 @@ def test_bool_or() raises:
     var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var result = s1.or_(s2)
-    ref d = result._col._data[List[Bool]]
+    ref d = result._col._bool_cache
     assert_true(d[0] == True)
     assert_true(d[1] == True)
     assert_true(d[2] == True)
@@ -597,7 +597,7 @@ def test_bool_xor() raises:
     var s1 = Series(pd.Series(Python.evaluate("[True, True, False, False]"), dtype="bool"))
     var s2 = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var result = s1.xor(s2)
-    ref d = result._col._data[List[Bool]]
+    ref d = result._col._bool_cache
     assert_true(d[0] == False)
     assert_true(d[1] == True)
     assert_true(d[2] == True)
@@ -610,7 +610,7 @@ def test_bool_invert() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[True, False, True, False]"), dtype="bool"))
     var result = s.invert()
-    ref d = result._col._data[List[Bool]]
+    ref d = result._col._bool_cache
     assert_true(d[0] == False)
     assert_true(d[1] == True)
     assert_true(d[2] == False)
@@ -629,7 +629,7 @@ def test_bool_and_kleene_nulls() raises:
     # False AND Null → False (non-null)
     assert_true(result._col.has_nulls())
     assert_false(result._col.is_null(0))
-    assert_true(result._col._data[List[Bool]][0] == False)
+    assert_true(result._col._bool_cache[0] == False)
     # True AND Null → Null
     assert_true(result._col.is_null(1))
     # Null AND Null → Null
@@ -647,7 +647,7 @@ def test_bool_or_kleene_nulls() raises:
     # True OR Null → True (non-null)
     assert_true(result._col.has_nulls())
     assert_false(result._col.is_null(0))
-    assert_true(result._col._data[List[Bool]][0] == True)
+    assert_true(result._col._bool_cache[0] == True)
     # False OR Null → Null
     assert_true(result._col.is_null(1))
     # Null OR Null → Null
@@ -661,10 +661,10 @@ def test_bool_invert_null() raises:
     var result = s.invert()
     assert_true(result._col.has_nulls())
     assert_false(result._col.is_null(0))
-    assert_true(result._col._data[List[Bool]][0] == False)
+    assert_true(result._col._bool_cache[0] == False)
     assert_true(result._col.is_null(1))
     assert_false(result._col.is_null(2))
-    assert_true(result._col._data[List[Bool]][2] == True)
+    assert_true(result._col._bool_cache[2] == True)
 
 
 def test_bool_and_mismatch() raises:

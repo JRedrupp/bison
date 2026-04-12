@@ -1,7 +1,7 @@
 """Tests for from_pandas / to_pandas interop (these work at stub stage)."""
 from std.python import Python, PythonObject
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import DataFrame, Series, Column, ColumnData, NullMask, int64, float64, object_, string_
+from bison import DataFrame, Series, Column, NullMask, int64, float64, object_, string_
 from _helpers import assert_frame_equal, assert_series_equal
 
 
@@ -70,25 +70,25 @@ def test_column_typed_storage() raises:
     # int64 column -> List[Int64] arm
     var s_int = pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64", name="i")
     var col_int = Column.from_pandas(s_int, "i")
-    assert_true(col_int._data.isa[List[Int64]](), "int column should use List[Int64]")
+    assert_true(col_int.is_int(), "int column should use List[Int64]")
     assert_equal(col_int.__len__(), 3)
 
     # float64 column -> List[Float64] arm
     var s_float = pd.Series(Python.evaluate("[1.1, 2.2]"), dtype="float64", name="f")
     var col_float = Column.from_pandas(s_float, "f")
-    assert_true(col_float._data.isa[List[Float64]](), "float column should use List[Float64]")
+    assert_true(col_float.is_float(), "float column should use List[Float64]")
     assert_equal(col_float.__len__(), 2)
 
     # bool column -> List[Bool] arm
     var s_bool = pd.Series(Python.evaluate("[True, False]"), dtype="bool", name="b")
     var col_bool = Column.from_pandas(s_bool, "b")
-    assert_true(col_bool._data.isa[List[Bool]](), "bool column should use List[Bool]")
+    assert_true(col_bool.is_bool(), "bool column should use List[Bool]")
     assert_equal(col_bool.__len__(), 2)
 
     # pure-string object column -> List[String] arm (promoted)
     var s_obj = pd.Series(Python.evaluate("['x', 'y']"), dtype="object", name="o")
     var col_obj = Column.from_pandas(s_obj, "o")
-    assert_true(col_obj._data.isa[List[String]](), "pure-string object column should be promoted to List[String]")
+    assert_true(col_obj.is_string(), "pure-string object column should be promoted to List[String]")
     assert_equal(col_obj.__len__(), 2)
     # #644: promoted string columns carry string_ dtype (not object_).
     assert_equal(col_obj.dtype.name, "string")
@@ -185,7 +185,7 @@ def test_int_column_direct_null_mask_to_pandas() raises:
     data.append(10)
     data.append(0)
     data.append(30)
-    var col = Column("x", ColumnData(data^), int64)
+    var col = Column("x", data^, int64)
     var mask = NullMask()
     mask.append_valid()
     mask.append_null()
@@ -212,7 +212,7 @@ def test_obj_column_with_null_mask_to_pandas() raises:
     raw.append(Python.evaluate("'apple'"))
     raw.append(Python.evaluate("'should-be-null'"))  # stored value, must be masked
     raw.append(Python.evaluate("'cherry'"))
-    var col = Column("fruit", ColumnData(raw^), object_)
+    var col = Column("fruit", raw^, object_)
     var mask = NullMask()
     mask.append_valid()
     mask.append_null()
@@ -234,7 +234,7 @@ def test_string_promotion_from_pandas() raises:
     # 'name' column should be promoted to List[String]
     ref name_col = df._cols[0]
     assert_true(
-        name_col._data.isa[List[String]](),
+        name_col.is_string(),
         "pure-string column should be promoted to List[String]",
     )
     # #644: promoted string columns now carry string_ dtype.
@@ -244,7 +244,7 @@ def test_string_promotion_from_pandas() raises:
     # 'val' column should remain List[Int64]
     ref val_col = df._cols[1]
     assert_true(
-        val_col._data.isa[List[Int64]](),
+        val_col.is_int(),
         "int column should remain List[Int64]",
     )
 
@@ -255,7 +255,7 @@ def test_mixed_object_column_not_promoted() raises:
     var s = pd.Series(Python.evaluate("['hello', 42, 3.14]"), dtype="object", name="mix")
     var col = Column.from_pandas(s, "mix")
     assert_true(
-        col._data.isa[List[PythonObject]](),
+        col.is_object(),
         "mixed-type object column must remain List[PythonObject]",
     )
 
@@ -269,7 +269,7 @@ def test_string_promotion_with_nulls() raises:
     )
     var col = Column.from_pandas(s, "s")
     assert_true(
-        col._data.isa[List[String]](),
+        col.is_string(),
         "string column with nulls should promote to List[String]",
     )
     # #644: promoted string column carries string_ dtype.
@@ -290,7 +290,7 @@ def test_string_promotion_roundtrip() raises:
     var df = DataFrame.from_pandas(pd_df)
     # Verify promotion happened
     assert_true(
-        df._cols[0]._data.isa[List[String]](),
+        df._cols[0].is_string(),
         "city column should be promoted to List[String]",
     )
     # #644: promoted string column carries string_ dtype.
@@ -314,7 +314,7 @@ def test_string_promotion_with_nulls_roundtrip() raises:
     )
     var s = Series.from_pandas(pd_s)
     assert_true(
-        s._col._data.isa[List[String]](),
+        s._col.is_string(),
         "string series with nulls should promote to List[String]",
     )
     var back = s.to_pandas()
@@ -329,7 +329,7 @@ def test_empty_object_column_promoted() raises:
     var s = pd.Series(Python.evaluate("[]"), dtype="object", name="e")
     var col = Column.from_pandas(s, "e")
     assert_true(
-        col._data.isa[List[String]](),
+        col.is_string(),
         "empty object column should promote to List[String]",
     )
     # #644: empty promoted string column carries string_ dtype.
@@ -358,7 +358,7 @@ def test_object_dtype_distinct_from_string() raises:
     var raw = List[PythonObject]()
     raw.append(Python.evaluate("'a'"))
     raw.append(Python.evaluate("42"))
-    var col = Column("x", ColumnData(raw^), object_)
+    var col = Column("x", raw^, object_)
     assert_equal(col.dtype.name, "object")
     assert_true(col.is_object())
     assert_false(col.is_string())

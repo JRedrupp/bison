@@ -261,8 +261,8 @@ def test_dt_date() raises:
     var col = acc.date()
     # date() returns a PythonObject column; verify against pandas
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15', '2021-06-30']"))).dt.date
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_time() raises:
@@ -271,8 +271,8 @@ def test_dt_time() raises:
     var acc = s.dt()
     var col = acc.time()
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:30:15', '2021-06-30 23:45:59']"))).dt.time
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_floor() raises:
@@ -280,8 +280,8 @@ def test_dt_floor() raises:
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:45:00']"))))
     var col = s.dt().floor("h")
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:45:00']"))).dt.floor("h")
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_ceil() raises:
@@ -289,8 +289,8 @@ def test_dt_ceil() raises:
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:01:00']"))))
     var col = s.dt().ceil("h")
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:37:00', '2021-06-30 23:01:00']"))).dt.ceil("h")
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_round() raises:
@@ -298,8 +298,8 @@ def test_dt_round() raises:
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:20:00', '2021-06-30 23:50:00']"))))
     var col = s.dt().round("h")
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:20:00', '2021-06-30 23:50:00']"))).dt.round("h")
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_tz_localize() raises:
@@ -307,8 +307,8 @@ def test_dt_tz_localize() raises:
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']"))))
     var col = s.dt().tz_localize("UTC")
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']"))).dt.tz_localize("UTC")
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def test_dt_tz_convert() raises:
@@ -316,8 +316,8 @@ def test_dt_tz_convert() raises:
     var s = Series(pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']")).tz_localize("UTC")))
     var col = s.dt().tz_convert("US/Eastern")
     var pd_result = pd.Series(pd.to_datetime(Python.evaluate("['2020-01-15 08:00:00', '2021-06-30 12:00:00']")).tz_localize("UTC")).dt.tz_convert("US/Eastern")
-    assert_equal(String(col._data[List[PythonObject]][0].__str__()), String(pd_result[0].__str__()))
-    assert_equal(String(col._data[List[PythonObject]][1].__str__()), String(pd_result[1].__str__()))
+    assert_equal(String(col._storage_legacy().data[0].__str__()), String(pd_result[0].__str__()))
+    assert_equal(String(col._storage_legacy().data[1].__str__()), String(pd_result[1].__str__()))
 
 
 def main() raises:

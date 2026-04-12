@@ -17,7 +17,7 @@ def test_df_isna_no_nulls() raises:
     assert_equal(result.shape()[1], 1)
     var col_a = result["a"]
     for i in range(3):
-        assert_true(not col_a._col._data[List[Bool]][i])
+        assert_true(not col_a._col._bool_cache[i])
 
 
 def test_df_isna_with_nulls() raises:
@@ -26,9 +26,9 @@ def test_df_isna_with_nulls() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var result = df.isna()
     var col_a = result["a"]
-    assert_true(not col_a._col._data[List[Bool]][0])
-    assert_true(col_a._col._data[List[Bool]][1])
-    assert_true(not col_a._col._data[List[Bool]][2])
+    assert_true(not col_a._col._bool_cache[0])
+    assert_true(col_a._col._bool_cache[1])
+    assert_true(not col_a._col._bool_cache[2])
 
 
 def test_df_isnull_alias() raises:
@@ -40,7 +40,7 @@ def test_df_isnull_alias() raises:
     var c1 = r1["x"]
     var c2 = r2["x"]
     for i in range(2):
-        assert_equal(c1._col._data[List[Bool]][i], c2._col._data[List[Bool]][i])
+        assert_equal(c1._col._bool_cache[i], c2._col._bool_cache[i])
 
 
 # ------------------------------------------------------------------
@@ -53,9 +53,9 @@ def test_df_notna_with_nulls() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var result = df.notna()
     var col_a = result["a"]
-    assert_true(col_a._col._data[List[Bool]][0])
-    assert_true(not col_a._col._data[List[Bool]][1])
-    assert_true(col_a._col._data[List[Bool]][2])
+    assert_true(col_a._col._bool_cache[0])
+    assert_true(not col_a._col._bool_cache[1])
+    assert_true(col_a._col._bool_cache[2])
 
 
 def test_df_notnull_alias() raises:
@@ -67,7 +67,7 @@ def test_df_notnull_alias() raises:
     var c1 = r1["x"]
     var c2 = r2["x"]
     for i in range(2):
-        assert_equal(c1._col._data[List[Bool]][i], c2._col._data[List[Bool]][i])
+        assert_equal(c1._col._bool_cache[i], c2._col._bool_cache[i])
 
 
 # ------------------------------------------------------------------
@@ -81,7 +81,7 @@ def test_df_fillna_float() raises:
     var result = df.fillna(DFScalar(Float64(0.0)))
     assert_equal(result.shape()[0], 3)
     var col_a = result["a"]
-    assert_equal(col_a._col._data[List[Float64]][1], Float64(0.0))
+    assert_equal(col_a._col._f64_cache[1], Float64(0.0))
 
 
 def test_df_fillna_no_nulls() raises:
@@ -166,9 +166,9 @@ def test_df_ffill() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, None, 4.0]}")))
     var result = df.ffill()
     var col_a = result["a"]
-    assert_equal(col_a._col._data[List[Float64]][1], Float64(1.0))
-    assert_equal(col_a._col._data[List[Float64]][2], Float64(1.0))
-    assert_equal(col_a._col._data[List[Float64]][3], Float64(4.0))
+    assert_equal(col_a._col._f64_cache[1], Float64(1.0))
+    assert_equal(col_a._col._f64_cache[2], Float64(1.0))
+    assert_equal(col_a._col._f64_cache[3], Float64(4.0))
 
 
 def test_df_ffill_no_nulls() raises:
@@ -189,8 +189,8 @@ def test_df_bfill() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [None, None, 3.0, 4.0]}")))
     var result = df.bfill()
     var col_a = result["a"]
-    assert_equal(col_a._col._data[List[Float64]][0], Float64(3.0))
-    assert_equal(col_a._col._data[List[Float64]][1], Float64(3.0))
+    assert_equal(col_a._col._f64_cache[0], Float64(3.0))
+    assert_equal(col_a._col._f64_cache[1], Float64(3.0))
 
 
 def test_df_bfill_no_nulls() raises:
@@ -211,7 +211,7 @@ def test_df_interpolate_linear() raises:
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [0.0, None, 4.0]}")))
     var result = df.interpolate()
     var col_a = result["a"]
-    assert_equal(col_a._col._data[List[Float64]][1], Float64(2.0))
+    assert_equal(col_a._col._f64_cache[1], Float64(2.0))
 
 
 def test_df_interpolate_no_nulls() raises:

@@ -5,7 +5,7 @@ duplicated, drop_duplicates, isin, combine_first, update.
 from std.python import Python
 from std.collections import Dict, Optional
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
-from bison import DataFrame, Series, ColumnData, DFScalar
+from bison import DataFrame, Series, DFScalar
 
 
 # ------------------------------------------------------------------

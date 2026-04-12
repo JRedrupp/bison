@@ -43,7 +43,6 @@ def _infer_and_build_column(
 
     if n == 0:
         var empty = Column(name, List[String](), string_)
-        empty._try_activate_storage()
         return empty^
 
     # ------------------------------------------------------------------
@@ -143,7 +142,6 @@ def _infer_and_build_column(
     var col = Column(name, data^, string_)
     if null_mask.has_nulls():
         col.set_null_mask(null_mask^)
-    col._try_activate_storage()
     return col^
 
 
