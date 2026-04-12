@@ -34,7 +34,6 @@ from .column import (
     _FillnaVisitor,
     _FfillVisitor,
     _BfillVisitor,
-    visit_col_data_raises,
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods

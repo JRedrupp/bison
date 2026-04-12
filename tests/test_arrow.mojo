@@ -213,44 +213,43 @@ def test_python_object_column_raises() raises:
 
 
 def test_storage_active_int64_no_nulls() raises:
-    """Phase 3: int64 Column constructed via typed-list ctor flips
-    _storage_active = True and populates the AnyArray arm of _storage.
+    """Phase 6c: int64 Column constructed via typed-list ctor populates
+    the AnyArray arm of _storage.
     """
     var data = List[Int64]()
     data.append(1)
     data.append(2)
     data.append(3)
     var col = Column("a", data^, int64)
-    assert_true(col._storage_active)
     assert_equal(len(col), 3)
 
 
 def test_storage_active_float64_no_nulls() raises:
-    """Phase 3: float64 Column constructed via typed-list ctor flips
-    _storage_active = True.
+    """Phase 6c: float64 Column constructed via typed-list ctor populates
+    the AnyArray arm of _storage.
     """
     var data = List[Float64]()
     data.append(1.5)
     data.append(2.5)
     data.append(3.5)
     var col = Column("b", data^, float64)
-    assert_true(col._storage_active)
+    assert_equal(len(col), 3)
 
 
 def test_storage_active_bool_no_nulls() raises:
-    """Phase 3: bool Column constructed via typed-list ctor flips
-    _storage_active = True.
+    """Phase 6c: bool Column constructed via typed-list ctor populates
+    the AnyArray arm of _storage.
     """
     var data = List[Bool]()
     data.append(True)
     data.append(False)
     data.append(True)
     var col = Column("c", data^, bool_)
-    assert_true(col._storage_active)
+    assert_equal(len(col), 3)
 
 
 def test_storage_active_with_null_mask_finalized() raises:
-    """Phase 3: after col._null_mask assignment, _try_activate_storage()
+    """Phase 6c: after col._null_mask assignment, _try_activate_storage()
     re-rebuilds _storage so the marrow bitmap reflects the current mask.
     """
     var data = List[Int64]()
@@ -264,7 +263,6 @@ def test_storage_active_with_null_mask_finalized() raises:
     mask.append_valid()
     col._null_mask = mask^
     col._try_activate_storage()
-    assert_true(col._storage_active)
     # has_nulls() should now read True via the marrow bitmap path.
     assert_true(col.has_nulls())
     assert_true(col.is_null(1))
