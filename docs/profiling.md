@@ -5,17 +5,21 @@ is spent during optimization sessions.
 
 ## Overview
 
-Bison uses external profiling tools (samply, callgrind) rather than custom
+Bison uses external profiling tools (perf, samply, callgrind) rather than custom
 instrumentation. Mojo compiles to native code, so standard Linux profiling
 tools work when the binary is compiled with debug symbols. This gives
 function-level and line-level cost attribution automatically.
 
 ## Prerequisites
 
-Install samply (the default profiling tool):
+Install perf (the default profiling tool):
 
 ```bash
-cargo install samply
+# Debian/Ubuntu
+apt install linux-perf
+
+# Or for a version-matched package
+apt install linux-tools-generic
 ```
 
 Ensure perf events are accessible:
@@ -31,11 +35,14 @@ echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid
 ## Quick start
 
 ```bash
-# Profile all benchmark operations (samply, default)
+# Profile all benchmark operations (perf, default)
 pixi run profile
 
 # Profile a single operation
 pixi run profile sort
+
+# Profile with samply instead (interactive flamegraph in Firefox Profiler)
+pixi run profile sort --samply
 
 # Profile with callgrind instead
 pixi run profile merge --callgrind
@@ -54,15 +61,46 @@ pixi run profile merge --callgrind
 
 ## Profiling tools
 
-### samply (default)
+### perf (default)
+
+[perf](https://perf.wiki.kernel.org/) is the Linux kernel performance
+profiler. It resolves Mojo symbols reliably via DWARF debug info and
+runs at near-native speed.
+
+```bash
+pixi run profile sort
+```
+
+This produces `profile_results/sort.perf.data`. View the report:
+
+```bash
+perf report -i profile_results/sort.perf.data
+```
+
+To generate an SVG flamegraph (requires
+[FlameGraph](https://github.com/brendangregg/FlameGraph)):
+
+```bash
+perf script -i profile_results/sort.perf.data \
+    | stackcollapse-perf.pl \
+    | flamegraph.pl > profile_results/sort.svg
+```
+
+### samply (alternative)
 
 [samply](https://github.com/mstange/samply) is a sampling profiler that
 produces interactive flamegraphs viewable in
 [Firefox Profiler](https://profiler.firefox.com). It runs at near-native
 speed and captures real wall-clock timing.
 
+**Note:** samply may produce unresolved hex addresses instead of function
+names on some Mojo binaries. This is a known issue where samply's offline
+symbolication does not handle the DWARF debug format emitted by
+`--debug-info-language C` on certain Mojo compiler versions. Use
+`--perf` (the default) for reliable symbol resolution.
+
 ```bash
-pixi run profile sort
+pixi run profile sort --samply
 ```
 
 This produces `profile_results/sort.samply.json`. View the flamegraph:
@@ -74,6 +112,12 @@ samply load profile_results/sort.samply.json
 This opens Firefox Profiler in your browser with an interactive flamegraph.
 You can zoom into call stacks, filter by function name, and see
 time-weighted call trees.
+
+Install samply:
+
+```bash
+cargo install samply
+```
 
 ### callgrind (alternative)
 
@@ -109,18 +153,19 @@ kcachegrind profile_results/callgrind.out.sort
 **Caveats:** Callgrind runs code under a CPU emulator (~20-50x slower than
 native). It may crash on Mojo binaries that use AVX-512 instructions
 (valgrind 3.22 does not support all EVEX-encoded instructions). If you
-encounter `SIGILL` errors, use samply instead.
+encounter `SIGILL` errors, use perf (the default) instead.
 
 ### When to use which tool
 
-| | samply | callgrind |
-|---|--------|-----------|
-| **Speed** | Near-native | ~20-50x slower |
-| **Accuracy** | Statistical (sampling) | Deterministic (instruction count) |
-| **Output** | Interactive flamegraph | Text + kcachegrind |
-| **Best for** | High-level overview, call trees | Line-level hotspot analysis |
-| **AVX-512** | Works | May crash |
-| **Install** | `cargo install samply` | `apt install valgrind` |
+| | perf | samply | callgrind |
+|---|------|--------|-----------|
+| **Speed** | Near-native | Near-native | ~20-50x slower |
+| **Accuracy** | Statistical (sampling) | Statistical (sampling) | Deterministic (instruction count) |
+| **Output** | Text report / SVG flamegraph | Interactive flamegraph | Text + kcachegrind |
+| **Symbol resolution** | Reliable with DWARF | May show hex addresses | Reliable |
+| **Best for** | Default profiling, CI | Interactive exploration | Line-level hotspot analysis |
+| **AVX-512** | Works | Works | May crash |
+| **Install** | `apt install linux-perf` | `cargo install samply` | `apt install valgrind` |
 
 ## How it works
 
@@ -137,7 +182,7 @@ The `pixi run profile` command:
 The compiler flags:
 - `-g` adds full debug info (function names + line numbers in profile output)
 - `--debug-info-language C` makes symbols readable by standard Linux tools
-  (samply, callgrind, perf) that don't understand Mojo debug format natively
+  (perf, samply, callgrind) that don't understand Mojo debug format natively
 
 ## Manual profiling
 
@@ -154,12 +199,12 @@ mojo build -I .bison-cache -I . benchmarks/bench_profile.mojo \
     -g --debug-info-language C \
     -o /tmp/bison_profile
 
-# 3a. Profile with samply
-BISON_PROFILE_OP=sort samply record /tmp/bison_profile
+# 3a. Profile with perf (default, recommended)
+BISON_PROFILE_OP=sort perf record -g --call-graph dwarf -o sort.perf.data /tmp/bison_profile
+perf report -i sort.perf.data
 
-# 3b. Or profile with perf (if installed)
-BISON_PROFILE_OP=sort perf record -g /tmp/bison_profile
-perf report
+# 3b. Or profile with samply
+BISON_PROFILE_OP=sort samply record /tmp/bison_profile
 
 # 3c. Or profile with callgrind
 BISON_PROFILE_OP=sort valgrind --tool=callgrind \
@@ -169,17 +214,19 @@ callgrind_annotate --auto=yes my_profile.out
 
 ## Interpreting results
 
-### Reading a samply flamegraph
+### Reading a perf report
 
-In Firefox Profiler:
+```bash
+perf report -i profile_results/sort.perf.data
+```
 
-- **Flame chart** (default view): Each row is a stack frame. Width = time
-  spent. Wider bars = more time. Click to zoom in.
-- **Call tree** tab: Shows hierarchical breakdown of where time is spent.
-  Sort by "Self" to find the functions that do the most actual work (vs
-  just calling other functions).
-- **Search**: Type a function name (e.g. `sort_perm`) to highlight it
-  across the flame chart.
+- **Children %**: fraction of samples where this function was anywhere in
+  the call stack (inclusive).
+- **Self %**: fraction of samples where this function was at the top of the
+  stack (where the CPU was actually executing).
+- Sort by **Self** to find the functions doing the most actual work.
+- Press `a` on a function to annotate it with source/assembly lines.
+- Press `q` to quit.
 
 ### Common hot functions
 
