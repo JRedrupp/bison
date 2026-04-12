@@ -30,7 +30,11 @@ Native I/O highlights:
   `nrows`, `skiprows`, and NA-value handling.
 - `read_json` — pure Mojo reader supporting `records`, `split`, `columns`,
   `index`, `values` orient formats, and JSON Lines / NDJSON (`lines=True`).
-- `read_parquet` and `read_excel` delegate to pandas (stubs).
+- `read_parquet` / `to_parquet` — native Parquet I/O via marrow (Apache Arrow
+  for Mojo) for int64, float64, bool, and string columns. Falls back to pandas
+  for object columns or when row-group filters are supplied.
+- `read_ipc` / `write_ipc` — Arrow IPC (Feather v2) via PyArrow interop.
+- `read_excel` — delegates to pandas (requires `openpyxl` or `xlrd`).
 
 ## Install
 
@@ -48,7 +52,7 @@ pixi install
 
 ```mojo
 import bison as bs
-from python import Python
+from std.python import Python
 
 def main() raises:
     var pd = Python.import_module("pandas")
