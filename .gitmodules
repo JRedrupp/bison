@@ -1,3 +1,0 @@
-[submodule "vendor/marrow"]
-	path = vendor/marrow
-	url = https://github.com/kszucs/marrow.git

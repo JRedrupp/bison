@@ -126,8 +126,8 @@ parameters (`decimals`). Do not refactor them to use `_apply`.
 
 ## Marrow integration
 
-Marrow (Apache Arrow for Mojo) is vendored at `vendor/marrow/` as a git
-submodule. Built via `pixi run build-marrow`. The integration provides:
+Marrow (Apache Arrow for Mojo) is installed as a pixi dependency from
+the upstream git repository via `pixi-build`. The integration provides:
 
 - **Arrow conversion layer** (`bison/arrow.mojo`):
   `column_to_marrow_array`, `marrow_array_to_column`,

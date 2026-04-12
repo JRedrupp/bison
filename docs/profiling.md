@@ -190,7 +190,6 @@ For more control, you can compile and profile manually:
 
 ```bash
 # 1. Build the bison package
-pixi run build-marrow
 pixi run gen-version
 mojo package bison/ -o .bison-cache/bison.mojopkg
 

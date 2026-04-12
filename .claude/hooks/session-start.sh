@@ -22,11 +22,7 @@ if ! grep -q '.pixi/bin' "$HOME/.bashrc" 2>/dev/null; then
   echo 'export PATH="$HOME/.pixi/bin:$PATH"' >> "$HOME/.bashrc"
 fi
 
-# Initialise git submodules (e.g. vendor/marrow) if not already checked out
-echo "Initialising submodules..."
-git submodule update --init --recursive
-
-# Install all project dependencies (MAX + pandas + numpy)
+# Install all project dependencies (MAX + pandas + numpy + marrow)
 echo "Running pixi install..."
 pixi install
 
@@ -38,9 +34,5 @@ pre-commit install
 # Generate _version.mojo from pixi.toml (required before tests or imports)
 echo "Generating version file..."
 pixi run gen-version
-
-# Build marrow package (required by tests and Arrow integration)
-echo "Building marrow..."
-pixi run build-marrow
 
 echo "Session start complete."

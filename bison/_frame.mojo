@@ -2889,7 +2889,7 @@ struct DataFrame(Copyable, Movable):
                 + "'. Supported: abs, sqrt, exp, log, log10, ceil, floor, neg"
             )
 
-    def pipe[F: fn(DataFrame) raises -> DataFrame](self) raises -> DataFrame:
+    def pipe[F: def(DataFrame) raises -> DataFrame](self) raises -> DataFrame:
         return F(self)
 
     # ------------------------------------------------------------------

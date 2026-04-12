@@ -4,12 +4,21 @@ version = "0.1.0"
 description = "A Mojo DataFrame library with a pandas-compatible API"
 license = "Apache-2.0"
 requires-pixi = ">=0.41.0"
-channels = ["conda-forge", "https://conda.modular.com/max"]
+channels = [
+  "conda-forge",
+  "https://conda.modular.com/max-nightly",
+  "https://conda.modular.com/max",
+  "https://prefix.dev/mojo-community",
+  "https://prefix.dev/pontoneer",
+  "https://prefix.dev/pixi-build-backends",
+]
 platforms = ["linux-64", "osx-arm64"]
+preview = ["pixi-build"]
 
 [dependencies]
 max = ">=26.2"
 mblack = ">=26.2"
+marrow = { git = "https://github.com/kszucs/marrow.git", rev = "f72632999f" }
 
 [feature.dev.dependencies]
 pandas = ">=2.0"
@@ -20,14 +29,13 @@ python = ">=3.11"
 
 [tasks]
 gen-version   = "python scripts/gen_version.py"
-build-marrow  = "mojo package vendor/marrow/marrow -o .pixi/envs/default/lib/mojo/marrow.mojopkg"
-test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
+test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version"] }
 fmt           = "mojo format bison/"
-check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
-check-compile = { cmd = "bash scripts/check_compile.sh", depends-on = ["gen-version", "build-marrow"] }
+check         = "mojo package bison/ --Werror -o /tmp/bison.mojopkg"
+check-compile = { cmd = "bash scripts/check_compile.sh", depends-on = ["gen-version"] }
 lint          = "pre-commit run --all-files"
-bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version", "build-marrow"] }
-profile       = { cmd = "bash scripts/run_profile.sh", depends-on = ["gen-version", "build-marrow"] }
+bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version"] }
+profile       = { cmd = "bash scripts/run_profile.sh", depends-on = ["gen-version"] }
 gen-report    = "python scripts/generate_report.py"
 
 [environments]
