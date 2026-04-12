@@ -5346,14 +5346,18 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
     # ------------------------------------------------------------------
 
     def copy(self) -> Column:
-        """Return an independent copy of this Column."""
-        var visitor = _CopyDataVisitor()
-        self._visit(visitor)
-        var idx = self._index.copy()
-        var col = Column(self.name, visitor^.result.copy(), self.dtype, idx^)
+        """Return an independent copy of this Column.
+
+        Copies storage and typed caches directly — avoids the round-trip
+        through ``_CopyDataVisitor`` + constructor that would redundantly
+        rebuild caches and marrow storage only to overwrite them.
+        """
+        var col = Column()
+        col.name = self.name
+        col.dtype = self.dtype
+        col._index = self._index.copy()
         col._index_names = self._index_names.copy()
         col._index_name = self._index_name
-        # Copy storage backend and typed caches (always populated post-#647).
         col._storage = self._storage.copy()
         col._f64_cache = self._f64_cache.copy()
         col._int64_cache = self._int64_cache.copy()
