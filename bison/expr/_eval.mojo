@@ -155,6 +155,28 @@ def _parse_int_literal(node: ASTNode) raises -> Int64:
     return Int64(Int(node.value))
 
 
+def _normalize_compare_operands(
+    lhs: ASTNode, op: String, rhs: ASTNode
+) raises -> Tuple[ASTNode, String, ASTNode]:
+    """Normalize a comparison to (col_node, op, rhs_node) form.
+
+    If the identifier (column) is already on the left, the triple is returned
+    unchanged.  If the right operand is the identifier, the operands are
+    swapped and *op* is flipped via ``_flip_op`` so the column is always on
+    the left side.  Raises if neither operand is an identifier.
+
+    The returned *rhs_node* is whatever non-identifier node was paired with the
+    column; callers are responsible for validating its kind.
+    """
+    if lhs.kind == NK_IDENT:
+        return (lhs, op, rhs)
+    if rhs.kind == NK_IDENT:
+        return (rhs, _flip_op(op), lhs)
+    raise Error(
+        "evaluator: comparison must involve at least one column identifier"
+    )
+
+
 def _eval_compare(
     node: ASTNode, lhs: ASTNode, rhs: ASTNode, df: DataFrame
 ) raises -> Series:
@@ -162,26 +184,19 @@ def _eval_compare(
 
     *lhs* and *rhs* are the already-resolved child nodes (left and right
     operands of the comparison).
+
+    The function first handles the column-vs-column case directly, then
+    delegates to ``_normalize_compare_operands`` to ensure the identifier is
+    always on the left before dispatching on the literal kind.  This removes
+    the duplicated ``_resolve_ident`` calls that were previously needed for
+    each literal-left branch.
     """
     # For NK_COMPARE nodes, node.value holds the operator string
     # ("<", "<=", ">", ">=", "==", "!=") as set by the parser.
     var op = node.value
 
-    var lhs_is_ident = lhs.kind == NK_IDENT
-    var rhs_is_ident = rhs.kind == NK_IDENT
-    var lhs_is_int = lhs.kind == NK_INT
-    var rhs_is_int = rhs.kind == NK_INT
-    var lhs_is_float = lhs.kind == NK_FLOAT
-    var rhs_is_float = rhs.kind == NK_FLOAT
-    var lhs_is_string = lhs.kind == NK_STRING
-    var rhs_is_string = rhs.kind == NK_STRING
-    var lhs_is_null = lhs.kind == NK_NULL
-    var rhs_is_null = rhs.kind == NK_NULL
-    var lhs_is_bool = lhs.kind == NK_BOOL
-    var rhs_is_bool = rhs.kind == NK_BOOL
-
-    if lhs_is_ident and rhs_is_ident:
-        # column vs column
+    # Column vs column — both sides are identifiers; handled before normalization.
+    if lhs.kind == NK_IDENT and rhs.kind == NK_IDENT:
         var left_col = _resolve_ident(lhs.value, df)
         var right_col = _resolve_ident(rhs.value, df)
         if op == "<":
@@ -199,60 +214,30 @@ def _eval_compare(
         else:
             raise Error("evaluator: unknown operator '" + op + "'")
 
-    elif lhs_is_ident and rhs_is_int:
-        var col = _resolve_ident(lhs.value, df)
-        var val = _parse_int_literal(rhs)
-        return _apply_int_op(col, op, val)
+    # Normalize: ensure the column identifier is on the left, flipping op if
+    # the identifier was on the right.  Raises if neither side is an identifier.
+    var normalized = _normalize_compare_operands(lhs, op, rhs)
+    var col_node = normalized[0]
+    var norm_op = normalized[1]
+    var rhs_node = normalized[2]
 
-    elif lhs_is_ident and rhs_is_float:
-        var col = _resolve_ident(lhs.value, df)
-        var val = _parse_float_literal(rhs)
-        return _apply_numeric_op(col, op, val)
+    var col = _resolve_ident(col_node.value, df)
 
-    elif lhs_is_ident and rhs_is_string:
-        var col = _resolve_ident(lhs.value, df)
-        return _apply_string_op(col, op, rhs.value)
-
-    elif lhs_is_int and rhs_is_ident:
-        var col = _resolve_ident(rhs.value, df)
-        var val = _parse_int_literal(lhs)
-        var flipped = _flip_op(op)
-        return _apply_int_op(col, flipped, val)
-
-    elif lhs_is_float and rhs_is_ident:
-        var col = _resolve_ident(rhs.value, df)
-        var val = _parse_float_literal(lhs)
-        var flipped = _flip_op(op)
-        return _apply_numeric_op(col, flipped, val)
-
-    elif lhs_is_string and rhs_is_ident:
-        var col = _resolve_ident(rhs.value, df)
-        var flipped = _flip_op(op)
-        return _apply_string_op(col, flipped, lhs.value)
-
-    elif lhs_is_ident and rhs_is_null:
-        var col = _resolve_ident(lhs.value, df)
-        return _apply_null_op(col, op)
-
-    elif lhs_is_null and rhs_is_ident:
-        var col = _resolve_ident(rhs.value, df)
-        var flipped = _flip_op(op)
-        return _apply_null_op(col, flipped)
-
-    elif lhs_is_ident and rhs_is_bool:
-        var col = _resolve_ident(lhs.value, df)
-        var val = _parse_bool_literal(rhs)
-        return _apply_numeric_op(col, op, val)
-
-    elif lhs_is_bool and rhs_is_ident:
-        var col = _resolve_ident(rhs.value, df)
-        var val = _parse_bool_literal(lhs)
-        var flipped = _flip_op(op)
-        return _apply_numeric_op(col, flipped, val)
-
+    if rhs_node.kind == NK_INT:
+        return _apply_int_op(col, norm_op, _parse_int_literal(rhs_node))
+    elif rhs_node.kind == NK_FLOAT:
+        return _apply_numeric_op(col, norm_op, _parse_float_literal(rhs_node))
+    elif rhs_node.kind == NK_STRING:
+        return _apply_string_op(col, norm_op, rhs_node.value)
+    elif rhs_node.kind == NK_NULL:
+        return _apply_null_op(col, norm_op)
+    elif rhs_node.kind == NK_BOOL:
+        return _apply_numeric_op(col, norm_op, _parse_bool_literal(rhs_node))
     else:
         raise Error(
-            "evaluator: comparison must involve at least one column identifier"
+            "evaluator: unsupported right-hand operand kind "
+            + String(rhs_node.kind)
+            + " (expected INT, FLOAT, STRING, NULL, or BOOL)"
         )
 
 
