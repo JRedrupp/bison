@@ -62,7 +62,7 @@ def _promote_piece_to_object(
         for k in range(len(src)):
             out.append(py_str(src[k]))
     elif piece.is_object():
-        ref src = piece._obj_data()
+        ref src = piece._storage_legacy().data
         for k in range(len(src)):
             out.append(src[k])
     else:
@@ -81,11 +81,11 @@ def _append_piece_mask(
 ) raises:
     if not need_mask:
         return
-    var has_m = piece._null_mask.has_nulls()
+    var has_m = piece.has_nulls()
     var n = len(piece)
     for k in range(n):
         if has_m:
-            mask.append(piece._null_mask[k])
+            mask.append(piece.is_null(k))
         else:
             mask.append_valid()
 
@@ -104,24 +104,21 @@ def _null_col(
         for _ in range(n):
             data.append(Int64(0))
         var col = Column(name, data^, dtype)
-        col._null_mask = NullMask.all_null(n)
-        col._try_activate_storage()
+        col.set_null_mask(NullMask.all_null(n))
         return col^
     elif dtype == float64:
         var data = List[Float64]()
         for _ in range(n):
             data.append(Float64(0))
         var col = Column(name, data^, dtype)
-        col._null_mask = NullMask.all_null(n)
-        col._try_activate_storage()
+        col.set_null_mask(NullMask.all_null(n))
         return col^
     elif dtype == bool_:
         var data = List[Bool]()
         for _ in range(n):
             data.append(False)
         var col = Column(name, data^, dtype)
-        col._null_mask = NullMask.all_null(n)
-        col._try_activate_storage()
+        col.set_null_mask(NullMask.all_null(n))
         return col^
     elif dtype == string_:
         # #644: preserve the string_ ⟺ List[String] invariant for all-null
@@ -130,16 +127,14 @@ def _null_col(
         for _ in range(n):
             data.append(String(""))
         var col = Column(name, data^, string_)
-        col._null_mask = NullMask.all_null(n)
-        col._try_activate_storage()
+        col.set_null_mask(NullMask.all_null(n))
         return col^
     else:
         var data = List[PythonObject]()
         for _ in range(n):
             data.append(Python.evaluate("None"))
         var col = Column(name, data^, object_)
-        col._null_mask = NullMask.all_null(n)
-        col._try_activate_storage()
+        col.set_null_mask(NullMask.all_null(n))
         return col^
 
 
@@ -270,7 +265,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
     # Detect whether any piece has a null mask.
     var need_mask = False
     for i in range(len(pieces)):
-        if pieces[i]._null_mask.has_nulls():
+        if pieces[i].has_nulls():
             need_mask = True
 
     # Check if all pieces share the same typed arm (no promotion needed).
@@ -286,8 +281,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, target_dtype)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     elif common and common.value() == float64:
         var data = List[Float64]()
@@ -299,8 +293,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, target_dtype)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     elif common and common.value() == bool_:
         var data = List[Bool]()
@@ -312,8 +305,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, target_dtype)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     elif common and common.value() == string_:
         # #644: All pieces hold List[String]; keep the string arm intact.
@@ -326,8 +318,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, target_dtype)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     elif target_dtype == float64:
         # Numeric promotion: pieces are a mix of float64, int64, and/or bool_.
@@ -338,8 +329,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, float64)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     elif target_dtype == int64:
         # Numeric promotion: pieces are a mix of int64 and bool_.
@@ -350,8 +340,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, int64)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
     else:
         # Same non-numeric dtype backed by List[PythonObject] (e.g. datetime64_ns),
@@ -366,8 +355,7 @@ def _vstack(pieces: List[Column]) raises -> Column:
             _append_piece_mask(mask, pieces[i], need_mask)
         var col = Column(col_name, data^, target_dtype)
         if need_mask:
-            col._null_mask = mask^
-        col._try_activate_storage()
+            col.set_null_mask(mask^)
         return col^
 
 

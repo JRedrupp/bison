@@ -1,6 +1,6 @@
 """Tests for bison.expr: tokenizer, AST, parser, and evaluator."""
 from std.python import Python
-from std.testing import assert_true, assert_equal, TestSuite
+from std.testing import assert_true, assert_false, assert_equal, TestSuite
 from bison import DataFrame, Series
 from bison.expr import (
     parse,
@@ -606,11 +606,11 @@ def test_eval_null_and() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 3.0]}")))
     var mask = eval_expr(parse("a > 1 and a < 5"), df)
-    assert_true(len(mask._col._null_mask) > 0)
-    assert_true(not mask._col._null_mask[0])
+    assert_true(mask._col.has_nulls())
+    assert_false(mask._col.is_null(0))
     assert_true(not mask._col._data[List[Bool]][0])
-    assert_true(mask._col._null_mask[1])
-    assert_true(not mask._col._null_mask[2])
+    assert_true(mask._col.is_null(1))
+    assert_false(mask._col.is_null(2))
     assert_true(mask._col._data[List[Bool]][2])
 
 
@@ -622,11 +622,11 @@ def test_eval_null_or() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1.0, None, 6.0]}")))
     var mask = eval_expr(parse("a < 2 or a > 5"), df)
-    assert_true(len(mask._col._null_mask) > 0)
-    assert_true(not mask._col._null_mask[0])
+    assert_true(mask._col.has_nulls())
+    assert_false(mask._col.is_null(0))
     assert_true(mask._col._data[List[Bool]][0])
-    assert_true(mask._col._null_mask[1])
-    assert_true(not mask._col._null_mask[2])
+    assert_true(mask._col.is_null(1))
+    assert_false(mask._col.is_null(2))
     assert_true(mask._col._data[List[Bool]][2])
 
 
@@ -1632,17 +1632,17 @@ def test_conformance_eval_nulls_simple() raises:
     var bs_mask = bs_df.eval("a > 1")
 
     # Null positions must carry the null flag.
-    assert_true(len(bs_mask._col._null_mask) > 0)
-    assert_true(bs_mask._col._null_mask[1])
-    assert_true(bs_mask._col._null_mask[3])
+    assert_true(bs_mask._col.has_nulls())
+    assert_true(bs_mask._col.is_null(1))
+    assert_true(bs_mask._col.is_null(3))
 
     # Non-null positions must agree with pandas boolean operations.
     var pd_bools = (pd_df["a"] > 1)
-    assert_true(not bs_mask._col._null_mask[0])
+    assert_false(bs_mask._col.is_null(0))
     assert_true(not bs_mask._col._data[List[Bool]][0])
-    assert_true(not bs_mask._col._null_mask[2])
+    assert_false(bs_mask._col.is_null(2))
     assert_true(bs_mask._col._data[List[Bool]][2])
-    assert_true(not bs_mask._col._null_mask[4])
+    assert_false(bs_mask._col.is_null(4))
     assert_true(bs_mask._col._data[List[Bool]][4])
 
     # query() must exclude null rows; count must match pandas oracle.

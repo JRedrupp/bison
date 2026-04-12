@@ -69,8 +69,7 @@ def _infer_and_build_column(
                 null_mask.append_valid()
         var col = Column(name, data^, bool_)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
-        col._try_activate_storage()
+            col.set_null_mask(null_mask^)
         return col^
 
     # ------------------------------------------------------------------
@@ -98,8 +97,7 @@ def _infer_and_build_column(
                 null_mask.append_valid()
         var col = Column(name, data^, int64)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
-        col._try_activate_storage()
+            col.set_null_mask(null_mask^)
         return col^
 
     # ------------------------------------------------------------------
@@ -127,8 +125,7 @@ def _infer_and_build_column(
                 null_mask.append_valid()
         var col = Column(name, data^, float64)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
-        col._try_activate_storage()
+            col.set_null_mask(null_mask^)
         return col^
 
     # ------------------------------------------------------------------
@@ -145,7 +142,7 @@ def _infer_and_build_column(
             null_mask.append_valid()
     var col = Column(name, data^, string_)
     if null_mask.has_nulls():
-        col._null_mask = null_mask^
+        col.set_null_mask(null_mask^)
     col._try_activate_storage()
     return col^
 

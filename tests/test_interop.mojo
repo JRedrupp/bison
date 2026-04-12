@@ -148,7 +148,7 @@ def test_float64_bitcast_roundtrip() raises:
 def test_int_column_with_nulls_to_pandas() raises:
     """Integer Column with null entries must round-trip through to_pandas() without raising.
 
-    When a Column has integer dtype and any _null_mask entries are True,
+    When a Column has integer dtype and any null mask entries are True,
     to_pandas() must use the pandas nullable integer dtype (e.g. "Int64")
     so that None values are accepted.  The resulting pandas Series must
     expose pd.isna() == True at the null positions and the correct integer
@@ -163,7 +163,7 @@ def test_int_column_with_nulls_to_pandas() raises:
     )
     var col = Column.from_pandas(pd_s, "with_nulls")
     # The column must have a null mask with True at index 1.
-    assert_true(col._null_mask[1], "null mask should be True at index 1")
+    assert_true(col.is_null(1), "null mask should be True at index 1")
     # Round-trip back to pandas must not raise.
     var back = col.to_pandas()
     # Non-null values must be preserved.
@@ -174,10 +174,10 @@ def test_int_column_with_nulls_to_pandas() raises:
 
 
 def test_int_column_direct_null_mask_to_pandas() raises:
-    """Column constructed directly with an int64 arm and a _null_mask must not raise on to_pandas().
+    """Column constructed directly with an int64 arm and a null mask must not raise on to_pandas().
 
     This covers the code path where a caller builds a Column manually
-    (e.g. from_dict or direct Column(...)) and sets _null_mask instead of
+    (e.g. from_dict or direct Column(...)) and sets a null mask instead of
     going through from_records.
     """
     var pd = Python.import_module("pandas")
@@ -190,7 +190,7 @@ def test_int_column_direct_null_mask_to_pandas() raises:
     mask.append_valid()
     mask.append_null()
     mask.append_valid()
-    col._null_mask = mask^
+    col.set_null_mask(mask^)
     # Must not raise even though dtype is int64 and mask has True entries.
     var back = col.to_pandas()
     assert_equal(Int(py=back[0]), 10)
@@ -217,7 +217,7 @@ def test_obj_column_with_null_mask_to_pandas() raises:
     mask.append_valid()
     mask.append_null()
     mask.append_valid()
-    col._null_mask = mask^
+    col.set_null_mask(mask^)
     var back = col.to_pandas()
     assert_equal(String(py=back[0]), "apple")
     assert_true(Bool(py=pd.isna(back[1])), "masked position must be NaN, not the stored value")
@@ -276,9 +276,9 @@ def test_string_promotion_with_nulls() raises:
     assert_equal(col.dtype.name, "string")
     assert_equal(col.__len__(), 3)
     # Null mask: position 1 should be null
-    assert_true(not col._null_mask[0], "position 0 should not be null")
-    assert_true(col._null_mask[1], "position 1 should be null")
-    assert_true(not col._null_mask[2], "position 2 should not be null")
+    assert_true(col.is_valid(0), "position 0 should not be null")
+    assert_true(col.is_null(1), "position 1 should be null")
+    assert_true(col.is_valid(2), "position 2 should not be null")
 
 
 def test_string_promotion_roundtrip() raises:

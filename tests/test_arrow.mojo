@@ -30,7 +30,7 @@ def test_int64_round_trip_no_nulls() raises:
     assert_equal(col2._data[List[Int64]][0], Int64(1))
     assert_equal(col2._data[List[Int64]][1], Int64(2))
     assert_equal(col2._data[List[Int64]][2], Int64(3))
-    assert_equal(len(col2._null_mask), 0)
+    assert_false(col2.has_nulls())
 
 
 def test_float64_round_trip_no_nulls() raises:
@@ -45,7 +45,7 @@ def test_float64_round_trip_no_nulls() raises:
     assert_equal(len(col2), 3)
     assert_equal(col2._data[List[Float64]][0], Float64(4.0))
     assert_equal(col2._data[List[Float64]][2], Float64(6.0))
-    assert_equal(len(col2._null_mask), 0)
+    assert_false(col2.has_nulls())
 
 
 def test_bool_round_trip_no_nulls() raises:
@@ -61,7 +61,7 @@ def test_bool_round_trip_no_nulls() raises:
     assert_true(col2._data[List[Bool]][0])
     assert_false(col2._data[List[Bool]][1])
     assert_true(col2._data[List[Bool]][2])
-    assert_equal(len(col2._null_mask), 0)
+    assert_false(col2.has_nulls())
 
 
 def test_string_round_trip_no_nulls() raises:
@@ -77,7 +77,7 @@ def test_string_round_trip_no_nulls() raises:
     assert_equal(col2._data[List[String]][0], "x")
     assert_equal(col2._data[List[String]][1], "y")
     assert_equal(col2._data[List[String]][2], "z")
-    assert_equal(len(col2._null_mask), 0)
+    assert_false(col2.has_nulls())
 
 
 def test_null_mask_preserved_int64() raises:
@@ -87,16 +87,17 @@ def test_null_mask_preserved_int64() raises:
     data.append(42)
     data.append(0)
     var col = Column("x", ColumnData(data^), int64)
-    col._null_mask = NullMask()
-    col._null_mask.append(True)
-    col._null_mask.append(False)
-    col._null_mask.append(True)
+    var mask = NullMask()
+    mask.append(True)
+    mask.append(False)
+    mask.append(True)
+    col.set_null_mask(mask^)
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "x")
-    assert_equal(len(col2._null_mask), 3)
-    assert_true(col2._null_mask[0])
-    assert_false(col2._null_mask[1])
-    assert_true(col2._null_mask[2])
+    assert_true(col2.has_nulls())
+    assert_true(col2.is_null(0))
+    assert_false(col2.is_null(1))
+    assert_true(col2.is_null(2))
     assert_equal(col2._data[List[Int64]][1], Int64(42))
 
 
@@ -107,16 +108,17 @@ def test_null_mask_preserved_string() raises:
     data.append("")
     data.append("world")
     var col = Column("s", ColumnData(data^), string_)
-    col._null_mask = NullMask()
-    col._null_mask.append(False)
-    col._null_mask.append(True)
-    col._null_mask.append(False)
+    var mask = NullMask()
+    mask.append(False)
+    mask.append(True)
+    mask.append(False)
+    col.set_null_mask(mask^)
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "s")
-    assert_equal(len(col2._null_mask), 3)
-    assert_false(col2._null_mask[0])
-    assert_true(col2._null_mask[1])
-    assert_false(col2._null_mask[2])
+    assert_true(col2.has_nulls())
+    assert_false(col2.is_null(0))
+    assert_true(col2.is_null(1))
+    assert_false(col2.is_null(2))
     assert_equal(col2._data[List[String]][0], "hello")
     assert_equal(col2._data[List[String]][2], "world")
 
@@ -166,20 +168,22 @@ def test_dataframe_round_trip_with_nulls() raises:
     d_a.append(0)
     d_a.append(30)
     var col_a = Column("a", ColumnData(d_a^), int64)
-    col_a._null_mask = NullMask()
-    col_a._null_mask.append(False)
-    col_a._null_mask.append(True)
-    col_a._null_mask.append(False)
+    var mask_a = NullMask()
+    mask_a.append(False)
+    mask_a.append(True)
+    mask_a.append(False)
+    col_a.set_null_mask(mask_a^)
 
     var d_b = List[String]()
     d_b.append("hi")
     d_b.append("bye")
     d_b.append("")
     var col_b = Column("b", ColumnData(d_b^), string_)
-    col_b._null_mask = NullMask()
-    col_b._null_mask.append(False)
-    col_b._null_mask.append(False)
-    col_b._null_mask.append(True)
+    var mask_b = NullMask()
+    mask_b.append(False)
+    mask_b.append(False)
+    mask_b.append(True)
+    col_b.set_null_mask(mask_b^)
 
     var cols = List[Column]()
     cols.append(col_a^)
@@ -189,15 +193,15 @@ def test_dataframe_round_trip_with_nulls() raises:
     var rb = dataframe_to_record_batch(df)
     var df2 = record_batch_to_dataframe(rb^)
 
-    assert_equal(len(df2._cols[0]._null_mask), 3)
-    assert_false(df2._cols[0]._null_mask[0])
-    assert_true(df2._cols[0]._null_mask[1])
-    assert_false(df2._cols[0]._null_mask[2])
+    assert_true(df2._cols[0].has_nulls())
+    assert_false(df2._cols[0].is_null(0))
+    assert_true(df2._cols[0].is_null(1))
+    assert_false(df2._cols[0].is_null(2))
 
-    assert_equal(len(df2._cols[1]._null_mask), 3)
-    assert_false(df2._cols[1]._null_mask[0])
-    assert_false(df2._cols[1]._null_mask[1])
-    assert_true(df2._cols[1]._null_mask[2])
+    assert_true(df2._cols[1].has_nulls())
+    assert_false(df2._cols[1].is_null(0))
+    assert_false(df2._cols[1].is_null(1))
+    assert_true(df2._cols[1].is_null(2))
 
 
 def test_python_object_column_raises() raises:
@@ -249,7 +253,7 @@ def test_storage_active_bool_no_nulls() raises:
 
 
 def test_storage_active_with_null_mask_finalized() raises:
-    """Phase 6c: after col._null_mask assignment, _try_activate_storage()
+    """Phase 6c: after set_null_mask(), _try_activate_storage()
     re-rebuilds _storage so the marrow bitmap reflects the current mask.
     """
     var data = List[Int64]()
@@ -261,7 +265,7 @@ def test_storage_active_with_null_mask_finalized() raises:
     mask.append_valid()
     mask.append_null()
     mask.append_valid()
-    col._null_mask = mask^
+    col.set_null_mask(mask^)
     col._try_activate_storage()
     # has_nulls() should now read True via the marrow bitmap path.
     assert_true(col.has_nulls())

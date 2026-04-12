@@ -563,7 +563,7 @@ def test_bool_and() raises:
     assert_true(d[1] == False)
     assert_true(d[2] == False)
     assert_true(d[3] == False)
-    assert_true(len(result._col._null_mask) == 0)
+    assert_false(result._col.has_nulls())
 
 
 def test_bool_and_dunder() raises:
@@ -588,7 +588,7 @@ def test_bool_or() raises:
     assert_true(d[1] == True)
     assert_true(d[2] == True)
     assert_true(d[3] == False)
-    assert_true(len(result._col._null_mask) == 0)
+    assert_false(result._col.has_nulls())
 
 
 def test_bool_xor() raises:
@@ -602,7 +602,7 @@ def test_bool_xor() raises:
     assert_true(d[1] == True)
     assert_true(d[2] == True)
     assert_true(d[3] == False)
-    assert_true(len(result._col._null_mask) == 0)
+    assert_false(result._col.has_nulls())
 
 
 def test_bool_invert() raises:
@@ -615,7 +615,7 @@ def test_bool_invert() raises:
     assert_true(d[1] == True)
     assert_true(d[2] == False)
     assert_true(d[3] == True)
-    assert_true(len(result._col._null_mask) == 0)
+    assert_false(result._col.has_nulls())
 
 
 def test_bool_and_kleene_nulls() raises:
@@ -627,13 +627,13 @@ def test_bool_and_kleene_nulls() raises:
     var s2 = Series(pd.Series(Python.evaluate("[None, None, None]"), dtype="object").astype("boolean"))
     var result = s1.and_(s2)
     # False AND Null → False (non-null)
-    assert_true(len(result._col._null_mask) > 0)
-    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col.has_nulls())
+    assert_false(result._col.is_null(0))
     assert_true(result._col._data[List[Bool]][0] == False)
     # True AND Null → Null
-    assert_true(result._col._null_mask[1] == True)
+    assert_true(result._col.is_null(1))
     # Null AND Null → Null
-    assert_true(result._col._null_mask[2] == True)
+    assert_true(result._col.is_null(2))
 
 
 def test_bool_or_kleene_nulls() raises:
@@ -645,13 +645,13 @@ def test_bool_or_kleene_nulls() raises:
     var s2 = Series(pd.Series(Python.evaluate("[None, None, None]"), dtype="object").astype("boolean"))
     var result = s1.or_(s2)
     # True OR Null → True (non-null)
-    assert_true(len(result._col._null_mask) > 0)
-    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col.has_nulls())
+    assert_false(result._col.is_null(0))
     assert_true(result._col._data[List[Bool]][0] == True)
     # False OR Null → Null
-    assert_true(result._col._null_mask[1] == True)
+    assert_true(result._col.is_null(1))
     # Null OR Null → Null
-    assert_true(result._col._null_mask[2] == True)
+    assert_true(result._col.is_null(2))
 
 
 def test_bool_invert_null() raises:
@@ -659,11 +659,11 @@ def test_bool_invert_null() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[True, None, False]"), dtype="object").astype("boolean"))
     var result = s.invert()
-    assert_true(len(result._col._null_mask) > 0)
-    assert_true(result._col._null_mask[0] == False)
+    assert_true(result._col.has_nulls())
+    assert_false(result._col.is_null(0))
     assert_true(result._col._data[List[Bool]][0] == False)
-    assert_true(result._col._null_mask[1] == True)
-    assert_true(result._col._null_mask[2] == False)
+    assert_true(result._col.is_null(1))
+    assert_false(result._col.is_null(2))
     assert_true(result._col._data[List[Bool]][2] == True)
 
 
