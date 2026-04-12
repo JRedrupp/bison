@@ -57,86 +57,12 @@ Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >=
 
 ## Architecture
 
-### Column storage
+See [`docs/architecture.md`](docs/architecture.md) for the full architecture reference including column storage, type predicates, visitor dispatch, marrow integration, and the `_apply[F]` math transform pattern.
 
-`column.mojo` is the storage layer. Each `Column` has a **dual-backend** architecture (#619):
-
-1. **Legacy backend** (`_data: ColumnData`): A `Variant[List[Int64], List[Float64], List[Bool], List[String], List[PythonObject]]` with a parallel `List[Bool]` null mask.
-2. **Marrow backend** (`_storage: ColumnStorage`): An `AnyArray` (Apache Arrow for Mojo) for SIMD aggregation kernels, or `LegacyObjectData` for `PythonObject` columns.
-3. **Typed caches** (`_int64_cache`, `_f64_cache`, `_bool_cache`, `_str_cache`): Pre-extracted typed lists populated from `_data` at construction time. At most one typed cache plus `_f64_cache` is non-empty. After #645, caches are also the **write target** for all mutations — `_data` is only written during construction and is stale afterward.
-
-The typed caches exist as a workaround for the Mojo compiler deadlock (#642): typed `AnyArray` downcasts (`arr.as_int64()` etc.) cannot co-exist on the same call graph as `df.query()` in `column.mojo`. All high-traffic operations (comparison, aggregation, transforms, extraction) read from caches instead of `_data`. See TODO(#642) comments throughout.
-
-Dtype promotion happens automatically (e.g. mixing int64 + float64 → float64 column). GroupBy key columns may promote to `List[Float64]` to unify key types.
-
-#### Column type predicates and visitor dispatch
-
-**Never use `_data.isa[...]()` directly in `_frame.mojo`.** Instead use the `Column` predicate methods:
-
-| Predicate | Replaces |
-|-----------|----------|
-| `col.is_int()` | `col._data.isa[List[Int64]]()` |
-| `col.is_float()` | `col._data.isa[List[Float64]]()` |
-| `col.is_bool()` | `col._data.isa[List[Bool]]()` |
-| `col.is_string()` | `col._data.isa[List[String]]()` |
-| `col.is_object()` | `col._data.isa[List[PythonObject]]()` |
-| `col.is_numeric()` | `col._data.isa[List[Int64]]() or col._data.isa[List[Float64]]()` |
-
-After #644, `is_string()` and `is_object()` dispatch on `self.dtype` like the
-other predicates — `is_string()` ⟺ `dtype == string_`, `is_object()` ⟺
-`dtype == object_`. Note that `is_object()` returns `False` for
-`datetime64_ns` / `timedelta64_ns` columns even though they are backed by
-`List[PythonObject]`; this matches pandas `dtype == object` semantics.
-
-For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)` — these read from typed caches when available.
-
-For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches. Post-#647, there is no standalone `visit_col_data` / `visit_col_data_raises` dispatcher — visitors are always invoked via the `Column._visit*` methods. Visitor structs implement `ColumnDataVisitorRaises` and the cache dispatch calls their `on_*` methods with cache data.
-
-After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`. **Important:** After #645, `_int64_data()` / `_float64_data()` / `_bool_data()` / `_str_data()` return refs directly into the typed caches — mutations go to the cache. `_obj_data()` still returns a ref into `_data` (object columns have no typed cache). After any cache mutation call `col._rebuild_marrow_only()` to sync the secondary `_f64_cache` (for int/bool) and rebuild the marrow backend. Do **not** call `_try_activate_storage()` from mutation paths — it reads from `_data` and will overwrite cache mutations.
-
-### Core types
-
-| Type | File | Notes |
-|------|------|-------|
-| `DataFrame` | `_frame.mojo` | `Dict[String, Column]` backing, ordered columns |
-| `Series` | `_frame.mojo` | Wraps `Column` + optional name |
-| `DataFrameGroupBy` / `SeriesGroupBy` | `_frame.mojo` | Supports agg, sum, mean, count, first, last; single-key numeric aggs use marrow hash-aggregate kernel |
-| `Index` | `index.mojo` | `List[String]` backed with name attribute |
-| `RangeIndex` | `index.mojo` | `start, stop, step` — like pandas |
-| `ColumnIndex` | `index.mojo` | Variant: `Index | List[Int64] | List[Float64] | List[PythonObject]` |
-| `BisonDtype` | `dtypes.mojo` | 15 comptime constants: `int8` … `uint64`, `float32/64`, `bool_`, `string_`, `object_`, `datetime64_ns`, `timedelta64_ns` |
-
-### I/O dtype inference order
-
-- **CSV / JSON**: `bool` > `int64` > `float64` > `String`
-- Null values tracked via `na_set` parameter and null mask
-- `read_parquet` / `to_parquet` use marrow's native Parquet I/O; falls back to pandas for object columns
-- `read_excel` delegates to pandas (stub)
-
-### Marrow integration
-
-Marrow (Apache Arrow for Mojo) is vendored at `vendor/marrow/` as a git submodule. Built via `pixi run build-marrow`. The integration provides:
-
-- **Arrow conversion layer** (`bison/arrow.mojo`): `column_to_marrow_array`, `marrow_array_to_column`, `dataframe_to_record_batch`, `record_batch_to_dataframe`, `dataframe_to_table`, `table_to_dataframe`. Supports int64, float64, bool, string columns. `List[PythonObject]` columns cannot be converted.
-- **SIMD aggregation kernels** (`column.mojo`): `Column.sum/min/max` use `marrow.kernels.aggregate` for int64/float64.
-- **Hash-aggregate GroupBy** (`_frame.mojo`): Single-key numeric GroupBy aggregations (sum, mean, min, max, count) use `marrow.kernels.groupby` for fused O(N) hash-aggregate when: `len(by) == 1`, `as_index=True`, and key column is Arrow-convertible (not `List[PythonObject]`).
-- **Parquet I/O** (`io/parquet.mojo`): Native read/write via `marrow.parquet`.
-
-### Accessors
-
-`Series.str` returns `StringMethods` (upper, lower, strip, contains, replace, split, …).
-`Series.dt` returns `DatetimeMethods` (year, month, day, hour, minute, second, …).
-
-### Element-wise math transforms
-
-`Column._apply[F: FloatTransformFn]()` is the generic kernel for element-wise Float64 transforms. It converts numeric arms to Float64, applies `F`, and propagates nulls. New scalar math operations should follow this pattern:
-
-1. Define a module-level `def _foo_fn(v: Float64) -> Float64` in `column.mojo`.
-2. Add `Column._foo()` as a one-liner: `return self._apply[_foo_fn]()`.
-3. Add `Series.foo()` and `DataFrame.foo()` wrappers in `_frame.mojo`.
-4. Wire into `applymap`/`transform`/`pipe` string dispatch.
-
-`_abs` and `_round` intentionally use dedicated visitors instead of `_apply[F]` because they preserve input dtype (Int64 in → Int64 out) or take extra parameters (`decimals`). Do not refactor them to use `_apply`.
+Key rules to remember:
+- Never use `_data.isa[...]()` directly in `_frame.mojo` — use `Column` predicates (`is_int()`, `is_float()`, etc.).
+- After cache mutations, call `col._rebuild_marrow_only()`. Do **not** call `_try_activate_storage()` from mutation paths.
+- New element-wise math operations should follow the `_apply[F]` pattern.
 
 ## Versioning
 
@@ -167,80 +93,13 @@ Rules:
 
 ## Tests
 
-Each `tests/test_*.mojo` file has a `main()` that calls every `test_*` function and prints `"<file>: all tests passed"` on success.
+See [`docs/testing.md`](docs/testing.md) for the full test file map, helper utilities, caching behavior, and how to write new tests.
 
-- Working paths (construction, `from_pandas`, `to_pandas`, `shape`, `columns`, etc.) assert real values.
-- Stub paths assert that calling the method raises an error containing `"not implemented"`.
+Quick reference: `pixi run test` runs the full suite. `mojo run tests/test_<area>.mojo` runs a single file.
 
-Run a single file: `mojo run tests/test_dataframe.mojo`
+## CI, benchmarks, and profiling
 
-Test files by feature area:
-
-| File | Area |
-|------|------|
-| `test_dataframe.mojo` | DataFrame construction, selection |
-| `test_series_*.mojo` | Series construction, io, math, transforms |
-| `test_aggregation.mojo` | sum, mean, std, var, min, max |
-| `test_groupby.mojo` | groupby operations |
-| `test_indexing.mojo` | .loc, .iloc, .at, .iat |
-| `test_io.mojo` | CSV, JSON, Excel, Parquet |
-| `test_reshaping.mojo` | concat, melt, pivot |
-| `test_accessors.mojo` | .str and .dt accessors |
-| `test_combining.mojo` | merge, join, append |
-| `test_missing.mojo` | null / NaN handling |
-| `test_functional.mojo` | map, apply, transform |
-| `test_structural.mojo` | shape, columns, dtypes |
-| `test_interop.mojo` | from_pandas / to_pandas |
-| `test_index.mojo` | Index operations |
-| `test_concat.mojo` | concat-specific cases |
-| `test_transform.mojo` | transformation tests |
-| `test_arrow.mojo` | Arrow ↔ Column round-trip conversion |
-| `test_expr.mojo` | query/eval tokenizer, parser, evaluator |
-
-Helper utilities live in `tests/_helpers.mojo`: `assert_frame_equal`, `assert_series_equal`, `make_simple_df`.
-
-## Test caching
-
-`scripts/run_tests.sh` rebuilds `bison.mojopkg` only when sources are newer than `.bison-cache/`. Tests run in parallel via background jobs; failures are collected and reported at the end.
-
-## Benchmarks
-
-`benchmarks/bench_core.mojo` measures bison vs pandas across aggregation, groupby, indexing, and I/O operations. `benchmarks/_bench_utils.mojo` provides `time_fn()` (wraps Python timeit) and `BenchResult` (outputs JSON with ratio = bison_ms / pandas_ms).
-
-Iteration counts: `FAST_ITERS=100`, `MED_ITERS=20`, `SLOW_ITERS=3`, `IO_ITERS=5`. Results are stored in `results/<commit>.json`; the latest is symlinked as `results/latest.json`. `scripts/generate_report.py` merges history into `docs/data.json` (capped at 200 runs).
-
-### Profiling
-
-`benchmarks/bench_profile.mojo` runs operations in isolation for external profilers. Compiled with `-g --debug-info-language C` for debug symbols readable by standard Linux tools.
-
-```bash
-pixi run profile sort           # samply flamegraph for sort_values
-pixi run profile merge          # samply flamegraph for merge
-pixi run profile --callgrind    # use callgrind instead (may fail with AVX-512)
-```
-
-Output goes to `profile_results/` (gitignored). View samply results: `samply load profile_results/sort.samply.json`. See `docs/profiling.md` for full documentation.
-
-## CI / GitHub Actions
-
-| Workflow | Trigger | What it does |
-|----------|---------|--------------|
-| `ci.yml` | push / PR | Matrix: `locked` (pixi.lock) + `latest` (newest MAX ≥ 26.1); lint, test, update compat table on main push |
-| `nightly.yml` | daily + manual | Switches to nightly MAX channel; drops pyarrow; runs tests |
-| `release.yml` | `v*.*.*` tag | Tests + creates GitHub Release |
-| `benchmarks.yml` | push | Runs bench suite; updates dashboard |
-| `renovate.yml` | schedule | Automated dependency bumps |
-
-## Pre-commit hooks
-
-Enforced by `.pre-commit-config.yaml`:
-- Trailing whitespace / end-of-file fixer
-- YAML, TOML, merge-conflict checks
-- No bare `raise Error("not yet implemented")` — must use `_not_implemented()`
-- `mojo format` auto-formatting
-- `mojo package --Werror` — zero warnings policy
-
-Run all hooks manually: `pixi run lint`
+See [`docs/ci.md`](docs/ci.md) for GitHub Actions workflows, pre-commit hooks, benchmark details, and release process. See [`docs/profiling.md`](docs/profiling.md) for profiling with perf, samply, and callgrind.
 
 ## GitHub issues
 
@@ -300,99 +159,13 @@ Use names from the refactoring.guru catalogs:
 
 ## Mojo language gotchas
 
-### `mut self` for mutating struct methods
+See [`docs/mojo-patterns.md`](docs/mojo-patterns.md) for the full reference on Mojo-specific patterns and pitfalls.
 
-Any `def` method that writes to a struct field must declare `mut self` explicitly.
-Read-only methods omit the annotation entirely.
-
-```mojo
-struct Counter:
-    var count: Int
-
-    # Mutating — must have mut self
-    def increment(mut self):
-        self.count += 1
-
-    # Read-only — no annotation needed
-    def value(self) -> Int:
-        return self.count
-```
-
-Without `mut self`, Mojo silently copies `self` instead of mutating it in-place, so
-field updates are lost and callers see no change. This affects every stateful struct
-(e.g. any struct that accumulates state across method calls).
-
-### `ref` for non-copyable Variant arms
-
-Accessing a `Variant` arm whose inner type does not implement `ImplicitlyCopyable`
-(e.g. `List[T]`) must use a `ref` borrow, not a `var` assignment:
-
-```mojo
-# WRONG — compile error if List[T] is not ImplicitlyCopyable
-var src = col._data[List[Int64]]
-
-# CORRECT — zero-cost borrow tied to the Variant's lifetime
-ref src = col._data[List[Int64]]
-```
-
-### `rebind[T]` for structurally identical but nominally different types
-
-When two types are bit-for-bit identical but the type checker treats them as
-distinct (e.g. a third-party library's `Scalar[dtype.native]` vs the stdlib's
-`Int64`), use `rebind[T]` to assert the structural equivalence:
-
-```mojo
-data.append(rebind[Int64](src.unsafe_get(i)))  # Scalar[int64.native] → Int64
-```
-
-### `def main() raises:` in test files
-
-Test-file `main()` functions must declare `raises` if they call any raising
-function — omitting it is a **compile error**, not a warning.
-
-### Nightly compiler hangs on standalone `query()`/`eval()` modules
-
-The nightly Mojo compiler (`0.26.3.0+`) enters infinite recursion when compiling
-a standalone module that calls `DataFrame.query()` or `DataFrame.eval()` (or
-`eval_expr` directly). The same calls compile fine when co-located with
-tokenizer/parser unit tests in `test_expr.mojo`.
-
-**Workaround**: all query/eval conformance tests live in `tests/test_expr.mojo`,
-not in a separate file. If you add new query/eval tests, add them there.
-
-### Compile-time function types for `apply`, `applymap`, `pipe`
-
-Mojo supports compile-time function types via `comptime`:
-
-```mojo
-comptime FloatTransformFn = def(Float64) -> Float64
-```
-
-These are used in `Column._apply[F]`, `Series.apply[F]`, `DataFrame.apply[F]`,
-`DataFrame.applymap[F]`, and `DataFrame.pipe[F]`. The function must be known at
-compile time — either a module-level `def` or an `@parameter` local function.
-
-**Limitation**: `capturing [_]` is not yet supported in parameter type constraints.
-`pipe[F]` requires `fn(DataFrame) raises -> DataFrame` (non-capturing). The
-`capturing` syntax works in other contexts (`fn call_it[f: fn() capturing [_] -> None]()`)
-but not when the captured function takes a struct argument in a parameter list.
-
-### `fn` is deprecated on nightly — use `def` everywhere
-
-Nightly Mojo deprecated the `fn` keyword (warning today, error soon). All function
-and method definitions must use `def`. Do not introduce new `fn` declarations.
-
-### Import aliases for stdlib names that shadow parameters
-
-When importing a stdlib function whose name collides with a common parameter name
-(`sort`, `min`, `max`, `sum`, `len`, `print`), alias the import to a leading-underscore
-name and call the alias:
-
-```mojo
-from algorithm import sort as _sort_list
-
-_sort_list(my_list)   # NOT sort(my_list) — would shadow the built-in
-```
+Critical reminders:
+- `mut self` is required on any method that writes to struct fields — without it, Mojo silently copies.
+- Use `ref` (not `var`) to access `Variant` arms with non-copyable types like `List[T]`.
+- Use `def` everywhere — `fn` is deprecated on nightly.
+- All query/eval tests must live in `tests/test_expr.mojo` due to a nightly compiler bug.
 
 ## Constraints
 
