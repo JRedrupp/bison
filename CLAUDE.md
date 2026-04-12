@@ -88,7 +88,7 @@ other predicates — `is_string()` ⟺ `dtype == string_`, `is_object()` ⟺
 
 For single-cell extraction use `_series_scalar_at(col, row)` or `_scalar_from_col(col, row)` — these read from typed caches when available.
 
-For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches when `_storage_active`, falling back to the legacy `visit_col_data_raises()` dispatcher. Visitor structs still implement `ColumnDataVisitorRaises` — the cache dispatch calls their `on_*` methods with cache data instead of `_data`.
+For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or `Column._visit[V]()` which route through typed caches. Post-#647, there is no standalone `visit_col_data` / `visit_col_data_raises` dispatcher — visitors are always invoked via the `Column._visit*` methods. Visitor structs implement `ColumnDataVisitorRaises` and the cache dispatch calls their `on_*` methods with cache data.
 
 After a predicate check, access the typed data via the unsafe accessors: `col._int64_data()`, `col._float64_data()`, `col._bool_data()`, `col._str_data()`, `col._obj_data()`. **Important:** After #645, `_int64_data()` / `_float64_data()` / `_bool_data()` / `_str_data()` return refs directly into the typed caches — mutations go to the cache. `_obj_data()` still returns a ref into `_data` (object columns have no typed cache). After any cache mutation call `col._rebuild_marrow_only()` to sync the secondary `_f64_cache` (for int/bool) and rebuild the marrow backend. Do **not** call `_try_activate_storage()` from mutation paths — it reads from `_data` and will overwrite cache mutations.
 

@@ -135,7 +135,6 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._storage = ColumnStorage(arr.copy())
-        col._storage_active = True
         return col^
 
     elif dt == _m_float64:
@@ -153,7 +152,6 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._storage = ColumnStorage(arr.copy())
-        col._storage_active = True
         return col^
 
     elif dt == _m_bool_:
@@ -171,7 +169,6 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._storage = ColumnStorage(arr.copy())
-        col._storage_active = True
         return col^
 
     elif dt == _m_string:
@@ -190,7 +187,6 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         if null_mask.has_nulls():
             col._null_mask = null_mask^
         col._storage = ColumnStorage(arr.copy())
-        col._storage_active = True
         return col^
 
     else:
