@@ -24,8 +24,10 @@ build-marrow  = "mojo package vendor/marrow/marrow -o .pixi/envs/default/lib/moj
 test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
 fmt           = "mojo format bison/"
 check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
+check-compile = { cmd = "bash scripts/check_compile.sh", depends-on = ["gen-version", "build-marrow"] }
 lint          = "pre-commit run --all-files"
 bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version", "build-marrow"] }
+profile       = { cmd = "bash scripts/run_profile.sh", depends-on = ["gen-version", "build-marrow"] }
 gen-report    = "python scripts/generate_report.py"
 
 [environments]

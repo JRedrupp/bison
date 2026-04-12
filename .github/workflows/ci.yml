@@ -41,5 +41,8 @@ jobs:
       - name: Generate version file
         run: pixi run gen-version
 
+      - name: Compile-check all entry points
+        run: pixi run check-compile
+
       - name: Run tests
         run: pixi run test

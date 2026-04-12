@@ -9,4 +9,5 @@ SESSION.md
 dist/
 .test-pass-count
 results/
+profile_results/
 docs/data.json

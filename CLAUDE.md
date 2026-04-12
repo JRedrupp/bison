@@ -46,8 +46,10 @@ pixi run gen-version    # write bison/_version.mojo from pixi.toml
 pixi run test           # regenerates version then runs all tests
 pixi run fmt            # mojo format bison/
 pixi run check          # mojo package bison/ --Werror (no warnings allowed)
+pixi run check-compile  # compile-check all test and benchmark entry points
 pixi run lint           # pre-commit run --all-files
 pixi run bench          # run benchmarks (depends on gen-version)
+pixi run profile        # profile operations with samply (see docs/profiling.md)
 pixi run gen-report     # merge benchmark results into docs/data.json
 ```
 
@@ -206,6 +208,18 @@ Helper utilities live in `tests/_helpers.mojo`: `assert_frame_equal`, `assert_se
 `benchmarks/bench_core.mojo` measures bison vs pandas across aggregation, groupby, indexing, and I/O operations. `benchmarks/_bench_utils.mojo` provides `time_fn()` (wraps Python timeit) and `BenchResult` (outputs JSON with ratio = bison_ms / pandas_ms).
 
 Iteration counts: `FAST_ITERS=100`, `MED_ITERS=20`, `SLOW_ITERS=3`, `IO_ITERS=5`. Results are stored in `results/<commit>.json`; the latest is symlinked as `results/latest.json`. `scripts/generate_report.py` merges history into `docs/data.json` (capped at 200 runs).
+
+### Profiling
+
+`benchmarks/bench_profile.mojo` runs operations in isolation for external profilers. Compiled with `-g --debug-info-language C` for debug symbols readable by standard Linux tools.
+
+```bash
+pixi run profile sort           # samply flamegraph for sort_values
+pixi run profile merge          # samply flamegraph for merge
+pixi run profile --callgrind    # use callgrind instead (may fail with AVX-512)
+```
+
+Output goes to `profile_results/` (gitignored). View samply results: `samply load profile_results/sort.samply.json`. See `docs/profiling.md` for full documentation.
 
 ## CI / GitHub Actions
 
