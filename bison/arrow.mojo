@@ -38,8 +38,8 @@ from .dtypes import int64, float64, bool_, object_, string_
 
 
 def _is_null(col: Column, i: Int) -> Bool:
-    """Return True if element i is null in col._null_mask."""
-    return len(col._null_mask) > 0 and col._null_mask[i]
+    """Return True if element i is null."""
+    return col.is_null(i)
 
 
 # ------------------------------------------------------------------
@@ -50,9 +50,8 @@ def _is_null(col: Column, i: Int) -> Bool:
 def column_to_marrow_array(col: Column) raises -> AnyArray:
     """Convert a bison Column to a marrow AnyArray.
 
-    Null elements (where _null_mask[i] is True) become Arrow null values.
-    An empty _null_mask means no nulls. List[PythonObject] columns raise
-    an error — Arrow has no object type.
+    Null elements become Arrow null values.
+    List[PythonObject] columns raise an error — Arrow has no object type.
     """
     var n = len(col)
 
@@ -106,16 +105,14 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
 def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
     """Convert a marrow AnyArray to a bison Column.
 
-    Arrow null elements (validity bit = 0) become True entries in
-    _null_mask. A fully-valid array leaves _null_mask empty (bison's
+    Arrow null elements (validity bit = 0) are recorded via the column's
+    null mask. A fully-valid array leaves the mask empty (bison's
     no-nulls sentinel). Only int64, float64, bool, and string Arrow
     types are supported.
 
     The input ``arr`` is also stored directly on the returned column's
     ``_storage`` field (zero-copy via ArcPointer ref-bump) so
     dual-backend readers can use the marrow representation immediately.
-    The legacy ``_data``/``_null_mask`` fields are populated in parallel
-    until the Phase 6-7 cleanup removes them.
     """
     var dt = arr.dtype()
     var n = arr.length()
@@ -133,7 +130,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
                 null_mask.append_valid()
         var col = Column(name, ColumnData(data^), int64)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
+            col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
         return col^
 
@@ -150,7 +147,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
                 null_mask.append_valid()
         var col = Column(name, ColumnData(data^), float64)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
+            col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
         return col^
 
@@ -167,7 +164,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
                 null_mask.append_valid()
         var col = Column(name, ColumnData(data^), bool_)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
+            col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
         return col^
 
@@ -185,7 +182,7 @@ def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
         # #644: string-backed columns carry string_ dtype.
         var col = Column(name, ColumnData(data^), string_)
         if null_mask.has_nulls():
-            col._null_mask = null_mask^
+            col.set_null_mask(null_mask^)
         col._storage = ColumnStorage(arr.copy())
         return col^
 

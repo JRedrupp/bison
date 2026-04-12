@@ -54,7 +54,7 @@ struct DatetimeMethods:
                 result.append(Int64(Int(py=self._data[i].__getattr__(attr))))
                 new_mask.append_valid()
         var col = Column(self._name, result^, int64)
-        col._null_mask = new_mask^
+        col.set_null_mask(new_mask^)
         return col^
 
     def year(self) raises -> Column:
@@ -99,7 +99,7 @@ struct DatetimeMethods:
                 result.append(self._data[i].date())
                 new_mask.append_valid()
         var col = Column(self._name, result^, object_)
-        col._null_mask = new_mask^
+        col.set_null_mask(new_mask^)
         return col^
 
     def time(self) raises -> Column:
@@ -113,7 +113,7 @@ struct DatetimeMethods:
                 result.append(self._data[i].time())
                 new_mask.append_valid()
         var col = Column(self._name, result^, object_)
-        col._null_mask = new_mask^
+        col.set_null_mask(new_mask^)
         return col^
 
     # ------------------------------------------------------------------
@@ -139,7 +139,7 @@ struct DatetimeMethods:
                 result.append(self._data[i].__getattr__(method)(arg))
                 new_mask.append_valid()
         var col = Column(self._name, result^, datetime64_ns)
-        col._null_mask = new_mask^
+        col.set_null_mask(new_mask^)
         return col^
 
     def tz_localize(self, tz: String) raises -> Column:

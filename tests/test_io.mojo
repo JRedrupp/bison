@@ -1,6 +1,6 @@
 """Tests for DataFrame IO (read and write methods)."""
 from std.python import Python, PythonObject
-from std.testing import assert_equal, assert_true, TestSuite
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 from bison import (
     read_csv,
     read_parquet,
@@ -127,9 +127,9 @@ def test_read_csv_bool_with_nulls() raises:
     var df = read_csv(path)
     var col = df["flag"]._col
     assert_true(col.dtype == bool_)
-    assert_true(not col._null_mask[0])
-    assert_true(col._null_mask[1])
-    assert_true(not col._null_mask[2])
+    assert_false(col.is_null(0))
+    assert_true(col.is_null(1))
+    assert_false(col.is_null(2))
 
 
 def test_to_csv_returns_string() raises:
@@ -451,20 +451,22 @@ def test_parquet_roundtrip_with_nulls() raises:
     d_a.append(0)
     d_a.append(30)
     var col_a = Column("a", ColumnData(d_a^), int64)
-    col_a._null_mask = NullMask()
-    col_a._null_mask.append(False)
-    col_a._null_mask.append(True)
-    col_a._null_mask.append(False)
+    var mask_a = NullMask()
+    mask_a.append(False)
+    mask_a.append(True)
+    mask_a.append(False)
+    col_a.set_null_mask(mask_a^)
 
     var d_b = List[String]()
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
     var col_b = Column("b", ColumnData(d_b^), string_)
-    col_b._null_mask = NullMask()
-    col_b._null_mask.append(False)
-    col_b._null_mask.append(True)
-    col_b._null_mask.append(False)
+    var mask_b = NullMask()
+    mask_b.append(False)
+    mask_b.append(True)
+    mask_b.append(False)
+    col_b.set_null_mask(mask_b^)
 
     var cols = List[Column]()
     cols.append(col_a^)
@@ -484,12 +486,12 @@ def test_parquet_roundtrip_with_nulls() raises:
     assert_equal(df2._cols[1]._data[List[String]][2], "bye")
 
     # Null masks preserved.
-    assert_true(not df2._cols[0]._null_mask[0])
-    assert_true(df2._cols[0]._null_mask[1])
-    assert_true(not df2._cols[0]._null_mask[2])
-    assert_true(not df2._cols[1]._null_mask[0])
-    assert_true(df2._cols[1]._null_mask[1])
-    assert_true(not df2._cols[1]._null_mask[2])
+    assert_false(df2._cols[0].is_null(0))
+    assert_true(df2._cols[0].is_null(1))
+    assert_false(df2._cols[0].is_null(2))
+    assert_false(df2._cols[1].is_null(0))
+    assert_true(df2._cols[1].is_null(1))
+    assert_false(df2._cols[1].is_null(2))
 
 
 
@@ -597,20 +599,22 @@ def test_ipc_roundtrip_with_nulls() raises:
     d_a.append(0.0)
     d_a.append(30.0)
     var col_a = Column("a", ColumnData(d_a^), float64)
-    col_a._null_mask = NullMask()
-    col_a._null_mask.append(False)
-    col_a._null_mask.append(True)
-    col_a._null_mask.append(False)
+    var mask_a = NullMask()
+    mask_a.append(False)
+    mask_a.append(True)
+    mask_a.append(False)
+    col_a.set_null_mask(mask_a^)
 
     var d_b = List[String]()
     d_b.append("hi")
     d_b.append("")
     d_b.append("bye")
     var col_b = Column("b", ColumnData(d_b^), string_)
-    col_b._null_mask = NullMask()
-    col_b._null_mask.append(False)
-    col_b._null_mask.append(True)
-    col_b._null_mask.append(False)
+    var mask_b = NullMask()
+    mask_b.append(False)
+    mask_b.append(True)
+    mask_b.append(False)
+    col_b.set_null_mask(mask_b^)
 
     var cols = List[Column]()
     cols.append(col_a^)
@@ -631,12 +635,12 @@ def test_ipc_roundtrip_with_nulls() raises:
     assert_equal(df2._cols[1]._data[List[String]][2], "bye")
 
     # Null masks preserved.
-    assert_true(not df2._cols[0]._null_mask[0])
-    assert_true(df2._cols[0]._null_mask[1])
-    assert_true(not df2._cols[0]._null_mask[2])
-    assert_true(not df2._cols[1]._null_mask[0])
-    assert_true(df2._cols[1]._null_mask[1])
-    assert_true(not df2._cols[1]._null_mask[2])
+    assert_false(df2._cols[0].is_null(0))
+    assert_true(df2._cols[0].is_null(1))
+    assert_false(df2._cols[0].is_null(2))
+    assert_false(df2._cols[1].is_null(0))
+    assert_true(df2._cols[1].is_null(1))
+    assert_false(df2._cols[1].is_null(2))
 
 
 def test_to_ipc_writes_file() raises:
