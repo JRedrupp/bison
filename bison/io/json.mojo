@@ -3,6 +3,7 @@ from std.collections import Optional
 from ..dataframe import DataFrame
 from ..column import Column, NullMask
 from ..dtypes import int64, float64, object_, bool_, string_
+from .._errors import _not_implemented
 
 
 # ------------------------------------------------------------------
@@ -183,10 +184,13 @@ def read_json(
                   keyed by row index), ``"values"`` (list of lists).
                   The default (``""``) auto-detects based on the shape of
                   the parsed object.
-    dtype       : Not yet used (accepted for API compatibility).
+    dtype       : Not yet implemented. Passing a non-``None`` value raises
+                  ``NotImplementedError``.
     lines       : If ``True``, treat each line of the file as a separate
                   JSON object (JSON Lines / NDJSON format).
     """
+    if dtype:
+        _not_implemented("read_json.dtype")
     var json_mod = Python.import_module("json")
     var py_builtins = Python.import_module("builtins")
 

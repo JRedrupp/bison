@@ -3,6 +3,7 @@ from std.collections import Optional
 from ..dataframe import DataFrame
 from ..column import Column, NullMask
 from ..dtypes import int64, float64, object_, bool_, string_
+from .._errors import _not_implemented
 
 
 # ------------------------------------------------------------------
@@ -171,16 +172,25 @@ def read_csv(
     sep        : Field delimiter (default ``","``).
     header     : Row number to use as column names (0-based). Pass ``-1``
                  for no header; auto-generated names ``0, 1, …`` are used.
-    index_col  : Not yet used (accepted for API compatibility).
+    index_col  : Not yet implemented. Passing a non-``None`` value raises
+                 ``NotImplementedError``.
     usecols    : List of column names or indices to read. ``None`` reads all.
-    dtype      : Not yet used (accepted for API compatibility).
+    dtype      : Not yet implemented. Passing a non-``None`` value raises
+                 ``NotImplementedError``.
     nrows      : Maximum number of data rows to read.
     skiprows   : If an integer, skip that many rows immediately after the
                  header. List-of-indices form is not yet supported.
     na_values  : Additional strings to recognise as NA/NaN.
     encoding   : File encoding (passed to the OS ``open`` call).
-    parse_dates: Not yet used (accepted for API compatibility).
+    parse_dates: Not yet implemented. Passing ``True`` or a non-empty list
+                 raises ``NotImplementedError``.
     """
+    if index_col:
+        _not_implemented("read_csv.index_col")
+    if dtype:
+        _not_implemented("read_csv.dtype")
+    if parse_dates:
+        _not_implemented("read_csv.parse_dates")
     var py_csv = Python.import_module("csv")
     var py_io = Python.import_module("io")
     var py_builtins = Python.import_module("builtins")
