@@ -96,5 +96,12 @@ def read_parquet(
 
         return df^
     except:
-        # Unsupported Arrow types (e.g. nested, decimal) → pandas fallback.
+        # marrow does not handle all Arrow types (nested structs, decimals,
+        # maps, etc.).  Fall back to pandas which supports the full spec.
+        # Emit a warning so the fallback is visible during debugging (#682).
+        var warnings = Python.import_module("warnings")
+        warnings.warn(
+            "read_parquet: native marrow reader failed; falling back to"
+            " pandas. Pass engine='pyarrow' to skip the native path."
+        )
         return _read_parquet_pandas(path, engine, columns, filters)

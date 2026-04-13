@@ -82,6 +82,8 @@ def _infer_and_build_column(
         try:
             _ = atol(raw[i])
         except:
+            # atol() raises for non-integer strings; expected during dtype
+            # inference — not an error.
             all_int = False
             break
 
@@ -110,6 +112,8 @@ def _infer_and_build_column(
         try:
             _ = atof(raw[i])
         except:
+            # atof() raises for non-numeric strings; expected during dtype
+            # inference — not an error.
             all_float = False
             break
 
@@ -237,7 +241,10 @@ def read_csv(
         try:
             data_start += Int(py=skiprows.value())
         except:
-            pass  # unsupported form — ignore
+            raise Error(
+                "read_csv: 'skiprows' must be an integer, got: "
+                + String(skiprows.value())
+            )
 
     # ------------------------------------------------------------------
     # Determine the effective row limit.
@@ -251,7 +258,10 @@ def read_csv(
             if nr < max_rows:
                 max_rows = nr
         except:
-            pass
+            raise Error(
+                "read_csv: 'nrows' must be a non-negative integer, got: "
+                + String(nrows.value())
+            )
 
     # ------------------------------------------------------------------
     # Build the NA-value set (defaults + user-supplied extras).
@@ -272,7 +282,7 @@ def read_csv(
             for i in range(nvlen):
                 na_set.append(String(nv[i]))
         except:
-            # Single value rather than a list.
+            # Single scalar value rather than a list — add it directly.
             na_set.append(String(na_values.value()))
 
     # ------------------------------------------------------------------
@@ -295,12 +305,20 @@ def read_csv(
                             out_col_names.append(col_names[j])
                             break
                 except:
-                    var ci = Int(py=uc[i])
-                    if ci >= 0 and ci < ncols:
-                        col_indices.append(ci)
-                        out_col_names.append(col_names[ci])
-        except:
-            pass
+                    # Not a string — fall back to integer index.
+                    try:
+                        var ci = Int(py=uc[i])
+                        if ci >= 0 and ci < ncols:
+                            col_indices.append(ci)
+                            out_col_names.append(col_names[ci])
+                    except:
+                        raise Error(
+                            "read_csv: invalid usecols element at position "
+                            + String(i)
+                            + ": expected a column name or integer index"
+                        )
+        except e:
+            raise e^
 
     if len(col_indices) == 0:
         # No usecols filter (or it resolved to nothing) — use all columns.

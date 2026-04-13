@@ -150,11 +150,10 @@ def _json_records_to_df(
         var key = col_names[ci]
         var py_vals = Python.evaluate("[]")
         for ri in range(n):
+            # Records may have inconsistent keys (sparse JSON); .get()
+            # returns None for missing keys instead of raising.
             var row = records[ri]
-            try:
-                py_vals.append(row[key])
-            except:
-                py_vals.append(Python.evaluate("None"))
+            py_vals.append(row.get(key))
         var col = _json_build_column(key, py_vals, n)
         cols.append(col^)
 
@@ -222,14 +221,16 @@ def read_json(
         if parsed_type == "list":
             eff_orient = "records"
         else:
-            # dict — probe for split-format keys.
+            # dict — probe for split-format keys ("columns" + "data").
+            # KeyError is expected when the dict uses a different orient;
+            # this is intentional format detection, not an error.
             var has_split = False
             try:
                 _ = parsed["columns"]
                 _ = parsed["data"]
                 has_split = True
             except:
-                pass
+                pass  # Not split format — keys absent.
             if has_split:
                 eff_orient = "split"
             else:
@@ -278,11 +279,10 @@ def read_json(
             var key = col_names[ci]
             var py_vals = Python.evaluate("[]")
             for ri in range(nrows):
+                # Row dicts may lack some column keys (sparse data);
+                # .get() returns None for missing keys.
                 var idx_key = index_keys[ri]
-                try:
-                    py_vals.append(parsed[idx_key][key])
-                except:
-                    py_vals.append(Python.evaluate("None"))
+                py_vals.append(parsed[idx_key].get(key))
             var col = _json_build_column(key, py_vals, nrows)
             cols.append(col^)
         return DataFrame(cols^)
@@ -329,10 +329,9 @@ def read_json(
             var col_dict = parsed[col_name]
             var py_vals = Python.evaluate("[]")
             for ri in range(nrows):
-                try:
-                    py_vals.append(col_dict[idx_keys[ri]])
-                except:
-                    py_vals.append(Python.evaluate("None"))
+                # Column dicts may lack some index keys (sparse data);
+                # .get() returns None for missing keys.
+                py_vals.append(col_dict.get(idx_keys[ri]))
             var col = _json_build_column(col_name, py_vals, nrows)
             cols.append(col^)
         return DataFrame(cols^)
