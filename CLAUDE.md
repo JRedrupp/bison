@@ -12,12 +12,13 @@ bison/
 │   ├── __init__.mojo   — public API exports
 │   ├── _errors.mojo    — _not_implemented() helper
 │   ├── _version.mojo   — AUTO-GENERATED; never edit by hand
-│   ├── _frame.mojo     — core DataFrame, Series, GroupBy (~8,000 lines)
+│   ├── _frame.mojo     — core DataFrame, Series, GroupBy, Window (~8,500 lines)
 │   ├── column.mojo     — Column storage & ColumnData variant (~5,000 lines)
 │   ├── arrow.mojo      — Arrow ↔ Column conversion (marrow interop)
 │   ├── dataframe.mojo  — re-exports from _frame
 │   ├── series.mojo     — re-exports from _frame
 │   ├── groupby.mojo    — re-exports from _frame
+│   ├── windows.mojo    — re-exports window structs from _frame
 │   ├── indexing.mojo   — re-exports indexer classes
 │   ├── dtypes.mojo     — BisonDtype struct + 14 comptime dtype constants
 │   ├── index.mojo      — Index, RangeIndex, ColumnIndex structs
@@ -29,8 +30,10 @@ bison/
 │   │   ├── json.mojo           — read_json (native; type inference)
 │   │   ├── parquet.mojo        — read_parquet / to_parquet (native via marrow)
 │   │   └── excel.mojo          — read_excel (stub → pandas/openpyxl)
-│   └── reshape/
-│       └── _concat.mojo        — concat axis=0 with dtype promotion
+│   ├── reshape/
+│   │   └── _concat.mojo        — concat axis=0 with dtype promotion
+│   └── window/
+│       └── _kernels.mojo       — pure sliding-window computation kernels
 ├── tests/              — one test_*.mojo file per feature area
 ├── benchmarks/         — bench_core.mojo + _bench_utils.mojo
 ├── scripts/            — gen_version.py, run_tests.sh, …
@@ -57,12 +60,13 @@ Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >=
 
 ## Architecture
 
-See [`docs/architecture.md`](docs/architecture.md) for the full architecture reference including column storage, type predicates, visitor dispatch, marrow integration, and the `_apply[F]` math transform pattern.
+See [`docs/architecture.md`](docs/architecture.md) for the full architecture reference including column storage, type predicates, visitor dispatch, marrow integration, the `_apply[F]` math transform pattern, and the window operation architecture.
 
 Key rules to remember:
 - Never use `_data.isa[...]()` directly in `_frame.mojo` — use `Column` predicates (`is_int()`, `is_float()`, etc.).
 - After cache mutations, call `col._rebuild_marrow_only()`. Do **not** call `_try_activate_storage()` from mutation paths.
 - New element-wise math operations should follow the `_apply[F]` pattern.
+- Window computation kernels live in `bison/window/_kernels.mojo` as pure functions; window structs live in `_frame.mojo` (after GroupBy).
 
 ## Versioning
 

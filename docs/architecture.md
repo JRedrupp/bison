@@ -124,6 +124,34 @@ propagates nulls. New scalar math operations should follow this pattern:
 because they preserve input dtype (Int64 in -> Int64 out) or take extra
 parameters (`decimals`). Do not refactor them to use `_apply`.
 
+## Window operations
+
+`DataFrame.rolling()`, `.expanding()`, and `.ewm()` return lightweight window
+objects (`Rolling`, `Expanding`, `ExponentialMovingWindow`) that hold a
+reference to the source DataFrame plus window parameters. Aggregation methods
+(`.mean()`, `.sum()`, etc.) iterate over numeric columns, call pure-function
+kernels from `bison/window/_kernels.mojo`, and assemble the results into a new
+DataFrame.
+
+The computation kernels operate on `List[Float64]` + `List[Bool]` (null mask)
+and return a `WindowResult` struct containing the result data, null mask, and a
+`has_any_null` flag. They have no dependency on DataFrame/Series/Column — this
+keeps the algorithmic code decoupled and testable.
+
+The window structs live in `_frame.mojo` (after the GroupBy structs) to avoid
+circular import issues, since their methods return `DataFrame` / `Series`.
+Series variants (`SeriesRolling`, `SeriesExpanding`,
+`SeriesExponentialMovingWindow`) follow the same pattern but operate on a
+single column.
+
+Key algorithms:
+- **Rolling sum/mean/count**: O(n) sliding window with running accumulators.
+- **Rolling min/max**: O(n) monotonic deque.
+- **Rolling var/std**: O(n) running sum-of-squares.
+- **Expanding**: Running accumulators from position 0 (simpler than rolling).
+- **EWM mean**: Recursive `adjust=True` formula matching pandas default.
+- **EWM var/std**: Online weighted variance with bias correction.
+
 ## Marrow integration
 
 Marrow (Apache Arrow for Mojo) is vendored at `vendor/marrow/` as a git

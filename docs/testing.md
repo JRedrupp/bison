@@ -46,6 +46,7 @@ mojo run tests/test_dataframe.mojo
 | `test_transform.mojo` | transformation tests |
 | `test_arrow.mojo` | Arrow <-> Column round-trip conversion |
 | `test_expr.mojo` | query/eval tokenizer, parser, evaluator |
+| `test_window.mojo` | rolling, expanding, ewm window operations |
 
 ## Helpers
 
