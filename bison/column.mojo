@@ -1979,16 +1979,14 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
     def on_int64(mut self, data: List[Int64]) raises:
         var has_mask = len(self.null_mask) > 0
-        var typed_vals = List[Int64]()
+        var val_set = Set[Int64]()
         for k in range(len(self.scalars)):
             if self.scalars[k].isa[Int64]():
-                typed_vals.append(self.scalars[k][Int64])
+                val_set.add(self.scalars[k][Int64])
             elif self.scalars[k].isa[Float64]():
-                typed_vals.append(Int64(Int(self.scalars[k][Float64])))
+                val_set.add(Int64(Int(self.scalars[k][Float64])))
             elif self.scalars[k].isa[Bool]():
-                typed_vals.append(
-                    Int64(1) if self.scalars[k][Bool] else Int64(0)
-                )
+                val_set.add(Int64(1) if self.scalars[k][Bool] else Int64(0))
         var result = List[Bool]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
@@ -1996,25 +1994,20 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                var found = False
-                for j in range(len(typed_vals)):
-                    if data[i] == typed_vals[j]:
-                        found = True
-                        break
-                result.append(found)
+                result.append(data[i] in val_set)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
     def on_float64(mut self, data: List[Float64]) raises:
         var has_mask = len(self.null_mask) > 0
-        var typed_vals = List[Float64]()
+        var val_set = Set[Float64]()
         for k in range(len(self.scalars)):
             if self.scalars[k].isa[Float64]():
-                typed_vals.append(self.scalars[k][Float64])
+                val_set.add(self.scalars[k][Float64])
             elif self.scalars[k].isa[Int64]():
-                typed_vals.append(Float64(self.scalars[k][Int64]))
+                val_set.add(Float64(self.scalars[k][Int64]))
             elif self.scalars[k].isa[Bool]():
-                typed_vals.append(
+                val_set.add(
                     Float64(1.0) if self.scalars[k][Bool] else Float64(0.0)
                 )
         var result = List[Bool]()
@@ -2024,21 +2017,16 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                var found = False
-                for j in range(len(typed_vals)):
-                    if data[i] == typed_vals[j]:
-                        found = True
-                        break
-                result.append(found)
+                result.append(data[i] in val_set)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
     def on_bool(mut self, data: List[Bool]) raises:
         var has_mask = len(self.null_mask) > 0
-        var typed_vals = List[Bool]()
+        var val_set = Set[Bool]()
         for k in range(len(self.scalars)):
             if self.scalars[k].isa[Bool]():
-                typed_vals.append(self.scalars[k][Bool])
+                val_set.add(self.scalars[k][Bool])
         var result = List[Bool]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
@@ -2046,21 +2034,16 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                var found = False
-                for j in range(len(typed_vals)):
-                    if data[i] == typed_vals[j]:
-                        found = True
-                        break
-                result.append(found)
+                result.append(data[i] in val_set)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
     def on_str(mut self, data: List[String]) raises:
         var has_mask = len(self.null_mask) > 0
-        var typed_vals = List[String]()
+        var val_set = Set[String]()
         for k in range(len(self.scalars)):
             if self.scalars[k].isa[String]():
-                typed_vals.append(self.scalars[k][String])
+                val_set.add(self.scalars[k][String])
         var result = List[Bool]()
         for i in range(len(data)):
             if has_mask and self.null_mask[i]:
@@ -2068,12 +2051,7 @@ struct _IsInVisitor(ColumnDataVisitorRaises, Copyable, Movable):
                 self.result_mask.append(True)
                 self.has_any_null = True
             else:
-                var found = False
-                for j in range(len(typed_vals)):
-                    if data[i] == typed_vals[j]:
-                        found = True
-                        break
-                result.append(found)
+                result.append(data[i] in val_set)
                 self.result_mask.append(False)
         self.col_data = ColumnData(result^)
 
