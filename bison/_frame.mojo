@@ -6568,9 +6568,14 @@ struct DataFrameGroupBy:
 
         return DataFrame(result_cols^)
 
-    def sum(self) raises -> DataFrame:
-        if self._can_use_marrow_agg("sum"):
-            return self._marrow_agg("sum")
+    def _agg_dispatch(self, name: String, ddof: Int = 1) raises -> DataFrame:
+        """Shared native aggregation fallback for sum/mean/min/max/count/std/var.
+
+        Checks the marrow fast path first, then falls back to the per-group
+        loop.  The `ddof` parameter is only used for std/var.
+        """
+        if self._can_use_marrow_agg(name):
+            return self._marrow_agg(name)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6579,167 +6584,74 @@ struct DataFrameGroupBy:
             ref col = self._df._cols[i]
             if col.name.value() in skip:
                 continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
+            var is_count = name == "count"
+            if not is_count and not (
+                col.dtype.is_integer() or col.dtype.is_float()
+            ):
                 continue
-            if col.dtype.is_integer():
+            if is_count:
                 var vals = List[Int64]()
                 for j in range(len(self._group_keys)):
                     vals.append(
-                        col.take(
-                            self._group_map[self._group_keys[j]]
-                        ).sum_int64()
+                        Int64(
+                            col.take(
+                                self._group_map[self._group_keys[j]]
+                            ).count()
+                        )
                     )
+                result_cols.append(self._make_result_col_int64(col.name, vals^))
+            elif col.dtype.is_integer() and (
+                name == "sum" or name == "min" or name == "max"
+            ):
+                var vals = List[Int64]()
+                for j in range(len(self._group_keys)):
+                    var taken = col.take(self._group_map[self._group_keys[j]])
+                    if name == "sum":
+                        vals.append(taken.sum_int64())
+                    elif name == "min":
+                        vals.append(taken.min_int64())
+                    elif name == "max":
+                        vals.append(taken.max_int64())
                 result_cols.append(self._make_result_col_int64(col.name, vals^))
             else:
                 var vals = List[Float64]()
                 for j in range(len(self._group_keys)):
-                    vals.append(
-                        col.take(self._group_map[self._group_keys[j]]).sum()
-                    )
+                    var taken = col.take(self._group_map[self._group_keys[j]])
+                    if name == "sum":
+                        vals.append(taken.sum())
+                    elif name == "mean":
+                        vals.append(taken.mean())
+                    elif name == "min":
+                        vals.append(taken.min())
+                    elif name == "max":
+                        vals.append(taken.max())
+                    elif name == "std":
+                        vals.append(taken.std(ddof))
+                    else:
+                        vals.append(taken.var(ddof))
                 result_cols.append(self._make_result_col(col.name, vals^))
         return self._wrap_agg_result(result_cols^)
+
+    def sum(self) raises -> DataFrame:
+        return self._agg_dispatch("sum")
 
     def mean(self) raises -> DataFrame:
-        if self._can_use_marrow_agg("mean"):
-            return self._marrow_agg("mean")
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).mean()
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("mean")
 
     def min(self) raises -> DataFrame:
-        if self._can_use_marrow_agg("min"):
-            return self._marrow_agg("min")
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            if col.dtype.is_integer():
-                var vals = List[Int64]()
-                for j in range(len(self._group_keys)):
-                    vals.append(
-                        col.take(
-                            self._group_map[self._group_keys[j]]
-                        ).min_int64()
-                    )
-                result_cols.append(self._make_result_col_int64(col.name, vals^))
-            else:
-                var vals = List[Float64]()
-                for j in range(len(self._group_keys)):
-                    vals.append(
-                        col.take(self._group_map[self._group_keys[j]]).min()
-                    )
-                result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("min")
 
     def max(self) raises -> DataFrame:
-        if self._can_use_marrow_agg("max"):
-            return self._marrow_agg("max")
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            if col.dtype.is_integer():
-                var vals = List[Int64]()
-                for j in range(len(self._group_keys)):
-                    vals.append(
-                        col.take(
-                            self._group_map[self._group_keys[j]]
-                        ).max_int64()
-                    )
-                result_cols.append(self._make_result_col_int64(col.name, vals^))
-            else:
-                var vals = List[Float64]()
-                for j in range(len(self._group_keys)):
-                    vals.append(
-                        col.take(self._group_map[self._group_keys[j]]).max()
-                    )
-                result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("max")
 
     def std(self, ddof: Int = 1) raises -> DataFrame:
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).std(ddof)
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("std", ddof)
 
     def var(self, ddof: Int = 1) raises -> DataFrame:
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
-                continue
-            var vals = List[Float64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    col.take(self._group_map[self._group_keys[j]]).var(ddof)
-                )
-            result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("var", ddof)
 
     def count(self) raises -> DataFrame:
-        if self._can_use_marrow_agg("count"):
-            return self._marrow_agg("count")
-        var skip = Dict[String, Bool]()
-        for i in range(len(self._by)):
-            skip[self._by[i]] = True
-        var result_cols = List[Column]()
-        for i in range(len(self._df._cols)):
-            ref col = self._df._cols[i]
-            if col.name.value() in skip:
-                continue
-            var vals = List[Int64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    Int64(
-                        col.take(self._group_map[self._group_keys[j]]).count()
-                    )
-                )
-            result_cols.append(self._make_result_col_int64(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+        return self._agg_dispatch("count")
 
     def nunique(self) raises -> DataFrame:
         var skip = Dict[String, Bool]()
@@ -7202,89 +7114,72 @@ struct SeriesGroupBy:
                 col.set_null_mask(null_mask^)
             return Series(col^)
 
-    def sum(self) raises -> Series:
-        if self._can_use_marrow_agg("sum"):
-            return self._marrow_agg("sum")
+    def _agg_dispatch(self, name: String) raises -> Series:
+        """Shared native aggregation fallback for sum/mean/min/max/count.
+
+        Checks the marrow fast path first, then falls back to the per-group
+        loop with string-dispatched column-level aggregation.
+        """
+        if self._can_use_marrow_agg(name):
+            return self._marrow_agg(name)
         var idx = ColumnIndex(Index(self._group_keys.copy()))
-        if self._series._col.dtype.is_integer():
+        if name == "count":
             var result_vals = List[Int64]()
             for i in range(len(self._group_keys)):
                 var key = self._group_keys[i]
                 result_vals.append(
-                    self._series._col.take(self._group_map[key]).sum_int64()
+                    Int64(self._series._col.take(self._group_map[key]).count())
                 )
+            return Series(Column(self._series.name, result_vals^, int64, idx^))
+        if name == "mean":
+            var result_vals = List[Float64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                result_vals.append(
+                    self._series._col.take(self._group_map[key]).mean()
+                )
+            return Series(
+                Column(self._series.name, result_vals^, float64, idx^)
+            )
+        # sum, min, max: preserve int64 dtype when the series is integer.
+        if self._series._col.dtype.is_integer():
+            var result_vals = List[Int64]()
+            for i in range(len(self._group_keys)):
+                var key = self._group_keys[i]
+                var taken = self._series._col.take(self._group_map[key])
+                if name == "sum":
+                    result_vals.append(taken.sum_int64())
+                elif name == "min":
+                    result_vals.append(taken.min_int64())
+                elif name == "max":
+                    result_vals.append(taken.max_int64())
             return Series(Column(self._series.name, result_vals^, int64, idx^))
         var result_vals = List[Float64]()
         for i in range(len(self._group_keys)):
             var key = self._group_keys[i]
-            result_vals.append(
-                self._series._col.take(self._group_map[key]).sum()
-            )
+            var taken = self._series._col.take(self._group_map[key])
+            if name == "sum":
+                result_vals.append(taken.sum())
+            elif name == "min":
+                result_vals.append(taken.min())
+            elif name == "max":
+                result_vals.append(taken.max())
         return Series(Column(self._series.name, result_vals^, float64, idx^))
+
+    def sum(self) raises -> Series:
+        return self._agg_dispatch("sum")
 
     def mean(self) raises -> Series:
-        if self._can_use_marrow_agg("mean"):
-            return self._marrow_agg("mean")
-        var result_vals = List[Float64]()
-        for i in range(len(self._group_keys)):
-            var key = self._group_keys[i]
-            result_vals.append(
-                self._series._col.take(self._group_map[key]).mean()
-            )
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(Column(self._series.name, result_vals^, float64, idx^))
+        return self._agg_dispatch("mean")
 
     def min(self) raises -> Series:
-        if self._can_use_marrow_agg("min"):
-            return self._marrow_agg("min")
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
-        if self._series._col.dtype.is_integer():
-            var result_vals = List[Int64]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                result_vals.append(
-                    self._series._col.take(self._group_map[key]).min_int64()
-                )
-            return Series(Column(self._series.name, result_vals^, int64, idx^))
-        var result_vals = List[Float64]()
-        for i in range(len(self._group_keys)):
-            var key = self._group_keys[i]
-            result_vals.append(
-                self._series._col.take(self._group_map[key]).min()
-            )
-        return Series(Column(self._series.name, result_vals^, float64, idx^))
+        return self._agg_dispatch("min")
 
     def max(self) raises -> Series:
-        if self._can_use_marrow_agg("max"):
-            return self._marrow_agg("max")
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
-        if self._series._col.dtype.is_integer():
-            var result_vals = List[Int64]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                result_vals.append(
-                    self._series._col.take(self._group_map[key]).max_int64()
-                )
-            return Series(Column(self._series.name, result_vals^, int64, idx^))
-        var result_vals = List[Float64]()
-        for i in range(len(self._group_keys)):
-            var key = self._group_keys[i]
-            result_vals.append(
-                self._series._col.take(self._group_map[key]).max()
-            )
-        return Series(Column(self._series.name, result_vals^, float64, idx^))
+        return self._agg_dispatch("max")
 
     def count(self) raises -> Series:
-        if self._can_use_marrow_agg("count"):
-            return self._marrow_agg("count")
-        var result_vals = List[Int64]()
-        for i in range(len(self._group_keys)):
-            var key = self._group_keys[i]
-            result_vals.append(
-                Int64(self._series._col.take(self._group_map[key]).count())
-            )
-        var idx = ColumnIndex(Index(self._group_keys.copy()))
-        return Series(Column(self._series.name, result_vals^, int64, idx^))
+        return self._agg_dispatch("count")
 
     def nunique(self) raises -> Series:
         var result_vals = List[Int64]()
