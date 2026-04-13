@@ -185,14 +185,14 @@ are implemented in Mojo. Methods marked **stub** raise
 | `eval(expr)` | native |
 | `query(expr)` | native |
 
-### Time series (stubs)
+### Time series
 
 | Method | Status |
 |--------|--------|
 | `resample(rule)` | stub |
-| `rolling(window)` | stub |
-| `expanding(min_periods)` | stub |
-| `ewm(com, span)` | stub |
+| `rolling(window)` | native |
+| `expanding(min_periods)` | native |
+| `ewm(com, span, halflife, alpha)` | native |
 
 ### Output
 
@@ -310,6 +310,14 @@ are implemented in Mojo. Methods marked **stub** raise
 | `diff(periods=1)` | native |
 | `pct_change(periods=1)` | native |
 
+### Window operations
+
+| Method | Status |
+|--------|--------|
+| `rolling(window, min_periods)` | native |
+| `expanding(min_periods)` | native |
+| `ewm(com, span, halflife, alpha)` | native |
+
 ### Missing data
 
 | Method | Status |
@@ -407,6 +415,53 @@ are implemented in Mojo. Methods marked **stub** raise
 | `agg(func)` | native |
 | `apply(func)` | native |
 | `transform(func)` | native |
+
+---
+
+## Rolling / SeriesRolling
+
+Returned by `DataFrame.rolling(window)` / `Series.rolling(window)`. All methods
+are native.
+
+| Method | Description |
+|--------|-------------|
+| `sum()` | Rolling sum |
+| `mean()` | Rolling mean |
+| `std(ddof=1)` | Rolling standard deviation |
+| `var(ddof=1)` | Rolling variance |
+| `min()` | Rolling minimum |
+| `max()` | Rolling maximum |
+| `count()` | Rolling count of non-null values |
+
+---
+
+## Expanding / SeriesExpanding
+
+Returned by `DataFrame.expanding(min_periods)` / `Series.expanding(min_periods)`.
+All methods are native.
+
+| Method | Description |
+|--------|-------------|
+| `sum()` | Expanding sum |
+| `mean()` | Expanding mean |
+| `std(ddof=1)` | Expanding standard deviation |
+| `var(ddof=1)` | Expanding variance |
+| `min()` | Expanding minimum |
+| `max()` | Expanding maximum |
+| `count()` | Expanding count of non-null values |
+
+---
+
+## ExponentialMovingWindow / SeriesExponentialMovingWindow
+
+Returned by `DataFrame.ewm()` / `Series.ewm()`. Exactly one of `com`, `span`,
+`halflife`, or `alpha` must be provided. All methods are native.
+
+| Method | Description |
+|--------|-------------|
+| `mean()` | Exponentially weighted moving average |
+| `std(ddof=1)` | Exponentially weighted moving standard deviation |
+| `var(ddof=1)` | Exponentially weighted moving variance |
 
 ---
 

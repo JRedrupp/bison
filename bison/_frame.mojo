@@ -46,6 +46,27 @@ from marrow.dtypes import (
     float64 as _m_float64,
 )
 from marrow.kernels.groupby import groupby as _marrow_groupby
+from .window import (
+    WindowResult,
+    rolling_sum as _w_rolling_sum,
+    rolling_count as _w_rolling_count,
+    rolling_mean as _w_rolling_mean,
+    rolling_var as _w_rolling_var,
+    rolling_std as _w_rolling_std,
+    rolling_min as _w_rolling_min,
+    rolling_max as _w_rolling_max,
+    expanding_sum as _w_expanding_sum,
+    expanding_count as _w_expanding_count,
+    expanding_mean as _w_expanding_mean,
+    expanding_var as _w_expanding_var,
+    expanding_std as _w_expanding_std,
+    expanding_min as _w_expanding_min,
+    expanding_max as _w_expanding_max,
+    ewm_mean as _w_ewm_mean,
+    ewm_var as _w_ewm_var,
+    ewm_std as _w_ewm_std,
+    resolve_ewm_alpha as _resolve_ewm_alpha,
+)
 
 
 # ------------------------------------------------------------------
@@ -1093,6 +1114,27 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         by_null_mask: NullMask = NullMask(),
     ) raises -> SeriesGroupBy:
         return SeriesGroupBy(self, by, as_index, sort, dropna, by_null_mask)
+
+    def rolling(
+        self, window: Int, min_periods: Optional[Int] = None
+    ) raises -> SeriesRolling:
+        var mp = window
+        if min_periods:
+            mp = min_periods.value()
+        return SeriesRolling(self, window, mp)
+
+    def expanding(self, min_periods: Int = 1) raises -> SeriesExpanding:
+        return SeriesExpanding(self, min_periods)
+
+    def ewm(
+        self,
+        com: Optional[Float64] = None,
+        span: Optional[Float64] = None,
+        halflife: Optional[Float64] = None,
+        alpha: Optional[Float64] = None,
+    ) raises -> SeriesExponentialMovingWindow:
+        var a = _resolve_ewm_alpha(com, span, halflife, alpha)
+        return SeriesExponentialMovingWindow(self, a)
 
 
 # ------------------------------------------------------------------
@@ -5268,19 +5310,24 @@ struct DataFrame(Copyable, Movable):
 
     def rolling(
         self, window: Int, min_periods: Optional[Int] = None
-    ) raises -> DataFrame:
-        _not_implemented("DataFrame.rolling")
-        return DataFrame()
+    ) raises -> Rolling:
+        var mp = window
+        if min_periods:
+            mp = min_periods.value()
+        return Rolling(self, window, mp)
 
-    def expanding(self, min_periods: Int = 1) raises -> DataFrame:
-        _not_implemented("DataFrame.expanding")
-        return DataFrame()
+    def expanding(self, min_periods: Int = 1) raises -> Expanding:
+        return Expanding(self, min_periods)
 
     def ewm(
-        self, com: Optional[Float64] = None, span: Optional[Float64] = None
-    ) raises -> DataFrame:
-        _not_implemented("DataFrame.ewm")
-        return DataFrame()
+        self,
+        com: Optional[Float64] = None,
+        span: Optional[Float64] = None,
+        halflife: Optional[Float64] = None,
+        alpha: Optional[Float64] = None,
+    ) raises -> ExponentialMovingWindow:
+        var a = _resolve_ewm_alpha(com, span, halflife, alpha)
+        return ExponentialMovingWindow(self, a)
 
     # ------------------------------------------------------------------
     # IO
@@ -7431,6 +7478,516 @@ struct SeriesGroupBy:
         return Series.from_pandas(
             self._pd_groupby().apply(Python.evaluate(func))
         )
+
+
+# ------------------------------------------------------------------
+# Window structs — Rolling / Expanding / ExponentialMovingWindow
+# ------------------------------------------------------------------
+
+
+def _col_null_mask_as_list(col: Column) raises -> List[Bool]:
+    """Extract the null mask from a Column as a List[Bool].
+
+    Returns an empty list when the column has no nulls (matching the
+    kernel convention: empty mask = all valid).
+    """
+    if not col.has_nulls():
+        return List[Bool]()
+    var n = len(col)
+    var result = List[Bool](capacity=n)
+    for i in range(n):
+        result.append(col.is_null(i))
+    return result^
+
+
+def _window_col(
+    col: Column,
+    var data: List[Float64],
+    var mask: List[Bool],
+    has_any_null: Bool,
+) raises -> Column:
+    """Build a float64 Column from window result components."""
+    var result_col = Column(col.name, data^, float64)
+    if has_any_null:
+        result_col.set_null_mask(NullMask.from_list(mask))
+    return result_col^
+
+
+struct Rolling:
+    """Rolling window object returned by DataFrame.rolling()."""
+
+    var _df: DataFrame
+    var _window: Int
+    var _min_periods: Int
+
+    def __init__(out self, df: DataFrame, window: Int, min_periods: Int) raises:
+        if window <= 0:
+            raise Error("Rolling: window must be > 0")
+        self._df = df.copy(True)
+        self._window = window
+        self._min_periods = min_periods
+
+    def sum(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_sum(data, mask, self._window, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def mean(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_mean(
+                data, mask, self._window, self._min_periods
+            )
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def std(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_std(
+                data, mask, self._window, self._min_periods, ddof
+            )
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def var(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_var(
+                data, mask, self._window, self._min_periods, ddof
+            )
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def min(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_min(data, mask, self._window, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def max(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_max(data, mask, self._window, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def count(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_rolling_count(
+                data, mask, self._window, self._min_periods
+            )
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+
+struct SeriesRolling:
+    """Rolling window object returned by Series.rolling()."""
+
+    var _series: Series
+    var _window: Int
+    var _min_periods: Int
+
+    def __init__(
+        out self, series: Series, window: Int, min_periods: Int
+    ) raises:
+        if window <= 0:
+            raise Error("Rolling: window must be > 0")
+        self._series = series.copy()
+        self._window = window
+        self._min_periods = min_periods
+
+    def _apply(self, wr: WindowResult) raises -> Series:
+        var col = _window_col(
+            self._series._col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+        )
+        return Series(col^)
+
+    def sum(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_sum(data, mask, self._window, self._min_periods)
+        )
+
+    def mean(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_mean(data, mask, self._window, self._min_periods)
+        )
+
+    def std(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_std(data, mask, self._window, self._min_periods, ddof)
+        )
+
+    def var(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_var(data, mask, self._window, self._min_periods, ddof)
+        )
+
+    def min(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_min(data, mask, self._window, self._min_periods)
+        )
+
+    def max(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_max(data, mask, self._window, self._min_periods)
+        )
+
+    def count(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_rolling_count(data, mask, self._window, self._min_periods)
+        )
+
+
+struct Expanding:
+    """Expanding window object returned by DataFrame.expanding()."""
+
+    var _df: DataFrame
+    var _min_periods: Int
+
+    def __init__(out self, df: DataFrame, min_periods: Int) raises:
+        self._df = df.copy(True)
+        self._min_periods = min_periods
+
+    def sum(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_sum(data, mask, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def mean(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_mean(data, mask, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def std(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_std(data, mask, self._min_periods, ddof)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def var(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_var(data, mask, self._min_periods, ddof)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def min(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_min(data, mask, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def max(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_max(data, mask, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def count(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_expanding_count(data, mask, self._min_periods)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+
+struct SeriesExpanding:
+    """Expanding window object returned by Series.expanding()."""
+
+    var _series: Series
+    var _min_periods: Int
+
+    def __init__(out self, series: Series, min_periods: Int) raises:
+        self._series = series.copy()
+        self._min_periods = min_periods
+
+    def _apply(self, wr: WindowResult) raises -> Series:
+        var col = _window_col(
+            self._series._col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+        )
+        return Series(col^)
+
+    def sum(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_expanding_sum(data, mask, self._min_periods))
+
+    def mean(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_expanding_mean(data, mask, self._min_periods))
+
+    def std(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_expanding_std(data, mask, self._min_periods, ddof)
+        )
+
+    def var(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(
+            _w_expanding_var(data, mask, self._min_periods, ddof)
+        )
+
+    def min(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_expanding_min(data, mask, self._min_periods))
+
+    def max(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_expanding_max(data, mask, self._min_periods))
+
+    def count(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_expanding_count(data, mask, self._min_periods))
+
+
+struct ExponentialMovingWindow:
+    """EWM object returned by DataFrame.ewm()."""
+
+    var _df: DataFrame
+    var _alpha: Float64
+
+    def __init__(out self, df: DataFrame, alpha: Float64) raises:
+        self._df = df.copy(True)
+        self._alpha = alpha
+
+    def mean(self) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_ewm_mean(data, mask, self._alpha)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def std(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_ewm_std(data, mask, self._alpha, ddof)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+    def var(self, ddof: Int = 1) raises -> DataFrame:
+        var result_cols = List[Column]()
+        for i in range(len(self._df._cols)):
+            ref col = self._df._cols[i]
+            if not col.is_numeric():
+                continue
+            var data = col._to_float64_list()
+            var mask = _col_null_mask_as_list(col)
+            var wr = _w_ewm_var(data, mask, self._alpha, ddof)
+            result_cols.append(
+                _window_col(
+                    col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+                )
+            )
+        return DataFrame(result_cols^)
+
+
+struct SeriesExponentialMovingWindow:
+    """EWM object returned by Series.ewm()."""
+
+    var _series: Series
+    var _alpha: Float64
+
+    def __init__(out self, series: Series, alpha: Float64) raises:
+        self._series = series.copy()
+        self._alpha = alpha
+
+    def _apply(self, wr: WindowResult) raises -> Series:
+        var col = _window_col(
+            self._series._col, wr.data.copy(), wr.mask.copy(), wr.has_any_null
+        )
+        return Series(col^)
+
+    def mean(self) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_ewm_mean(data, mask, self._alpha))
+
+    def std(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_ewm_std(data, mask, self._alpha, ddof))
+
+    def var(self, ddof: Int = 1) raises -> Series:
+        var data = self._series._col._to_float64_list()
+        var mask = _col_null_mask_as_list(self._series._col)
+        return self._apply(_w_ewm_var(data, mask, self._alpha, ddof))
 
 
 # ------------------------------------------------------------------

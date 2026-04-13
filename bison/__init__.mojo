@@ -32,6 +32,14 @@ from .column import (
 from .series import Series
 from .dataframe import DataFrame, ToDictResult
 from .groupby import DataFrameGroupBy, SeriesGroupBy
+from .windows import (
+    Rolling,
+    SeriesRolling,
+    Expanding,
+    SeriesExpanding,
+    ExponentialMovingWindow,
+    SeriesExponentialMovingWindow,
+)
 from .indexing import LocIndexer, ILocIndexer, AtIndexer, IAtIndexer
 from .io import (
     read_csv,

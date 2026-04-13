@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `DataFrame.rolling(window)` and `Series.rolling(window)` with native Mojo
+  sliding-window operations: `sum()`, `mean()`, `std()`, `var()`, `min()`,
+  `max()`, `count()`. Supports `min_periods` parameter for partial windows.
+- `DataFrame.expanding(min_periods)` and `Series.expanding(min_periods)` with
+  native Mojo expanding-window operations: `sum()`, `mean()`, `std()`, `var()`,
+  `min()`, `max()`, `count()`.
+- `DataFrame.ewm()` and `Series.ewm()` with exponentially weighted moving
+  operations: `mean()`, `std()`, `var()`. Supports `com`, `span`, `halflife`,
+  and `alpha` parameters. Closes #688.
 - New `string_` BisonDtype constant (distinct from `object_`) for columns
   backed by `List[String]`. `DataFrame.dtypes` and `Series.dtype` now return
   `"string"` for string columns instead of `"object"`. Round-trips through
