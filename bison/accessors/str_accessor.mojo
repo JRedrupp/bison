@@ -5,6 +5,22 @@ from ..column import Column, NullMask
 from ..dtypes import BisonDtype, object_, bool_, int64, string_
 
 
+# Compile-time function type for element-wise String→String transforms
+# used with _apply_str_transform[F] below. F must be a module-level
+# (non-capturing) def matching this signature.
+comptime StrTransformFn = def(String) -> String
+
+
+def _upper_fn(s: String) -> String:
+    """Return *s* upper-cased; used with ``_apply_str_transform[_upper_fn]``."""
+    return s.upper()
+
+
+def _lower_fn(s: String) -> String:
+    """Return *s* lower-cased; used with ``_apply_str_transform[_lower_fn]``."""
+    return s.lower()
+
+
 struct StringMethods:
     """Vectorized string operations on a Series (.str accessor)."""
 
@@ -34,31 +50,62 @@ struct StringMethods:
     def _is_null(self, i: Int) -> Bool:
         return self._null_mask.is_null(i)
 
+    def _make_str_col(self, var result: List[String]) raises -> Column:
+        """Build a string Column copying this accessor's null mask."""
+        var col = Column(self._name, result^, string_)
+        col.set_null_mask(self._null_mask.copy())
+        return col^
+
+    def _make_str_col_masked(
+        self, var result: List[String], var mask: NullMask
+    ) raises -> Column:
+        """Build a string Column using an explicit null mask."""
+        var col = Column(self._name, result^, string_)
+        col.set_null_mask(mask^)
+        return col^
+
+    def _make_bool_col(
+        self, var result: List[Bool], var mask: NullMask
+    ) raises -> Column:
+        """Build a bool Column using an explicit null mask."""
+        var col = Column(self._name, result^, bool_)
+        col.set_null_mask(mask^)
+        return col^
+
+    def _make_int64_col(
+        self, var result: List[Int64], var mask: NullMask
+    ) raises -> Column:
+        """Build an int64 Column using an explicit null mask."""
+        var col = Column(self._name, result^, int64)
+        col.set_null_mask(mask^)
+        return col^
+
+    def _apply_str_transform[F: StrTransformFn](self) raises -> Column:
+        """Apply a compile-time string transform element-wise, propagating nulls.
+
+        *F* must be a module-level (non-capturing) function matching
+        ``StrTransformFn``.  Null positions receive an empty string in the
+        output; the original null mask is copied onto the result column.
+
+        Call as ``self._apply_str_transform[_upper_fn]()``.
+        """
+        var result = List[String]()
+        for i in range(len(self._data)):
+            if self._is_null(i):
+                result.append(String(""))
+            else:
+                result.append(F(self._data[i]))
+        return self._make_str_col(result^)
+
     # ------------------------------------------------------------------
     # Case / transform
     # ------------------------------------------------------------------
 
     def upper(self) raises -> Column:
-        var result = List[String]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(String(""))
-            else:
-                result.append(self._data[i].upper())
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._apply_str_transform[_upper_fn]()
 
     def lower(self) raises -> Column:
-        var result = List[String]()
-        for i in range(len(self._data)):
-            if self._is_null(i):
-                result.append(String(""))
-            else:
-                result.append(self._data[i].lower())
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._apply_str_transform[_lower_fn]()
 
     # ------------------------------------------------------------------
     # Stripping
@@ -73,9 +120,7 @@ struct StringMethods:
                 result.append(String(self._data[i].strip()))
             else:
                 result.append(String(self._data[i].strip(to_strip)))
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._make_str_col(result^)
 
     def lstrip(self, to_strip: String = "") raises -> Column:
         var result = List[String]()
@@ -86,9 +131,7 @@ struct StringMethods:
                 result.append(String(self._data[i].lstrip()))
             else:
                 result.append(String(self._data[i].lstrip(to_strip)))
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._make_str_col(result^)
 
     def rstrip(self, to_strip: String = "") raises -> Column:
         var result = List[String]()
@@ -99,9 +142,7 @@ struct StringMethods:
                 result.append(String(self._data[i].rstrip()))
             else:
                 result.append(String(self._data[i].rstrip(to_strip)))
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._make_str_col(result^)
 
     # ------------------------------------------------------------------
     # Predicates
@@ -122,9 +163,7 @@ struct StringMethods:
                 else:
                     result.append(self._data[i].lower().find(pat.lower()) != -1)
                 new_mask.append_valid()
-        var col = Column(self._name, result^, bool_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_bool_col(result^, new_mask^)
 
     def startswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
@@ -136,9 +175,7 @@ struct StringMethods:
             else:
                 result.append(self._data[i].startswith(pat))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, bool_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_bool_col(result^, new_mask^)
 
     def endswith(self, pat: String) raises -> Column:
         var result = List[Bool]()
@@ -150,9 +187,7 @@ struct StringMethods:
             else:
                 result.append(self._data[i].endswith(pat))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, bool_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_bool_col(result^, new_mask^)
 
     # ------------------------------------------------------------------
     # Replace / split
@@ -172,9 +207,7 @@ struct StringMethods:
                 result.append(String(sub_result))
             else:
                 result.append(self._data[i].replace(pat, repl))
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(self._null_mask.copy())
-        return col^
+        return self._make_str_col(result^)
 
     def split(
         self, pat: String = " ", n: Int = -1, expand: Bool = False
@@ -213,9 +246,7 @@ struct StringMethods:
             else:
                 result.append(Int64(len(self._data[i])))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, int64)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_int64_col(result^, new_mask^)
 
     def find(self, sub: String, start: Int = 0, end: Int = -1) raises -> Column:
         var result = List[Int64]()
@@ -231,9 +262,7 @@ struct StringMethods:
                     pos = -1
                 result.append(Int64(pos))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, int64)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_int64_col(result^, new_mask^)
 
     def count(self, pat: String) raises -> Column:
         var result = List[Int64]()
@@ -248,9 +277,7 @@ struct StringMethods:
                 var matches = re_mod.findall(pat, py_s)
                 result.append(Int64(Int(py=matches.__len__())))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, int64)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_int64_col(result^, new_mask^)
 
     # ------------------------------------------------------------------
     # Indexing / slicing
@@ -278,9 +305,7 @@ struct StringMethods:
                         j += 1
                     result.append(char_val)
                     new_mask.append_valid()
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_str_col_masked(result^, new_mask^)
 
     def slice(
         self, start: Int = 0, stop: Int = -1, step: Int = 1
@@ -305,9 +330,7 @@ struct StringMethods:
                     j += 1
                 result.append(sub)
                 new_mask.append_valid()
-        var col = Column(self._name, result^, string_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_str_col_masked(result^, new_mask^)
 
     # ------------------------------------------------------------------
     # Concatenation
@@ -342,6 +365,4 @@ struct StringMethods:
                 var m = re_mod.match(pat, py_s)
                 result.append(Bool(m.__bool__()))
                 new_mask.append_valid()
-        var col = Column(self._name, result^, bool_)
-        col.set_null_mask(new_mask^)
-        return col^
+        return self._make_bool_col(result^, new_mask^)
