@@ -5,6 +5,23 @@ from ..arrow import table_to_dataframe
 from marrow.parquet import read_table as _marrow_read_table
 
 
+def _require_pyarrow() raises:
+    """Raise a descriptive error when pyarrow is not installed.
+
+    Both the native marrow path and the pandas fallback path for Parquet
+    I/O depend on pyarrow at runtime.  This helper is called at the entry
+    point of every public Parquet function so that callers receive a clear
+    message instead of a cryptic import error buried inside a dependency.
+    """
+    try:
+        _ = Python.import_module("pyarrow")
+    except:
+        raise Error(
+            "pyarrow is required for Parquet I/O but is not installed. "
+            "Install it with:  pip install pyarrow"
+        )
+
+
 def _read_parquet_pandas(
     path: String,
     engine: String,
@@ -38,6 +55,11 @@ def read_parquet(
 ) raises -> DataFrame:
     """Read a Parquet file into a DataFrame.
 
+    .. note::
+        ``pyarrow`` is required at runtime for all Parquet I/O (both the
+        native marrow path and the pandas fallback).  An ``Error`` with a
+        descriptive message is raised when it is not installed.
+
     Uses marrow's native Parquet reader (via the Arrow C Stream Interface)
     for int64, float64, bool, and string columns. Falls back to pandas
     when ``filters`` are specified or when the file contains unsupported
@@ -53,6 +75,8 @@ def read_parquet(
               fallback path because marrow does not support row-group
               filtering.
     """
+    _require_pyarrow()
+
     # filters require the pandas path — marrow has no filter support.
     if filters:
         return _read_parquet_pandas(path, engine, columns, filters)

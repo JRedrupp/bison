@@ -5343,6 +5343,11 @@ struct DataFrame(Copyable, Movable):
     ) raises:
         """Write the DataFrame to a Parquet file.
 
+        .. note::
+            ``pyarrow`` is required at runtime for all Parquet I/O (both the
+            native marrow path and the pandas fallback).  An ``Error`` with a
+            descriptive message is raised when it is not installed.
+
         Uses marrow's native Parquet writer (via the Arrow C Stream
         Interface) for int64, float64, bool, and string columns.  Falls
         back to pandas when the DataFrame contains unsupported column
@@ -5357,8 +5362,11 @@ struct DataFrame(Copyable, Movable):
         compression : Compression codec (default ``"snappy"``).  Only
                       used on the pandas fallback path.
         """
+        from .io.parquet import _require_pyarrow
         from .arrow import dataframe_to_table
         from marrow.parquet import write_table as _marrow_write_table
+
+        _require_pyarrow()
 
         try:
             var table = dataframe_to_table(self)
