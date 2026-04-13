@@ -1050,6 +1050,62 @@ def test_null_roundtrip_records() raises:
     assert_true(not isna_b.iloc(2)[Bool])
 
 
+def test_read_csv_unimplemented_index_col() raises:
+    """Passing index_col to read_csv raises an error."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("a,b\n1,2\n")
+    var raised = False
+    try:
+        _ = read_csv(path, index_col=PythonObject("a"))
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_read_csv_unimplemented_dtype() raises:
+    """Passing dtype to read_csv raises an error."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("a,b\n1,2\n")
+    var raised = False
+    try:
+        _ = read_csv(path, dtype=PythonObject("float64"))
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_read_csv_unimplemented_parse_dates() raises:
+    """Passing parse_dates=True to read_csv raises an error."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".csv"))
+    with open(path, "w") as f:
+        f.write("date,value\n2024-01-01,1\n")
+    var raised = False
+    try:
+        _ = read_csv(path, parse_dates=True)
+    except:
+        raised = True
+    assert_true(raised)
+
+
+def test_read_json_unimplemented_dtype() raises:
+    """Passing dtype to read_json raises an error."""
+    var tempfile = Python.import_module("tempfile")
+    var path = String(tempfile.mktemp(suffix=".json"))
+    with open(path, "w") as f:
+        f.write('[{"a": 1, "b": 2}]')
+    var raised = False
+    try:
+        _ = read_json(path, dtype=PythonObject("float64"))
+    except:
+        raised = True
+    assert_true(raised)
+
+
 def _preload_arrow_rtld_deepbind() raises:
     """Pre-load Arrow shared libraries with RTLD_DEEPBIND before any pyarrow import.
 
