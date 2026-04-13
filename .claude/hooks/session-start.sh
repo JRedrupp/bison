@@ -26,6 +26,17 @@ fi
 echo "Initialising submodules..."
 git submodule update --init --recursive
 
+# Install perf for profiling (kernel-version-independent binary)
+if ! command -v perf &>/dev/null; then
+  echo "Installing perf..."
+  apt-get update -qq && apt-get install -y -qq linux-tools-common linux-tools-generic >/dev/null 2>&1
+  # The wrapper script fails on mismatched kernels; symlink the real binary.
+  PERF_BIN=$(find /usr/lib/linux-tools -name perf -type f 2>/dev/null | head -1)
+  if [ -n "$PERF_BIN" ]; then
+    ln -sf "$PERF_BIN" /usr/local/bin/perf
+  fi
+fi
+
 # Install all project dependencies (MAX + pandas + numpy)
 echo "Running pixi install..."
 pixi install
