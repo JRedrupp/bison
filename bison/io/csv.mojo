@@ -1,33 +1,22 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column, NullMask
+from ..column import Column
 from ..dtypes import int64, float64, object_, bool_, string_
 from .._errors import _not_implemented
+from ._builder import (
+    _in_na_set,
+    _is_bool_value,
+    _csv_col_bool,
+    _csv_col_int64,
+    _csv_col_float64,
+    _csv_col_string,
+)
 
 
 # ------------------------------------------------------------------
 # Private helpers
 # ------------------------------------------------------------------
-
-
-def _in_na_set(s: String, na_set: List[String]) -> Bool:
-    """Return True if *s* matches any string in *na_set*."""
-    for i in range(len(na_set)):
-        if s == na_set[i]:
-            return True
-    return False
-
-
-def _is_bool_value(s: String) -> Bool:
-    """Return True if *s* is a case-insensitive match for 'true' or 'false'."""
-    var lower = s.lower()
-    return lower == "true" or lower == "false"
-
-
-def _parse_bool_value(s: String) -> Bool:
-    """Parse a bool CSV token — 'true' (case-insensitive) returns True."""
-    return s.lower() == "true"
 
 
 def _infer_and_build_column(
@@ -58,19 +47,7 @@ def _infer_and_build_column(
             break
 
     if all_bool:
-        var data = List[Bool]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if _in_na_set(raw[i], na_set):
-                data.append(False)
-                null_mask.append_null()
-            else:
-                data.append(_parse_bool_value(raw[i]))
-                null_mask.append_valid()
-        var col = Column(name, data^, bool_)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
+        return _csv_col_bool(name, raw, na_set)
 
     # ------------------------------------------------------------------
     # Try Int64 — atol() raises for anything that isn't a decimal integer.
@@ -88,19 +65,7 @@ def _infer_and_build_column(
             break
 
     if all_int:
-        var data = List[Int64]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if _in_na_set(raw[i], na_set):
-                data.append(Int64(0))
-                null_mask.append_null()
-            else:
-                data.append(Int64(atol(raw[i])))
-                null_mask.append_valid()
-        var col = Column(name, data^, int64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
+        return _csv_col_int64(name, raw, na_set)
 
     # ------------------------------------------------------------------
     # Try Float64 — atof() raises for non-numeric strings.
@@ -118,36 +83,12 @@ def _infer_and_build_column(
             break
 
     if all_float:
-        var data = List[Float64]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if _in_na_set(raw[i], na_set):
-                data.append(Float64(0))
-                null_mask.append_null()
-            else:
-                data.append(atof(raw[i]))
-                null_mask.append_valid()
-        var col = Column(name, data^, float64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
+        return _csv_col_float64(name, raw, na_set)
 
     # ------------------------------------------------------------------
     # Default: String (stored as List[String] with string_ dtype, #644)
     # ------------------------------------------------------------------
-    var data = List[String]()
-    var null_mask = NullMask()
-    for i in range(n):
-        if _in_na_set(raw[i], na_set):
-            data.append(String(""))
-            null_mask.append_null()
-        else:
-            data.append(raw[i])
-            null_mask.append_valid()
-    var col = Column(name, data^, string_)
-    if null_mask.has_nulls():
-        col.set_null_mask(null_mask^)
-    return col^
+    return _csv_col_string(name, raw, na_set)
 
 
 # ------------------------------------------------------------------

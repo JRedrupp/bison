@@ -1,19 +1,21 @@
 from std.python import Python, PythonObject
 from std.collections import Optional
 from ..dataframe import DataFrame
-from ..column import Column, NullMask
+from ..column import Column
 from ..dtypes import int64, float64, object_, bool_, string_
 from .._errors import _not_implemented
+from ._builder import (
+    _json_py_type,
+    _json_col_bool,
+    _json_col_int64,
+    _json_col_float64,
+    _json_col_string,
+)
 
 
 # ------------------------------------------------------------------
 # Private helpers
 # ------------------------------------------------------------------
-
-
-def _json_py_type(val: PythonObject) raises -> String:
-    """Return the Python class name of a JSON value."""
-    return String(val.__class__.__name__)
 
 
 def _json_infer_dtype(py_values: PythonObject, n: Int) raises -> String:
@@ -63,68 +65,13 @@ def _json_build_column(
     var dtype_str = _json_infer_dtype(py_values, n)
 
     if dtype_str == "bool":
-        var data = List[Bool]()
-        var null_mask = NullMask()
-        for ri in range(n):
-            var val = py_values[ri]
-            if _json_py_type(val) == "NoneType":
-                data.append(False)
-                null_mask.append_null()
-            else:
-                data.append(Bool(val.__bool__()))
-                null_mask.append_valid()
-        var col = Column(name, data^, bool_)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
-
+        return _json_col_bool(name, py_values, n)
     elif dtype_str == "int64":
-        var data = List[Int64]()
-        var null_mask = NullMask()
-        for ri in range(n):
-            var val = py_values[ri]
-            if _json_py_type(val) == "NoneType":
-                data.append(Int64(0))
-                null_mask.append_null()
-            else:
-                data.append(Int64(Int(py=val)))
-                null_mask.append_valid()
-        var col = Column(name, data^, int64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
-
+        return _json_col_int64(name, py_values, n)
     elif dtype_str == "float64":
-        var data = List[Float64]()
-        var null_mask = NullMask()
-        for ri in range(n):
-            var val = py_values[ri]
-            if _json_py_type(val) == "NoneType":
-                data.append(Float64(0))
-                null_mask.append_null()
-            else:
-                data.append(atof(String(val)))
-                null_mask.append_valid()
-        var col = Column(name, data^, float64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
-
+        return _json_col_float64(name, py_values, n)
     else:  # "string"
-        var data = List[String]()
-        var null_mask = NullMask()
-        for ri in range(n):
-            var val = py_values[ri]
-            if _json_py_type(val) == "NoneType":
-                data.append(String(""))
-                null_mask.append_null()
-            else:
-                data.append(String(val))
-                null_mask.append_valid()
-        var col = Column(name, data^, string_)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        return col^
+        return _json_col_string(name, py_values, n)
 
 
 def _json_records_to_df(
