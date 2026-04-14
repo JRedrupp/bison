@@ -1030,14 +1030,14 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         path : File path to write.  When empty (default) the CSV text is
                returned as a ``String``.
         """
-        var result = String()
         ref col = self._col
         var has_index = col._index_len() > 0
         var n = col.__len__()
+        var result = String(capacity=n * 32)
         for i in range(n):
             var key = col._index_label(i) if has_index else String(i)
             var val = _col_cell_str(col, i)
-            result += (
+            result.write(
                 _csv_quote_field(key, ",")
                 + ","
                 + _csv_quote_field(val, ",")

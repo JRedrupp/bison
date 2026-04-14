@@ -30,16 +30,18 @@ struct Index(Copyable, Movable):
         return self._data.copy()
 
     def __repr__(self) -> String:
-        var s = String("Index([")
-        for i in range(len(self._data)):
+        var n = len(self._data)
+        var s = String(capacity=n * 16)
+        s.write("Index([")
+        for i in range(n):
             if i > 0:
-                s += ", "
-            s += "'" + self._data[i] + "'"
-        s += "]"
+                s.write(", ")
+            s.write("'" + self._data[i] + "'")
+        s.write("]")
         if self.name:
-            s += ", name='" + self.name + "'"
-        s += ")"
-        return s
+            s.write(", name='" + self.name + "'")
+        s.write(")")
+        return s^
 
     def get_loc(self, key: String) raises -> Int:
         for i in range(len(self._data)):
