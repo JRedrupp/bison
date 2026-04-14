@@ -574,8 +574,8 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var idx_len = self._col._index_len()
         if idx_len == 0:
             return pos
-        if self._col._index.isa[List[Int64]]():
-            return Int(self._col._index[List[Int64]][pos])
+        if self._col.is_int_index():
+            return Int(self._col._int_index_data()[pos])
         raise Error("idxmin: index labels are not integer-typed")
 
     def idxmax(self, skipna: Bool = True) raises -> Int:
@@ -585,8 +585,8 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var idx_len = self._col._index_len()
         if idx_len == 0:
             return pos
-        if self._col._index.isa[List[Int64]]():
-            return Int(self._col._index[List[Int64]][pos])
+        if self._col.is_int_index():
+            return Int(self._col._int_index_data()[pos])
         raise Error("idxmax: index labels are not integer-typed")
 
     def corr(self, other: Series) raises -> Float64:
@@ -2470,9 +2470,9 @@ struct DataFrame(Copyable, Movable):
                 var idx_len = self._cols[i]._index_len()
                 if idx_len == 0:
                     values.append(Float64(pos))
-                elif self._cols[i]._index.isa[List[Int64]]():
+                elif self._cols[i].is_int_index():
                     values.append(
-                        Float64(Int(self._cols[i]._index[List[Int64]][pos]))
+                        Float64(Int(self._cols[i]._int_index_data()[pos]))
                     )
                 else:
                     _not_implemented("DataFrame.idxmin with non-integer index")
@@ -2491,9 +2491,9 @@ struct DataFrame(Copyable, Movable):
                 var idx_len = self._cols[i]._index_len()
                 if idx_len == 0:
                     values.append(Float64(pos))
-                elif self._cols[i]._index.isa[List[Int64]]():
+                elif self._cols[i].is_int_index():
                     values.append(
-                        Float64(Int(self._cols[i]._index[List[Int64]][pos]))
+                        Float64(Int(self._cols[i]._int_index_data()[pos]))
                     )
                 else:
                     _not_implemented("DataFrame.idxmax with non-integer index")
@@ -3331,16 +3331,16 @@ struct DataFrame(Copyable, Movable):
         var new_cols = List[Column]()
         if not drop and has_index:
             var empty_col_idx = ColumnIndex(List[PythonObject]())
-            if self._cols[0]._index.isa[Index]():
-                ref str_idx = self._cols[0]._index[Index]
+            if self._cols[0].is_str_index():
+                ref str_idx = self._cols[0]._str_index()
                 var str_data = List[String]()
                 for i in range(n_idx):
                     str_data.append(str_idx[i])
                 new_cols.append(
                     Column("index", str_data^, string_, empty_col_idx^)
                 )
-            elif self._cols[0]._index.isa[List[Int64]]():
-                ref int_idx = self._cols[0]._index[List[Int64]]
+            elif self._cols[0].is_int_index():
+                ref int_idx = self._cols[0]._int_index_data()
                 var int_data = List[Int64]()
                 for i in range(n_idx):
                     int_data.append(int_idx[i])
@@ -3348,7 +3348,7 @@ struct DataFrame(Copyable, Movable):
                     Column("index", int_data^, int64, empty_col_idx^)
                 )
             else:
-                ref obj_idx = self._cols[0]._index[List[PythonObject]]
+                ref obj_idx = self._cols[0]._obj_index_data()
                 ref idx_names = self._cols[0]._index_names
                 var n_levels = len(idx_names)
                 if n_levels > 1:
@@ -3489,8 +3489,8 @@ struct DataFrame(Copyable, Movable):
                 # Rename only supports string index arms natively.  For
                 # other arms fall back to string conversion.
                 var n_idx = c._index_len()
-                if c._index.isa[Index]():
-                    ref old = c._index[Index]
+                if c.is_str_index():
+                    ref old = c._str_index()
                     var new_labels = List[String]()
                     for k in range(n_idx):
                         var lbl = old[k]
@@ -3499,8 +3499,8 @@ struct DataFrame(Copyable, Movable):
                         else:
                             new_labels.append(lbl)
                     c._index = ColumnIndex(Index(new_labels^))
-                elif c._index.isa[List[Int64]]():
-                    ref old = c._index[List[Int64]]
+                elif c.is_int_index():
+                    ref old = c._int_index_data()
                     var new_ints = List[Int64]()
                     for k in range(n_idx):
                         var lbl = String(Int(old[k]))
@@ -3512,7 +3512,7 @@ struct DataFrame(Copyable, Movable):
                 else:
                     # PythonObject fallback: stringify labels.
                     var builtins = Python.import_module("builtins")
-                    ref old = c._index[List[PythonObject]]
+                    ref old = c._obj_index_data()
                     var new_objs = List[PythonObject]()
                     for k in range(n_idx):
                         var lbl = String(old[k])
@@ -4339,10 +4339,10 @@ struct DataFrame(Copyable, Movable):
             return DataFrame()
         if not self._has_index():
             raise Error("DataFrame.unstack: requires an explicit MultiIndex")
-        if not self._cols[0]._index.isa[List[PythonObject]]():
+        if not self._cols[0].is_obj_index():
             raise Error("DataFrame.unstack: requires a tuple-backed MultiIndex")
 
-        ref idx_objs = self._cols[0]._index[List[PythonObject]]
+        ref idx_objs = self._cols[0]._obj_index_data()
         if len(idx_objs) == 0:
             raise Error("DataFrame.unstack: requires a non-empty MultiIndex")
         if String(idx_objs[0].__class__.__name__) != "tuple":
@@ -4593,12 +4593,12 @@ struct DataFrame(Copyable, Movable):
             return DataFrame()
         if not self._has_index():
             raise Error("DataFrame.swaplevel: requires a MultiIndex on axis 0")
-        if not self._cols[0]._index.isa[List[PythonObject]]():
+        if not self._cols[0].is_obj_index():
             raise Error(
                 "DataFrame.swaplevel: requires a tuple-backed MultiIndex"
             )
 
-        ref idx_objs = self._cols[0]._index[List[PythonObject]]
+        ref idx_objs = self._cols[0]._obj_index_data()
         if len(idx_objs) == 0:
             raise Error("DataFrame.swaplevel: requires a non-empty MultiIndex")
         if String(idx_objs[0].__class__.__name__) != "tuple":

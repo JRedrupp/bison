@@ -58,6 +58,21 @@ key types.
 | `col.is_object()` | `col._data.isa[List[PythonObject]]()` |
 | `col.is_numeric()` | `col._data.isa[List[Int64]]() or col._data.isa[List[Float64]]()` |
 
+The same encapsulation applies to `_index`.  **Never use `_index.isa[...]()` or
+`_index[Arm]` directly in `_frame.mojo`.**  Use the index predicates and
+accessors on `Column` instead:
+
+| Predicate / Accessor | Replaces |
+|----------------------|----------|
+| `col.is_str_index()` | `col._index.isa[Index]()` |
+| `col.is_int_index()` | `col._index.isa[List[Int64]]()` |
+| `col.is_float_index()` | `col._index.isa[List[Float64]]()` |
+| `col.is_obj_index()` | `col._index.isa[List[PythonObject]]()` |
+| `col._str_index()` | `col._index[Index]` |
+| `col._int_index_data()` | `col._index[List[Int64]]` |
+| `col._float_index_data()` | `col._index[List[Float64]]` |
+| `col._obj_index_data()` | `col._index[List[PythonObject]]` |
+
 After [#644](https://github.com/JRedrupp/bison/issues/644), `is_string()` and
 `is_object()` dispatch on `self.dtype` like the other predicates —
 `is_string()` is equivalent to `dtype == string_`, `is_object()` is equivalent
