@@ -9,6 +9,21 @@ calling code. The library provides the full pandas DataFrame and Series API;
 methods that are not yet implemented natively raise an error until they are
 ported to Mojo.
 
+## Why bison?
+
+If you are writing a Mojo program that processes tabular data, the alternative
+to bison is wrapping pandas at the Python boundary — every DataFrame call then
+crosses the Python/Mojo language boundary and carries Python object overhead.
+bison runs natively in Mojo: data lives in Apache Arrow-backed columns,
+aggregations use SIMD kernels from [marrow](https://github.com/kszucs/marrow),
+and there is no Python interop in the hot path.
+
+The pandas-compatible API means the transition cost is low. For most scripts
+replacing `import pandas as pd` with `import bison as bs` is the bulk of the
+change. See [Migrating from pandas](#migrating-from-pandas) for the full
+walkthrough. Methods not yet implemented natively raise immediately with a
+clear message so you know exactly what to work around.
+
 ## Status
 
 Most of the pandas DataFrame and Series API is implemented natively in Mojo
@@ -95,20 +110,75 @@ print(bs.__version__)
 pixi run test
 ```
 
-## Benchmarks
+## Performance
 
-The benchmark suite in `benchmarks/bench_core.mojo` compares bison against
-pandas across aggregation, groupby, indexing, and I/O operations. Each entry
-reports a ratio of bison time to pandas time; values below 1.0 mean bison is
-faster.
+bison is faster than pandas for element-wise operations and small-dataset
+queries. Complex operations — groupby, sort, merge, eval — are slower at this
+stage and are being actively optimized.
+
+Ratio = bison time / pandas time. Values below 1.0 mean bison is faster.
+
+| Operation | bison | pandas | Ratio |
+|-----------|------:|-------:|------:|
+| iloc row | 0.002 ms | 0.041 ms | 0.04x |
+| query (1k rows) | 0.029 ms | 0.308 ms | 0.09x |
+| series_mean | 0.047 ms | 0.134 ms | 0.35x |
+| loc slice | 0.014 ms | 0.031 ms | 0.45x |
+| fillna | 0.037 ms | 0.069 ms | 0.53x |
+| series_sum | 0.055 ms | 0.096 ms | 0.57x |
+| query (10k rows) | 0.306 ms | 0.363 ms | 0.84x |
+| csv roundtrip | 506 ms | 343 ms | 1.48x |
+| series_apply | 0.817 ms | 0.221 ms | 3.70x |
+| sort_values | 24.4 ms | 5.68 ms | 4.29x |
+| merge | 13.1 ms | 2.0 ms | 6.56x |
+| groupby_sum | 64.5 ms | 4.4 ms | 14.75x |
+| eval_expr | 1.6 ms | 0.098 ms | 16.58x |
+
+Benchmarks run at 100k rows (aggregation, groupby, sort), 10k rows
+(query/apply), and a 1k/10k sweep for the query scalability entries.
+Full history and per-commit charts at
+[jredrupp.github.io/bison](https://jredrupp.github.io/bison/).
 
 ```bash
 pixi run bench        # run the full suite
 pixi run gen-report   # merge results into docs/data.json
 ```
 
-The `docs/` directory contains an HTML performance dashboard that plots ratio
-history across commits.
+## Migrating from pandas
+
+For most scripts the required changes are minimal:
+
+1. Replace `import pandas as pd` with `import bison as bs`.
+2. Wrap your entry point in `def main() raises:`.
+3. Declare variables with `var`.
+
+```python
+# Before — Python + pandas
+import pandas as pd
+
+df = pd.read_csv("sales.csv")
+totals = df.groupby("region")["revenue"].sum()
+df_clean = df.dropna(subset=["revenue"])
+df.to_parquet("out.parquet")
+```
+
+```mojo
+# After — Mojo + bison
+import bison as bs
+
+def main() raises:
+    var df = bs.read_csv("sales.csv")
+    var totals = df.groupby("region")["revenue"].sum()
+    var df_clean = df.dropna(subset=List[String]("revenue"))
+    df.to_parquet("out.parquet")
+```
+
+If a method you rely on is not yet implemented natively, bison raises
+immediately with a clear message (`bison.<method>: not implemented`).
+
+See [docs/migrating-from-pandas.md](docs/migrating-from-pandas.md) for a
+full walkthrough covering common patterns, known differences, and how to
+work around unimplemented methods.
 
 ## Known limitations
 
@@ -200,6 +270,7 @@ documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — installation, first DataFrame, core operations
+- [Migrating from pandas](docs/migrating-from-pandas.md) — step-by-step guide for porting pandas scripts
 - [API reference](docs/api-reference.md) — full method listing with native/stub status
 - [Architecture](docs/architecture.md) — column storage, type predicates, marrow integration
 - [Mojo patterns](docs/mojo-patterns.md) — language-specific tips and pitfalls
