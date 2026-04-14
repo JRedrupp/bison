@@ -1,5 +1,5 @@
 from std.python import Python, PythonObject
-from std.collections import Optional
+from std.collections import Optional, Dict, Set
 from ..dataframe import DataFrame, _sort_col_names
 from ..column import Column, NullMask
 from ..dtypes import BisonDtype, int64, float64, bool_, object_, string_
@@ -200,6 +200,26 @@ def _dtype_for(dfs: List[DataFrame], col_name: String) raises -> BisonDtype:
     return object_
 
 
+def _dtype_for_mapped(
+    dfs: List[DataFrame],
+    name_maps: List[Dict[String, Int]],
+    col_name: String,
+) raises -> BisonDtype:
+    """Like _dtype_for but uses pre-built name→index maps for O(1) lookups."""
+    var result: Optional[BisonDtype] = None
+    for i in range(len(dfs)):
+        if col_name in name_maps[i]:
+            var j = name_maps[i][col_name]
+            var dt = dfs[i]._cols[j].dtype
+            if result:
+                result = _promote_dtype(result.value(), dt)
+            else:
+                result = dt
+    if result:
+        return result.value()
+    return object_
+
+
 def _common_dtype(pieces: List[Column]) -> Optional[BisonDtype]:
     """Return the shared dtype if all pieces use the same typed data arm.
 
@@ -394,48 +414,51 @@ def _concat_axis0(
             for j in range(len(dfs[0]._cols)):
                 col_names.append(dfs[0]._cols[j].name.value())
             for i in range(1, len(dfs)):
+                var col_set = Set[String]()
+                for j in range(len(dfs[i]._cols)):
+                    col_set.add(dfs[i]._cols[j].name.value())
                 var keep = List[String]()
                 for k in range(len(col_names)):
-                    var found = False
-                    for j in range(len(dfs[i]._cols)):
-                        if dfs[i]._cols[j].name == col_names[k]:
-                            found = True
-                    if found:
+                    if col_names[k] in col_set:
                         keep.append(col_names[k])
                 col_names = keep^
     else:
         # Outer (default): union of all column names, first-seen order.
+        var seen = Set[String]()
         for i in range(len(dfs)):
             for j in range(len(dfs[i]._cols)):
                 var name = dfs[i]._cols[j].name.value()
-                var seen = False
-                for k in range(len(col_names)):
-                    if col_names[k] == name:
-                        seen = True
-                if not seen:
+                if name not in seen:
                     col_names.append(name)
+                    seen.add(name)
 
     if sort:
         col_names = _sort_col_names(col_names)
 
     # 2. For each output column, gather one piece from every DataFrame and stack.
+    # Pre-build name→column-index maps for O(1) lookups per DataFrame.
+    var name_maps = List[Dict[String, Int]]()
+    for i in range(len(dfs)):
+        var m = Dict[String, Int]()
+        for j in range(len(dfs[i]._cols)):
+            m[dfs[i]._cols[j].name.value()] = j
+        name_maps.append(m^)
+
     var result_cols = List[Column]()
     for c in range(len(col_names)):
         var col_name = col_names[c]
-        var dtype = _dtype_for(dfs, col_name)
+        var dtype = _dtype_for_mapped(dfs, name_maps, col_name)
         var pieces = List[Column]()
         for i in range(len(dfs)):
             var nrows = dfs[i].shape()[0]
-            var found = False
-            for j in range(len(dfs[i]._cols)):
-                if dfs[i]._cols[j].name == col_name:
-                    var piece = dfs[i]._cols[j].copy()
-                    # Cast to promoted dtype if this frame's column differs.
-                    if piece.dtype != dtype:
-                        piece = piece._astype(dtype)
-                    pieces.append(piece^)
-                    found = True
-            if not found:
+            if col_name in name_maps[i]:
+                var j = name_maps[i][col_name]
+                var piece = dfs[i]._cols[j].copy()
+                # Cast to promoted dtype if this frame's column differs.
+                if piece.dtype != dtype:
+                    piece = piece._astype(dtype)
+                pieces.append(piece^)
+            else:
                 pieces.append(_null_col(col_name, nrows, dtype))
         result_cols.append(_vstack(pieces))
 
