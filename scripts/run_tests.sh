@@ -27,37 +27,112 @@ else
     echo "Package up to date: bison.mojopkg"
 fi
 
-pids=()
-files=()
+BIN_DIR="$TMP_DIR/bin"
+COMPILE_RESULT_DIR="$TMP_DIR/compile_results"
+LOG_DIR="$TMP_DIR/logs"
+mkdir -p "$BIN_DIR" "$COMPILE_RESULT_DIR" "$LOG_DIR"
 
 # Leave at least one core free so the machine stays responsive.
 MAX_JOBS=$(( $(nproc) - 1 ))
 [ "$MAX_JOBS" -lt 1 ] && MAX_JOBS=1
+
+# ── Phase 1: Compile ────────────────────────────────────────────────────
+echo "Compiling tests ..."
+echo ""
+
+files=()
+pids=()
 running=0
 
 for f in "$TESTS_DIR"/test_*.mojo; do
-    result_file="$TMP_DIR/$(basename "$f").result"
-    echo "Running $f ..."
+    name="$(basename "$f" .mojo)"
+    compile_result="$COMPILE_RESULT_DIR/$name"
+    log_file="$LOG_DIR/$name.log"
+    files+=("$f")
+    echo "  Compiling $(basename "$f") ..."
     (
-        if timeout 1800 mojo run -I "$CACHE_DIR" -I "$REPO_ROOT" "$f"; then
-            echo "pass" > "$result_file"
+        if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" -Xlinker -lm "$f" -o "$BIN_DIR/$name" >"$log_file" 2>&1; then
+            echo "pass" > "$compile_result"
         else
-            echo "fail" > "$result_file"
+            echo "fail" > "$compile_result"
         fi
     ) &
     pids+=($!)
-    files+=("$f")
     running=$(( running + 1 ))
 
-    # Once we have MAX_JOBS in flight, wait for the oldest to finish
-    # before spawning the next one.
     if [ "$running" -ge "$MAX_JOBS" ]; then
         wait "${pids[$(( ${#pids[@]} - running ))]}" || true
         running=$(( running - 1 ))
     fi
 done
 
-# Wait for all test processes to finish
+for pid in "${pids[@]}"; do
+    wait "$pid" || true
+done
+
+# Report compile results and abort early on compile failures.
+COMPILE_PASS=0
+COMPILE_FAIL=0
+COMPILE_ERRORS=()
+
+for f in "${files[@]}"; do
+    name="$(basename "$f" .mojo)"
+    compile_result="$COMPILE_RESULT_DIR/$name"
+    result="$(cat "$compile_result" 2>/dev/null || echo fail)"
+    if [ "$result" = "pass" ]; then
+        echo "  OK   $(basename "$f")"
+        COMPILE_PASS=$((COMPILE_PASS + 1))
+    else
+        echo "  FAIL $(basename "$f")"
+        COMPILE_FAIL=$((COMPILE_FAIL + 1))
+        COMPILE_ERRORS+=("$f")
+    fi
+done
+
+echo ""
+echo "Compile: $COMPILE_PASS passed, $COMPILE_FAIL failed"
+
+if [ ${#COMPILE_ERRORS[@]} -gt 0 ]; then
+    echo ""
+    echo "Failed to compile:"
+    for e in "${COMPILE_ERRORS[@]}"; do
+        echo "  $e"
+        log_file="$LOG_DIR/$(basename "$e" .mojo).log"
+        if [ -f "$log_file" ]; then
+            sed 's/^/    /' "$log_file"
+        fi
+    done
+    exit 1
+fi
+
+# ── Phase 2: Run ────────────────────────────────────────────────────────
+echo ""
+echo "Running tests ..."
+echo ""
+
+pids=()
+running=0
+
+for f in "${files[@]}"; do
+    name="$(basename "$f" .mojo)"
+    result_file="$TMP_DIR/$name.result"
+    echo "  Running $name ..."
+    (
+        if timeout 1800 "$BIN_DIR/$name"; then
+            echo "pass" > "$result_file"
+        else
+            echo "fail" > "$result_file"
+        fi
+    ) &
+    pids+=($!)
+    running=$(( running + 1 ))
+
+    if [ "$running" -ge "$MAX_JOBS" ]; then
+        wait "${pids[$(( ${#pids[@]} - running ))]}" || true
+        running=$(( running - 1 ))
+    fi
+done
+
 for pid in "${pids[@]}"; do
     wait "$pid" || true
 done
@@ -68,7 +143,8 @@ ERRORS=()
 
 for i in "${!files[@]}"; do
     f="${files[$i]}"
-    result_file="$TMP_DIR/$(basename "$f").result"
+    name="$(basename "$f" .mojo)"
+    result_file="$TMP_DIR/$name.result"
     result="$(cat "$result_file" 2>/dev/null || echo fail)"
     if [ "$result" = "pass" ]; then
         PASS=$((PASS + 1))
