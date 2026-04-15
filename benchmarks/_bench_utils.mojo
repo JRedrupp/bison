@@ -49,7 +49,7 @@ struct BenchResult(Copyable, Movable):
         return r^
 
 
-def time_fn(callable: PythonObject, iterations: Int = 100) -> Float64:
+def time_fn(callable: PythonObject, iterations: Int = 100) raises -> Float64:
     """Time a Python callable using timeit.
 
     Runs `callable` `iterations` times and returns the mean wall time in
@@ -63,7 +63,7 @@ def time_fn(callable: PythonObject, iterations: Int = 100) -> Float64:
     return (total_seconds / Float64(iterations)) * 1000.0
 
 
-def print_json(results: List[BenchResult]):
+def print_json(results: List[BenchResult]) raises:
     """Serialise a List[BenchResult] to a JSON object on stdout.
 
     Output format::
