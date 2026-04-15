@@ -33,12 +33,12 @@ comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 # ---------------------------------------------------------------------------
 
 
-fn _elapsed_ms(t0: UInt, iters: Int) -> Float64:
+def _elapsed_ms(t0: UInt, iters: Int) -> Float64:
     """Return mean milliseconds per call given a start timestamp and count."""
     return Float64(perf_counter_ns() - t0) / Float64(iters) / 1_000_000.0
 
 
-fn _time_pandas(
+def _time_pandas(
     stmt: String,
     globals_dict: PythonObject,
     iters: Int,
@@ -55,7 +55,7 @@ fn _time_pandas(
     return (total_seconds / Float64(iters)) * 1000.0
 
 
-fn my_sqrt(x: Float64) -> Float64:
+def my_sqrt(x: Float64) -> Float64:
     """Element-wise sqrt used for the series_apply benchmark."""
     return sqrt(x)
 
@@ -65,7 +65,7 @@ fn my_sqrt(x: Float64) -> Float64:
 # ---------------------------------------------------------------------------
 
 
-fn main() raises:
+def main():
     var results = List[BenchResult]()
 
     # ------------------------------------------------------------------

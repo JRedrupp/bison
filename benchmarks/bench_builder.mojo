@@ -83,7 +83,7 @@ comptime N = 10_000
 comptime REPS = 5
 
 
-fn _ms_per_call(elapsed_ns: UInt, reps: Int) -> Float64:
+def _ms_per_call(elapsed_ns: UInt, reps: Int) -> Float64:
     """Return mean milliseconds per repetition."""
     return Float64(elapsed_ns) / Float64(reps) / 1_000_000.0
 
