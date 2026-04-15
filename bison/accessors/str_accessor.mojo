@@ -8,7 +8,7 @@ from ..dtypes import BisonDtype, object_, bool_, int64, string_
 # Compile-time function type for element-wise String→String transforms
 # used with _apply_str_transform[F] below. F must be a module-level
 # (non-capturing) def matching this signature.
-comptime StrTransformFn = def(String) -> String
+comptime StrTransformFn = def(String) thin -> String
 
 
 def _upper_fn(s: String) -> String:
@@ -244,7 +244,7 @@ struct StringMethods:
                 result.append(Int64(0))
                 new_mask.append_null()
             else:
-                result.append(Int64(len(self._data[i])))
+                result.append(Int64(self._data[i].count_codepoints()))
                 new_mask.append_valid()
         return self._make_int64_col(result^, new_mask^)
 
@@ -292,7 +292,7 @@ struct StringMethods:
                 new_mask.append_null()
             else:
                 var s = self._data[idx]
-                if i < 0 or i >= len(s):
+                if i < 0 or i >= s.count_codepoints():
                     result.append(String(""))
                     new_mask.append_null()
                 else:
@@ -318,7 +318,7 @@ struct StringMethods:
                 new_mask.append_null()
             else:
                 var s = self._data[i]
-                var slen = len(s)
+                var slen = s.count_codepoints()
                 var actual_stop = slen if stop == -1 or stop > slen else stop
                 var sub = String("")
                 var j = 0
