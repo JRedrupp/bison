@@ -45,9 +45,33 @@ fi
 
 # Collect entry-point files: benchmarks only.
 # Tests are validated by the test runner (run_tests.sh).
+#
+# bench_core.mojo and bench_profile.mojo are temporarily excluded: they
+# both call DataFrame.query() from a monolithic def main(), which hits a
+# Mojo 0.26.3 nightly compile-time deadlock (all compiler threads wait
+# forever on sem_wait inside libAsyncRTMojoBindings.so).  The same call
+# distributed across many small test functions — as in tests/test_expr.mojo —
+# compiles in ~30-45s, so the regular test suite is unaffected.  See
+# repro_hang.mojo / repro_hang.patch at the repo root for the root-cause
+# analysis (typed AnyArray.as_*() monomorphisation in the query evaluator's
+# transitive call graph).  Re-enable when the compiler regression lands
+# upstream.
+SKIP_FILES=(bench_core.mojo bench_profile.mojo)
 FILES=()
 for f in "$REPO_ROOT"/benchmarks/bench_*.mojo; do
-    [ -f "$f" ] && FILES+=("$f")
+    [ -f "$f" ] || continue
+    skip=0
+    for s in "${SKIP_FILES[@]}"; do
+        if [ "$(basename "$f")" = "$s" ]; then
+            skip=1
+            break
+        fi
+    done
+    if [ "$skip" -eq 0 ]; then
+        FILES+=("$f")
+    else
+        echo "  SKIP $(basename "$f")  (Mojo 0.26.3 nightly compile-deadlock — see repro_hang.mojo)"
+    fi
 done
 
 echo "Compile-checking ${#FILES[@]} files ..."
