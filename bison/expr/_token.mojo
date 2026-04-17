@@ -63,7 +63,7 @@ struct Tokenizer:
         return String(from_utf8=bytes[start:end])
 
     def _at_end(self) -> Bool:
-        return self._pos >= len(self._src)
+        return self._pos >= self._src.byte_length()
 
     def _is_ident_start(self, b: UInt8) -> Bool:
         # A-Z (65-90), a-z (97-122), _ (95)
@@ -73,7 +73,7 @@ struct Tokenizer:
         return self._is_ident_start(b) or (b >= 48 and b <= 57)
 
     def _skip_whitespace(mut self):
-        while self._pos < len(self._src):
+        while self._pos < self._src.byte_length():
             var b = self._src.as_bytes()[self._pos]
             if b == 32 or b == 9 or b == 10 or b == 13:  # space, tab, LF, CR
                 self._pos += 1
@@ -82,7 +82,7 @@ struct Tokenizer:
 
     def _read_ident_or_keyword(mut self) raises -> Token:
         var start = self._pos
-        while self._pos < len(self._src) and self._is_ident_cont(
+        while self._pos < self._src.byte_length() and self._is_ident_cont(
             self._src.as_bytes()[self._pos]
         ):
             self._pos += 1
@@ -105,19 +105,20 @@ struct Tokenizer:
     def _read_number(mut self) raises -> Token:
         var start = self._pos
         while (
-            self._pos < len(self._src)
+            self._pos < self._src.byte_length()
             and self._src.as_bytes()[self._pos] >= 48
             and self._src.as_bytes()[self._pos] <= 57
         ):
             self._pos += 1
         var is_float = False
         if (
-            self._pos < len(self._src) and self._src.as_bytes()[self._pos] == 46
+            self._pos < self._src.byte_length()
+            and self._src.as_bytes()[self._pos] == 46
         ):  # '.'
             is_float = True
             self._pos += 1
             while (
-                self._pos < len(self._src)
+                self._pos < self._src.byte_length()
                 and self._src.as_bytes()[self._pos] >= 48
                 and self._src.as_bytes()[self._pos] <= 57
             ):
@@ -132,11 +133,11 @@ struct Tokenizer:
         self._pos += 1  # skip opening quote
         var start = self._pos
         while (
-            self._pos < len(self._src)
+            self._pos < self._src.byte_length()
             and self._src.as_bytes()[self._pos] != quote
         ):
             self._pos += 1
-        if self._pos >= len(self._src):
+        if self._pos >= self._src.byte_length():
             raise Error("invalid expression: unterminated string")
         var s = self._extract(start, self._pos)
         self._pos += 1  # skip closing quote
@@ -166,7 +167,7 @@ struct Tokenizer:
         # Two-character operators (must check before single-char)
         if b == 60:  # <
             if (
-                self._pos + 1 < len(self._src)
+                self._pos + 1 < self._src.byte_length()
                 and self._src.as_bytes()[self._pos + 1] == 61
             ):
                 self._pos += 2
@@ -175,7 +176,7 @@ struct Tokenizer:
             return Token(TK_LT, String("<"))
         if b == 62:  # >
             if (
-                self._pos + 1 < len(self._src)
+                self._pos + 1 < self._src.byte_length()
                 and self._src.as_bytes()[self._pos + 1] == 61
             ):
                 self._pos += 2
@@ -184,7 +185,7 @@ struct Tokenizer:
             return Token(TK_GT, String(">"))
         if b == 61:  # =
             if (
-                self._pos + 1 < len(self._src)
+                self._pos + 1 < self._src.byte_length()
                 and self._src.as_bytes()[self._pos + 1] == 61
             ):
                 self._pos += 2
@@ -193,7 +194,7 @@ struct Tokenizer:
             raise Error("unsupported syntax: '='")
         if b == 33:  # !
             if (
-                self._pos + 1 < len(self._src)
+                self._pos + 1 < self._src.byte_length()
                 and self._src.as_bytes()[self._pos + 1] == 61
             ):
                 self._pos += 2
