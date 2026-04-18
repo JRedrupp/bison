@@ -7047,17 +7047,9 @@ struct DataFrameGroupBy:
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
-        # Build row → group_key mapping by inverting _group_map.
         var n_rows = len(self._df._cols[0])
-        var row_key = List[String]()
-        for _ in range(n_rows):
-            row_key.append(String(""))
-        for j in range(len(self._group_keys)):
-            var key = self._group_keys[j]
-            ref indices = self._group_map[key]
-            for k in range(len(indices)):
-                row_key[indices[k]] = key
-        # Dtype-preserving broadcast for first/last.
+        var row_key = _gb_row_key_map(self._group_keys, self._group_map, n_rows)
+
         if func == "first" or func == "last":
             var want_first = func == "first"
             var result_cols = List[Column]()
@@ -7065,39 +7057,18 @@ struct DataFrameGroupBy:
                 ref col = self._df._cols[i]
                 if col.name.value() in skip:
                     continue
-                var key_to_idx = Dict[String, Int]()
-                for j in range(len(self._group_keys)):
-                    var key = self._group_keys[j]
-                    ref indices = self._group_map[key]
-                    var found = -1
-                    var start = 0 if want_first else len(indices) - 1
-                    var stop = len(indices) if want_first else -1
-                    var step = 1 if want_first else -1
-                    var ii = start
-                    while ii != stop:
-                        if col.is_valid(indices[ii]):
-                            found = indices[ii]
-                            break
-                        ii += step
-                    key_to_idx[key] = found
-                var selected = List[Int]()
-                for r in range(n_rows):
-                    if row_key[r] != "":
-                        selected.append(key_to_idx[row_key[r]])
-                    else:
-                        # Row was excluded by dropna — emit null.
-                        selected.append(-1)
-                var result_col = col.take_with_nulls(selected)
-                result_col.name = col.name
-                result_cols.append(result_col^)
+                result_cols.append(
+                    _gb_transform_first_last_col(
+                        col,
+                        self._group_keys,
+                        self._group_map,
+                        row_key,
+                        want_first,
+                    )
+                )
             return DataFrame(result_cols^)
-        # Detect whether any row has no group key (dropna null-key row).
-        var any_null_row = False
-        for r in range(n_rows):
-            if row_key[r] == "":
-                any_null_row = True
-                break
-        # Scalar-broadcast functions (float64 or int64-preserving).
+
+        var any_null_row = _gb_any_null_row(row_key)
         var needs_numeric = (
             func == "sum"
             or func == "mean"
@@ -7116,57 +7087,26 @@ struct DataFrameGroupBy:
                 col.dtype.is_integer() or col.dtype.is_float()
             ):
                 continue
-            # Integer-preserving path: only when no null rows can arise.
             if int_preserving and col.dtype.is_integer() and not any_null_row:
-                var key_to_int = Dict[String, Int64]()
-                for j in range(len(self._group_keys)):
-                    var key = self._group_keys[j]
-                    var sub = col.take(self._group_map[key])
-                    if func == "sum":
-                        key_to_int[key] = sub.sum_int64()
-                    elif func == "min":
-                        key_to_int[key] = sub.min_int64()
-                    else:  # max
-                        key_to_int[key] = sub.max_int64()
-                var int_vals = List[Int64]()
-                for r in range(n_rows):
-                    int_vals.append(key_to_int[row_key[r]])
-                result_cols.append(Column(col.name, int_vals^, int64))
+                result_cols.append(
+                    _gb_transform_int_col(
+                        col,
+                        self._group_keys,
+                        self._group_map,
+                        row_key,
+                        func,
+                    )
+                )
                 continue
-            var key_to_val = Dict[String, Float64]()
-            for j in range(len(self._group_keys)):
-                var key = self._group_keys[j]
-                var sub = col.take(self._group_map[key])
-                if func == "sum":
-                    key_to_val[key] = sub.sum()
-                elif func == "mean":
-                    key_to_val[key] = sub.mean()
-                elif func == "min":
-                    key_to_val[key] = sub.min()
-                elif func == "max":
-                    key_to_val[key] = sub.max()
-                elif func == "std":
-                    key_to_val[key] = sub.std()
-                elif func == "var":
-                    key_to_val[key] = sub.var()
-                elif func == "count":
-                    key_to_val[key] = Float64(sub.count())
-                # No else needed: first/last are handled in the separate branch above.
-            var nan = Float64(0) / Float64(0)
-            var vals = List[Float64]()
-            var null_mask = NullMask()
-            for r in range(n_rows):
-                if row_key[r] != "":
-                    vals.append(key_to_val[row_key[r]])
-                    null_mask.append_valid()
-                else:
-                    # Row was excluded by dropna — emit NaN.
-                    vals.append(nan)
-                    null_mask.append_null()
-            var result_col = Column(col.name, vals^, float64)
-            if null_mask.has_nulls():
-                result_col.set_null_mask(null_mask^)
-            result_cols.append(result_col^)
+            result_cols.append(
+                _gb_transform_float_col(
+                    col,
+                    self._group_keys,
+                    self._group_map,
+                    row_key,
+                    func,
+                )
+            )
         return DataFrame(result_cols^)
 
     def apply(self, func: String) raises -> DataFrame:
@@ -7178,6 +7118,144 @@ struct DataFrameGroupBy:
         return DataFrame.from_pandas(
             self._pd_groupby().filter(Python.evaluate(func))
         )
+
+
+# ------------------------------------------------------------------
+# groupby transform helpers (shared by DataFrameGroupBy / SeriesGroupBy)
+# ------------------------------------------------------------------
+
+
+def _gb_row_key_map(
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    n_rows: Int,
+) raises -> List[String]:
+    """Invert *group_map* to a row→group-key array.
+
+    Rows excluded by ``dropna`` are left as the empty string — the caller
+    uses ``""`` as a sentinel to emit NaN / null for those rows.
+    """
+    var row_key = List[String]()
+    for _ in range(n_rows):
+        row_key.append(String(""))
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        ref indices = group_map[key]
+        for k in range(len(indices)):
+            row_key[indices[k]] = key
+    return row_key^
+
+
+def _gb_any_null_row(row_key: List[String]) -> Bool:
+    """Return True if any row was excluded by ``dropna`` (empty sentinel)."""
+    for r in range(len(row_key)):
+        if row_key[r] == "":
+            return True
+    return False
+
+
+def _gb_transform_first_last_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    want_first: Bool,
+) raises -> Column:
+    """Dtype-preserving first/last broadcast for one column."""
+    var key_to_idx = Dict[String, Int]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        ref indices = group_map[key]
+        var found = -1
+        var start = 0 if want_first else len(indices) - 1
+        var stop = len(indices) if want_first else -1
+        var step = 1 if want_first else -1
+        var ii = start
+        while ii != stop:
+            if col.is_valid(indices[ii]):
+                found = indices[ii]
+                break
+            ii += step
+        key_to_idx[key] = found
+    var selected = List[Int]()
+    var n_rows = len(row_key)
+    for r in range(n_rows):
+        if row_key[r] != "":
+            selected.append(key_to_idx[row_key[r]])
+        else:
+            selected.append(-1)
+    var result_col = col.take_with_nulls(selected)
+    result_col.name = col.name
+    return result_col^
+
+
+def _gb_transform_int_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    func: String,
+) raises -> Column:
+    """Integer-preserving sum/min/max broadcast (no null rows present)."""
+    var key_to_int = Dict[String, Int64]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        var sub = col.take(group_map[key])
+        if func == "sum":
+            key_to_int[key] = sub.sum_int64()
+        elif func == "min":
+            key_to_int[key] = sub.min_int64()
+        else:  # max
+            key_to_int[key] = sub.max_int64()
+    var int_vals = List[Int64]()
+    for r in range(len(row_key)):
+        int_vals.append(key_to_int[row_key[r]])
+    return Column(col.name, int_vals^, int64)
+
+
+def _gb_transform_float_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    func: String,
+) raises -> Column:
+    """Float64 broadcast for sum/mean/min/max/std/var/count.
+
+    Rows excluded by ``dropna`` (empty-string sentinel in *row_key*) emit NaN.
+    """
+    var key_to_val = Dict[String, Float64]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        var sub = col.take(group_map[key])
+        if func == "sum":
+            key_to_val[key] = sub.sum()
+        elif func == "mean":
+            key_to_val[key] = sub.mean()
+        elif func == "min":
+            key_to_val[key] = sub.min()
+        elif func == "max":
+            key_to_val[key] = sub.max()
+        elif func == "std":
+            key_to_val[key] = sub.std()
+        elif func == "var":
+            key_to_val[key] = sub.var()
+        elif func == "count":
+            key_to_val[key] = Float64(sub.count())
+    var nan = Float64(0) / Float64(0)
+    var vals = List[Float64]()
+    var null_mask = NullMask()
+    for r in range(len(row_key)):
+        if row_key[r] != "":
+            vals.append(key_to_val[row_key[r]])
+            null_mask.append_valid()
+        else:
+            vals.append(nan)
+            null_mask.append_null()
+    var result_col = Column(col.name, vals^, float64)
+    if null_mask.has_nulls():
+        result_col.set_null_mask(null_mask^)
+    return result_col^
 
 
 struct SeriesGroupBy:
