@@ -1,6 +1,159 @@
 {
   "runs": [
     {
+      "commit": "68c0b47f16b90c6651394439767c0475bfe36606",
+      "short_commit": "68c0b47",
+      "timestamp": "2026-04-18T23:22:28Z",
+      "ref": "main",
+      "results": {
+        "builder_int64_safe_vs_list": {
+          "bison_ms": 0.0489974,
+          "pandas_ms": 0.0345544,
+          "ratio": 1.4179786076447574
+        },
+        "builder_int64_fast_vs_list": {
+          "bison_ms": 0.0165308,
+          "pandas_ms": 0.0345544,
+          "ratio": 0.47839927766073204
+        },
+        "builder_float64_safe_vs_list": {
+          "bison_ms": 0.026471400000000003,
+          "pandas_ms": 0.0085338,
+          "ratio": 3.101947549743374
+        },
+        "builder_float64_fast_vs_list": {
+          "bison_ms": 0.016643,
+          "pandas_ms": 0.0085338,
+          "ratio": 1.9502449084815678
+        },
+        "builder_bool_safe_vs_list": {
+          "bison_ms": 0.10001260000000001,
+          "pandas_ms": 0.0070852,
+          "ratio": 14.115705978659744
+        },
+        "builder_bool_fast_vs_list": {
+          "bison_ms": 0.1014452,
+          "pandas_ms": 0.0070852,
+          "ratio": 14.317902105798002
+        },
+        "builder_string_safe_vs_list": {
+          "bison_ms": 0.28812940000000004,
+          "pandas_ms": 0.192409,
+          "ratio": 1.4974840054259417
+        },
+        "builder_string_unsafe_vs_list": {
+          "bison_ms": 0.2010732,
+          "pandas_ms": 0.192409,
+          "ratio": 1.0450301181337671
+        },
+        "series_sum": {
+          "bison_ms": 0.05283762,
+          "pandas_ms": 0.09567889999999579,
+          "ratio": 0.5522389994032365
+        },
+        "series_mean": {
+          "bison_ms": 0.04123358,
+          "pandas_ms": 0.12515516000007665,
+          "ratio": 0.3294596882779323
+        },
+        "groupby_sum": {
+          "bison_ms": 80.3959954,
+          "pandas_ms": 5.391499499999952,
+          "ratio": 14.911620672505064
+        },
+        "query_simple": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "query_and": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "query_or": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "eval_expr": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "query_size_1k": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "query_size_10k": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "iloc_row": {
+          "bison_ms": 0.0018561600000000001,
+          "pandas_ms": 0.04568010999989269,
+          "ratio": 0.040633877633052116
+        },
+        "loc_slice": {
+          "bison_ms": 0.013999319999999999,
+          "pandas_ms": 0.033188609999967866,
+          "ratio": 0.42181097671802326
+        },
+        "sort_values": {
+          "bison_ms": 23.889419,
+          "pandas_ms": 7.234314666665871,
+          "ratio": 3.302236645867394
+        },
+        "merge": {
+          "bison_ms": 57.120353333333334,
+          "pandas_ms": 2.004459000000717,
+          "ratio": 28.496643400195715
+        },
+        "fillna": {
+          "bison_ms": 0.033615110000000004,
+          "pandas_ms": 0.07322429000012676,
+          "ratio": 0.4590704805733427
+        },
+        "series_apply": {
+          "bison_ms": 0.8067611,
+          "pandas_ms": 0.22413679999999658,
+          "ratio": 3.599413840119125
+        },
+        "csv_roundtrip": {
+          "bison_ms": 619.2512058,
+          "pandas_ms": 341.15614499999936,
+          "ratio": 1.8151547755354112
+        },
+        "profile_sort": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_groupby": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_merge": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_query": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_csv": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        }
+      }
+    },
+    {
       "commit": "86b785612e9971e5d54893d75dd11e94644ddb8d",
       "short_commit": "86b7856",
       "timestamp": "2026-04-18T23:03:49Z",
