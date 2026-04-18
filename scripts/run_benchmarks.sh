@@ -59,11 +59,17 @@ blob_dir, commit, timestamp, ref, out_file = sys.argv[1:]
 all_results = []
 for path in sorted(glob.glob(os.path.join(blob_dir, "*.json"))):
     with open(path) as f:
-        try:
-            data = json.load(f)
-            all_results.extend(data.get("results", []))
-        except json.JSONDecodeError:
-            print(f"WARNING: could not parse {path}", file=sys.stderr)
+        # Benchmarks may emit `# ...` comment lines alongside the JSON
+        # envelope (e.g. bench_builder prints the optimizer-escape sink
+        # value). Strip them so the remainder parses as JSON.
+        raw = "".join(
+            line for line in f if not line.lstrip().startswith("#")
+        )
+    try:
+        data = json.loads(raw)
+        all_results.extend(data.get("results", []))
+    except json.JSONDecodeError:
+        print(f"WARNING: could not parse {path}", file=sys.stderr)
 
 envelope = {
     "commit": commit,

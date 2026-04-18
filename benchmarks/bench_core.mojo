@@ -199,147 +199,21 @@ def main() raises:
         )
 
     # ------------------------------------------------------------------
-    # query_simple  (native single-condition filter via df.query)
+    # query_simple, query_and, query_or, eval_expr, query_size_1k,
+    # query_size_10k  (native df.query / df.eval pipeline)
     #
-    # Uses the native parse+eval+mask pipeline; no pandas round-trip.
-    # Comparison baseline uses boolean-index pandas (not pd.query) so
-    # both sides use the cheapest available path.
+    # Disabled: calling df.query/df.eval from this file currently triggers
+    # a 10+ minute mojo compile (see #708). The benchmarks are emitted as
+    # skipped so the dashboard keeps the series column and starts graphing
+    # again as soon as upstream mojo is fixed and the full bodies are
+    # restored.
     # ------------------------------------------------------------------
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df.query("a > 0.5")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas("pd_df[pd_df['a'] > 0.5]", g, MED_ITERS)
-    if skipped:
-        results.append(BenchResult.skipped_result("query_simple"))
-    else:
-        results.append(
-            BenchResult("query_simple", bison_ms, pandas_ms, MED_ITERS)
-        )
-
-    # ------------------------------------------------------------------
-    # query_and  (native two-condition AND filter via df.query)
-    #
-    # Both logical connectives and comparisons are evaluated natively
-    # without a pandas round-trip.  Pandas baseline uses boolean-index
-    # form which avoids pd.eval overhead.
-    # ------------------------------------------------------------------
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df.query("a > 0.5 and b < 0.3")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas(
-        "pd_df[(pd_df['a'] > 0.5) & (pd_df['b'] < 0.3)]", g, MED_ITERS
-    )
-    if skipped:
-        results.append(BenchResult.skipped_result("query_and"))
-    else:
-        results.append(BenchResult("query_and", bison_ms, pandas_ms, MED_ITERS))
-
-    # ------------------------------------------------------------------
-    # query_or  (native two-condition OR filter via df.query)
-    # ------------------------------------------------------------------
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df.query("a > 0.8 or b > 0.8")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas(
-        "pd_df[(pd_df['a'] > 0.8) | (pd_df['b'] > 0.8)]", g, MED_ITERS
-    )
-    if skipped:
-        results.append(BenchResult.skipped_result("query_or"))
-    else:
-        results.append(BenchResult("query_or", bison_ms, pandas_ms, MED_ITERS))
-
-    # ------------------------------------------------------------------
-    # eval_expr  (native df.eval returning a boolean Series)
-    #
-    # df.eval("a > 0.5") runs the same parse+eval pipeline as df.query
-    # but returns the raw boolean mask instead of filtering rows.
-    # ------------------------------------------------------------------
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df.eval("a > 0.5")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas("pd_df['a'] > 0.5", g, MED_ITERS)
-    if skipped:
-        results.append(BenchResult.skipped_result("eval_expr"))
-    else:
-        results.append(BenchResult("eval_expr", bison_ms, pandas_ms, MED_ITERS))
-
-    # ------------------------------------------------------------------
-    # query_size_1k / query_size_10k
-    #
-    # Size sweep for the simple single-condition filter at 1 K and 10 K
-    # rows.  Together with query_simple (100 K rows above) these three
-    # data points make the native-path overhead trend visible across
-    # representative sizes.
-    # ------------------------------------------------------------------
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df_1k.query("a > 0.5")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas("pd_df_1k[pd_df_1k['a'] > 0.5]", g, MED_ITERS)
-    if skipped:
-        results.append(BenchResult.skipped_result("query_size_1k"))
-    else:
-        results.append(
-            BenchResult("query_size_1k", bison_ms, pandas_ms, MED_ITERS)
-        )
-
-    skipped = False
-    try:
-        var t0 = perf_counter_ns()
-        for _ in range(MED_ITERS):
-            _ = df_10k.query("a > 0.5")
-        bison_ms = _elapsed_ms(t0, MED_ITERS)
-    except e:
-        if "not implemented" in String(e):
-            skipped = True
-        else:
-            raise e^
-    pandas_ms = _time_pandas("pd_df_10k[pd_df_10k['a'] > 0.5]", g, MED_ITERS)
-    if skipped:
-        results.append(BenchResult.skipped_result("query_size_10k"))
-    else:
-        results.append(
-            BenchResult("query_size_10k", bison_ms, pandas_ms, MED_ITERS)
-        )
+    results.append(BenchResult.skipped_result("query_simple"))
+    results.append(BenchResult.skipped_result("query_and"))
+    results.append(BenchResult.skipped_result("query_or"))
+    results.append(BenchResult.skipped_result("eval_expr"))
+    results.append(BenchResult.skipped_result("query_size_1k"))
+    results.append(BenchResult.skipped_result("query_size_10k"))
 
     # ------------------------------------------------------------------
     # iloc_row  (single integer-position row access via df.iloc())
