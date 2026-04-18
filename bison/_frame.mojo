@@ -1244,6 +1244,148 @@ struct _RowKeyVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = String(data[self.row])
 
 
+# ------------------------------------------------------------------
+# from_records helpers
+# ------------------------------------------------------------------
+
+
+def _from_records_build_null_col(name: String, nrows: Int) raises -> Column:
+    """All rows missing this key — build an object column of nulls."""
+    var py_none = Python.evaluate("None")
+    var data = List[PythonObject]()
+    var null_mask = NullMask()
+    for _ in range(nrows):
+        data.append(py_none)
+        null_mask.append_null()
+    var col = Column(name, data^, object_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_string_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a String column from mixed scalars (String dominates all types)."""
+    var data = List[String]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(String(""))
+            null_mask.append_null()
+        else:
+            var val: String
+            if v.isa[String]():
+                val = v[String]
+            elif v.isa[Int64]():
+                val = String(Int(v[Int64]))
+            elif v.isa[Float64]():
+                val = String(v[Float64])
+            else:  # Bool
+                val = String("True") if v[Bool] else String("False")
+            data.append(val)
+            null_mask.append_valid()
+    var col = Column(name, data^, string_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_float_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a Float64 column from mixed numeric scalars (Int64/Bool promoted).
+    """
+    var data = List[Float64]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(Float64(0.0))
+            null_mask.append_null()
+        else:
+            var val: Float64
+            if v.isa[Float64]():
+                val = v[Float64]
+            elif v.isa[Int64]():
+                val = Float64(v[Int64])
+            else:  # Bool
+                val = Float64(1) if v[Bool] else Float64(0)
+            data.append(val)
+            null_mask.append_valid()
+    var col = Column(name, data^, float64)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_int_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build an Int64 column (Bool values promoted to Int64).
+
+    If any row is null, promotes to Float64 so NaN can represent null,
+    matching pandas behavior.
+    """
+    var data = List[Int64]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(Int64(0))
+            null_mask.append_null()
+        else:
+            var val: Int64
+            if v.isa[Int64]():
+                val = v[Int64]
+            else:  # Bool
+                val = Int64(1) if v[Bool] else Int64(0)
+            data.append(val)
+            null_mask.append_valid()
+    if null_mask.has_nulls():
+        var fdata = List[Float64]()
+        for i in range(len(data)):
+            fdata.append(Float64(data[i]))
+        var col = Column(name, fdata^, float64)
+        col.set_null_mask(null_mask^)
+        return col^
+    var col = Column(name, data^, int64)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_bool_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a Bool column.
+
+    If any row is null, promotes to object dtype so None can represent null,
+    matching pandas behavior.
+    """
+    var data = List[Bool]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(False)
+            null_mask.append_null()
+        else:
+            data.append(v[Bool])
+            null_mask.append_valid()
+    if null_mask.has_nulls():
+        var py_none = Python.evaluate("None")
+        var odata = List[PythonObject]()
+        for i in range(len(data)):
+            if null_mask.is_null(i):
+                odata.append(py_none)
+            else:
+                odata.append(PythonObject(data[i]))
+        var col = Column(name, odata^, object_)
+        col.set_null_mask(null_mask^)
+        return col^
+    var col = Column(name, data^, bool_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
     """
@@ -1328,7 +1470,6 @@ struct DataFrame(Copyable, Movable):
 
         for ci in range(len(col_names)):
             var col_name = col_names[ci]
-            var null_mask = NullMask()
 
             # Single pass: extract values AND determine dominant dtype.
             # Previous implementation scanned all rows twice per column —
@@ -1364,116 +1505,17 @@ struct DataFrame(Copyable, Movable):
                     vals.append(DFScalar.null())
 
             if not found:
-                # All rows missing this key — object column, all null
-                var data = List[PythonObject]()
-                var py_none = Python.evaluate("None")
-                for _ in range(len(records)):
-                    data.append(py_none)
-                    null_mask.append_null()
-                var col = Column(col_name, data^, object_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
-                continue
-
-            # Build typed column from cached values — no second dict lookup.
-            if has_string:
-                # String dominates: convert all non-null values to String
-                var data = List[String]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(String(""))
-                        null_mask.append_null()
-                    else:
-                        var val: String
-                        if v.isa[String]():
-                            val = v[String]
-                        elif v.isa[Int64]():
-                            val = String(Int(v[Int64]))
-                        elif v.isa[Float64]():
-                            val = String(v[Float64])
-                        else:  # Bool
-                            val = String("True") if v[Bool] else String("False")
-                        data.append(val)
-                        null_mask.append_valid()
-                var col = Column(col_name, data^, string_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(
+                    _from_records_build_null_col(col_name, len(records))
+                )
+            elif has_string:
+                cols.append(_from_records_build_string_col(col_name, vals))
             elif has_float:
-                # Float64 dominates Int64 and Bool
-                var data = List[Float64]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(Float64(0.0))
-                        null_mask.append_null()
-                    else:
-                        var val: Float64
-                        if v.isa[Float64]():
-                            val = v[Float64]
-                        elif v.isa[Int64]():
-                            val = Float64(v[Int64])
-                        else:  # Bool
-                            val = Float64(1) if v[Bool] else Float64(0)
-                        data.append(val)
-                        null_mask.append_valid()
-                var col = Column(col_name, data^, float64)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(_from_records_build_float_col(col_name, vals))
             elif has_int:
-                # Int64 (Bool values are promoted to Int64)
-                var data = List[Int64]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(Int64(0))
-                        null_mask.append_null()
-                    else:
-                        var val: Int64
-                        if v.isa[Int64]():
-                            val = v[Int64]
-                        else:  # Bool
-                            val = Int64(1) if v[Bool] else Int64(0)
-                        data.append(val)
-                        null_mask.append_valid()
-                if null_mask.has_nulls():
-                    # Promote to float64 so NaN can be represented (mirrors pandas behavior)
-                    var fdata = List[Float64]()
-                    for i in range(len(data)):
-                        fdata.append(Float64(data[i]))
-                    var col = Column(col_name, fdata^, float64)
-                    col.set_null_mask(null_mask^)
-                    cols.append(col^)
-                    continue
-                var col = Column(col_name, data^, int64)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
-            else:  # Bool only
-                var data = List[Bool]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(False)
-                        null_mask.append_null()
-                    else:
-                        data.append(v[Bool])
-                        null_mask.append_valid()
-                if null_mask.has_nulls():
-                    # Promote to object so None can be represented (mirrors pandas behavior)
-                    var py_none = Python.evaluate("None")
-                    var odata = List[PythonObject]()
-                    for i in range(len(data)):
-                        if null_mask.is_null(i):
-                            odata.append(py_none)
-                        else:
-                            odata.append(PythonObject(data[i]))
-                    var col = Column(col_name, odata^, object_)
-                    col.set_null_mask(null_mask^)
-                    cols.append(col^)
-                    continue
-                var col = Column(col_name, data^, bool_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(_from_records_build_int_col(col_name, vals))
+            else:
+                cols.append(_from_records_build_bool_col(col_name, vals))
 
         return DataFrame(cols^)
 
