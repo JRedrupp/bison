@@ -6413,6 +6413,141 @@ def _label_groupby_indices(
         _sort_list(group_keys)
 
 
+# ------------------------------------------------------------------
+# _marrow_agg helpers (DataFrameGroupBy / SeriesGroupBy)
+# ------------------------------------------------------------------
+
+
+def _marrow_agg_sort_keep(
+    mut keep: List[Int],
+    result_key: AnyArray,
+    num_groups: Int,
+) raises:
+    """Insertion-sort *keep* in ascending order of the underlying key values.
+
+    Uses numeric comparison when *result_key* is numeric, string comparison
+    otherwise.  *keep* is typically short so insertion sort is sufficient.
+    """
+    var sort_vals = List[Float64]()
+    var sort_strs = List[String]()
+    var use_numeric = result_key.dtype().is_numeric()
+    if use_numeric:
+        for i in range(num_groups):
+            if result_key.dtype() == _m_float64:
+                sort_vals.append(
+                    rebind[Float64](result_key.as_float64().unsafe_get(i))
+                )
+            else:
+                sort_vals.append(
+                    Float64(Int(result_key.as_int64().unsafe_get(i)))
+                )
+    else:
+        for i in range(num_groups):
+            sort_strs.append(String(result_key.as_string().unsafe_get(UInt(i))))
+
+    for i in range(1, len(keep)):
+        var j = i
+        while j > 0:
+            var a = keep[j - 1]
+            var b = keep[j]
+            var should_swap = (
+                sort_vals[a]
+                > sort_vals[b] if use_numeric else sort_strs[a]
+                > sort_strs[b]
+            )
+            if should_swap:
+                keep[j - 1] = b
+                keep[j] = a
+                j -= 1
+            else:
+                break
+
+
+def _marrow_agg_build_index(
+    result_key: AnyArray, keep: List[Int]
+) raises -> ColumnIndex:
+    """Build a ColumnIndex from the kept rows of a marrow key column."""
+    var n_keep = len(keep)
+    if result_key.dtype() == _m_int64:
+        var int_keys = List[Int64]()
+        for i in range(n_keep):
+            int_keys.append(
+                rebind[Int64](result_key.as_int64().unsafe_get(keep[i]))
+            )
+        return ColumnIndex(int_keys^)
+    if result_key.dtype() == _m_float64:
+        var flt_keys = List[Float64]()
+        for i in range(n_keep):
+            flt_keys.append(
+                rebind[Float64](result_key.as_float64().unsafe_get(keep[i]))
+            )
+        return ColumnIndex(flt_keys^)
+    var str_keys = List[String]()
+    for i in range(n_keep):
+        str_keys.append(
+            String(result_key.as_string().unsafe_get(UInt(keep[i])))
+        )
+    return ColumnIndex(Index(str_keys^))
+
+
+def _marrow_agg_build_int_col(
+    name: String,
+    rb_col: AnyArray,
+    keep: List[Int],
+    idx: ColumnIndex,
+    key_col_name: String,
+    is_count: Bool,
+) raises -> Column:
+    """Build an Int64 result column for count / int-preserving sum/min/max.
+
+    When *is_count* is false, the marrow kernel stored the result as float64
+    (the current accumulator type) — cast back to int64 here.
+    """
+    var vals = List[Int64]()
+    var null_mask = NullMask()
+    for i in range(len(keep)):
+        var ri = keep[i]
+        if not rb_col.is_valid(ri):
+            vals.append(Int64(0))
+            null_mask.append_null()
+        elif is_count:
+            vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
+            null_mask.append_valid()
+        else:
+            vals.append(Int64(Float64(rb_col.as_float64().unsafe_get(ri))))
+            null_mask.append_valid()
+    var col = Column(name, vals^, int64, idx.copy())
+    col._index_name = key_col_name
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
+def _marrow_agg_build_float_col(
+    name: String,
+    rb_col: AnyArray,
+    keep: List[Int],
+    idx: ColumnIndex,
+    key_col_name: String,
+) raises -> Column:
+    """Build a Float64 result column for mean / float sum/min/max."""
+    var vals = List[Float64]()
+    var null_mask = NullMask()
+    for i in range(len(keep)):
+        var ri = keep[i]
+        if not rb_col.is_valid(ri):
+            vals.append(Float64(0))
+            null_mask.append_null()
+        else:
+            vals.append(rebind[Float64](rb_col.as_float64().unsafe_get(ri)))
+            null_mask.append_valid()
+    var col = Column(name, vals^, float64, idx.copy())
+    col._index_name = key_col_name
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
 struct DataFrameGroupBy:
     """GroupBy object returned by DataFrame.groupby().
 
@@ -6662,126 +6797,34 @@ struct DataFrameGroupBy:
                 continue
             keep.append(i)
 
-        # Sort by key if requested.
         if self._sort and len(keep) > 1:
-            # Build sortable key values from the marrow result key column.
-            var sort_vals = List[Float64]()
-            var sort_strs = List[String]()
-            var use_numeric = result_key.dtype().is_numeric()
-            if use_numeric:
-                for i in range(num_groups):
-                    if result_key.dtype() == _m_float64:
-                        sort_vals.append(
-                            rebind[Float64](
-                                result_key.as_float64().unsafe_get(i)
-                            )
-                        )
-                    else:
-                        sort_vals.append(
-                            Float64(Int(result_key.as_int64().unsafe_get(i)))
-                        )
-            else:
-                for i in range(num_groups):
-                    sort_strs.append(
-                        String(result_key.as_string().unsafe_get(UInt(i)))
-                    )
+            _marrow_agg_sort_keep(keep, result_key, num_groups)
 
-            # Insertion sort on keep indices — G is typically small.
-            for i in range(1, len(keep)):
-                var j = i
-                while j > 0:
-                    var a = keep[j - 1]
-                    var b = keep[j]
-                    var should_swap = (
-                        sort_vals[a]
-                        > sort_vals[b] if use_numeric else sort_strs[a]
-                        > sort_strs[b]
-                    )
-                    if should_swap:
-                        keep[j - 1] = b
-                        keep[j] = a
-                        j -= 1
-                    else:
-                        break
+        var idx = _marrow_agg_build_index(result_key, keep)
 
-        var n_keep = len(keep)
-
-        # Build ColumnIndex from the key column.
-        var idx: ColumnIndex
-        if result_key.dtype() == _m_int64:
-            var int_keys = List[Int64]()
-            for i in range(n_keep):
-                int_keys.append(
-                    rebind[Int64](result_key.as_int64().unsafe_get(keep[i]))
-                )
-            idx = ColumnIndex(int_keys^)
-        elif result_key.dtype() == _m_float64:
-            var flt_keys = List[Float64]()
-            for i in range(n_keep):
-                flt_keys.append(
-                    rebind[Float64](result_key.as_float64().unsafe_get(keep[i]))
-                )
-            idx = ColumnIndex(flt_keys^)
-        else:
-            var str_keys = List[String]()
-            for i in range(n_keep):
-                str_keys.append(
-                    String(result_key.as_string().unsafe_get(UInt(keep[i])))
-                )
-            idx = ColumnIndex(Index(str_keys^))
-
-        # Build result columns.
         var result_cols = List[Column]()
         for v in range(len(value_names)):
             var rb_col = rb.column(v + 1).copy()  # +1 to skip key column.
             var is_count = agg == "count"
             var orig_is_int = value_dtypes[v].is_integer()
 
-            # Determine whether to produce int64 or float64 result.
             if is_count or (orig_is_int and agg != "mean"):
-                # int64 result: count always int64; sum/min/max of int -> int64.
-                var vals = List[Int64]()
-                var null_mask = NullMask()
-                for i in range(n_keep):
-                    var ri = keep[i]
-                    if not rb_col.is_valid(ri):
-                        vals.append(Int64(0))
-                        null_mask.append_null()
-                    elif is_count:
-                        vals.append(
-                            rebind[Int64](rb_col.as_int64().unsafe_get(ri))
-                        )
-                        null_mask.append_valid()
-                    else:
-                        # sum/min/max of integer col: marrow stores as float64.
-                        vals.append(
-                            Int64(Float64(rb_col.as_float64().unsafe_get(ri)))
-                        )
-                        null_mask.append_valid()
-                var col = Column(value_names[v], vals^, int64, idx.copy())
-                col._index_name = key_col_name
-                if null_mask.has_nulls():
-                    col.set_null_mask(null_mask^)
-                result_cols.append(col^)
+                result_cols.append(
+                    _marrow_agg_build_int_col(
+                        value_names[v],
+                        rb_col,
+                        keep,
+                        idx,
+                        key_col_name,
+                        is_count,
+                    )
+                )
             else:
-                # float64 result: mean, or float col sum/min/max.
-                var vals = List[Float64]()
-                var null_mask = NullMask()
-                for i in range(n_keep):
-                    var ri = keep[i]
-                    if not rb_col.is_valid(ri):
-                        vals.append(Float64(0))
-                        null_mask.append_null()
-                    else:
-                        vals.append(
-                            rebind[Float64](rb_col.as_float64().unsafe_get(ri))
-                        )
-                        null_mask.append_valid()
-                var col = Column(value_names[v], vals^, float64, idx.copy())
-                col._index_name = key_col_name
-                if null_mask.has_nulls():
-                    col.set_null_mask(null_mask^)
-                result_cols.append(col^)
+                result_cols.append(
+                    _marrow_agg_build_float_col(
+                        value_names[v], rb_col, keep, idx, key_col_name
+                    )
+                )
 
         return DataFrame(result_cols^)
 
