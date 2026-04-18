@@ -1386,6 +1386,86 @@ def _from_records_build_bool_col(
     return col^
 
 
+# ------------------------------------------------------------------
+# pivot_table helpers
+# ------------------------------------------------------------------
+
+
+def _pivot_row_label(
+    cols: List[Column],
+    row: Int,
+    names: List[String],
+    name_to_ci: Dict[String, Int],
+    py: PythonObject,
+) raises -> String:
+    """Serialize a composite row-key label from one or more columns.
+
+    Returns ``"0"`` when *names* is empty (the single-group default).
+    """
+    if len(names) == 0:
+        return String("0")
+    if len(names) == 1:
+        return _frame_cell_as_str(cols[name_to_ci[names[0]]], row)
+    var items = py.list()
+    for k in range(len(names)):
+        _ = items.append(_frame_cell_as_python(cols[name_to_ci[names[k]]], row))
+    return String(py.tuple(items))
+
+
+def _pivot_col_label(
+    cols: List[Column],
+    row: Int,
+    names: List[String],
+    name_to_ci: Dict[String, Int],
+    py: PythonObject,
+) raises -> String:
+    """Serialize a composite column-key label; ``"__all__"`` when no columns."""
+    if len(names) == 0:
+        return String("__all__")
+    if len(names) == 1:
+        return _frame_cell_as_str(cols[name_to_ci[names[0]]], row)
+    var items = py.list()
+    for k in range(len(names)):
+        _ = items.append(_frame_cell_as_python(cols[name_to_ci[names[k]]], row))
+    return String(py.tuple(items))
+
+
+def _pivot_build_result_col(
+    name: String,
+    out_i: Int,
+    n_rk: Int,
+    sums: List[List[Float64]],
+    counts: List[List[Int]],
+    aggfunc: String,
+    py_none: PythonObject,
+    result_idx: ColumnIndex,
+) raises -> Column:
+    """Build a single output column from the accumulated sums/counts."""
+    var data = List[PythonObject]()
+    var null_mask = NullMask()
+    for rk in range(n_rk):
+        if aggfunc == "count":
+            data.append(PythonObject(Int(counts[rk][out_i])))
+            null_mask.append_valid()
+            continue
+        if counts[rk][out_i] == 0:
+            data.append(py_none)
+            null_mask.append_null()
+            continue
+        null_mask.append_valid()
+        if aggfunc == "sum":
+            data.append(PythonObject(sums[rk][out_i]))
+        else:
+            data.append(
+                PythonObject(sums[rk][out_i] / Float64(counts[rk][out_i]))
+            )
+    var col = Column(name, data^, object_)
+    col._index = result_idx.copy()
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
     """
@@ -4066,39 +4146,18 @@ struct DataFrame(Copyable, Movable):
         var col_labels = List[String]()
         var col_keys = Dict[String, Int]()
 
+        # First pass: discover unique row/col keys.
         for r in range(nrows):
-            var row_label = String("0")
-            if len(idx_names) == 1:
-                row_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[idx_names[0]]], r
-                )
-            elif len(idx_names) > 1:
-                var items = py.list()
-                for k in range(len(idx_names)):
-                    _ = items.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[idx_names[k]]], r
-                        )
-                    )
-                row_label = String(py.tuple(items))
+            var row_label = _pivot_row_label(
+                self._cols, r, idx_names, name_to_ci, py
+            )
             if row_label not in row_keys:
                 row_keys[row_label] = len(row_labels)
                 row_labels.append(row_label)
 
-            var col_label = String("__all__")
-            if len(col_names) == 1:
-                col_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[col_names[0]]], r
-                )
-            elif len(col_names) > 1:
-                var citems = py.list()
-                for k in range(len(col_names)):
-                    _ = citems.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[col_names[k]]], r
-                        )
-                    )
-                col_label = String(py.tuple(citems))
+            var col_label = _pivot_col_label(
+                self._cols, r, col_names, name_to_ci, py
+            )
             if col_label not in col_keys:
                 col_keys[col_label] = len(col_labels)
                 col_labels.append(col_label)
@@ -4137,38 +4196,14 @@ struct DataFrame(Copyable, Movable):
             sums.append(sum_row^)
             counts.append(count_row^)
 
+        # Second pass: accumulate sums and counts per cell.
         for r in range(nrows):
-            var row_label = String("0")
-            if len(idx_names) == 1:
-                row_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[idx_names[0]]], r
-                )
-            elif len(idx_names) > 1:
-                var items = py.list()
-                for k in range(len(idx_names)):
-                    _ = items.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[idx_names[k]]], r
-                        )
-                    )
-                row_label = String(py.tuple(items))
-            var rk = row_keys[row_label]
-
-            var col_label = String("__all__")
-            if len(col_names) == 1:
-                col_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[col_names[0]]], r
-                )
-            elif len(col_names) > 1:
-                var citems = py.list()
-                for k in range(len(col_names)):
-                    _ = citems.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[col_names[k]]], r
-                        )
-                    )
-                col_label = String(py.tuple(citems))
-            var ck = col_keys[col_label]
+            var rk = row_keys[
+                _pivot_row_label(self._cols, r, idx_names, name_to_ci, py)
+            ]
+            var ck = col_keys[
+                _pivot_col_label(self._cols, r, col_names, name_to_ci, py)
+            ]
 
             for vi in range(n_val):
                 var out_pos = vi
@@ -4195,7 +4230,7 @@ struct DataFrame(Copyable, Movable):
                     continue
 
                 if vcol.is_numeric() or vcol.is_bool():
-                    sums[rk][out_pos] += vcol._f64_cache[r]
+                    sums[rk][out_pos] += vcol._float64_data()[r]
                 else:
                     raise Error(
                         "DataFrame.pivot_table: aggfunc "
@@ -4209,31 +4244,18 @@ struct DataFrame(Copyable, Movable):
         var result_cols = List[Column]()
 
         for out_i in range(n_out):
-            var data = List[PythonObject]()
-            var null_mask = NullMask()
-            for rk in range(n_rk):
-                if aggfunc == "count":
-                    data.append(PythonObject(Int(counts[rk][out_i])))
-                    null_mask.append_valid()
-                    continue
-                if counts[rk][out_i] == 0:
-                    data.append(py_none)
-                    null_mask.append_null()
-                    continue
-                null_mask.append_valid()
-                if aggfunc == "sum":
-                    data.append(PythonObject(sums[rk][out_i]))
-                else:
-                    data.append(
-                        PythonObject(
-                            sums[rk][out_i] / Float64(counts[rk][out_i])
-                        )
-                    )
-            var col = Column(out_names[out_i], data^, object_)
-            col._index = result_idx.copy()
-            if null_mask.has_nulls():
-                col.set_null_mask(null_mask^)
-            result_cols.append(col^)
+            result_cols.append(
+                _pivot_build_result_col(
+                    out_names[out_i],
+                    out_i,
+                    n_rk,
+                    sums,
+                    counts,
+                    aggfunc,
+                    py_none,
+                    result_idx,
+                )
+            )
 
         return DataFrame(result_cols^)
 
