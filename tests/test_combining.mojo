@@ -326,5 +326,94 @@ def test_merge_multikey_delimiter_no_false_match() raises:
     assert_equal(result.shape()[0], 0)
 
 
+def test_merge_inner_int64_key_all_values() raises:
+    """Verify all output column values for an int64 key join, not just counts."""
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'id': [10, 20, 30, 40], 'val': [1, 2, 3, 4]}")
+        )
+    )
+    var right = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'id': [20, 30, 50], 'score': [200, 300, 500]}")
+        )
+    )
+    var on = List[String]()
+    on.append("id")
+    var result = left.merge(right, on=on^)
+    assert_equal(result.shape()[0], 2)
+    assert_equal(result.shape()[1], 3)
+    var id_col = result["id"]
+    assert_equal(id_col.iloc(0)[Int64], Int64(20))
+    assert_equal(id_col.iloc(1)[Int64], Int64(30))
+    var val_col = result["val"]
+    assert_equal(val_col.iloc(0)[Int64], Int64(2))
+    assert_equal(val_col.iloc(1)[Int64], Int64(3))
+    var score_col = result["score"]
+    assert_equal(score_col.iloc(0)[Int64], Int64(200))
+    assert_equal(score_col.iloc(1)[Int64], Int64(300))
+
+
+def test_merge_inner_int64_many_to_one() raises:
+    """One left int64 key matching multiple right rows (many-to-one)."""
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(Python.evaluate("{'id': [1, 2], 'a': [10, 20]}"))
+    )
+    var right = DataFrame(
+        pd.DataFrame(
+            Python.evaluate("{'id': [1, 1, 2], 'b': [100, 101, 200]}")
+        )
+    )
+    var on = List[String]()
+    on.append("id")
+    var result = left.merge(right, on=on^)
+    assert_equal(result.shape()[0], 3)
+    var id_col = result["id"]
+    assert_equal(id_col.iloc(0)[Int64], Int64(1))
+    assert_equal(id_col.iloc(1)[Int64], Int64(1))
+    assert_equal(id_col.iloc(2)[Int64], Int64(2))
+    var b_col = result["b"]
+    assert_equal(b_col.iloc(0)[Int64], Int64(100))
+    assert_equal(b_col.iloc(1)[Int64], Int64(101))
+    assert_equal(b_col.iloc(2)[Int64], Int64(200))
+
+
+def test_merge_inner_int64_no_matches() raises:
+    """Inner join on int64 key with no overlapping keys produces empty result."""
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(Python.evaluate("{'id': [1, 2, 3], 'a': [10, 20, 30]}"))
+    )
+    var right = DataFrame(
+        pd.DataFrame(Python.evaluate("{'id': [4, 5, 6], 'b': [40, 50, 60]}"))
+    )
+    var on = List[String]()
+    on.append("id")
+    var result = left.merge(right, on=on^)
+    assert_equal(result.shape()[0], 0)
+
+
+def test_merge_left_int64_key() raises:
+    """Left join on int64 key preserves unmatched left rows with null right values."""
+    var pd = Python.import_module("pandas")
+    var left = DataFrame(
+        pd.DataFrame(Python.evaluate("{'id': [1, 2, 3], 'a': [10, 20, 30]}"))
+    )
+    var right = DataFrame(
+        pd.DataFrame(Python.evaluate("{'id': [1, 3], 'b': [100, 300]}"))
+    )
+    var on = List[String]()
+    on.append("id")
+    var result = left.merge(right, how="left", on=on^)
+    # All 3 left rows, row 2 (id=2) gets null b
+    assert_equal(result.shape()[0], 3)
+    var id_col = result["id"]
+    assert_equal(id_col.iloc(0)[Int64], Int64(1))
+    assert_equal(id_col.iloc(1)[Int64], Int64(2))
+    assert_equal(id_col.iloc(2)[Int64], Int64(3))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

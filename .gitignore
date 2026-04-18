@@ -11,3 +11,4 @@ dist/
 results/
 profile_results/
 docs/data.json
+.worktrees/
