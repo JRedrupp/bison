@@ -1466,6 +1466,119 @@ def _pivot_build_result_col(
     return col^
 
 
+# ------------------------------------------------------------------
+# merge helpers
+# ------------------------------------------------------------------
+
+
+def _merge_hashjoin_int64(
+    left: DataFrame,
+    right: DataFrame,
+    lkey_idx: Int,
+    rkey_idx: Int,
+    how: String,
+    n_left: Int,
+    n_right: Int,
+    needs_right_unmatched: Bool,
+    mut out_left: List[Int],
+    mut out_right: List[Int],
+    mut right_matched: List[Bool],
+) raises:
+    """Fast-path hash join for a single int64 key column pair."""
+    var right_map = Dict[Int, List[Int]]()
+    for i in range(n_right):
+        var k = Int(right._cols[rkey_idx]._int64_data()[i])
+        if k not in right_map:
+            right_map[k] = List[Int]()
+        right_map[k].append(i)
+    for i in range(n_left):
+        var k = Int(left._cols[lkey_idx]._int64_data()[i])
+        if k in right_map:
+            ref matches = right_map[k]
+            for m in range(len(matches)):
+                out_left.append(i)
+                out_right.append(matches[m])
+                if needs_right_unmatched:
+                    right_matched[matches[m]] = True
+        elif how == "left" or how == "outer":
+            out_left.append(i)
+            out_right.append(-1)
+
+
+def _merge_hashjoin_string(
+    left: DataFrame,
+    right: DataFrame,
+    lkeys: List[String],
+    rkeys: List[String],
+    left_col_idx: Dict[String, Int],
+    right_col_idx: Dict[String, Int],
+    how: String,
+    n_left: Int,
+    n_right: Int,
+    needs_right_unmatched: Bool,
+    mut out_left: List[Int],
+    mut out_right: List[Int],
+    mut right_matched: List[Bool],
+) raises:
+    """Generic hash join using string-serialised composite keys."""
+    var right_map = Dict[String, List[Int]]()
+    for i in range(n_right):
+        var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
+        if k not in right_map:
+            right_map[k] = List[Int]()
+        right_map[k].append(i)
+    for i in range(n_left):
+        var k = DataFrame._row_key_str(left, lkeys, i, left_col_idx)
+        if k in right_map:
+            ref matches = right_map[k]
+            for m in range(len(matches)):
+                out_left.append(i)
+                out_right.append(matches[m])
+                if needs_right_unmatched:
+                    right_matched[matches[m]] = True
+        elif how == "left" or how == "outer":
+            out_left.append(i)
+            out_right.append(-1)
+
+
+def _merge_fill_right_only_key(
+    mut key_col: Column,
+    rk: Column,
+    out_left: List[Int],
+    out_right: List[Int],
+) raises:
+    """Fill right-only rows (``out_left[r] < 0``) in a key column with the RHS
+    frame's key values.  Inner/left joins have no right-only rows.
+    """
+    if key_col.is_int() and rk.is_int():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._int64_data()[r] = rk._int64_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_float() and rk.is_float():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._float64_data()[r] = rk._float64_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_bool() and rk.is_bool():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._bool_data()[r] = rk._bool_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_string() and rk.is_string():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._str_data()[r] = rk._str_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_object() and rk.is_object():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._storage_legacy().data[r] = rk._storage_legacy().data[
+                    out_right[r]
+                ]
+                key_col.set_valid_at(r)
+
+
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
     """
@@ -5108,45 +5221,35 @@ struct DataFrame(Copyable, Movable):
             and self._cols[left_col_idx[lkeys[0]]].is_int()
             and right._cols[right_col_idx[rkeys[0]]].is_int()
         ):
-            var lkey_idx = left_col_idx[lkeys[0]]
-            var rkey_idx = right_col_idx[rkeys[0]]
-            var right_map = Dict[Int, List[Int]]()
-            for i in range(n_right):
-                var k = Int(right._cols[rkey_idx]._int64_cache[i])
-                if k not in right_map:
-                    right_map[k] = List[Int]()
-                right_map[k].append(i)
-            for i in range(n_left):
-                var k = Int(self._cols[lkey_idx]._int64_cache[i])
-                if k in right_map:
-                    ref matches = right_map[k]
-                    for m in range(len(matches)):
-                        out_left.append(i)
-                        out_right.append(matches[m])
-                        if needs_right_unmatched:
-                            right_matched[matches[m]] = True
-                elif how == "left" or how == "outer":
-                    out_left.append(i)
-                    out_right.append(-1)
+            _merge_hashjoin_int64(
+                self,
+                right,
+                left_col_idx[lkeys[0]],
+                right_col_idx[rkeys[0]],
+                how,
+                n_left,
+                n_right,
+                needs_right_unmatched,
+                out_left,
+                out_right,
+                right_matched,
+            )
         else:
-            var right_map = Dict[String, List[Int]]()
-            for i in range(n_right):
-                var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
-                if k not in right_map:
-                    right_map[k] = List[Int]()
-                right_map[k].append(i)
-            for i in range(n_left):
-                var k = DataFrame._row_key_str(self, lkeys, i, left_col_idx)
-                if k in right_map:
-                    ref matches = right_map[k]
-                    for m in range(len(matches)):
-                        out_left.append(i)
-                        out_right.append(matches[m])
-                        if needs_right_unmatched:
-                            right_matched[matches[m]] = True
-                elif how == "left" or how == "outer":
-                    out_left.append(i)
-                    out_right.append(-1)
+            _merge_hashjoin_string(
+                self,
+                right,
+                lkeys,
+                rkeys,
+                left_col_idx,
+                right_col_idx,
+                how,
+                n_left,
+                n_right,
+                needs_right_unmatched,
+                out_left,
+                out_right,
+                right_matched,
+            )
 
         if how == "right" or how == "outer":
             for j in range(n_right):
@@ -5178,44 +5281,12 @@ struct DataFrame(Copyable, Movable):
                     # For right-only rows, substitute the right frame's key value.
                     for j in range(len(right._cols)):
                         if right._cols[j].name == lkeys[k]:
-                            ref rk = right._cols[j]
-                            if key_col.is_int() and rk.is_int():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._int64_data()[
-                                            r
-                                        ] = rk._int64_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_float() and rk.is_float():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._float64_data()[
-                                            r
-                                        ] = rk._f64_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_bool() and rk.is_bool():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._bool_data()[
-                                            r
-                                        ] = rk._bool_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_string() and rk.is_string():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._str_data()[r] = rk._str_cache[
-                                            out_right[r]
-                                        ]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_object() and rk.is_object():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._storage_legacy().data[
-                                            r
-                                        ] = rk._storage_legacy().data[
-                                            out_right[r]
-                                        ]
-                                        key_col.set_valid_at(r)
+                            _merge_fill_right_only_key(
+                                key_col,
+                                right._cols[j],
+                                out_left,
+                                out_right,
+                            )
                             break
                     # Sync secondary caches and rebuild marrow after
                     # cache-first key fill (#645). Only needed when right-only
