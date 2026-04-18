@@ -38,9 +38,16 @@ WARN_COUNT=0
 
 for f in "$BENCH_DIR"/bench_*.mojo; do
     name="$(basename "$f" .mojo)"
+    BIN_OUT="$TMP_DIR/$name"
+    echo "Building $name ..."
+    if ! mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" "$f" -Xlinker -lm -o "$BIN_OUT"; then
+        echo "  WARNING: $name failed to build — skipping"
+        WARN_COUNT=$((WARN_COUNT + 1))
+        continue
+    fi
     echo "Running $name ..."
     blob_file="$BLOB_DIR/$name.json"
-    if mojo run -I "$CACHE_DIR" -I "$REPO_ROOT" "$f" > "$blob_file"; then
+    if "$BIN_OUT" > "$blob_file"; then
         echo "  OK"
     else
         echo "  WARNING: $name exited with non-zero status — skipping"
