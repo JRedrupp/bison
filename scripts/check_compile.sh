@@ -45,25 +45,9 @@ fi
 
 # Collect entry-point files: benchmarks only.
 # Tests are validated by the test runner (run_tests.sh).
-#
-# Benchmarks that call DataFrame.query/eval (bench_core, bench_profile) are
-# excluded: the query expression plumbing hits a known mojo-nightly compile
-# slowness (10+ minutes per file) that makes this parallel check unusable.
-# The query/eval code path is already exercised by tests/test_expr.mojo in
-# the regular test suite, and the benchmarks themselves are exercised by
-# scripts/run_benchmarks.sh when the dashboard is updated.
-SKIP=( "bench_core.mojo" "bench_profile.mojo" )
 FILES=()
 for f in "$REPO_ROOT"/benchmarks/bench_*.mojo; do
-    [ -f "$f" ] || continue
-    skip=0
-    for s in "${SKIP[@]}"; do
-        if [ "$(basename "$f")" = "$s" ]; then
-            skip=1
-            break
-        fi
-    done
-    [ "$skip" -eq 0 ] && FILES+=("$f")
+    [ -f "$f" ] && FILES+=("$f")
 done
 
 echo "Compile-checking ${#FILES[@]} files ..."

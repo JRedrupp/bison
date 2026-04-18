@@ -91,13 +91,15 @@ def _profile_merge(df: DataFrame, df2: DataFrame, iters: Int) raises:
 
 
 def _profile_query(df: DataFrame, iters: Int) raises:
-    """Profile DataFrame.query with a compound expression."""
-    print("  query (a > 0.5 and b < 0.3) ...", end="")
-    var t0 = perf_counter_ns()
-    for _ in range(iters):
-        _ = df.query("a > 0.5 and b < 0.3")
-    var ms = _elapsed_ms(t0, iters)
-    print(" ", ms, "ms/call")
+    """Profile DataFrame.query with a compound expression.
+
+    Disabled body: calling `df.query` from this file currently triggers a
+    10+ minute mojo compile (see #708). Restore the inner loop once
+    upstream mojo is fixed.
+    """
+    print("  query (a > 0.5 and b < 0.3) ... [skipped — #708]")
+    _ = df
+    _ = iters
 
 
 def _profile_csv(df: DataFrame, iters: Int) raises:
