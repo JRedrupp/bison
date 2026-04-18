@@ -5025,34 +5025,59 @@ struct DataFrame(Copyable, Movable):
         for i in range(len(self._cols)):
             left_col_idx[self._cols[i].name.value()] = i
 
-        # Build right hash map: key_str → list of right row indices.
-        var right_map = Dict[String, List[Int]]()
+        # Build index lists (out_left, out_right) from the hash join.
+        # Fast path: single int64 key — avoids String allocation per row.
+        # Fallback: String-serialise each key for multi-column / non-int keys.
+        var n_left = self.shape()[0]
         var n_right = right.shape()[0]
-        for i in range(n_right):
-            var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
-            if k not in right_map:
-                right_map[k] = List[Int]()
-            right_map[k].append(i)
-
-        # Match rows — build parallel index lists (-1 means null/unmatched side).
         var out_left = List[Int]()
         var out_right = List[Int]()
-        var n_left = self.shape()[0]
         var right_matched = List[Bool]()
         for _ in range(n_right):
             right_matched.append(False)
 
-        for i in range(n_left):
-            var k = DataFrame._row_key_str(self, lkeys, i, left_col_idx)
-            if k in right_map:
-                ref matches = right_map[k]
-                for m in range(len(matches)):
+        if (
+            len(lkeys) == 1
+            and self._cols[left_col_idx[lkeys[0]]].is_int()
+            and right._cols[right_col_idx[rkeys[0]]].is_int()
+        ):
+            var lkey_idx = left_col_idx[lkeys[0]]
+            var rkey_idx = right_col_idx[rkeys[0]]
+            var right_map = Dict[Int, List[Int]]()
+            for i in range(n_right):
+                var k = Int(right._cols[rkey_idx]._int64_cache[i])
+                if k not in right_map:
+                    right_map[k] = List[Int]()
+                right_map[k].append(i)
+            for i in range(n_left):
+                var k = Int(self._cols[lkey_idx]._int64_cache[i])
+                if k in right_map:
+                    ref matches = right_map[k]
+                    for m in range(len(matches)):
+                        out_left.append(i)
+                        out_right.append(matches[m])
+                        right_matched[matches[m]] = True
+                elif how == "left" or how == "outer":
                     out_left.append(i)
-                    out_right.append(matches[m])
-                    right_matched[matches[m]] = True
-            elif how == "left" or how == "outer":
-                out_left.append(i)
-                out_right.append(-1)
+                    out_right.append(-1)
+        else:
+            var right_map = Dict[String, List[Int]]()
+            for i in range(n_right):
+                var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
+                if k not in right_map:
+                    right_map[k] = List[Int]()
+                right_map[k].append(i)
+            for i in range(n_left):
+                var k = DataFrame._row_key_str(self, lkeys, i, left_col_idx)
+                if k in right_map:
+                    ref matches = right_map[k]
+                    for m in range(len(matches)):
+                        out_left.append(i)
+                        out_right.append(matches[m])
+                        right_matched[matches[m]] = True
+                elif how == "left" or how == "outer":
+                    out_left.append(i)
+                    out_right.append(-1)
 
         if how == "right" or how == "outer":
             for j in range(n_right):

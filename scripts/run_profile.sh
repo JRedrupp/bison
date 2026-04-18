@@ -149,6 +149,7 @@ mojo build \
     -I "$REPO_ROOT" \
     "$BENCH_SRC" \
     -g --debug-info-language C \
+    -Xlinker -lm \
     -o "$BIN_OUT"
 
 echo "Binary: $BIN_OUT"
