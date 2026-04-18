@@ -1043,7 +1043,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
                 + _csv_quote_field(val, ",")
                 + "\n"
             )
-        if len(path) > 0:
+        if path.byte_length() > 0:
             with open(path, "w") as f:
                 f.write(result)
             return String("")
@@ -1069,7 +1069,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
             var key = col._index_label(i) if has_index else String(i)
             py_dict[key] = _col_cell_pyobj(col, i)
         var result = String(json_mod.dumps(py_dict))
-        if len(path) > 0:
+        if path.byte_length() > 0:
             with open(path, "w") as f:
                 f.write(result)
             return String("")
@@ -2931,7 +2931,9 @@ struct DataFrame(Copyable, Movable):
                 + "'. Supported: abs, sqrt, exp, log, log10, ceil, floor, neg"
             )
 
-    def pipe[F: fn(DataFrame) raises -> DataFrame](self) raises -> DataFrame:
+    def pipe[
+        F: def(DataFrame) raises thin -> DataFrame
+    ](self) raises -> DataFrame:
         return F(self)
 
     # ------------------------------------------------------------------
@@ -3806,7 +3808,7 @@ struct DataFrame(Copyable, Movable):
             var key = String("")
             for k in range(len(work_indices)):
                 var cell = _col_cell_str(self._cols[work_indices[k]], i)
-                key = key + String(len(cell)) + ":" + cell
+                key = key + String(cell.byte_length()) + ":" + cell
             keys.append(key)
 
         var result = List[Bool]()
@@ -4980,7 +4982,7 @@ struct DataFrame(Copyable, Movable):
             var part = visitor.result
             if n_keys == 1:
                 return part
-            key += String(len(part)) + ":" + part
+            key += String(part.byte_length()) + ":" + part
         return key
 
     def merge(
@@ -5376,7 +5378,7 @@ struct DataFrame(Copyable, Movable):
             result += line + "\n"
 
         # Write to file or return string.
-        if len(path_or_buf) > 0:
+        if path_or_buf.byte_length() > 0:
             with open(path_or_buf, "w") as f:
                 f.write(result)
             return String("")
@@ -5454,7 +5456,7 @@ struct DataFrame(Copyable, Movable):
         var json_mod = Python.import_module("json")
         var nrows = self.__len__()
         var ncols = self._cols.__len__()
-        var eff_orient = orient if len(orient) > 0 else "columns"
+        var eff_orient = orient if orient.byte_length() > 0 else "columns"
 
         var py_obj: PythonObject
 
@@ -5519,7 +5521,7 @@ struct DataFrame(Copyable, Movable):
 
         var result = String(json_mod.dumps(py_obj))
 
-        if len(path_or_buf) > 0:
+        if path_or_buf.byte_length() > 0:
             with open(path_or_buf, "w") as f:
                 f.write(result)
             return String("")
@@ -5800,11 +5802,11 @@ struct DataFrame(Copyable, Movable):
         # Compute per-column display widths.
         var widths = List[Int]()
         for ci in range(ncols):
-            var w = len(self._cols[ci].name.value())
+            var w = self._cols[ci].name.value().byte_length()
             for ri in range(nrows):
                 var s = _col_cell_str(self._cols[ci], ri)
-                if len(s) > w:
-                    w = len(s)
+                if s.byte_length() > w:
+                    w = s.byte_length()
             widths.append(w)
 
         # Header row.
@@ -5815,7 +5817,7 @@ struct DataFrame(Copyable, Movable):
         for ci in range(ncols):
             line += "  "
             var name = self._cols[ci].name.value()
-            var pad = widths[ci] - len(name)
+            var pad = widths[ci] - name.byte_length()
             for _ in range(pad):
                 line += " "
             line += name
@@ -5825,13 +5827,13 @@ struct DataFrame(Copyable, Movable):
         for ri in range(nrows):
             var idx_str = String(ri)
             var row_line = idx_str
-            var pad = idx_width - len(idx_str)
+            var pad = idx_width - idx_str.byte_length()
             for _ in range(pad):
                 row_line += " "
             for ci in range(ncols):
                 row_line += "  "
                 var cell = _col_cell_str(self._cols[ci], ri)
-                var col_pad = widths[ci] - len(cell)
+                var col_pad = widths[ci] - cell.byte_length()
                 for _ in range(col_pad):
                     row_line += " "
                 row_line += cell
@@ -5890,18 +5892,18 @@ struct DataFrame(Copyable, Movable):
         # Index column width.
         var idx_width = 5  # len("index")
         if nrows > 0:
-            var tmp_w = len(String(nrows - 1))
+            var tmp_w = String(nrows - 1).byte_length()
             if tmp_w > idx_width:
                 idx_width = tmp_w
 
         # Per-column widths (at least as wide as the header).
         var widths = List[Int]()
         for ci in range(ncols):
-            var w = len(self._cols[ci].name.value())
+            var w = self._cols[ci].name.value().byte_length()
             for ri in range(nrows):
                 var s = _col_cell_str(self._cols[ci], ri)
-                if len(s) > w:
-                    w = len(s)
+                if s.byte_length() > w:
+                    w = s.byte_length()
             widths.append(w)
 
         # Header row.
@@ -5915,7 +5917,7 @@ struct DataFrame(Copyable, Movable):
             result += " "
             var name = self._cols[ci].name.value()
             result += name
-            var col_pad = widths[ci] - len(name)
+            var col_pad = widths[ci] - name.byte_length()
             for _ in range(col_pad):
                 result += " "
             result += " |"
@@ -5938,7 +5940,7 @@ struct DataFrame(Copyable, Movable):
         for ri in range(nrows):
             var idx_str = String(ri)
             result += "| " + idx_str
-            var ri_pad = idx_width - len(idx_str)
+            var ri_pad = idx_width - idx_str.byte_length()
             for _ in range(ri_pad):
                 result += " "
             result += " |"
@@ -5946,7 +5948,7 @@ struct DataFrame(Copyable, Movable):
                 result += " "
                 var cell = _col_cell_str(self._cols[ci], ri)
                 result += cell
-                var col_pad = widths[ci] - len(cell)
+                var col_pad = widths[ci] - cell.byte_length()
                 for _ in range(col_pad):
                     result += " "
                 result += " |"
@@ -8009,7 +8011,7 @@ def _parse_int_label(label: String) raises -> Int:
     Supports an optional leading ``'-'`` sign.  Raises when the string
     contains non-digit characters.
     """
-    var n = len(label)
+    var n = label.byte_length()
     if n == 0:
         raise Error("loc: empty row label")
     var bytes = label.as_bytes()

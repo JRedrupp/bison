@@ -122,7 +122,7 @@ def main() raises:
 
     # When invoked by run_benchmarks.sh without BISON_PROFILE_OP, emit
     # skip-JSON so the runner doesn't choke on unexpected output.
-    if len(op) == 0:
+    if op.byte_length() == 0:
         var results = List[BenchResult]()
         results.append(BenchResult.skipped_result("profile_sort"))
         results.append(BenchResult.skipped_result("profile_groupby"))

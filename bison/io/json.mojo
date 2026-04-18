@@ -153,7 +153,7 @@ def read_json(
         var records = Python.evaluate("[]")
         for i in range(nlines):
             var line_str = String(py_lines[i]).strip()
-            if len(line_str) > 0:
+            if line_str.byte_length() > 0:
                 records.append(json_mod.loads(line_str))
         var n = Int(records.__len__())
         return _json_records_to_df(records, n, py_builtins)
@@ -163,7 +163,7 @@ def read_json(
 
     # Determine effective orient (auto-detect when not specified).
     var eff_orient = orient
-    if len(eff_orient) == 0:
+    if eff_orient.byte_length() == 0:
         var parsed_type = String(parsed.__class__.__name__)
         if parsed_type == "list":
             eff_orient = "records"

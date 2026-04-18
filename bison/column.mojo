@@ -3246,7 +3246,7 @@ struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
 
 
 # Compile-time function type for element-wise Float64 transforms (_apply kernel)
-comptime FloatTransformFn = def(Float64) -> Float64
+comptime FloatTransformFn = def(Float64) thin -> Float64
 
 
 # Element-wise FloatTransformFn definitions for _apply[F] (#606)
@@ -5643,7 +5643,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         # Use _caches_only_from_col_data to skip marrow AnyArray construction
         # (#659 perf fix).
         var col = Column._caches_only_from_col_data(
-            self.name, self.dtype, visitor^.result
+            self.name, self.dtype, visitor^.result.copy()
         )
         if out_mask.has_nulls():
             col.set_null_mask(out_mask^)
@@ -5656,7 +5656,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         # Use _caches_only_from_col_data to skip marrow AnyArray construction
         # (#659 perf fix).
         var col = Column._caches_only_from_col_data(
-            self.name, self.dtype, visitor^.result
+            self.name, self.dtype, visitor^.result.copy()
         )
         # Merge null masks only when at least one side has nulls
         if self.has_nulls() or other.has_nulls():
@@ -7581,7 +7581,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             var data = List[Float64]()
             var struct_mod = Python.import_module("struct")
             var pack_fmt = "d"  # pack as IEEE-754 double-precision float
-            var unpack_fmt = "q"  # unpack as signed 64-bit integer (same bytes, avoids overflow in Int)
+            var unpack_fmt = (  # unpack as signed 64-bit integer (same bytes, avoids overflow in Int)
+                "q"
+            )
             for i in range(n):
                 if null_mask[i]:
                     data.append(Float64(0))  # placeholder for null
