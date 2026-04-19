@@ -166,6 +166,32 @@ def test_getitem_bool_mask_string_eq() raises:
     assert_equal(result["val"].iloc(1)[Int64], Int64(3))
 
 
+def test_getitem_bool_mask_mixed_dtype_take_path() raises:
+    """Boolean mask keeps row order across mixed AnyArray-backed dtypes."""
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(
+            Python.evaluate(
+                "{'i': [10, 20, 30, 40, 50], 'f': [1.0, 2.0, 3.0, 4.0, 5.0], 'b': [True, False, True, False, True], 's': ['a', 'b', 'c', 'd', 'e'], 'sel': [0, 1, 0, 1, 1]}"
+            )
+        )
+    )
+    var result = df[df["sel"].__gt__(0.0)]
+    assert_equal(result.shape()[0], 3)
+    assert_equal(result["i"].iloc(0)[Int64], Int64(20))
+    assert_equal(result["i"].iloc(1)[Int64], Int64(40))
+    assert_equal(result["i"].iloc(2)[Int64], Int64(50))
+    assert_true(result["f"].iloc(0)[Float64] == 2.0)
+    assert_true(result["f"].iloc(1)[Float64] == 4.0)
+    assert_true(result["f"].iloc(2)[Float64] == 5.0)
+    assert_equal(result["b"].iloc(0)[Bool], Bool(False))
+    assert_equal(result["b"].iloc(1)[Bool], Bool(False))
+    assert_equal(result["b"].iloc(2)[Bool], Bool(True))
+    assert_equal(result["s"].iloc(0)[String], "b")
+    assert_equal(result["s"].iloc(1)[String], "d")
+    assert_equal(result["s"].iloc(2)[String], "e")
+
+
 def test_getitem_missing_raises() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1]}")))
