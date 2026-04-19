@@ -1,6 +1,124 @@
 {
   "runs": [
     {
+      "commit": "69a30ca2179630d49ab396555d8e99a56fa958d3",
+      "short_commit": "69a30ca",
+      "timestamp": "2026-04-19T23:51:11Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.0181448,
+          "pandas_ms": 0.10153498999898147,
+          "ratio": 0.17870489769272657
+        },
+        "series_mean": {
+          "bison_ms": 0.019526869999999998,
+          "pandas_ms": 0.1265581600000587,
+          "ratio": 0.15429167111777653
+        },
+        "groupby_sum": {
+          "bison_ms": 3.7206121000000003,
+          "pandas_ms": 5.113556300000255,
+          "ratio": 0.727597758139441
+        },
+        "query_simple": {
+          "bison_ms": 14.613965199999999,
+          "pandas_ms": 1.6229564499894877,
+          "ratio": 9.004533177766204
+        },
+        "query_and": {
+          "bison_ms": 15.136458150000001,
+          "pandas_ms": 0.7558664500038503,
+          "ratio": 20.025307579034493
+        },
+        "query_or": {
+          "bison_ms": 15.977891,
+          "pandas_ms": 1.6968131499993433,
+          "ratio": 9.41641158309398
+        },
+        "eval_expr": {
+          "bison_ms": 1.1290896499999998,
+          "pandas_ms": 0.08735725000406092,
+          "ratio": 12.924967875562848
+        },
+        "query_size_1k": {
+          "bison_ms": 0.15352115,
+          "pandas_ms": 0.29594370000722847,
+          "ratio": 0.5187512016517001
+        },
+        "query_size_10k": {
+          "bison_ms": 1.4663977,
+          "pandas_ms": 0.35662740000361737,
+          "ratio": 4.1118481080958045
+        },
+        "iloc_row": {
+          "bison_ms": 0.0021387800000000003,
+          "pandas_ms": 0.04129640999963158,
+          "ratio": 0.05179094260297883
+        },
+        "loc_slice": {
+          "bison_ms": 0.00796009,
+          "pandas_ms": 0.0328595300015877,
+          "ratio": 0.24224600898477203
+        },
+        "sort_values": {
+          "bison_ms": 22.541468,
+          "pandas_ms": 7.11445066667693,
+          "ratio": 3.1684059748394926
+        },
+        "merge": {
+          "bison_ms": 4.570799666666667,
+          "pandas_ms": 1.9112566666687296,
+          "ratio": 2.3915153555139463
+        },
+        "merge_string_key": {
+          "bison_ms": 19.456451333333334,
+          "pandas_ms": 11.833516000024247,
+          "ratio": 1.6441817743174105
+        },
+        "fillna": {
+          "bison_ms": 0.00087503,
+          "pandas_ms": 0.07288809000101537,
+          "ratio": 0.012005116336397488
+        },
+        "series_apply": {
+          "bison_ms": 0.7826908499999999,
+          "pandas_ms": 0.22111379000079978,
+          "ratio": 3.5397649780105027
+        },
+        "csv_roundtrip": {
+          "bison_ms": 578.4871664,
+          "pandas_ms": 337.07772900002055,
+          "ratio": 1.716183291361752
+        },
+        "profile_sort": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_groupby": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_merge": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_query": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_csv": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        }
+      }
+    },
+    {
       "commit": "d2ad65d79b6f247f702178254c80aa9e2b2f74da",
       "short_commit": "d2ad65d",
       "timestamp": "2026-04-19T23:24:54Z",
@@ -9345,6 +9463,12 @@
     "series_sum",
     "series_mean",
     "groupby_sum",
+    "query_simple",
+    "query_and",
+    "query_or",
+    "eval_expr",
+    "query_size_1k",
+    "query_size_10k",
     "iloc_row",
     "loc_slice",
     "sort_values",
@@ -9356,14 +9480,8 @@
     "profile_sort",
     "profile_groupby",
     "profile_merge",
-    "profile_csv",
-    "query_simple",
-    "query_and",
-    "query_or",
-    "eval_expr",
-    "query_size_1k",
-    "query_size_10k",
     "profile_query",
+    "profile_csv",
     "builder_int64_safe_vs_list",
     "builder_int64_fast_vs_list",
     "builder_float64_safe_vs_list",
