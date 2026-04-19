@@ -4546,6 +4546,19 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._storage = ColumnStorage(LegacyObjectData())
         _init_storage_from_column_data(self, data^)
 
+    def __init__(
+        out self,
+        name: Optional[String],
+        var storage: AnyArray,
+        dtype: BisonDtype,
+    ):
+        self.name = name
+        self.dtype = dtype
+        self._index = ColumnIndex(List[PythonObject]())
+        self._index_names = List[String]()
+        self._index_name = String("")
+        self._storage = ColumnStorage(storage^)
+
     # ------------------------------------------------------------------
     # Typed-list constructor overloads — let callers pass typed lists
     # directly without wrapping in ColumnData(). Each delegates to the
@@ -5454,30 +5467,10 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 new_mask.append(self.is_null(i))
         # Slice via the active storage arm.
         var col: Column
-        if self.is_int():
-            var src = self._int64_list()
-            var result = List[Int64](capacity=e - s)
-            for i in range(s, e):
-                result.append(src[i])
-            col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_bool():
-            var src = self._bool_list()
-            var result = List[Bool](capacity=e - s)
-            for i in range(s, e):
-                result.append(src[i])
-            col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_string():
-            var src = self._str_list()
-            var result = List[String](capacity=e - s)
-            for i in range(s, e):
-                result.append(src[i])
-            col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_float():
-            var src = self._float64_list()
-            var result = List[Float64](capacity=e - s)
-            for i in range(s, e):
-                result.append(src[i])
-            col = Column(self.name, ColumnData(result^), self.dtype)
+        if self._storage.isa[AnyArray]():
+            # Zero-copy: AnyArray.slice() adjusts offset/length metadata only.
+            var sliced = self._storage[AnyArray].slice(s, e - s)
+            col = Column(self.name, sliced^, self.dtype)
         else:
             var visitor = _SliceVisitor(s, e)
             self._visit(visitor)
