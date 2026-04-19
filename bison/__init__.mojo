@@ -50,7 +50,6 @@ from .io import (
     write_ipc,
 )
 from .reshape import concat
-from .expr import parse, ParsedExpr
 from .arrow import (
     column_to_marrow_array,
     marrow_array_to_column,

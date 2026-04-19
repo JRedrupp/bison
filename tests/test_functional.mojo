@@ -300,42 +300,6 @@ def test_df_transform_cummax() raises:
 
 
 # ---------------------------------------------------------------------------
-# eval
-# ---------------------------------------------------------------------------
-
-def test_df_eval_simple() raises:
-    # Arithmetic expressions are out-of-scope for the first milestone; the
-    # native evaluator raises an explicit "unsupported syntax" error instead
-    # of delegating to pandas.
-    var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3], 'b': [10, 20, 30]}"))
-    var df = DataFrame(pd_df)
-    var raised = False
-    try:
-        _ = df.eval("a + b")
-    except e:
-        raised = "unsupported syntax" in String(e)
-    assert_true(raised)
-
-
-# ---------------------------------------------------------------------------
-# query
-# ---------------------------------------------------------------------------
-
-def test_df_query_simple() raises:
-    var pd = Python.import_module("pandas")
-    var pd_df = pd.DataFrame(Python.evaluate("{'a': [1, 2, 3, 4], 'b': [10, 20, 30, 40]}"))
-    var df = DataFrame(pd_df)
-    var result = df.query("a > 2")
-    # Expected: rows where a > 2, i.e., a=[3,4] and b=[30,40]
-    assert_true(result.shape()[0] == 2)
-    assert_true(result.shape()[1] == 2)
-    var a_col_pd = result["a"].to_pandas()
-    assert_true(Float64(String(a_col_pd.iloc[0])) == 3.0)
-    assert_true(Float64(String(a_col_pd.iloc[1])) == 4.0)
-
-
-# ---------------------------------------------------------------------------
 # pipe — string overload
 # ---------------------------------------------------------------------------
 

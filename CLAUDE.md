@@ -63,8 +63,8 @@ Supported platforms: `linux-64`, `osx-arm64`. Requires `pixi >= 0.41.0`, `max >=
 See [`docs/architecture.md`](docs/architecture.md) for the full architecture reference including column storage, type predicates, visitor dispatch, marrow integration, the `_apply[F]` math transform pattern, and the window operation architecture.
 
 Key rules to remember:
-- Never use `_data.isa[...]()` directly in `_frame.mojo` — use `Column` predicates (`is_int()`, `is_float()`, etc.).
-- After cache mutations, call `col._rebuild_marrow_only()`. Do **not** call `_try_activate_storage()` from mutation paths.
+- Never query `_storage.isa[AnyArray]()` directly in `_frame.mojo` — use `Column` predicates (`is_int()`, `is_float()`, etc.) plus `_int64_list()` / `_float64_list()` / `_bool_list()` / `_str_list()` / `_f64_list()` accessors.
+- Writes go through `_flush_int64_list` / `_flush_float64_list` / `_flush_bool_list` / `_flush_str_list` — extract the typed list, mutate, flush.
 - New element-wise math operations should follow the `_apply[F]` pattern.
 - Window computation kernels live in `bison/window/_kernels.mojo` as pure functions; window structs live in `_frame.mojo` (after GroupBy).
 

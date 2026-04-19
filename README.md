@@ -112,30 +112,27 @@ pixi run test
 
 ## Performance
 
-bison is faster than pandas for element-wise operations and small-dataset
-queries. Complex operations — groupby, sort, merge, eval — are slower at this
-stage and are being actively optimized.
+bison is faster than pandas for element-wise operations. Complex operations —
+groupby, sort, merge — are slower at this stage and are being actively
+optimized.
 
 Ratio = bison time / pandas time. Values below 1.0 mean bison is faster.
 
 | Operation | bison | pandas | Ratio |
 |-----------|------:|-------:|------:|
 | iloc row | 0.002 ms | 0.041 ms | 0.04x |
-| query (1k rows) | 0.029 ms | 0.308 ms | 0.09x |
 | series_mean | 0.047 ms | 0.134 ms | 0.35x |
 | loc slice | 0.014 ms | 0.031 ms | 0.45x |
 | fillna | 0.037 ms | 0.069 ms | 0.53x |
 | series_sum | 0.055 ms | 0.096 ms | 0.57x |
-| query (10k rows) | 0.306 ms | 0.363 ms | 0.84x |
 | csv roundtrip | 506 ms | 343 ms | 1.48x |
 | series_apply | 0.817 ms | 0.221 ms | 3.70x |
 | sort_values | 24.4 ms | 5.68 ms | 4.29x |
 | merge | 13.1 ms | 2.0 ms | 6.56x |
 | groupby_sum | 64.5 ms | 4.4 ms | 14.75x |
-| eval_expr | 1.6 ms | 0.098 ms | 16.58x |
 
-Benchmarks run at 100k rows (aggregation, groupby, sort), 10k rows
-(query/apply), and a 1k/10k sweep for the query scalability entries.
+Benchmarks run at 100k rows (aggregation, groupby, sort) and 10k rows
+(apply).
 Full history and per-commit charts at
 [jredrupp.github.io/bison](https://jredrupp.github.io/bison/).
 
@@ -227,45 +224,6 @@ var result = s.apply[double]()
 Runtime closures that capture variables are not yet supported in parameter
 type constraints. Use `clip()` or `where()` for threshold-style operations
 in the meantime.
-
-### Native query/eval subset
-
-`DataFrame.query()` and `DataFrame.eval()` are implemented natively in Mojo
-using the `bison.expr` parser and evaluator. The first milestone covers a
-well-defined subset of the pandas query/eval grammar:
-
-**Supported in this release:**
-
-- Column references by bare identifier name (`a`, `column_name`).
-- Scalar literals: integer, float, boolean (`True`/`False`), string, and
-  null (`None`).
-- Comparison operators: `<`, `<=`, `>`, `>=`, `==`, `!=`.
-- Logical operators: `not`, `and`, `or` (with Kleene three-valued null
-  semantics).
-- Parenthetical grouping for explicit precedence.
-- Column-vs-column and column-vs-scalar comparisons in either order.
-
-**Explicitly out of scope (raise with `"unsupported syntax"`):**
-
-- Arithmetic expressions: `a + b`, `a * 2`, `-a`.
-- Function calls: `abs(a)`, `len(a)`.
-- Attribute access: `a.str.len`.
-- Indexing and slicing: `a[0]`, `a[1:3]`.
-- Membership and identity operators: `in`, `not in`, `is`, `is not`.
-- Comparison chaining: `a < b < c`.
-- Assignment expressions: `a = b`, `a := b`.
-
-**Error messages:**
-
-| Situation | Message contains |
-|-----------|-----------------|
-| Unsupported grammar | `unsupported syntax` |
-| Malformed expression | `invalid expression` |
-| Unknown column name | `unknown column` |
-| Type mismatch | `type error` |
-
-The full grammar, precedence table, and null-semantics truth tables are
-documented in [`docs/query-eval-spec.md`](docs/query-eval-spec.md).
 
 ## Documentation
 
