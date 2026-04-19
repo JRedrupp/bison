@@ -5636,18 +5636,113 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
 
     def take_with_nulls(self, indices: List[Int]) raises -> Column:
         """Like take() but index -1 inserts a null placeholder row."""
-        var visitor = _TakeWithNullsVisitor(indices, self.null_mask_copy())
-        self._visit_raises(visitor)
-        # Save out_mask before consuming visitor to avoid partial-move issues.
-        var out_mask = visitor.out_mask.copy()
-        # Use _caches_only_from_col_data to skip marrow AnyArray construction
-        # (#659 perf fix).
-        var col = Column._caches_only_from_col_data(
-            self.name, self.dtype, visitor^.result.copy()
-        )
-        if out_mask.has_nulls():
-            col.set_null_mask(out_mask^)
-        return col^
+        var n = len(indices)
+        var src_has_nulls = self.has_nulls()
+        var out_mask = NullMask()
+
+        if len(self._int64_cache) > 0:
+            var result = List[Int64](capacity=n)
+            var f64 = List[Float64](capacity=n)
+            for k in range(n):
+                var i = indices[k]
+                if i < 0:
+                    result.append(Int64(0))
+                    f64.append(Float64(0))
+                    out_mask.append_null()
+                else:
+                    var v = self._int64_cache[i]
+                    result.append(v)
+                    f64.append(Float64(v))
+                    out_mask.append(src_has_nulls and self.is_null(i))
+            var col = Column._caches_only(
+                self.name,
+                self.dtype,
+                result^,
+                f64^,
+                List[Bool](),
+                List[String](),
+            )
+            if out_mask.has_nulls():
+                col.set_null_mask(out_mask^)
+            return col^
+        elif len(self._f64_cache) > 0:
+            var result = List[Float64](capacity=n)
+            for k in range(n):
+                var i = indices[k]
+                if i < 0:
+                    result.append(Float64(0) / Float64(0))
+                    out_mask.append_null()
+                else:
+                    result.append(self._f64_cache[i])
+                    out_mask.append(src_has_nulls and self.is_null(i))
+            var col = Column._caches_only(
+                self.name,
+                self.dtype,
+                List[Int64](),
+                result^,
+                List[Bool](),
+                List[String](),
+            )
+            if out_mask.has_nulls():
+                col.set_null_mask(out_mask^)
+            return col^
+        elif len(self._bool_cache) > 0:
+            var result = List[Bool](capacity=n)
+            var f64 = List[Float64](capacity=n)
+            for k in range(n):
+                var i = indices[k]
+                if i < 0:
+                    result.append(False)
+                    f64.append(Float64(0))
+                    out_mask.append_null()
+                else:
+                    var v = self._bool_cache[i]
+                    result.append(v)
+                    f64.append(Float64(1.0) if v else Float64(0.0))
+                    out_mask.append(src_has_nulls and self.is_null(i))
+            var col = Column._caches_only(
+                self.name,
+                self.dtype,
+                List[Int64](),
+                f64^,
+                result^,
+                List[String](),
+            )
+            if out_mask.has_nulls():
+                col.set_null_mask(out_mask^)
+            return col^
+        elif len(self._str_cache) > 0:
+            var result = List[String](capacity=n)
+            for k in range(n):
+                var i = indices[k]
+                if i < 0:
+                    result.append(String(""))
+                    out_mask.append_null()
+                else:
+                    result.append(self._str_cache[i])
+                    out_mask.append(src_has_nulls and self.is_null(i))
+            var col = Column._caches_only(
+                self.name,
+                self.dtype,
+                List[Int64](),
+                List[Float64](),
+                List[Bool](),
+                result^,
+            )
+            if out_mask.has_nulls():
+                col.set_null_mask(out_mask^)
+            return col^
+        else:
+            # Object / datetime / timedelta: fall back to visitor path.
+            var visitor = _TakeWithNullsVisitor(indices, self.null_mask_copy())
+            self._visit_raises(visitor)
+            var obj_mask = visitor.out_mask.copy()
+            var col = Column._caches_only_from_col_data(
+                self.name, self.dtype, visitor^.result.copy()
+            )
+            if obj_mask.has_nulls():
+                col.set_null_mask(obj_mask^)
+            return col^
 
     def concat(self, other: Column) raises -> Column:
         """Return a new Column with *other* appended row-wise."""

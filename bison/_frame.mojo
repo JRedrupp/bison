@@ -5030,11 +5030,14 @@ struct DataFrame(Copyable, Movable):
         # Fallback: String-serialise each key for multi-column / non-int keys.
         var n_left = self.shape()[0]
         var n_right = right.shape()[0]
-        var out_left = List[Int]()
-        var out_right = List[Int]()
+        var out_left = List[Int](capacity=n_left)
+        var out_right = List[Int](capacity=n_left)
+        var needs_right_unmatched = how == "right" or how == "outer"
         var right_matched = List[Bool]()
-        for _ in range(n_right):
-            right_matched.append(False)
+        if needs_right_unmatched:
+            right_matched = List[Bool](capacity=n_right)
+            for _ in range(n_right):
+                right_matched.append(False)
 
         if (
             len(lkeys) == 1
@@ -5056,7 +5059,8 @@ struct DataFrame(Copyable, Movable):
                     for m in range(len(matches)):
                         out_left.append(i)
                         out_right.append(matches[m])
-                        right_matched[matches[m]] = True
+                        if needs_right_unmatched:
+                            right_matched[matches[m]] = True
                 elif how == "left" or how == "outer":
                     out_left.append(i)
                     out_right.append(-1)
@@ -5074,7 +5078,8 @@ struct DataFrame(Copyable, Movable):
                     for m in range(len(matches)):
                         out_left.append(i)
                         out_right.append(matches[m])
-                        right_matched[matches[m]] = True
+                        if needs_right_unmatched:
+                            right_matched[matches[m]] = True
                 elif how == "left" or how == "outer":
                     out_left.append(i)
                     out_right.append(-1)
@@ -5149,8 +5154,11 @@ struct DataFrame(Copyable, Movable):
                                         key_col.set_valid_at(r)
                             break
                     # Sync secondary caches and rebuild marrow after
-                    # cache-first key fill (#645).
-                    key_col._rebuild_storage()
+                    # cache-first key fill (#645). Only needed when right-only
+                    # rows exist (outer/right joins); inner/left joins leave
+                    # key_col unmodified so the caches are already correct.
+                    if needs_right_unmatched:
+                        key_col._rebuild_storage()
                     result_cols.append(key_col^)
                     break
 
