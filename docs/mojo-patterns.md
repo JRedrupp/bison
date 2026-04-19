@@ -79,6 +79,26 @@ Nightly Mojo deprecated the `fn` keyword (warning today, error soon). All
 function and method definitions must use `def`. Do not introduce new `fn`
 declarations.
 
+## Compiler bug #642 — generic dispatch + AnyArray typed downcasts
+
+Mojo compiler bug #642 (still present as of `max 26.3.0.dev2026041520`) causes
+a comptime monomorphisation deadlock when a generic visitor function and
+AnyArray typed downcasts (`.as_int64()`, `.as_float64()`) appear in the same
+call graph.
+
+The original `bison.expr` evaluator used a generic
+`visit_ast_node_raises[V: ASTNodeVisitorRaises]` visitor which triggered this
+bug. The workaround: remove all generic dispatch from the evaluator's hot path
+and replace it with a plain non-generic recursive `_eval_node` function that
+uses integer `if/elif` on `NK_*` constants. No traits, no template
+instantiation, no generic dispatch.
+
+**Side effect**: all `query()`/`eval()` tests must live in
+`tests/test_expr.mojo`. Compiling `df.query()` or `df.eval()` in a standalone
+test file (e.g. `test_functional.mojo`) hangs compilation — it only resolves
+when co-compiled alongside other `bison.expr` tests. Do not add query/eval
+calls to any test file other than `test_expr.mojo`.
+
 ## Import aliases for stdlib names that shadow parameters
 
 When importing a stdlib function whose name collides with a common parameter
