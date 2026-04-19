@@ -6626,8 +6626,6 @@ struct DataFrameGroupBy:
     var _as_index: Bool
     var _sort: Bool
     var _dropna: Bool
-    var _group_map: Dict[String, List[Int]]
-    var _group_keys: List[String]
 
     def __init__(
         out self,
@@ -6637,15 +6635,32 @@ struct DataFrameGroupBy:
         sort: Bool,
         dropna: Bool,
     ) raises:
-        self._df = df.copy(True)
+        # The marrow hash-aggregate fast path (sum/mean/min/max/count for
+        # a single non-object key column with as_index=True) never needs
+        # _group_map / _group_keys, so the O(N^2) `_groupby_indices`
+        # call is no longer run eagerly in __init__.  Slow-path methods
+        # build the group structures locally via `_build_groups`.
+        # Column storage is ArcPointer-backed so this is a cheap
+        # ref-bump rather than a deep copy.
+        self._df = DataFrame(copy=df)
         self._by = by.copy()
         self._as_index = as_index
         self._sort = sort
         self._dropna = dropna
-        self._group_map = Dict[String, List[Int]]()
-        self._group_keys = List[String]()
+
+    def _build_groups(
+        self,
+        mut group_map: Dict[String, List[Int]],
+        mut group_keys: List[String],
+    ) raises:
+        """Materialise group_map / group_keys into caller-owned buffers.
+
+        Used by non-marrow code paths.  Out-parameters (rather than a
+        tuple return) sidestep Mojo's aliasing checks when binding both
+        halves as local `ref`s.
+        """
         _groupby_indices(
-            df, by, sort, dropna, self._group_map, self._group_keys
+            self._df, self._by, self._sort, self._dropna, group_map, group_keys
         )
 
     def _pd_groupby(self) raises -> PythonObject:
@@ -6668,7 +6683,11 @@ struct DataFrameGroupBy:
             m[self._df._cols[i].name.value()] = i
         return m^
 
-    def _build_group_index(self) raises -> ColumnIndex:
+    def _build_group_index(
+        self,
+        group_map: Dict[String, List[Int]],
+        group_keys: List[String],
+    ) raises -> ColumnIndex:
         """Return a properly typed ColumnIndex for the group keys.
 
         Single-key: Int64 → List[Int64], Float64 → List[Float64], else Index.
@@ -6681,16 +6700,16 @@ struct DataFrameGroupBy:
             if ci >= 0 and self._df._cols[ci].is_int():
                 var d = self._df._cols[ci]._int64_list()
                 var int_keys = List[Int64]()
-                for i in range(len(self._group_keys)):
-                    int_keys.append(d[self._group_map[self._group_keys[i]][0]])
+                for i in range(len(group_keys)):
+                    int_keys.append(d[group_map[group_keys[i]][0]])
                 return ColumnIndex(int_keys^)
             elif ci >= 0 and self._df._cols[ci].is_float():
                 var d = self._df._cols[ci]._float64_list()
                 var flt_keys = List[Float64]()
-                for i in range(len(self._group_keys)):
-                    flt_keys.append(d[self._group_map[self._group_keys[i]][0]])
+                for i in range(len(group_keys)):
+                    flt_keys.append(d[group_map[group_keys[i]][0]])
                 return ColumnIndex(flt_keys^)
-            return ColumnIndex(Index(self._group_keys.copy()))
+            return ColumnIndex(Index(group_keys.copy()))
         # Multi-key: build a List[PythonObject] of Python tuples, one per group.
         var builtins = Python.import_module("builtins")
         # Build name→index map once (O(n_cols)), then resolve key positions.
@@ -6699,8 +6718,8 @@ struct DataFrameGroupBy:
         for k in range(len(self._by)):
             key_col_indices.append(col_idx.get(self._by[k], -1))
         var multi_idx = List[PythonObject]()
-        for j in range(len(self._group_keys)):
-            var first_row = self._group_map[self._group_keys[j]][0]
+        for j in range(len(group_keys)):
+            var first_row = group_map[group_keys[j]][0]
             var items = builtins.list()
             for k in range(len(key_col_indices)):
                 var ci = key_col_indices[k]
@@ -6709,10 +6728,14 @@ struct DataFrameGroupBy:
         return ColumnIndex(multi_idx^)
 
     def _make_result_col(
-        self, name: Optional[String], var vals: List[Float64]
+        self,
+        name: Optional[String],
+        var vals: List[Float64],
+        group_map: Dict[String, List[Int]],
+        group_keys: List[String],
     ) raises -> Column:
         """Build a float64 result Column with group keys as index."""
-        var idx = self._build_group_index()
+        var idx = self._build_group_index(group_map, group_keys)
         var col = Column(name, vals^, float64, idx^)
         if len(self._by) == 1:
             col._index_name = self._by[0]
@@ -6721,10 +6744,14 @@ struct DataFrameGroupBy:
         return col^
 
     def _make_result_col_int64(
-        self, name: Optional[String], var vals: List[Int64]
+        self,
+        name: Optional[String],
+        var vals: List[Int64],
+        group_map: Dict[String, List[Int]],
+        group_keys: List[String],
     ) raises -> Column:
         """Build an int64 result Column with group keys as index."""
-        var idx = self._build_group_index()
+        var idx = self._build_group_index(group_map, group_keys)
         var col = Column(name, vals^, int64, idx^)
         if len(self._by) == 1:
             col._index_name = self._by[0]
@@ -6732,7 +6759,12 @@ struct DataFrameGroupBy:
             col._index_names = self._by.copy()
         return col^
 
-    def _make_key_col(self, key_idx: Int) raises -> Column:
+    def _make_key_col(
+        self,
+        key_idx: Int,
+        group_map: Dict[String, List[Int]],
+        group_keys: List[String],
+    ) raises -> Column:
         """Build a data Column with the per-group representative key values.
 
         Used when as_index=False to include the groupby key as a regular
@@ -6746,8 +6778,8 @@ struct DataFrameGroupBy:
                 "DataFrameGroupBy._make_key_col: column not found: " + key_name
             )
         var indices = List[Int]()
-        for j in range(len(self._group_keys)):
-            indices.append(self._group_map[self._group_keys[j]][0])
+        for j in range(len(group_keys)):
+            indices.append(group_map[group_keys[j]][0])
         var key_col = self._df._cols[ci].take(indices)
         key_col._index = ColumnIndex(List[PythonObject]())
         key_col._index_name = String("")
@@ -6755,7 +6787,10 @@ struct DataFrameGroupBy:
         return key_col^
 
     def _wrap_agg_result(
-        self, var result_cols: List[Column]
+        self,
+        var result_cols: List[Column],
+        group_map: Dict[String, List[Int]],
+        group_keys: List[String],
     ) raises -> DataFrame:
         """Return a DataFrame from aggregation result columns.
 
@@ -6767,7 +6802,7 @@ struct DataFrameGroupBy:
             return DataFrame(result_cols^)
         var final_cols = List[Column]()
         for k in range(len(self._by)):
-            final_cols.append(self._make_key_col(k))
+            final_cols.append(self._make_key_col(k, group_map, group_keys))
         for i in range(len(result_cols)):
             var c = result_cols[i].copy()
             c._index = ColumnIndex(List[PythonObject]())
@@ -6902,6 +6937,9 @@ struct DataFrameGroupBy:
         """
         if self._can_use_marrow_agg(name):
             return self._marrow_agg(name)
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6915,34 +6953,39 @@ struct DataFrameGroupBy:
                 col.dtype.is_integer() or col.dtype.is_float()
             ):
                 continue
+            var col_name = col.name
             if is_count:
                 var vals = List[Int64]()
-                for j in range(len(self._group_keys)):
+                for j in range(len(group_keys)):
                     vals.append(
-                        Int64(
-                            col.take(
-                                self._group_map[self._group_keys[j]]
-                            ).count()
-                        )
+                        Int64(col.take(group_map[group_keys[j]]).count())
                     )
-                result_cols.append(self._make_result_col_int64(col.name, vals^))
+                result_cols.append(
+                    self._make_result_col_int64(
+                        col_name, vals^, group_map, group_keys
+                    )
+                )
             elif col.dtype.is_integer() and (
                 name == "sum" or name == "min" or name == "max"
             ):
                 var vals = List[Int64]()
-                for j in range(len(self._group_keys)):
-                    var taken = col.take(self._group_map[self._group_keys[j]])
+                for j in range(len(group_keys)):
+                    var taken = col.take(group_map[group_keys[j]])
                     if name == "sum":
                         vals.append(taken.sum_int64())
                     elif name == "min":
                         vals.append(taken.min_int64())
                     elif name == "max":
                         vals.append(taken.max_int64())
-                result_cols.append(self._make_result_col_int64(col.name, vals^))
+                result_cols.append(
+                    self._make_result_col_int64(
+                        col_name, vals^, group_map, group_keys
+                    )
+                )
             else:
                 var vals = List[Float64]()
-                for j in range(len(self._group_keys)):
-                    var taken = col.take(self._group_map[self._group_keys[j]])
+                for j in range(len(group_keys)):
+                    var taken = col.take(group_map[group_keys[j]])
                     if name == "sum":
                         vals.append(taken.sum())
                     elif name == "mean":
@@ -6955,8 +6998,12 @@ struct DataFrameGroupBy:
                         vals.append(taken.std(ddof))
                     else:
                         vals.append(taken.var(ddof))
-                result_cols.append(self._make_result_col(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+                result_cols.append(
+                    self._make_result_col(
+                        col_name, vals^, group_map, group_keys
+                    )
+                )
+        return self._wrap_agg_result(result_cols^, group_map, group_keys)
 
     def sum(self) raises -> DataFrame:
         return self._agg_dispatch("sum")
@@ -6980,6 +7027,9 @@ struct DataFrameGroupBy:
         return self._agg_dispatch("count")
 
     def nunique(self) raises -> DataFrame:
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -6988,17 +7038,21 @@ struct DataFrameGroupBy:
             ref col = self._df._cols[i]
             if col.name.value() in skip:
                 continue
+            var col_name = col.name
             var vals = List[Int64]()
-            for j in range(len(self._group_keys)):
-                vals.append(
-                    Int64(
-                        col.take(self._group_map[self._group_keys[j]]).nunique()
-                    )
+            for j in range(len(group_keys)):
+                vals.append(Int64(col.take(group_map[group_keys[j]]).nunique()))
+            result_cols.append(
+                self._make_result_col_int64(
+                    col_name, vals^, group_map, group_keys
                 )
-            result_cols.append(self._make_result_col_int64(col.name, vals^))
-        return self._wrap_agg_result(result_cols^)
+            )
+        return self._wrap_agg_result(result_cols^, group_map, group_keys)
 
     def first(self) raises -> DataFrame:
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -7007,9 +7061,10 @@ struct DataFrameGroupBy:
             ref col = self._df._cols[i]
             if col.name.value() in skip:
                 continue
+            var col_name = col.name
             var selected = List[Int]()
-            for j in range(len(self._group_keys)):
-                ref indices = self._group_map[self._group_keys[j]]
+            for j in range(len(group_keys)):
+                ref indices = group_map[group_keys[j]]
                 var found = -1
                 for k in range(len(indices)):
                     if col.is_valid(indices[k]):
@@ -7017,16 +7072,19 @@ struct DataFrameGroupBy:
                         break
                 selected.append(found)
             var result_col = col.take_with_nulls(selected)
-            result_col.name = col.name
-            result_col._index = self._build_group_index()
+            result_col.name = col_name
+            result_col._index = self._build_group_index(group_map, group_keys)
             if len(self._by) == 1:
                 result_col._index_name = self._by[0]
             else:
                 result_col._index_names = self._by.copy()
             result_cols.append(result_col^)
-        return self._wrap_agg_result(result_cols^)
+        return self._wrap_agg_result(result_cols^, group_map, group_keys)
 
     def last(self) raises -> DataFrame:
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
@@ -7035,9 +7093,10 @@ struct DataFrameGroupBy:
             ref col = self._df._cols[i]
             if col.name.value() in skip:
                 continue
+            var col_name = col.name
             var selected = List[Int]()
-            for j in range(len(self._group_keys)):
-                ref indices = self._group_map[self._group_keys[j]]
+            for j in range(len(group_keys)):
+                ref indices = group_map[group_keys[j]]
                 var found = -1
                 for k in range(len(indices) - 1, -1, -1):
                     if col.is_valid(indices[k]):
@@ -7045,22 +7104,25 @@ struct DataFrameGroupBy:
                         break
                 selected.append(found)
             var result_col = col.take_with_nulls(selected)
-            result_col.name = col.name
-            result_col._index = self._build_group_index()
+            result_col.name = col_name
+            result_col._index = self._build_group_index(group_map, group_keys)
             if len(self._by) == 1:
                 result_col._index_name = self._by[0]
             else:
                 result_col._index_names = self._by.copy()
             result_cols.append(result_col^)
-        return self._wrap_agg_result(result_cols^)
+        return self._wrap_agg_result(result_cols^, group_map, group_keys)
 
     def size(self) raises -> Series:
         if not self._as_index:
             return Series.from_pandas(self._pd_groupby().size())
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var vals = List[Int64]()
-        for i in range(len(self._group_keys)):
-            vals.append(Int64(len(self._group_map[self._group_keys[i]])))
-        var idx = self._build_group_index()
+        for i in range(len(group_keys)):
+            vals.append(Int64(len(group_map[group_keys[i]])))
+        var idx = self._build_group_index(group_map, group_keys)
         # pandas groupby().size() returns a Series with name=None
         var col = Column(None, vals^, int64, idx^)
         if len(self._by) == 1:
@@ -7110,11 +7172,14 @@ struct DataFrameGroupBy:
             return DataFrame.from_pandas(self._pd_groupby().transform(func))
         if len(self._df._cols) == 0:
             return DataFrame()
+        var group_map = Dict[String, List[Int]]()
+        var group_keys = List[String]()
+        self._build_groups(group_map, group_keys)
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
         var n_rows = len(self._df._cols[0])
-        var row_key = _gb_row_key_map(self._group_keys, self._group_map, n_rows)
+        var row_key = _gb_row_key_map(group_keys, group_map, n_rows)
         # DataFrameGroupBy uses the empty-string sentinel to mark rows that
         # were dropped from the group_map by ``dropna``.
         var excluded = List[Bool]()
@@ -7131,8 +7196,8 @@ struct DataFrameGroupBy:
                 result_cols.append(
                     _gb_transform_first_last_col(
                         col,
-                        self._group_keys,
-                        self._group_map,
+                        group_keys,
+                        group_map,
                         row_key,
                         excluded,
                         want_first,
@@ -7163,8 +7228,8 @@ struct DataFrameGroupBy:
                 result_cols.append(
                     _gb_transform_int_col(
                         col,
-                        self._group_keys,
-                        self._group_map,
+                        group_keys,
+                        group_map,
                         row_key,
                         func,
                     )
@@ -7173,8 +7238,8 @@ struct DataFrameGroupBy:
             result_cols.append(
                 _gb_transform_float_col(
                     col,
-                    self._group_keys,
-                    self._group_map,
+                    group_keys,
+                    group_map,
                     row_key,
                     excluded,
                     func,
