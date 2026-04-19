@@ -38,6 +38,7 @@ comptime SORT_ITERS = 30
 comptime GROUPBY_ITERS = 50
 comptime MERGE_ITERS = 30
 comptime CSV_ITERS = 10
+comptime LOC_SLICE_ITERS = 5000
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,6 +98,16 @@ def _profile_csv(df: DataFrame, iters: Int) raises:
     for _ in range(iters):
         _ = df.to_csv(tmp)
         _ = read_csv(tmp)
+    var ms = _elapsed_ms(t0, iters)
+    print(" ", ms, "ms/call")
+
+
+def _profile_loc_slice(mut df: DataFrame, iters: Int) raises:
+    """Profile df.loc()[0:100] — label-based slice of 100 rows."""
+    print("  loc_slice ...", end="")
+    var t0 = perf_counter_ns()
+    for _ in range(iters):
+        _ = df.loc()[0:100]
     var ms = _elapsed_ms(t0, iters)
     print(" ", ms, "ms/call")
 
@@ -164,6 +175,8 @@ def main() raises:
         _profile_merge(df, df2, MERGE_ITERS)
     if op == "csv" or op == "all":
         _profile_csv(df, CSV_ITERS)
+    if op == "loc_slice":
+        _profile_loc_slice(df, LOC_SLICE_ITERS)
 
     print("")
     print(
