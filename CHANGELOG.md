@@ -6,16 +6,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha] - 2026-04-20
+
 ### Added
 - Restore `DataFrame.query()` and `DataFrame.eval()` as fully native Mojo
   (issue #716). The `bison.expr` package (tokenizer, AST, parser, evaluator)
   is restored. The evaluator is rewritten to use a plain recursive
   `_eval_node` function instead of the original generic visitor pattern,
   working around Mojo compiler bug #642 without re-introducing typed caches.
-
-## [0.1.0-alpha] - 2026-04-19
-
-### Added
 - `DataFrame.rolling(window)` and `Series.rolling(window)` with native Mojo
   sliding-window operations: `sum()`, `mean()`, `std()`, `var()`, `min()`,
   `max()`, `count()`. Supports `min_periods` parameter for partial windows.
