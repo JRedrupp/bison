@@ -46,7 +46,8 @@ def _resolve_ident(name: String, df: DataFrame) raises -> Series:
 
 
 def _flip_op(op: String) raises -> String:
-    """Flip a comparison operator for 'literal op identifier' → 'identifier flipped_op literal'."""
+    """Flip a comparison operator for 'literal op identifier' → 'identifier flipped_op literal'.
+    """
     if op == "<":
         return String(">")
     elif op == "<=":
@@ -104,7 +105,8 @@ def _apply_int_op(col: Series, op: String, val: Int64) raises -> Series:
 
 
 def _apply_string_op(col: Series, op: String, val: String) raises -> Series:
-    """Apply a string equality/inequality operator to *col* against scalar *val*."""
+    """Apply a string equality/inequality operator to *col* against scalar *val*.
+    """
     if op == "==":
         return col.__eq__(val)
     elif op == "!=":
@@ -233,8 +235,11 @@ def _eval_compare(
 # ------------------------------------------------------------------
 
 
-def _eval_node(node_idx: Int, parsed: ParsedExpr, df: DataFrame) raises -> Series:
-    """Recursively evaluate the node at *node_idx* and return a boolean Series."""
+def _eval_node(
+    node_idx: Int, parsed: ParsedExpr, df: DataFrame
+) raises -> Series:
+    """Recursively evaluate the node at *node_idx* and return a boolean Series.
+    """
     var node = parsed.node_at(node_idx)
     if node.kind == NK_COMPARE:
         var lhs = parsed.node_at(node.left)

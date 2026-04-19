@@ -112,7 +112,8 @@ struct Tokenizer:
             self._pos += 1
         var is_float = False
         if (
-            self._pos < self._src.byte_length() and self._src.as_bytes()[self._pos] == 46
+            self._pos < self._src.byte_length()
+            and self._src.as_bytes()[self._pos] == 46
         ):  # '.'
             is_float = True
             self._pos += 1
