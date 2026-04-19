@@ -67,8 +67,7 @@ all_results = []
 for path in sorted(glob.glob(os.path.join(blob_dir, "*.json"))):
     with open(path) as f:
         # Benchmarks may emit `# ...` comment lines alongside the JSON
-        # envelope (e.g. bench_builder prints the optimizer-escape sink
-        # value). Strip them so the remainder parses as JSON.
+        # envelope. Strip them so the remainder parses as JSON.
         raw = "".join(
             line for line in f if not line.lstrip().startswith("#")
         )
