@@ -56,7 +56,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
     var n = len(col)
 
     if col.is_int():
-        ref src = col._int64_data()
+        var src = col._int64_data()
         var vals = List[Optional[Int]]()
         for i in range(n):
             if _is_null(col, i):
@@ -66,7 +66,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
         return AnyArray(array[Int64Type](vals^))
 
     elif col.is_float():
-        ref src = col._float64_data()
+        var src = col._float64_data()
         var vals = List[Optional[Float64]]()
         for i in range(n):
             if _is_null(col, i):
@@ -76,7 +76,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
         return AnyArray(array[Float64Type](vals^))
 
     elif col.is_bool():
-        ref src = col._bool_data()
+        var src = col._bool_data()
         var vals = List[Optional[Bool]]()
         for i in range(n):
             if _is_null(col, i):
@@ -86,7 +86,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
         return AnyArray(array(vals^))
 
     elif col.is_string():
-        ref src = col._str_data()
+        var src = col._str_data()
         var b = StringBuilder(capacity=n)
         for i in range(n):
             if _is_null(col, i):

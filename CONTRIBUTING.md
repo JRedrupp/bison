@@ -74,9 +74,12 @@ type predicates, visitor dispatch, marrow integration, and adding new math
 transforms.
 
 Key rules:
-- Never use `_data.isa[...]()` directly in `_frame.mojo` — use the `Column`
-  predicate methods (`is_int()`, `is_float()`, etc.).
-- After cache mutations, call `col._rebuild_marrow_only()` to sync backends.
+- Never query `_storage.isa[AnyArray]()` directly in `_frame.mojo` — use the
+  `Column` predicate methods (`is_int()`, `is_float()`, etc.) plus typed
+  list accessors (`_int64_list()`, `_float64_list()`, `_bool_list()`,
+  `_str_list()`, `_f64_list()`).
+- Writes go through `_flush_*_list` helpers: extract the typed list,
+  mutate, and flush back into `_storage`.
 - New element-wise math operations should follow the `_apply[F]` pattern
   documented in the architecture guide.
 

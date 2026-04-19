@@ -95,7 +95,7 @@ def test_read_csv_bool_inference() raises:
     # 'flag' column should be inferred as bool_
     var col = df["flag"]._col
     assert_true(col.dtype == bool_)
-    ref data = col._bool_cache
+    var data = col._bool_list()
     assert_true(data[0])
     assert_true(not data[1])
     assert_true(data[2])
@@ -209,10 +209,10 @@ def test_parquet_roundtrip() raises:
     assert_equal(df2.columns()[1], "b")
 
     # Verify values round-tripped correctly.
-    assert_equal(df2._cols[0]._int64_cache[0], Int64(1))
-    assert_equal(df2._cols[0]._int64_cache[2], Int64(3))
-    assert_equal(df2._cols[1]._f64_cache[0], Float64(4.0))
-    assert_equal(df2._cols[1]._f64_cache[2], Float64(6.0))
+    assert_equal(df2._cols[0]._int64_list()[0], Int64(1))
+    assert_equal(df2._cols[0]._int64_list()[2], Int64(3))
+    assert_equal(df2._cols[1]._float64_list()[0], Float64(4.0))
+    assert_equal(df2._cols[1]._float64_list()[2], Float64(6.0))
 
 
 def test_read_json_records() raises:
@@ -433,10 +433,10 @@ def test_parquet_roundtrip_bool_string() raises:
 
     assert_equal(df2.shape()[0], 3)
     assert_equal(df2.shape()[1], 2)
-    assert_equal(df2._cols[0]._bool_cache[0], True)
-    assert_equal(df2._cols[0]._bool_cache[1], False)
-    assert_equal(df2._cols[1]._str_cache[0], "alice")
-    assert_equal(df2._cols[1]._str_cache[2], "carol")
+    assert_equal(df2._cols[0]._bool_list()[0], True)
+    assert_equal(df2._cols[0]._bool_list()[1], False)
+    assert_equal(df2._cols[1]._str_list()[0], "alice")
+    assert_equal(df2._cols[1]._str_list()[2], "carol")
 
 
 def test_parquet_roundtrip_with_nulls() raises:
@@ -479,10 +479,10 @@ def test_parquet_roundtrip_with_nulls() raises:
     assert_equal(df2.shape()[1], 2)
 
     # Non-null values preserved.
-    assert_equal(df2._cols[0]._int64_cache[0], Int64(10))
-    assert_equal(df2._cols[0]._int64_cache[2], Int64(30))
-    assert_equal(df2._cols[1]._str_cache[0], "hi")
-    assert_equal(df2._cols[1]._str_cache[2], "bye")
+    assert_equal(df2._cols[0]._int64_list()[0], Int64(10))
+    assert_equal(df2._cols[0]._int64_list()[2], Int64(30))
+    assert_equal(df2._cols[1]._str_list()[0], "hi")
+    assert_equal(df2._cols[1]._str_list()[2], "bye")
 
     # Null masks preserved.
     assert_false(df2._cols[0].is_null(0))
@@ -550,10 +550,10 @@ def test_ipc_roundtrip() raises:
     assert_equal(shape[1], 2)
     assert_equal(df2.columns()[0], "a")
     assert_equal(df2.columns()[1], "b")
-    assert_equal(df2._cols[0]._int64_cache[0], Int64(1))
-    assert_equal(df2._cols[0]._int64_cache[2], Int64(3))
-    assert_equal(df2._cols[1]._f64_cache[0], Float64(4.0))
-    assert_equal(df2._cols[1]._f64_cache[2], Float64(6.0))
+    assert_equal(df2._cols[0]._int64_list()[0], Int64(1))
+    assert_equal(df2._cols[0]._int64_list()[2], Int64(3))
+    assert_equal(df2._cols[1]._float64_list()[0], Float64(4.0))
+    assert_equal(df2._cols[1]._float64_list()[2], Float64(6.0))
 
 
 def test_ipc_roundtrip_bool_string() raises:
@@ -580,11 +580,11 @@ def test_ipc_roundtrip_bool_string() raises:
 
     assert_equal(df2.shape()[0], 3)
     assert_equal(df2.shape()[1], 2)
-    assert_equal(df2._cols[0]._bool_cache[0], True)
-    assert_equal(df2._cols[0]._bool_cache[1], False)
+    assert_equal(df2._cols[0]._bool_list()[0], True)
+    assert_equal(df2._cols[0]._bool_list()[1], False)
     # Strings come back as List[String] (promoted from object dtype by from_pandas).
-    assert_equal(df2._cols[1]._str_cache[0], "alice")
-    assert_equal(df2._cols[1]._str_cache[2], "carol")
+    assert_equal(df2._cols[1]._str_list()[0], "alice")
+    assert_equal(df2._cols[1]._str_list()[2], "carol")
 
 
 def test_ipc_roundtrip_with_nulls() raises:
@@ -627,11 +627,11 @@ def test_ipc_roundtrip_with_nulls() raises:
     assert_equal(df2.shape()[1], 2)
 
     # Non-null values preserved (float64 survives pandas round-trip as Float64).
-    assert_equal(df2._cols[0]._f64_cache[0], Float64(10.0))
-    assert_equal(df2._cols[0]._f64_cache[2], Float64(30.0))
+    assert_equal(df2._cols[0]._float64_list()[0], Float64(10.0))
+    assert_equal(df2._cols[0]._float64_list()[2], Float64(30.0))
     # Strings come back as List[String] (promoted from object dtype by from_pandas).
-    assert_equal(df2._cols[1]._str_cache[0], "hi")
-    assert_equal(df2._cols[1]._str_cache[2], "bye")
+    assert_equal(df2._cols[1]._str_list()[0], "hi")
+    assert_equal(df2._cols[1]._str_list()[2], "bye")
 
     # Null masks preserved.
     assert_false(df2._cols[0].is_null(0))

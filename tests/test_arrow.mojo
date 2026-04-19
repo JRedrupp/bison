@@ -26,9 +26,9 @@ def test_int64_round_trip_no_nulls() raises:
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "a")
     assert_equal(len(col2), 3)
-    assert_equal(col2._int64_cache[0], Int64(1))
-    assert_equal(col2._int64_cache[1], Int64(2))
-    assert_equal(col2._int64_cache[2], Int64(3))
+    assert_equal(col2._int64_list()[0], Int64(1))
+    assert_equal(col2._int64_list()[1], Int64(2))
+    assert_equal(col2._int64_list()[2], Int64(3))
     assert_false(col2.has_nulls())
 
 
@@ -42,8 +42,8 @@ def test_float64_round_trip_no_nulls() raises:
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "b")
     assert_equal(len(col2), 3)
-    assert_equal(col2._f64_cache[0], Float64(4.0))
-    assert_equal(col2._f64_cache[2], Float64(6.0))
+    assert_equal(col2._float64_list()[0], Float64(4.0))
+    assert_equal(col2._float64_list()[2], Float64(6.0))
     assert_false(col2.has_nulls())
 
 
@@ -57,9 +57,9 @@ def test_bool_round_trip_no_nulls() raises:
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "c")
     assert_equal(len(col2), 3)
-    assert_true(col2._bool_cache[0])
-    assert_false(col2._bool_cache[1])
-    assert_true(col2._bool_cache[2])
+    assert_true(col2._bool_list()[0])
+    assert_false(col2._bool_list()[1])
+    assert_true(col2._bool_list()[2])
     assert_false(col2.has_nulls())
 
 
@@ -73,9 +73,9 @@ def test_string_round_trip_no_nulls() raises:
     var arr = column_to_marrow_array(col)
     var col2 = marrow_array_to_column(arr^, "d")
     assert_equal(len(col2), 3)
-    assert_equal(col2._str_cache[0], "x")
-    assert_equal(col2._str_cache[1], "y")
-    assert_equal(col2._str_cache[2], "z")
+    assert_equal(col2._str_list()[0], "x")
+    assert_equal(col2._str_list()[1], "y")
+    assert_equal(col2._str_list()[2], "z")
     assert_false(col2.has_nulls())
 
 
@@ -97,7 +97,7 @@ def test_null_mask_preserved_int64() raises:
     assert_true(col2.is_null(0))
     assert_false(col2.is_null(1))
     assert_true(col2.is_null(2))
-    assert_equal(col2._int64_cache[1], Int64(42))
+    assert_equal(col2._int64_list()[1], Int64(42))
 
 
 def test_null_mask_preserved_string() raises:
@@ -118,8 +118,8 @@ def test_null_mask_preserved_string() raises:
     assert_false(col2.is_null(0))
     assert_true(col2.is_null(1))
     assert_false(col2.is_null(2))
-    assert_equal(col2._str_cache[0], "hello")
-    assert_equal(col2._str_cache[2], "world")
+    assert_equal(col2._str_list()[0], "hello")
+    assert_equal(col2._str_list()[2], "world")
 
 
 def test_dataframe_round_trip() raises:
@@ -155,9 +155,9 @@ def test_dataframe_round_trip() raises:
     assert_equal(colnames[1], "b")
     assert_equal(colnames[2], "c")
 
-    assert_equal(df2._cols[0]._int64_cache[0], Int64(1))
-    assert_equal(df2._cols[1]._f64_cache[1], Float64(5.0))
-    assert_equal(df2._cols[2]._str_cache[2], "z")
+    assert_equal(df2._cols[0]._int64_list()[0], Int64(1))
+    assert_equal(df2._cols[1]._float64_list()[1], Float64(5.0))
+    assert_equal(df2._cols[2]._str_list()[2], "z")
 
 
 def test_dataframe_round_trip_with_nulls() raises:

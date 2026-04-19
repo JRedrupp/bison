@@ -22,6 +22,7 @@ from .column import (
     DFScalar,
     SeriesScalar,
     DictSplitResult,
+    LegacyObjectData,
     NullMask,
     _Null,
     FloatTransformFn,
@@ -975,7 +976,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         var n = col.__len__()
         if not (col.is_int() or col.is_float() or col.is_bool()):
             raise Error("Series.to_numpy: non-numeric dtype is not supported")
-        ref data = col._f64_cache
+        var data = col._f64_list()
         for i in range(n):
             if col.is_null(i):
                 result.append(nan)
@@ -1081,8 +1082,7 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
     def str(self) raises -> StringMethods:
         if not self._col.is_string():
             raise Error("Series.str: accessor requires a string Series")
-        ref d = self._col._str_cache
-        var data = d.copy()
+        var data = self._col._str_list()
         var null_mask = self._col.null_mask_copy()
         return StringMethods(data^, null_mask^, self._col.name)
 
@@ -1484,14 +1484,16 @@ def _merge_hashjoin_int64(
     mut right_matched: List[Bool],
 ) raises:
     """Fast-path hash join for a single int64 key column pair."""
+    var right_keys = right._cols[rkey_idx]._int64_list()
+    var left_keys = left._cols[lkey_idx]._int64_list()
     var right_map = Dict[Int, List[Int]]()
     for i in range(n_right):
-        var k = Int(right._cols[rkey_idx]._int64_data()[i])
+        var k = Int(right_keys[i])
         if k not in right_map:
             right_map[k] = List[Int]()
         right_map[k].append(i)
     for i in range(n_left):
-        var k = Int(left._cols[lkey_idx]._int64_data()[i])
+        var k = Int(left_keys[i])
         if k in right_map:
             ref matches = right_map[k]
             for m in range(len(matches)):
@@ -1550,25 +1552,49 @@ def _merge_fill_right_only_key(
     frame's key values.  Inner/left joins have no right-only rows.
     """
     if key_col.is_int() and rk.is_int():
+        var key_vals = key_col._int64_list()
+        var rk_vals = rk._int64_list()
+        var did_write = False
         for r in range(len(out_left)):
             if out_left[r] < 0:
-                key_col._int64_data()[r] = rk._int64_data()[out_right[r]]
+                key_vals[r] = rk_vals[out_right[r]]
                 key_col.set_valid_at(r)
+                did_write = True
+        if did_write:
+            key_col._flush_int64_list(key_vals^)
     elif key_col.is_float() and rk.is_float():
+        var key_vals = key_col._float64_list()
+        var rk_vals = rk._float64_list()
+        var did_write = False
         for r in range(len(out_left)):
             if out_left[r] < 0:
-                key_col._float64_data()[r] = rk._float64_data()[out_right[r]]
+                key_vals[r] = rk_vals[out_right[r]]
                 key_col.set_valid_at(r)
+                did_write = True
+        if did_write:
+            key_col._flush_float64_list(key_vals^)
     elif key_col.is_bool() and rk.is_bool():
+        var key_vals = key_col._bool_list()
+        var rk_vals = rk._bool_list()
+        var did_write = False
         for r in range(len(out_left)):
             if out_left[r] < 0:
-                key_col._bool_data()[r] = rk._bool_data()[out_right[r]]
+                key_vals[r] = rk_vals[out_right[r]]
                 key_col.set_valid_at(r)
+                did_write = True
+        if did_write:
+            key_col._flush_bool_list(key_vals^)
     elif key_col.is_string() and rk.is_string():
+        var key_vals = key_col._str_list()
+        var rk_vals = rk._str_list()
+        var did_write = False
         for r in range(len(out_left)):
             if out_left[r] < 0:
-                key_col._str_data()[r] = rk._str_data()[out_right[r]]
+                key_vals[r] = rk_vals[out_right[r]]
                 key_col.set_valid_at(r)
+                did_write = True
+        if did_write:
+            key_col._flush_str_list(key_vals^)
     elif key_col.is_object() and rk.is_object():
         for r in range(len(out_left)):
             if out_left[r] < 0:
@@ -1872,7 +1898,7 @@ struct DataFrame(Copyable, Movable):
             )
         var indices = List[Int]()
         if mask._col.is_bool():
-            ref d = mask._col._bool_cache
+            var d = mask._col._bool_list()
             for i in range(mask_len):
                 if mask._col.is_valid(i) and d[i]:
                     indices.append(i)
@@ -2107,7 +2133,12 @@ struct DataFrame(Copyable, Movable):
                 if not skipna:
                     vals.append(nan)
                 continue
-            vals.append(col._f64_cache[row])
+            if col.is_int():
+                ref a = col._storage[AnyArray].as_int64()
+                vals.append(Float64(rebind[Int64](a.unsafe_get(row))))
+            else:
+                ref a = col._storage[AnyArray].as_float64()
+                vals.append(rebind[Float64](a.unsafe_get(row)))
         return vals^
 
     def _row_non_null_count(self, row: Int) -> Int:
@@ -2307,13 +2338,27 @@ struct DataFrame(Copyable, Movable):
                     if col.is_null(i):
                         continue
                     var key: String
-                    if col.is_int() or col.is_float():
+                    if col.is_int():
                         # Represent as Float64 so int 1 == float 1.0 (matches pandas)
-                        key = "n:" + String(col._f64_cache[i])
+                        ref a = col._storage[AnyArray].as_int64()
+                        key = "n:" + String(
+                            Float64(rebind[Int64](a.unsafe_get(i)))
+                        )
+                    elif col.is_float():
+                        ref a = col._storage[AnyArray].as_float64()
+                        key = "n:" + String(rebind[Float64](a.unsafe_get(i)))
                     elif col.is_bool():
-                        key = "b:" + ("1" if col._bool_cache[i] else "0")
+                        ref a = col._storage[AnyArray].as_bool()
+                        key = "b:" + (
+                            "1" if a.values().test(a.offset + i) else "0"
+                        )
                     elif col.is_string():
-                        key = "s:" + col._str_cache[i]
+                        if col._storage.isa[AnyArray]():
+                            ref a = col._storage[AnyArray].as_string()
+                            key = "s:" + String(a.unsafe_get(UInt(i)))
+                        else:
+                            ref d = col._storage[LegacyObjectData].data
+                            key = "s:" + String(d[i])
                     else:
                         key = "o:" + String(col._storage_legacy().data[i])
                     seen[key] = True
@@ -2467,6 +2512,15 @@ struct DataFrame(Copyable, Movable):
         var result_lists = List[List[Float64]]()
         for _ in range(ncols):
             result_lists.append(List[Float64]())
+        # Pre-extract Float64 lists once per numeric column; empty
+        # placeholder for non-numeric columns.
+        var col_vals = List[List[Float64]]()
+        for ci in range(ncols):
+            ref col = self._cols[ci]
+            if col.dtype.is_integer() or col.dtype.is_float():
+                col_vals.append(col._f64_list())
+            else:
+                col_vals.append(List[Float64]())
         for i in range(nrows):
             var running = Float64(0)
             comptime if op == _CUM_PROD:
@@ -2482,7 +2536,7 @@ struct DataFrame(Copyable, Movable):
                         propagate_nan = True
                     result_lists[ci].append(nan if propagate_nan else running)
                 else:
-                    var v = col._f64_cache[i]
+                    var v = col_vals[ci][i]
                     comptime if op == _CUM_SUM:
                         running += v
                     elif op == _CUM_PROD:
@@ -2791,13 +2845,14 @@ struct DataFrame(Copyable, Movable):
                         raise Error(
                             "DataFrame.shift(axis=1) requires numeric columns"
                         )
+                    var src_vals = src_col._f64_list()
                     for i in range(nrows):
                         var is_null = src_col.is_null(i)
                         if is_null:
                             values.append(nan)
                             null_mask.append_null()
                         else:
-                            values.append(src_col._f64_cache[i])
+                            values.append(src_vals[i])
                             null_mask.append_valid()
                 var col = Column(self._cols[j].name, values^, float64)
                 if null_mask.has_nulls():
@@ -2850,6 +2905,8 @@ struct DataFrame(Copyable, Movable):
                         raise Error(
                             "DataFrame.diff(axis=1) requires numeric columns"
                         )
+                    var cur_vals = cur_col._f64_list()
+                    var src_vals = src_col._f64_list()
                     for i in range(nrows):
                         var cur_null = cur_col.is_null(i)
                         var src_null = src_col.is_null(i)
@@ -2857,8 +2914,8 @@ struct DataFrame(Copyable, Movable):
                             values.append(nan)
                             null_mask.append_null()
                         else:
-                            var cur_val = cur_col._f64_cache[i]
-                            var src_val = src_col._f64_cache[i]
+                            var cur_val = cur_vals[i]
+                            var src_val = src_vals[i]
                             values.append(cur_val - src_val)
                             null_mask.append_valid()
                 var col = Column(self._cols[j].name, values^, float64)
@@ -2915,6 +2972,8 @@ struct DataFrame(Copyable, Movable):
                             "DataFrame.pct_change(axis=1) requires numeric"
                             " columns"
                         )
+                    var cur_vals = cur_col._f64_list()
+                    var src_vals = src_col._f64_list()
                     for i in range(nrows):
                         var cur_null = cur_col.is_null(i)
                         var src_null = src_col.is_null(i)
@@ -2922,8 +2981,8 @@ struct DataFrame(Copyable, Movable):
                             values.append(nan)
                             null_mask.append_null()
                         else:
-                            var cur_val = cur_col._f64_cache[i]
-                            var src_val = src_col._f64_cache[i]
+                            var cur_val = cur_vals[i]
+                            var src_val = src_vals[i]
                             values.append((cur_val - src_val) / src_val)
                             null_mask.append_valid()
                 var col = Column(self._cols[j].name, values^, float64)
@@ -3325,7 +3384,7 @@ struct DataFrame(Copyable, Movable):
                 continue
             # Linear interpolation for Float64 columns.
             var n = len(col)
-            ref d = col._f64_cache
+            var d = col._float64_list()
             var data = List[Float64]()
             var new_mask = List[Bool]()
             for j in range(n):
@@ -3963,7 +4022,7 @@ struct DataFrame(Copyable, Movable):
         and ``keep`` semantics.
         """
         var dup = self.duplicated(subset, keep)
-        ref dup_data = dup._col._bool_cache
+        var dup_data = dup._col._bool_list()
         var keep_indices = List[Int]()
         for i in range(len(dup_data)):
             if not dup_data[i]:
@@ -4326,7 +4385,19 @@ struct DataFrame(Copyable, Movable):
                     continue
 
                 if vcol.is_numeric() or vcol.is_bool():
-                    sums[rk][out_pos] += vcol._float64_data()[r]
+                    if vcol.is_int():
+                        ref a = vcol._storage[AnyArray].as_int64()
+                        sums[rk][out_pos] += Float64(
+                            rebind[Int64](a.unsafe_get(r))
+                        )
+                    elif vcol.is_float():
+                        ref a = vcol._storage[AnyArray].as_float64()
+                        sums[rk][out_pos] += rebind[Float64](a.unsafe_get(r))
+                    else:
+                        ref a = vcol._storage[AnyArray].as_bool()
+                        sums[rk][out_pos] += 1.0 if a.values().test(
+                            a.offset + r
+                        ) else 0.0
                 else:
                     raise Error(
                         "DataFrame.pivot_table: aggfunc "
@@ -5271,12 +5342,6 @@ struct DataFrame(Copyable, Movable):
                                 out_right,
                             )
                             break
-                    # Sync secondary caches and rebuild marrow after
-                    # cache-first key fill (#645). Only needed when right-only
-                    # rows exist (outer/right joins); inner/left joins leave
-                    # key_col unmodified so the caches are already correct.
-                    if needs_right_unmatched:
-                        key_col._rebuild_storage()
                     result_cols.append(key_col^)
                     break
 
@@ -5917,6 +5982,11 @@ struct DataFrame(Copyable, Movable):
                     + col.name.value()
                     + "' has non-numeric dtype"
                 )
+        # Pre-extract Float64 lists once per column (O(n) per column vs
+        # O(n*m) if re-extracted inside the row loop).
+        var col_vals = List[List[Float64]]()
+        for ci in range(ncols):
+            col_vals.append(self._cols[ci]._f64_list())
         var result = List[List[Float64]]()
         for ri in range(nrows):
             var row = List[Float64]()
@@ -5925,7 +5995,7 @@ struct DataFrame(Copyable, Movable):
                 if col.is_null(ri):
                     row.append(nan)
                 else:
-                    row.append(col._f64_cache[ri])
+                    row.append(col_vals[ci][ri])
             result.append(row^)
         return result^
 
@@ -6237,27 +6307,38 @@ def _groupby_row_less(
             return not left_is_null and right_is_null
 
         if col.is_int():
-            var left_val = col._int64_cache[left_row]
-            var right_val = col._int64_cache[right_row]
+            ref a = col._storage[AnyArray].as_int64()
+            var left_val = rebind[Int64](a.unsafe_get(left_row))
+            var right_val = rebind[Int64](a.unsafe_get(right_row))
             if left_val < right_val:
                 return True
             if left_val > right_val:
                 return False
         elif col.is_float():
-            var left_val = col._f64_cache[left_row]
-            var right_val = col._f64_cache[right_row]
+            ref a = col._storage[AnyArray].as_float64()
+            var left_val = rebind[Float64](a.unsafe_get(left_row))
+            var right_val = rebind[Float64](a.unsafe_get(right_row))
             if left_val < right_val:
                 return True
             if left_val > right_val:
                 return False
         elif col.is_bool():
-            var left_val = col._bool_cache[left_row]
-            var right_val = col._bool_cache[right_row]
+            ref a = col._storage[AnyArray].as_bool()
+            var left_val = a.values().test(a.offset + left_row)
+            var right_val = a.values().test(a.offset + right_row)
             if left_val != right_val:
                 return not left_val and right_val
         elif col.is_string():
-            var left_val = col._str_cache[left_row]
-            var right_val = col._str_cache[right_row]
+            var left_val: String
+            var right_val: String
+            if col._storage.isa[AnyArray]():
+                ref a = col._storage[AnyArray].as_string()
+                left_val = String(a.unsafe_get(UInt(left_row)))
+                right_val = String(a.unsafe_get(UInt(right_row)))
+            else:
+                ref d = col._storage[LegacyObjectData].data
+                left_val = String(d[left_row])
+                right_val = String(d[right_row])
             if left_val < right_val:
                 return True
             if left_val > right_val:
@@ -6347,12 +6428,14 @@ def _groupby_indices(
                 var ci = col_idx[by[0]]
                 ref col = df._cols[ci]
                 if col.is_int():
+                    var int_vals = col._int64_list()
                     _insertion_sort_keys_by[Int64](
-                        group_keys, group_map, col._int64_cache
+                        group_keys, group_map, int_vals
                     )
                 elif col.is_float():
+                    var flt_vals = col._float64_list()
                     _insertion_sort_keys_by[Float64](
-                        group_keys, group_map, col._f64_cache
+                        group_keys, group_map, flt_vals
                     )
                 else:
                     _sort_list(group_keys)
@@ -6596,13 +6679,13 @@ struct DataFrameGroupBy:
             var col_idx = self._col_name_index()
             var ci = col_idx.get(self._by[0], -1)
             if ci >= 0 and self._df._cols[ci].is_int():
-                ref d = self._df._cols[ci]._int64_cache
+                var d = self._df._cols[ci]._int64_list()
                 var int_keys = List[Int64]()
                 for i in range(len(self._group_keys)):
                     int_keys.append(d[self._group_map[self._group_keys[i]][0]])
                 return ColumnIndex(int_keys^)
             elif ci >= 0 and self._df._cols[ci].is_float():
-                ref d = self._df._cols[ci]._f64_cache
+                var d = self._df._cols[ci]._float64_list()
                 var flt_keys = List[Float64]()
                 for i in range(len(self._group_keys)):
                     flt_keys.append(d[self._group_map[self._group_keys[i]][0]])
@@ -8318,45 +8401,56 @@ def _df_row_index(df: DataFrame, label: String) raises -> Int:
 
 
 def _set_scalar_in_col(mut col: Column, row: Int, value: DFScalar) raises:
-    """Write *value* into *col* at integer position *row* via typed caches (#645).
+    """Write *value* into *col* at integer position *row*.
+
+    Extracts the column's typed list from storage, mutates the target
+    cell, and flushes back via ``_flush_*_list``.
     """
     if col.is_int():
+        var data = col._int64_list()
         if value.isa[Int64]():
-            col._int64_cache[row] = value[Int64]
+            data[row] = value[Int64]
         elif value.isa[Float64]():
-            col._int64_cache[row] = Int64(Int(value[Float64]))
+            data[row] = Int64(Int(value[Float64]))
         elif value.isa[Bool]():
-            col._int64_cache[row] = Int64(1) if value[Bool] else Int64(0)
+            data[row] = Int64(1) if value[Bool] else Int64(0)
         else:
             raise Error("iat/at: cannot assign String to int column")
+        col._flush_int64_list(data^)
     elif col.is_float():
+        var data = col._float64_list()
         if value.isa[Float64]():
-            col._f64_cache[row] = value[Float64]
+            data[row] = value[Float64]
         elif value.isa[Int64]():
-            col._f64_cache[row] = Float64(Int(value[Int64]))
+            data[row] = Float64(Int(value[Int64]))
         elif value.isa[Bool]():
-            col._f64_cache[row] = Float64(1) if value[Bool] else Float64(0)
+            data[row] = Float64(1) if value[Bool] else Float64(0)
         else:
             raise Error("iat/at: cannot assign String to float column")
+        col._flush_float64_list(data^)
     elif col.is_bool():
+        var data = col._bool_list()
         if value.isa[Bool]():
-            col._bool_cache[row] = value[Bool]
+            data[row] = value[Bool]
         elif value.isa[Int64]():
-            col._bool_cache[row] = value[Int64] != 0
+            data[row] = value[Int64] != 0
         elif value.isa[Float64]():
-            col._bool_cache[row] = value[Float64] != 0.0
+            data[row] = value[Float64] != 0.0
         else:
             raise Error("iat/at: cannot assign String to bool column")
+        col._flush_bool_list(data^)
     elif col.is_string():
-        if value.isa[String]():
-            col._str_cache[row] = value[String]
-        else:
+        if not value.isa[String]():
             raise Error("iat/at: cannot assign non-String to string column")
+        if col.has_nulls():
+            raise Error("iat/at: cannot write into string column with nulls")
+        var data = col._str_list()
+        data[row] = value[String]
+        col._flush_str_list(data^)
     else:
         raise Error(
             "iat/at: scalar write not supported for object/datetime columns"
         )
-    col._rebuild_storage()
 
 
 def _set_series_scalar_in_col(
@@ -8368,7 +8462,6 @@ def _set_series_scalar_in_col(
             col._storage_legacy().data[row] = value[PythonObject]
         else:
             raise Error("iloc: cannot assign PythonObject to typed column")
-        col._rebuild_storage()
         return
     var ds: DFScalar
     if value.isa[Int64]():

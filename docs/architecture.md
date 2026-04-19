@@ -17,28 +17,27 @@ contributors working on the library internals.
 
 ## Column storage
 
-`column.mojo` is the storage layer. Each `Column` has a **dual-backend**
-architecture ([#619](https://github.com/JRedrupp/bison/issues/619)):
+`column.mojo` is the storage layer. Each `Column` has a single canonical
+storage field:
 
-1. **Legacy backend** (`_data: ColumnData`): A
-   `Variant[List[Int64], List[Float64], List[Bool], List[String], List[PythonObject]]`
-   with a parallel `List[Bool]` null mask.
-2. **Marrow backend** (`_storage: ColumnStorage`): An `AnyArray` (Apache Arrow
-   for Mojo) for SIMD aggregation kernels, or `LegacyObjectData` for
-   `PythonObject` columns.
-3. **Typed caches** (`_int64_cache`, `_f64_cache`, `_bool_cache`,
-   `_str_cache`): Pre-extracted typed lists populated from `_data` at
-   construction time. At most one typed cache plus `_f64_cache` is non-empty.
-   After [#645](https://github.com/JRedrupp/bison/issues/645), caches are also
-   the **write target** for all mutations — `_data` is only written during
-   construction and is stale afterward.
+- **`_storage: ColumnStorage`** is a `Variant[AnyArray, LegacyObjectData]`.
+  - `AnyArray` (Apache Arrow for Mojo) backs int64 / float64 / bool / string
+    columns without nulls, plus int64 / float64 / bool with nulls (validity
+    stored in the Arrow bitmap). SIMD aggregation kernels operate directly on
+    `AnyArray`.
+  - `LegacyObjectData` wraps a `List[PythonObject]` plus a `NullMask` and backs
+    object / datetime64 / timedelta64 columns, plus string-with-nulls (marrow
+    cannot build a string + null array yet).
 
-The typed caches exist as a workaround for a Mojo compiler deadlock
-([#642](https://github.com/JRedrupp/bison/issues/642)): typed `AnyArray`
-downcasts (`arr.as_int64()` etc.) cannot co-exist on the same call graph as
-`df.query()` in `column.mojo`. All high-traffic operations (comparison,
-aggregation, transforms, extraction) read from caches instead of `_data`. See
-`TODO(#642)` comments throughout.
+There are no side caches — the typed caches that used to exist alongside
+`_storage` ([#642](https://github.com/JRedrupp/bison/issues/642) workaround)
+have been removed now that the query-evaluator compiler deadlock is gone.
+Typed reads go through `_int64_list()` / `_float64_list()` / `_bool_list()` /
+`_str_list()` (which allocate a fresh `List[T]` from the AnyArray) or, for
+single-cell access, `col._storage[AnyArray].as_*().unsafe_get(i)` with the
+appropriate `rebind` for the primitive scalar types. Writes go through the
+`_flush_*_list` helpers: the caller extracts a `List[T]`, mutates, then flushes
+back into storage in one shot.
 
 Dtype promotion happens automatically (e.g. mixing int64 + float64 produces a
 float64 column). GroupBy key columns may promote to `List[Float64]` to unify
@@ -83,30 +82,34 @@ to `dtype == object_`. Note that `is_object()` returns `False` for
 ### Visitor dispatch
 
 For single-cell extraction use `_series_scalar_at(col, row)` or
-`_scalar_from_col(col, row)` — these read from typed caches when available.
+`_scalar_from_col(col, row)` — these read directly from the `AnyArray` storage
+arm via `unsafe_get`.
 
 For multi-arm algorithmic dispatch, use `Column._visit_raises[V]()` or
-`Column._visit[V]()` which route through typed caches. Post-#647, there is no
-standalone `visit_col_data` / `visit_col_data_raises` dispatcher — visitors are
-always invoked via the `Column._visit*` methods. Visitor structs implement
-`ColumnDataVisitorRaises` and the cache dispatch calls their `on_*` methods
-with cache data.
+`Column._visit[V]()` which extract a fresh `List[T]` from storage on demand
+and dispatch to the appropriate `on_int64` / `on_float64` / `on_bool` /
+`on_str` / `on_obj` visitor method.
 
-### Unsafe typed accessors
+### Typed list accessors
 
-After a predicate check, access the typed data via the unsafe accessors:
-`col._int64_data()`, `col._float64_data()`, `col._bool_data()`,
-`col._str_data()`, `col._obj_data()`.
+After a predicate check, access the typed data via:
 
-After [#645](https://github.com/JRedrupp/bison/issues/645):
-- `_int64_data()` / `_float64_data()` / `_bool_data()` / `_str_data()` return
-  refs directly into the typed caches — mutations go to the cache.
-- `_obj_data()` still returns a ref into `_data` (object columns have no typed
-  cache).
-- After any cache mutation call `col._rebuild_marrow_only()` to sync the
-  secondary `_f64_cache` (for int/bool) and rebuild the marrow backend.
-- Do **not** call `_try_activate_storage()` from mutation paths — it reads from
-  `_data` and will overwrite cache mutations.
+- `col._int64_list()` / `col._float64_list()` / `col._bool_list()` /
+  `col._str_list()` — extract a fresh owned `List[T]` from `_storage[AnyArray]`.
+- `col._f64_list()` — extract a Float64 list, widening int64 / bool values.
+- `col._storage[AnyArray].as_int64()` (etc.) for ref-bound borrows used in
+  tight loops that need O(1) `unsafe_get` access.
+
+For writes, use the `_flush_*_list` helpers:
+
+```mojo
+var data = col._int64_list()
+data[row] = new_value
+col._flush_int64_list(data^)   # rebuilds _storage from the mutated list
+```
+
+`_rebuild_storage()` is retained as a no-op for backwards compatibility with
+older call sites; it is safe to delete any remaining calls.
 
 ## I/O and dtype inference
 
