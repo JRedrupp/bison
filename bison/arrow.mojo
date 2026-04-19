@@ -53,6 +53,10 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
     Null elements become Arrow null values.
     List[PythonObject] columns raise an error — Arrow has no object type.
     """
+    # Fast path: column already holds a marrow AnyArray — O(1) ref-bump.
+    if col._storage.isa[AnyArray]():
+        return col._storage[AnyArray].copy()
+
     var n = len(col)
 
     if col.is_int():

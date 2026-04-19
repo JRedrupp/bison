@@ -251,6 +251,46 @@ def test_storage_active_bool_no_nulls() raises:
     assert_equal(len(col), 3)
 
 
+def test_fast_path_anyarray_backed_int64() raises:
+    """column_to_marrow_array returns correct values for an AnyArray-backed int64 column."""
+    var data = List[Int64]()
+    data.append(7)
+    data.append(8)
+    data.append(9)
+    var col = Column("a", data^, int64)
+    # marrow_array_to_column sets _storage = ColumnStorage(arr.copy()), guaranteeing AnyArray backing.
+    var col2 = marrow_array_to_column(column_to_marrow_array(col), "a")
+    # Second conversion should hit the fast path.
+    var col3 = marrow_array_to_column(column_to_marrow_array(col2), "a")
+    assert_equal(len(col3), 3)
+    assert_equal(col3._int64_list()[0], Int64(7))
+    assert_equal(col3._int64_list()[1], Int64(8))
+    assert_equal(col3._int64_list()[2], Int64(9))
+    assert_false(col3.has_nulls())
+
+
+def test_fast_path_anyarray_backed_with_nulls() raises:
+    """Nulls survive column_to_marrow_array fast path for AnyArray-backed string column."""
+    var data = List[String]()
+    data.append("a")
+    data.append("")
+    data.append("c")
+    var col = Column("s", data^, string_)
+    var mask = NullMask()
+    mask.append(False)
+    mask.append(True)
+    mask.append(False)
+    col.set_null_mask(mask^)
+    var col2 = marrow_array_to_column(column_to_marrow_array(col), "s")
+    var col3 = marrow_array_to_column(column_to_marrow_array(col2), "s")
+    assert_true(col3.has_nulls())
+    assert_false(col3.is_null(0))
+    assert_true(col3.is_null(1))
+    assert_false(col3.is_null(2))
+    assert_equal(col3._str_list()[0], "a")
+    assert_equal(col3._str_list()[2], "c")
+
+
 def main() raises:
     test_int64_round_trip_no_nulls()
     test_float64_round_trip_no_nulls()
@@ -264,4 +304,6 @@ def main() raises:
     test_storage_active_int64_no_nulls()
     test_storage_active_float64_no_nulls()
     test_storage_active_bool_no_nulls()
+    test_fast_path_anyarray_backed_int64()
+    test_fast_path_anyarray_backed_with_nulls()
     print("test_arrow: all tests passed")
