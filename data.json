@@ -1,6 +1,89 @@
 {
   "runs": [
     {
+      "commit": "35d7872bdb4497ef5f63437f7ecc6e3066c9ccde",
+      "short_commit": "35d7872",
+      "timestamp": "2026-04-19T21:31:05Z",
+      "ref": "main",
+      "results": {
+        "series_sum": {
+          "bison_ms": 0.0181245,
+          "pandas_ms": 0.09409578999964197,
+          "ratio": 0.1926175443138207
+        },
+        "series_mean": {
+          "bison_ms": 0.01765072,
+          "pandas_ms": 0.12628409999990708,
+          "ratio": 0.1397699314483216
+        },
+        "groupby_sum": {
+          "bison_ms": 3.72412495,
+          "pandas_ms": 5.137666800001739,
+          "ratio": 0.724866966849376
+        },
+        "iloc_row": {
+          "bison_ms": 0.00208019,
+          "pandas_ms": 0.042263939999998,
+          "ratio": 0.04921902690568126
+        },
+        "loc_slice": {
+          "bison_ms": 1.4650355400000001,
+          "pandas_ms": 0.032860260000120434,
+          "ratio": 44.58380852721892
+        },
+        "sort_values": {
+          "bison_ms": 38.236299,
+          "pandas_ms": 7.136027000001377,
+          "ratio": 5.358205483246157
+        },
+        "merge": {
+          "bison_ms": 4.819541,
+          "pandas_ms": 1.9460330000053243,
+          "ratio": 2.47659777608438
+        },
+        "merge_string_key": {
+          "bison_ms": 20.095118666666668,
+          "pandas_ms": 11.476334999997562,
+          "ratio": 1.7510048867230643
+        },
+        "fillna": {
+          "bison_ms": 0.00087724,
+          "pandas_ms": 0.07475482000018019,
+          "ratio": 0.011734895488984999
+        },
+        "series_apply": {
+          "bison_ms": 0.7546739100000001,
+          "pandas_ms": 0.2220624400001725,
+          "ratio": 3.3984761673311965
+        },
+        "csv_roundtrip": {
+          "bison_ms": 586.736565,
+          "pandas_ms": 331.79292659999646,
+          "ratio": 1.768381776587296
+        },
+        "profile_sort": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_groupby": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_merge": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        },
+        "profile_csv": {
+          "bison_ms": null,
+          "pandas_ms": null,
+          "ratio": null
+        }
+      }
+    },
+    {
       "commit": "e339d3903279d54936c3ae5da7172622ae6c3e68",
       "short_commit": "e339d39",
       "timestamp": "2026-04-19T20:39:03Z",
