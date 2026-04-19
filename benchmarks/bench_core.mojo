@@ -112,11 +112,22 @@ def main() raises:
     var df2 = DataFrame.from_pandas(pd_df2)
 
     var np = Python.import_module("numpy")
+    var pd = Python.import_module("pandas")
+
+    # Fixture 3 — 10-row string-key lookup table (for merge_string_key benchmark)
+    var pd_df_klookup = pd.DataFrame(
+        Python.evaluate(
+            "{'key': ['k0','k1','k2','k3','k4','k5','k6','k7','k8','k9'],"
+            " 'label': list(range(10))}"
+        )
+    )
+    var df_klookup = DataFrame.from_pandas(pd_df_klookup)
 
     # Shared globals dict for _time_pandas calls
     var g = Python.evaluate("{}")
     g["pd_df"] = pd_df
     g["pd_df2"] = pd_df2
+    g["pd_df_klookup"] = pd_df_klookup
     g["np"] = np
 
     # ------------------------------------------------------------------
@@ -275,6 +286,32 @@ def main() raises:
         results.append(BenchResult.skipped_result("merge"))
     else:
         results.append(BenchResult("merge", bison_ms, pandas_ms, SLOW_ITERS))
+
+    # ------------------------------------------------------------------
+    # merge_string_key  (many-to-one inner join on string key; 100k rows)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(SLOW_ITERS):
+            var on_keys = List[String]()
+            on_keys.append("key")
+            _ = df.merge(df_klookup, on=on_keys^)
+        bison_ms = _elapsed_ms(t0, SLOW_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas(
+        "pd_df.merge(pd_df_klookup, on='key')", g, SLOW_ITERS
+    )
+    if skipped:
+        results.append(BenchResult.skipped_result("merge_string_key"))
+    else:
+        results.append(
+            BenchResult("merge_string_key", bison_ms, pandas_ms, SLOW_ITERS)
+        )
 
     # ------------------------------------------------------------------
     # fillna  (numeric column only — the string "key" column is an
