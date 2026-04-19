@@ -6,6 +6,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha] - 2026-04-19
+
 ### Added
 - `DataFrame.rolling(window)` and `Series.rolling(window)` with native Mojo
   sliding-window operations: `sum()`, `mean()`, `std()`, `var()`, `min()`,
