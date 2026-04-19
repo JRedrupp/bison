@@ -4131,6 +4131,13 @@ def _merge_sort_perm_comparable[
     var has_mask = len(null_mask) > 0
     var scratch = List[Int](capacity=n)
     scratch.resize(n, 0)
+    # Raw pointers into perm, scratch, and data let the inner loop skip
+    # per-access bounds checks.  All index arithmetic below keeps every
+    # access within [0, n) by construction (lo, li, ri, k, hi are
+    # derived from the merge-sort invariants).
+    var pp = perm.unsafe_ptr()
+    var sp = scratch.unsafe_ptr()
+    var dp = data.unsafe_ptr()
     var width = 1
     while width < n:
         var lo = 0
@@ -4145,8 +4152,8 @@ def _merge_sort_perm_comparable[
             var li = lo
             var ri = mid_idx
             while li < mid_idx and ri < hi:
-                var lv = perm[li]
-                var rv = perm[ri]
+                var lv = pp[li]
+                var rv = pp[ri]
                 var lnull = has_mask and null_mask[lv]
                 var rnull = has_mask and null_mask[rv]
                 var take_right: Bool
@@ -4157,26 +4164,26 @@ def _merge_sort_perm_comparable[
                 elif rnull:
                     take_right = not na_last
                 elif ascending:
-                    take_right = data[rv] < data[lv]
+                    take_right = dp[rv] < dp[lv]
                 else:
-                    take_right = data[rv] > data[lv]
+                    take_right = dp[rv] > dp[lv]
                 if take_right:
-                    scratch[k] = rv
+                    sp[k] = rv
                     ri += 1
                 else:
-                    scratch[k] = lv
+                    sp[k] = lv
                     li += 1
                 k += 1
             while li < mid_idx:
-                scratch[k] = perm[li]
+                sp[k] = pp[li]
                 li += 1
                 k += 1
             while ri < hi:
-                scratch[k] = perm[ri]
+                sp[k] = pp[ri]
                 ri += 1
                 k += 1
             for j in range(lo, hi):
-                perm[j] = scratch[j]
+                pp[j] = sp[j]
             lo += 2 * width
         width *= 2
 
@@ -5001,6 +5008,8 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         """
         if self._storage.isa[AnyArray]():
             ref arr = self._storage[AnyArray]
+            if arr.null_count() == 0:
+                return NullMask()
             var n = len(self)
             var mask = NullMask()
             for i in range(n):

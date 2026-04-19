@@ -291,6 +291,23 @@ def test_fast_path_anyarray_backed_with_nulls() raises:
     assert_equal(col3._str_list()[2], "c")
 
 
+def test_null_mask_copy_no_nulls_returns_empty() raises:
+    """AnyArray-backed column with no nulls: null_mask_copy returns an empty NullMask.
+
+    The sort kernel uses `len(null_mask) > 0` to decide whether to enter the
+    null-check branch on every comparison.  For a no-null column the mask must
+    be empty so the kernel uses the fast path with no null overhead.
+    """
+    var data = List[Float64]()
+    data.append(3.0)
+    data.append(1.0)
+    data.append(2.0)
+    var col = Column("a", data^, float64)
+    var col2 = marrow_array_to_column(column_to_marrow_array(col), "a")
+    var mask = col2.null_mask_copy()
+    assert_equal(len(mask), 0)
+
+
 def main() raises:
     test_int64_round_trip_no_nulls()
     test_float64_round_trip_no_nulls()
@@ -306,4 +323,5 @@ def main() raises:
     test_storage_active_bool_no_nulls()
     test_fast_path_anyarray_backed_int64()
     test_fast_path_anyarray_backed_with_nulls()
+    test_null_mask_copy_no_nulls_returns_empty()
     print("test_arrow: all tests passed")
