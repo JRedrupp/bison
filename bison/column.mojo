@@ -5498,29 +5498,30 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 new_mask.append(self.is_null(indices[k]))
         # Take via the active storage arm.
         var col: Column
-        if self.is_int():
-            var src = self._int64_list()
+        if self._storage.isa[AnyArray]() and self.is_int():
+            ref a = self._storage[AnyArray].as_int64()
             var result = List[Int64](capacity=len(indices))
             for k in range(len(indices)):
-                result.append(src[indices[k]])
+                result.append(rebind[Int64](a.unsafe_get(indices[k])))
             col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_bool():
-            var src = self._bool_list()
+        elif self._storage.isa[AnyArray]() and self.is_bool():
+            ref a = self._storage[AnyArray].as_bool()
             var result = List[Bool](capacity=len(indices))
+            var view = a.values()
             for k in range(len(indices)):
-                result.append(src[indices[k]])
+                result.append(view.test(a.offset + indices[k]))
             col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_string():
-            var src = self._str_list()
+        elif self._storage.isa[AnyArray]() and self.is_string():
+            ref a = self._storage[AnyArray].as_string()
             var result = List[String](capacity=len(indices))
             for k in range(len(indices)):
-                result.append(src[indices[k]])
+                result.append(String(a.unsafe_get(UInt(indices[k]))))
             col = Column(self.name, ColumnData(result^), self.dtype)
-        elif self.is_float():
-            var src = self._float64_list()
+        elif self._storage.isa[AnyArray]() and self.is_float():
+            ref a = self._storage[AnyArray].as_float64()
             var result = List[Float64](capacity=len(indices))
             for k in range(len(indices)):
-                result.append(src[indices[k]])
+                result.append(rebind[Float64](a.unsafe_get(indices[k])))
             col = Column(self.name, ColumnData(result^), self.dtype)
         else:
             # Object / datetime / timedelta: fall back to the visitor path.
