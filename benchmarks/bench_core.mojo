@@ -24,7 +24,7 @@ from std.time import perf_counter_ns
 # ---------------------------------------------------------------------------
 
 comptime FAST_ITERS = 100  # <1 ms per call  (sum, mean, iloc, fillna, apply)
-comptime MED_ITERS = 20  # 1–20 ms per call (groupby, query/eval)
+comptime MED_ITERS = 20  # 1–20 ms per call (groupby)
 comptime SLOW_ITERS = 3  # >20 ms per call  (sort, merge)
 comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 
@@ -72,7 +72,7 @@ def main() raises:
     # Build fixtures in a single Python call to avoid pandas __setitem__
     # triggering sys._getframe() through Mojo's shallow call stack.
     #
-    # Fixture schema (created at three sizes for query size-sweep):
+    # Fixture schema:
     #   key  (str, 10 unique values)
     #   a    (float64)
     #   b    (float64)
@@ -108,16 +108,8 @@ def main() raises:
     var pd_df = _fixtures[0]
     var pd_df2 = _fixtures[1]
 
-    # Smaller fixtures for query size-sweep (1 K and 10 K rows)
-    var _fixtures_1k = _make_fixtures(1_000)
-    var pd_df_1k = _fixtures_1k[0]
-    var _fixtures_10k = _make_fixtures(10_000)
-    var pd_df_10k = _fixtures_10k[0]
-
     var df = DataFrame.from_pandas(pd_df)
     var df2 = DataFrame.from_pandas(pd_df2)
-    var df_1k = DataFrame.from_pandas(pd_df_1k)
-    var df_10k = DataFrame.from_pandas(pd_df_10k)
 
     var np = Python.import_module("numpy")
 
@@ -125,8 +117,6 @@ def main() raises:
     var g = Python.evaluate("{}")
     g["pd_df"] = pd_df
     g["pd_df2"] = pd_df2
-    g["pd_df_1k"] = pd_df_1k
-    g["pd_df_10k"] = pd_df_10k
     g["np"] = np
 
     # ------------------------------------------------------------------
@@ -197,23 +187,6 @@ def main() raises:
         results.append(
             BenchResult("groupby_sum", bison_ms, pandas_ms, MED_ITERS)
         )
-
-    # ------------------------------------------------------------------
-    # query_simple, query_and, query_or, eval_expr, query_size_1k,
-    # query_size_10k  (native df.query / df.eval pipeline)
-    #
-    # Disabled: calling df.query/df.eval from this file currently triggers
-    # a 10+ minute mojo compile (see #708). The benchmarks are emitted as
-    # skipped so the dashboard keeps the series column and starts graphing
-    # again as soon as upstream mojo is fixed and the full bodies are
-    # restored.
-    # ------------------------------------------------------------------
-    results.append(BenchResult.skipped_result("query_simple"))
-    results.append(BenchResult.skipped_result("query_and"))
-    results.append(BenchResult.skipped_result("query_or"))
-    results.append(BenchResult.skipped_result("eval_expr"))
-    results.append(BenchResult.skipped_result("query_size_1k"))
-    results.append(BenchResult.skipped_result("query_size_10k"))
 
     # ------------------------------------------------------------------
     # iloc_row  (single integer-position row access via df.iloc())

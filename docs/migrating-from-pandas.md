@@ -81,9 +81,6 @@ var col = df["price"]
 # Boolean mask
 var expensive = df[df["price"] > 100.0]
 
-# Query string (subset of pandas grammar)
-var result = df.query("price > 100 and category == 'electronics'")
-
 # iloc / loc
 var row = df.iloc(0)
 var subset = df.loc(bs.slice(10, 20))

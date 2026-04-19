@@ -45,7 +45,6 @@ mojo run tests/test_dataframe.mojo
 | `test_concat.mojo` | concat-specific cases |
 | `test_transform.mojo` | transformation tests |
 | `test_arrow.mojo` | Arrow <-> Column round-trip conversion |
-| `test_expr.mojo` | query/eval tokenizer, parser, evaluator |
 | `test_window.mojo` | rolling, expanding, ewm window operations |
 
 ## Helpers
@@ -72,8 +71,3 @@ collected and reported at the end.
 4. For stub methods, assert that calling the method raises with
    `"not implemented"` in the error message.
 5. Run `pixi run test` to verify the full suite still passes.
-
-**Note on query/eval tests**: due to a nightly compiler bug, all query/eval
-tests must live in `tests/test_expr.mojo`. See
-[Mojo patterns](mojo-patterns.md#nightly-compiler-hangs-on-standalone-queryeval-modules)
-for details.

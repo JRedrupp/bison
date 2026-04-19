@@ -96,18 +96,6 @@ var med = df["price"].median()
 var sorted_df = df.sort_values("price", ascending=False)
 ```
 
-### Filtering with query
-
-```mojo
-# Filter rows using a query expression
-var result = df.query("price > 100 and category == 'electronics'")
-```
-
-The query engine supports column references, scalar literals (int, float, bool,
-string, null), comparison operators (`<`, `<=`, `>`, `>=`, `==`, `!=`),
-logical operators (`not`, `and`, `or`), and parenthetical grouping. See
-[query-eval-spec.md](query-eval-spec.md) for the full grammar.
-
 ### GroupBy
 
 ```mojo

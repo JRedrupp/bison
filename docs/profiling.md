@@ -55,7 +55,6 @@ pixi run profile merge --callgrind
 | `sort` | `DataFrame.sort_values` | Single-key ascending sort on 100K rows |
 | `groupby` | `DataFrame.groupby().sum()` | Single-key groupby + sum aggregation |
 | `merge` | `DataFrame.merge` | Inner join on integer key (100K x 10K rows) |
-| `query` | `DataFrame.query` | Compound boolean expression filter |
 | `csv` | `to_csv` + `read_csv` | CSV round-trip on 100K rows |
 | `all` | All of the above | Runs sequentially (default) |
 
@@ -236,7 +235,6 @@ perf report -i profile_results/sort.perf.data
 | `take` | `sort_values`, `groupby` | Reorder column data by index array |
 | `_row_key_str` | `merge`, `groupby` | Serialize row values to string key |
 | `_groupby_indices` | `groupby` | Build key-to-row-index mapping |
-| `_eval_expr` | `query` | Evaluate parsed expression against DataFrame |
 | `take_with_nulls` | `merge` | Reorder with null insertion for outer joins |
 | `_merge_sort_perm_comparable` | `sort_perm` | The actual sort kernel |
 | `_try_activate_storage` | `Column` construction | Sync marrow backend |
