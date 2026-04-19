@@ -69,7 +69,7 @@ for arg in "$@"; do
         --perf) TOOL="perf" ;;
         --samply) TOOL="samply" ;;
         --callgrind) TOOL="callgrind" ;;
-        sort|groupby|merge|query|csv|all) OP="$arg" ;;
+        sort|groupby|merge|query|csv|loc_slice|all) OP="$arg" ;;
         *) echo "Unknown argument: $arg" >&2; usage ;;
     esac
 done
