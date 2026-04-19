@@ -38,6 +38,7 @@ from .column import (
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
+from .expr import parse as _parse_expr, eval_expr as _eval_expr
 from .arrow import column_to_marrow_array, marrow_array_to_column
 from marrow.arrays import AnyArray
 from marrow.builders import StringBuilder as _MarrowStringBuilder
@@ -3248,6 +3249,22 @@ struct DataFrame(Copyable, Movable):
                 + "'. Supported: abs, cumsum, cumprod, cummin, cummax, sqrt,"
                 " exp, log, log10, ceil, floor, neg"
             )
+
+    def eval(self, expr: String) raises -> Series:
+        """Evaluate *expr* against this DataFrame and return a boolean Series.
+
+        In-scope expressions are comparison predicates, optionally combined
+        with ``and``, ``or``, and ``not``, and parenthetical groupings.
+        Unsupported syntax (arithmetic, assignment, function calls, etc.)
+        raises an Error whose message contains ``"unsupported syntax"``.
+        """
+        var parsed = _parse_expr(expr)
+        return _eval_expr(parsed, self)
+
+    def query(self, expr: String) raises -> DataFrame:
+        var parsed = _parse_expr(expr)
+        var mask = _eval_expr(parsed, self)
+        return self[mask]
 
     def pipe(self, func: String) raises -> DataFrame:
         if func == "abs":
