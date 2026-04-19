@@ -166,7 +166,7 @@ def test_getitem_bool_mask_string_eq() raises:
     assert_equal(result["val"].iloc(1)[Int64], Int64(3))
 
 
-def test_getitem_bool_mask_mixed_dtype_take_path() raises:
+def test_getitem_bool_mask_mixed_dtype() raises:
     """Boolean mask keeps row order across mixed AnyArray-backed dtypes."""
     var pd = Python.import_module("pandas")
     var df = DataFrame(
