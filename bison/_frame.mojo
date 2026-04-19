@@ -1243,6 +1243,94 @@ struct _RowKeyVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = String(data[self.row])
 
 
+struct _ColDataView(Copyable, Movable):
+    """Pre-materialised typed data for a single key column.
+
+    Materialise once per column before a row loop, then call ``str_at(i)``
+    per row.  Eliminates the O(N²) allocation pattern caused by calling
+    ``_visit_raises`` (and therefore ``_str_list`` / ``_int64_list`` etc.)
+    inside per-row loops.
+    """
+
+    comptime KIND_INT = 0
+    comptime KIND_FLT = 1
+    comptime KIND_BOOL = 2
+    comptime KIND_STR = 3
+    comptime KIND_OBJ = 4
+
+    var kind: Int
+    var int_data: List[Int64]
+    var flt_data: List[Float64]
+    var bool_data: List[Bool]
+    var str_data: List[String]
+    var obj_data: List[PythonObject]
+
+    def __init__(out self, col: Column) raises:
+        self.kind = Self.KIND_OBJ
+        self.int_data = List[Int64]()
+        self.flt_data = List[Float64]()
+        self.bool_data = List[Bool]()
+        self.str_data = List[String]()
+        self.obj_data = List[PythonObject]()
+        if col.is_int():
+            self.kind = Self.KIND_INT
+            self.int_data = col._int64_list()
+        elif col.is_float():
+            self.kind = Self.KIND_FLT
+            self.flt_data = col._float64_list()
+        elif col.is_bool():
+            self.kind = Self.KIND_BOOL
+            self.bool_data = col._bool_list()
+        elif col.is_string():
+            self.kind = Self.KIND_STR
+            self.str_data = col._str_list()
+        else:
+            self.obj_data = col._obj_list()
+
+    def str_at(self, i: Int) raises -> String:
+        """Return the string representation of element *i*."""
+        if self.kind == Self.KIND_INT:
+            return String(Int(self.int_data[i]))
+        elif self.kind == Self.KIND_FLT:
+            return String(self.flt_data[i])
+        elif self.kind == Self.KIND_BOOL:
+            return "1" if self.bool_data[i] else "0"
+        elif self.kind == Self.KIND_STR:
+            return self.str_data[i]
+        else:
+            return String(self.obj_data[i])
+
+
+def _build_col_views(
+    df: DataFrame,
+    key_cols: List[String],
+    col_idx: Dict[String, Int],
+) raises -> List[_ColDataView]:
+    """Materialise each key column once, returning a list of ``_ColDataView``.
+    """
+    var views = List[_ColDataView]()
+    for k in range(len(key_cols)):
+        var ci = col_idx[key_cols[k]]
+        views.append(_ColDataView(df._cols[ci]))
+    return views^
+
+
+def _row_key_from_views(views: List[_ColDataView], row: Int) raises -> String:
+    """Build the row-key string for *row* from pre-materialised column views.
+
+    Uses the same length-prefixed encoding as ``DataFrame._row_key_str`` for
+    multi-column keys so existing hash maps remain compatible.
+    """
+    var n_keys = len(views)
+    if n_keys == 1:
+        return views[0].str_at(row)
+    var key = String()
+    for k in range(n_keys):
+        var part = views[k].str_at(row)
+        key += String(part.byte_length()) + ":" + part
+    return key
+
+
 # ------------------------------------------------------------------
 # from_records helpers
 # ------------------------------------------------------------------
@@ -1521,15 +1609,21 @@ def _merge_hashjoin_string(
     mut out_right: List[Int],
     mut right_matched: List[Bool],
 ) raises:
-    """Generic hash join using string-serialised composite keys."""
+    """Generic hash join using string-serialised composite keys.
+
+    Typed column data is materialised once per side before the row loops to
+    avoid O(N²) allocations from calling ``_visit_raises`` per row.
+    """
+    var right_views = _build_col_views(right, rkeys, right_col_idx)
+    var left_views = _build_col_views(left, lkeys, left_col_idx)
     var right_map = Dict[String, List[Int]]()
     for i in range(n_right):
-        var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
+        var k = _row_key_from_views(right_views, i)
         if k not in right_map:
             right_map[k] = List[Int]()
         right_map[k].append(i)
     for i in range(n_left):
-        var k = DataFrame._row_key_str(left, lkeys, i, left_col_idx)
+        var k = _row_key_from_views(left_views, i)
         if k in right_map:
             ref matches = right_map[k]
             for m in range(len(matches)):
@@ -6389,16 +6483,18 @@ def _groupby_indices(
     """Build key→row-index mapping for a DataFrame groupby.
 
     Populates *group_map* (key→row-index list) and *group_keys* (ordered key
-    list) in place.  Uses DataFrame._row_key_str for key serialisation, the
-    same approach as merge.  When dropna=True, rows where any key column is
-    null are excluded.  When sort_keys=True, group_keys is sorted
-    lexicographically on return.
+    list) in place.  Uses ``_row_key_from_views`` for key serialisation, which
+    materialises each key column exactly once before the row loop (O(N) rather
+    than O(N²)).  When dropna=True, rows where any key column is null are
+    excluded.  When sort_keys=True, group_keys is sorted lexicographically on
+    return.
     """
     var col_idx = Dict[String, Int]()
     for i in range(len(df._cols)):
         col_idx[df._cols[i].name.value()] = i
 
     var n_rows = df.shape()[0]
+    var views = _build_col_views(df, by, col_idx)
 
     for i in range(n_rows):
         if dropna:
@@ -6412,7 +6508,7 @@ def _groupby_indices(
             if skip:
                 continue
 
-        var k = DataFrame._row_key_str(df, by, i, col_idx)
+        var k = _row_key_from_views(views, i)
         if k not in group_map:
             group_keys.append(k)
             group_map[k] = List[Int]()

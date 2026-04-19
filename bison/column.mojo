@@ -4756,6 +4756,15 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             return out^
         raise Error("Column._str_list: requires string column")
 
+    def _obj_list(self) raises -> List[PythonObject]:
+        """Extract object column values as ``List[PythonObject]``.
+
+        Requires ``LegacyObjectData`` storage; raises otherwise.
+        """
+        if not self._storage.isa[LegacyObjectData]():
+            raise Error("Column._obj_list: requires LegacyObjectData storage")
+        return self._storage[LegacyObjectData].data.copy()
+
     def _f64_list(self) raises -> List[Float64]:
         """Extract column values as ``List[Float64]``, widening int64 / bool
         to float64.
