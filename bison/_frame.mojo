@@ -1244,6 +1244,341 @@ struct _RowKeyVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.result = String(data[self.row])
 
 
+# ------------------------------------------------------------------
+# from_records helpers
+# ------------------------------------------------------------------
+
+
+def _from_records_build_null_col(name: String, nrows: Int) raises -> Column:
+    """All rows missing this key — build an object column of nulls."""
+    var py_none = Python.evaluate("None")
+    var data = List[PythonObject]()
+    var null_mask = NullMask()
+    for _ in range(nrows):
+        data.append(py_none)
+        null_mask.append_null()
+    var col = Column(name, data^, object_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_string_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a String column from mixed scalars (String dominates all types)."""
+    var data = List[String]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(String(""))
+            null_mask.append_null()
+        else:
+            var val: String
+            if v.isa[String]():
+                val = v[String]
+            elif v.isa[Int64]():
+                val = String(Int(v[Int64]))
+            elif v.isa[Float64]():
+                val = String(v[Float64])
+            else:  # Bool
+                val = String("True") if v[Bool] else String("False")
+            data.append(val)
+            null_mask.append_valid()
+    var col = Column(name, data^, string_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_float_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a Float64 column from mixed numeric scalars (Int64/Bool promoted).
+    """
+    var data = List[Float64]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(Float64(0.0))
+            null_mask.append_null()
+        else:
+            var val: Float64
+            if v.isa[Float64]():
+                val = v[Float64]
+            elif v.isa[Int64]():
+                val = Float64(v[Int64])
+            else:  # Bool
+                val = Float64(1) if v[Bool] else Float64(0)
+            data.append(val)
+            null_mask.append_valid()
+    var col = Column(name, data^, float64)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_int_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build an Int64 column (Bool values promoted to Int64).
+
+    If any row is null, promotes to Float64 so NaN can represent null,
+    matching pandas behavior.
+    """
+    var data = List[Int64]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(Int64(0))
+            null_mask.append_null()
+        else:
+            var val: Int64
+            if v.isa[Int64]():
+                val = v[Int64]
+            else:  # Bool
+                val = Int64(1) if v[Bool] else Int64(0)
+            data.append(val)
+            null_mask.append_valid()
+    if null_mask.has_nulls():
+        var fdata = List[Float64]()
+        for i in range(len(data)):
+            fdata.append(Float64(data[i]))
+        var col = Column(name, fdata^, float64)
+        col.set_null_mask(null_mask^)
+        return col^
+    var col = Column(name, data^, int64)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+def _from_records_build_bool_col(
+    name: String, vals: List[DFScalar]
+) raises -> Column:
+    """Build a Bool column.
+
+    If any row is null, promotes to object dtype so None can represent null,
+    matching pandas behavior.
+    """
+    var data = List[Bool]()
+    var null_mask = NullMask()
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v.is_null():
+            data.append(False)
+            null_mask.append_null()
+        else:
+            data.append(v[Bool])
+            null_mask.append_valid()
+    if null_mask.has_nulls():
+        var py_none = Python.evaluate("None")
+        var odata = List[PythonObject]()
+        for i in range(len(data)):
+            if null_mask.is_null(i):
+                odata.append(py_none)
+            else:
+                odata.append(PythonObject(data[i]))
+        var col = Column(name, odata^, object_)
+        col.set_null_mask(null_mask^)
+        return col^
+    var col = Column(name, data^, bool_)
+    col.set_null_mask(null_mask^)
+    return col^
+
+
+# ------------------------------------------------------------------
+# pivot_table helpers
+# ------------------------------------------------------------------
+
+
+def _pivot_row_label(
+    cols: List[Column],
+    row: Int,
+    names: List[String],
+    name_to_ci: Dict[String, Int],
+    py: PythonObject,
+) raises -> String:
+    """Serialize a composite row-key label from one or more columns.
+
+    Returns ``"0"`` when *names* is empty (the single-group default).
+    """
+    if len(names) == 0:
+        return String("0")
+    if len(names) == 1:
+        return _frame_cell_as_str(cols[name_to_ci[names[0]]], row)
+    var items = py.list()
+    for k in range(len(names)):
+        _ = items.append(_frame_cell_as_python(cols[name_to_ci[names[k]]], row))
+    return String(py.tuple(items))
+
+
+def _pivot_col_label(
+    cols: List[Column],
+    row: Int,
+    names: List[String],
+    name_to_ci: Dict[String, Int],
+    py: PythonObject,
+) raises -> String:
+    """Serialize a composite column-key label; ``"__all__"`` when no columns."""
+    if len(names) == 0:
+        return String("__all__")
+    if len(names) == 1:
+        return _frame_cell_as_str(cols[name_to_ci[names[0]]], row)
+    var items = py.list()
+    for k in range(len(names)):
+        _ = items.append(_frame_cell_as_python(cols[name_to_ci[names[k]]], row))
+    return String(py.tuple(items))
+
+
+def _pivot_build_result_col(
+    name: String,
+    out_i: Int,
+    n_rk: Int,
+    sums: List[List[Float64]],
+    counts: List[List[Int]],
+    aggfunc: String,
+    py_none: PythonObject,
+    result_idx: ColumnIndex,
+) raises -> Column:
+    """Build a single output column from the accumulated sums/counts."""
+    var data = List[PythonObject]()
+    var null_mask = NullMask()
+    for rk in range(n_rk):
+        if aggfunc == "count":
+            data.append(PythonObject(Int(counts[rk][out_i])))
+            null_mask.append_valid()
+            continue
+        if counts[rk][out_i] == 0:
+            data.append(py_none)
+            null_mask.append_null()
+            continue
+        null_mask.append_valid()
+        if aggfunc == "sum":
+            data.append(PythonObject(sums[rk][out_i]))
+        else:
+            data.append(
+                PythonObject(sums[rk][out_i] / Float64(counts[rk][out_i]))
+            )
+    var col = Column(name, data^, object_)
+    col._index = result_idx.copy()
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
+# ------------------------------------------------------------------
+# merge helpers
+# ------------------------------------------------------------------
+
+
+def _merge_hashjoin_int64(
+    left: DataFrame,
+    right: DataFrame,
+    lkey_idx: Int,
+    rkey_idx: Int,
+    how: String,
+    n_left: Int,
+    n_right: Int,
+    needs_right_unmatched: Bool,
+    mut out_left: List[Int],
+    mut out_right: List[Int],
+    mut right_matched: List[Bool],
+) raises:
+    """Fast-path hash join for a single int64 key column pair."""
+    var right_map = Dict[Int, List[Int]]()
+    for i in range(n_right):
+        var k = Int(right._cols[rkey_idx]._int64_data()[i])
+        if k not in right_map:
+            right_map[k] = List[Int]()
+        right_map[k].append(i)
+    for i in range(n_left):
+        var k = Int(left._cols[lkey_idx]._int64_data()[i])
+        if k in right_map:
+            ref matches = right_map[k]
+            for m in range(len(matches)):
+                out_left.append(i)
+                out_right.append(matches[m])
+                if needs_right_unmatched:
+                    right_matched[matches[m]] = True
+        elif how == "left" or how == "outer":
+            out_left.append(i)
+            out_right.append(-1)
+
+
+def _merge_hashjoin_string(
+    left: DataFrame,
+    right: DataFrame,
+    lkeys: List[String],
+    rkeys: List[String],
+    left_col_idx: Dict[String, Int],
+    right_col_idx: Dict[String, Int],
+    how: String,
+    n_left: Int,
+    n_right: Int,
+    needs_right_unmatched: Bool,
+    mut out_left: List[Int],
+    mut out_right: List[Int],
+    mut right_matched: List[Bool],
+) raises:
+    """Generic hash join using string-serialised composite keys."""
+    var right_map = Dict[String, List[Int]]()
+    for i in range(n_right):
+        var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
+        if k not in right_map:
+            right_map[k] = List[Int]()
+        right_map[k].append(i)
+    for i in range(n_left):
+        var k = DataFrame._row_key_str(left, lkeys, i, left_col_idx)
+        if k in right_map:
+            ref matches = right_map[k]
+            for m in range(len(matches)):
+                out_left.append(i)
+                out_right.append(matches[m])
+                if needs_right_unmatched:
+                    right_matched[matches[m]] = True
+        elif how == "left" or how == "outer":
+            out_left.append(i)
+            out_right.append(-1)
+
+
+def _merge_fill_right_only_key(
+    mut key_col: Column,
+    rk: Column,
+    out_left: List[Int],
+    out_right: List[Int],
+) raises:
+    """Fill right-only rows (``out_left[r] < 0``) in a key column with the RHS
+    frame's key values.  Inner/left joins have no right-only rows.
+    """
+    if key_col.is_int() and rk.is_int():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._int64_data()[r] = rk._int64_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_float() and rk.is_float():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._float64_data()[r] = rk._float64_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_bool() and rk.is_bool():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._bool_data()[r] = rk._bool_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_string() and rk.is_string():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._str_data()[r] = rk._str_data()[out_right[r]]
+                key_col.set_valid_at(r)
+    elif key_col.is_object() and rk.is_object():
+        for r in range(len(out_left)):
+            if out_left[r] < 0:
+                key_col._storage_legacy().data[r] = rk._storage_legacy().data[
+                    out_right[r]
+                ]
+                key_col.set_valid_at(r)
+
+
 struct DataFrame(Copyable, Movable):
     """A two-dimensional labeled data structure, mirroring the pandas DataFrame API.
     """
@@ -1328,7 +1663,6 @@ struct DataFrame(Copyable, Movable):
 
         for ci in range(len(col_names)):
             var col_name = col_names[ci]
-            var null_mask = NullMask()
 
             # Single pass: extract values AND determine dominant dtype.
             # Previous implementation scanned all rows twice per column —
@@ -1364,116 +1698,17 @@ struct DataFrame(Copyable, Movable):
                     vals.append(DFScalar.null())
 
             if not found:
-                # All rows missing this key — object column, all null
-                var data = List[PythonObject]()
-                var py_none = Python.evaluate("None")
-                for _ in range(len(records)):
-                    data.append(py_none)
-                    null_mask.append_null()
-                var col = Column(col_name, data^, object_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
-                continue
-
-            # Build typed column from cached values — no second dict lookup.
-            if has_string:
-                # String dominates: convert all non-null values to String
-                var data = List[String]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(String(""))
-                        null_mask.append_null()
-                    else:
-                        var val: String
-                        if v.isa[String]():
-                            val = v[String]
-                        elif v.isa[Int64]():
-                            val = String(Int(v[Int64]))
-                        elif v.isa[Float64]():
-                            val = String(v[Float64])
-                        else:  # Bool
-                            val = String("True") if v[Bool] else String("False")
-                        data.append(val)
-                        null_mask.append_valid()
-                var col = Column(col_name, data^, string_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(
+                    _from_records_build_null_col(col_name, len(records))
+                )
+            elif has_string:
+                cols.append(_from_records_build_string_col(col_name, vals))
             elif has_float:
-                # Float64 dominates Int64 and Bool
-                var data = List[Float64]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(Float64(0.0))
-                        null_mask.append_null()
-                    else:
-                        var val: Float64
-                        if v.isa[Float64]():
-                            val = v[Float64]
-                        elif v.isa[Int64]():
-                            val = Float64(v[Int64])
-                        else:  # Bool
-                            val = Float64(1) if v[Bool] else Float64(0)
-                        data.append(val)
-                        null_mask.append_valid()
-                var col = Column(col_name, data^, float64)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(_from_records_build_float_col(col_name, vals))
             elif has_int:
-                # Int64 (Bool values are promoted to Int64)
-                var data = List[Int64]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(Int64(0))
-                        null_mask.append_null()
-                    else:
-                        var val: Int64
-                        if v.isa[Int64]():
-                            val = v[Int64]
-                        else:  # Bool
-                            val = Int64(1) if v[Bool] else Int64(0)
-                        data.append(val)
-                        null_mask.append_valid()
-                if null_mask.has_nulls():
-                    # Promote to float64 so NaN can be represented (mirrors pandas behavior)
-                    var fdata = List[Float64]()
-                    for i in range(len(data)):
-                        fdata.append(Float64(data[i]))
-                    var col = Column(col_name, fdata^, float64)
-                    col.set_null_mask(null_mask^)
-                    cols.append(col^)
-                    continue
-                var col = Column(col_name, data^, int64)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
-            else:  # Bool only
-                var data = List[Bool]()
-                for i in range(len(vals)):
-                    var v = vals[i]
-                    if v.is_null():
-                        data.append(False)
-                        null_mask.append_null()
-                    else:
-                        data.append(v[Bool])
-                        null_mask.append_valid()
-                if null_mask.has_nulls():
-                    # Promote to object so None can be represented (mirrors pandas behavior)
-                    var py_none = Python.evaluate("None")
-                    var odata = List[PythonObject]()
-                    for i in range(len(data)):
-                        if null_mask.is_null(i):
-                            odata.append(py_none)
-                        else:
-                            odata.append(PythonObject(data[i]))
-                    var col = Column(col_name, odata^, object_)
-                    col.set_null_mask(null_mask^)
-                    cols.append(col^)
-                    continue
-                var col = Column(col_name, data^, bool_)
-                col.set_null_mask(null_mask^)
-                cols.append(col^)
+                cols.append(_from_records_build_int_col(col_name, vals))
+            else:
+                cols.append(_from_records_build_bool_col(col_name, vals))
 
         return DataFrame(cols^)
 
@@ -4024,39 +4259,18 @@ struct DataFrame(Copyable, Movable):
         var col_labels = List[String]()
         var col_keys = Dict[String, Int]()
 
+        # First pass: discover unique row/col keys.
         for r in range(nrows):
-            var row_label = String("0")
-            if len(idx_names) == 1:
-                row_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[idx_names[0]]], r
-                )
-            elif len(idx_names) > 1:
-                var items = py.list()
-                for k in range(len(idx_names)):
-                    _ = items.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[idx_names[k]]], r
-                        )
-                    )
-                row_label = String(py.tuple(items))
+            var row_label = _pivot_row_label(
+                self._cols, r, idx_names, name_to_ci, py
+            )
             if row_label not in row_keys:
                 row_keys[row_label] = len(row_labels)
                 row_labels.append(row_label)
 
-            var col_label = String("__all__")
-            if len(col_names) == 1:
-                col_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[col_names[0]]], r
-                )
-            elif len(col_names) > 1:
-                var citems = py.list()
-                for k in range(len(col_names)):
-                    _ = citems.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[col_names[k]]], r
-                        )
-                    )
-                col_label = String(py.tuple(citems))
+            var col_label = _pivot_col_label(
+                self._cols, r, col_names, name_to_ci, py
+            )
             if col_label not in col_keys:
                 col_keys[col_label] = len(col_labels)
                 col_labels.append(col_label)
@@ -4095,38 +4309,14 @@ struct DataFrame(Copyable, Movable):
             sums.append(sum_row^)
             counts.append(count_row^)
 
+        # Second pass: accumulate sums and counts per cell.
         for r in range(nrows):
-            var row_label = String("0")
-            if len(idx_names) == 1:
-                row_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[idx_names[0]]], r
-                )
-            elif len(idx_names) > 1:
-                var items = py.list()
-                for k in range(len(idx_names)):
-                    _ = items.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[idx_names[k]]], r
-                        )
-                    )
-                row_label = String(py.tuple(items))
-            var rk = row_keys[row_label]
-
-            var col_label = String("__all__")
-            if len(col_names) == 1:
-                col_label = _frame_cell_as_str(
-                    self._cols[name_to_ci[col_names[0]]], r
-                )
-            elif len(col_names) > 1:
-                var citems = py.list()
-                for k in range(len(col_names)):
-                    _ = citems.append(
-                        _frame_cell_as_python(
-                            self._cols[name_to_ci[col_names[k]]], r
-                        )
-                    )
-                col_label = String(py.tuple(citems))
-            var ck = col_keys[col_label]
+            var rk = row_keys[
+                _pivot_row_label(self._cols, r, idx_names, name_to_ci, py)
+            ]
+            var ck = col_keys[
+                _pivot_col_label(self._cols, r, col_names, name_to_ci, py)
+            ]
 
             for vi in range(n_val):
                 var out_pos = vi
@@ -4153,7 +4343,7 @@ struct DataFrame(Copyable, Movable):
                     continue
 
                 if vcol.is_numeric() or vcol.is_bool():
-                    sums[rk][out_pos] += vcol._f64_cache[r]
+                    sums[rk][out_pos] += vcol._float64_data()[r]
                 else:
                     raise Error(
                         "DataFrame.pivot_table: aggfunc "
@@ -4167,31 +4357,18 @@ struct DataFrame(Copyable, Movable):
         var result_cols = List[Column]()
 
         for out_i in range(n_out):
-            var data = List[PythonObject]()
-            var null_mask = NullMask()
-            for rk in range(n_rk):
-                if aggfunc == "count":
-                    data.append(PythonObject(Int(counts[rk][out_i])))
-                    null_mask.append_valid()
-                    continue
-                if counts[rk][out_i] == 0:
-                    data.append(py_none)
-                    null_mask.append_null()
-                    continue
-                null_mask.append_valid()
-                if aggfunc == "sum":
-                    data.append(PythonObject(sums[rk][out_i]))
-                else:
-                    data.append(
-                        PythonObject(
-                            sums[rk][out_i] / Float64(counts[rk][out_i])
-                        )
-                    )
-            var col = Column(out_names[out_i], data^, object_)
-            col._index = result_idx.copy()
-            if null_mask.has_nulls():
-                col.set_null_mask(null_mask^)
-            result_cols.append(col^)
+            result_cols.append(
+                _pivot_build_result_col(
+                    out_names[out_i],
+                    out_i,
+                    n_rk,
+                    sums,
+                    counts,
+                    aggfunc,
+                    py_none,
+                    result_idx,
+                )
+            )
 
         return DataFrame(result_cols^)
 
@@ -5044,45 +5221,35 @@ struct DataFrame(Copyable, Movable):
             and self._cols[left_col_idx[lkeys[0]]].is_int()
             and right._cols[right_col_idx[rkeys[0]]].is_int()
         ):
-            var lkey_idx = left_col_idx[lkeys[0]]
-            var rkey_idx = right_col_idx[rkeys[0]]
-            var right_map = Dict[Int, List[Int]]()
-            for i in range(n_right):
-                var k = Int(right._cols[rkey_idx]._int64_cache[i])
-                if k not in right_map:
-                    right_map[k] = List[Int]()
-                right_map[k].append(i)
-            for i in range(n_left):
-                var k = Int(self._cols[lkey_idx]._int64_cache[i])
-                if k in right_map:
-                    ref matches = right_map[k]
-                    for m in range(len(matches)):
-                        out_left.append(i)
-                        out_right.append(matches[m])
-                        if needs_right_unmatched:
-                            right_matched[matches[m]] = True
-                elif how == "left" or how == "outer":
-                    out_left.append(i)
-                    out_right.append(-1)
+            _merge_hashjoin_int64(
+                self,
+                right,
+                left_col_idx[lkeys[0]],
+                right_col_idx[rkeys[0]],
+                how,
+                n_left,
+                n_right,
+                needs_right_unmatched,
+                out_left,
+                out_right,
+                right_matched,
+            )
         else:
-            var right_map = Dict[String, List[Int]]()
-            for i in range(n_right):
-                var k = DataFrame._row_key_str(right, rkeys, i, right_col_idx)
-                if k not in right_map:
-                    right_map[k] = List[Int]()
-                right_map[k].append(i)
-            for i in range(n_left):
-                var k = DataFrame._row_key_str(self, lkeys, i, left_col_idx)
-                if k in right_map:
-                    ref matches = right_map[k]
-                    for m in range(len(matches)):
-                        out_left.append(i)
-                        out_right.append(matches[m])
-                        if needs_right_unmatched:
-                            right_matched[matches[m]] = True
-                elif how == "left" or how == "outer":
-                    out_left.append(i)
-                    out_right.append(-1)
+            _merge_hashjoin_string(
+                self,
+                right,
+                lkeys,
+                rkeys,
+                left_col_idx,
+                right_col_idx,
+                how,
+                n_left,
+                n_right,
+                needs_right_unmatched,
+                out_left,
+                out_right,
+                right_matched,
+            )
 
         if how == "right" or how == "outer":
             for j in range(n_right):
@@ -5114,44 +5281,12 @@ struct DataFrame(Copyable, Movable):
                     # For right-only rows, substitute the right frame's key value.
                     for j in range(len(right._cols)):
                         if right._cols[j].name == lkeys[k]:
-                            ref rk = right._cols[j]
-                            if key_col.is_int() and rk.is_int():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._int64_data()[
-                                            r
-                                        ] = rk._int64_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_float() and rk.is_float():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._float64_data()[
-                                            r
-                                        ] = rk._f64_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_bool() and rk.is_bool():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._bool_data()[
-                                            r
-                                        ] = rk._bool_cache[out_right[r]]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_string() and rk.is_string():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._str_data()[r] = rk._str_cache[
-                                            out_right[r]
-                                        ]
-                                        key_col.set_valid_at(r)
-                            elif key_col.is_object() and rk.is_object():
-                                for r in range(len(out_left)):
-                                    if out_left[r] < 0:
-                                        key_col._storage_legacy().data[
-                                            r
-                                        ] = rk._storage_legacy().data[
-                                            out_right[r]
-                                        ]
-                                        key_col.set_valid_at(r)
+                            _merge_fill_right_only_key(
+                                key_col,
+                                right._cols[j],
+                                out_left,
+                                out_right,
+                            )
                             break
                     # Sync secondary caches and rebuild marrow after
                     # cache-first key fill (#645). Only needed when right-only
@@ -6278,6 +6413,141 @@ def _label_groupby_indices(
         _sort_list(group_keys)
 
 
+# ------------------------------------------------------------------
+# _marrow_agg helpers (DataFrameGroupBy / SeriesGroupBy)
+# ------------------------------------------------------------------
+
+
+def _marrow_agg_sort_keep(
+    mut keep: List[Int],
+    result_key: AnyArray,
+    num_groups: Int,
+) raises:
+    """Insertion-sort *keep* in ascending order of the underlying key values.
+
+    Uses numeric comparison when *result_key* is numeric, string comparison
+    otherwise.  *keep* is typically short so insertion sort is sufficient.
+    """
+    var sort_vals = List[Float64]()
+    var sort_strs = List[String]()
+    var use_numeric = result_key.dtype().is_numeric()
+    if use_numeric:
+        for i in range(num_groups):
+            if result_key.dtype() == _m_float64:
+                sort_vals.append(
+                    rebind[Float64](result_key.as_float64().unsafe_get(i))
+                )
+            else:
+                sort_vals.append(
+                    Float64(Int(result_key.as_int64().unsafe_get(i)))
+                )
+    else:
+        for i in range(num_groups):
+            sort_strs.append(String(result_key.as_string().unsafe_get(UInt(i))))
+
+    for i in range(1, len(keep)):
+        var j = i
+        while j > 0:
+            var a = keep[j - 1]
+            var b = keep[j]
+            var should_swap = (
+                sort_vals[a]
+                > sort_vals[b] if use_numeric else sort_strs[a]
+                > sort_strs[b]
+            )
+            if should_swap:
+                keep[j - 1] = b
+                keep[j] = a
+                j -= 1
+            else:
+                break
+
+
+def _marrow_agg_build_index(
+    result_key: AnyArray, keep: List[Int]
+) raises -> ColumnIndex:
+    """Build a ColumnIndex from the kept rows of a marrow key column."""
+    var n_keep = len(keep)
+    if result_key.dtype() == _m_int64:
+        var int_keys = List[Int64]()
+        for i in range(n_keep):
+            int_keys.append(
+                rebind[Int64](result_key.as_int64().unsafe_get(keep[i]))
+            )
+        return ColumnIndex(int_keys^)
+    if result_key.dtype() == _m_float64:
+        var flt_keys = List[Float64]()
+        for i in range(n_keep):
+            flt_keys.append(
+                rebind[Float64](result_key.as_float64().unsafe_get(keep[i]))
+            )
+        return ColumnIndex(flt_keys^)
+    var str_keys = List[String]()
+    for i in range(n_keep):
+        str_keys.append(
+            String(result_key.as_string().unsafe_get(UInt(keep[i])))
+        )
+    return ColumnIndex(Index(str_keys^))
+
+
+def _marrow_agg_build_int_col(
+    name: String,
+    rb_col: AnyArray,
+    keep: List[Int],
+    idx: ColumnIndex,
+    key_col_name: String,
+    is_count: Bool,
+) raises -> Column:
+    """Build an Int64 result column for count / int-preserving sum/min/max.
+
+    When *is_count* is false, the marrow kernel stored the result as float64
+    (the current accumulator type) — cast back to int64 here.
+    """
+    var vals = List[Int64]()
+    var null_mask = NullMask()
+    for i in range(len(keep)):
+        var ri = keep[i]
+        if not rb_col.is_valid(ri):
+            vals.append(Int64(0))
+            null_mask.append_null()
+        elif is_count:
+            vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
+            null_mask.append_valid()
+        else:
+            vals.append(Int64(Float64(rb_col.as_float64().unsafe_get(ri))))
+            null_mask.append_valid()
+    var col = Column(name, vals^, int64, idx.copy())
+    col._index_name = key_col_name
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
+def _marrow_agg_build_float_col(
+    name: String,
+    rb_col: AnyArray,
+    keep: List[Int],
+    idx: ColumnIndex,
+    key_col_name: String,
+) raises -> Column:
+    """Build a Float64 result column for mean / float sum/min/max."""
+    var vals = List[Float64]()
+    var null_mask = NullMask()
+    for i in range(len(keep)):
+        var ri = keep[i]
+        if not rb_col.is_valid(ri):
+            vals.append(Float64(0))
+            null_mask.append_null()
+        else:
+            vals.append(rebind[Float64](rb_col.as_float64().unsafe_get(ri)))
+            null_mask.append_valid()
+    var col = Column(name, vals^, float64, idx.copy())
+    col._index_name = key_col_name
+    if null_mask.has_nulls():
+        col.set_null_mask(null_mask^)
+    return col^
+
+
 struct DataFrameGroupBy:
     """GroupBy object returned by DataFrame.groupby().
 
@@ -6527,126 +6797,34 @@ struct DataFrameGroupBy:
                 continue
             keep.append(i)
 
-        # Sort by key if requested.
         if self._sort and len(keep) > 1:
-            # Build sortable key values from the marrow result key column.
-            var sort_vals = List[Float64]()
-            var sort_strs = List[String]()
-            var use_numeric = result_key.dtype().is_numeric()
-            if use_numeric:
-                for i in range(num_groups):
-                    if result_key.dtype() == _m_float64:
-                        sort_vals.append(
-                            rebind[Float64](
-                                result_key.as_float64().unsafe_get(i)
-                            )
-                        )
-                    else:
-                        sort_vals.append(
-                            Float64(Int(result_key.as_int64().unsafe_get(i)))
-                        )
-            else:
-                for i in range(num_groups):
-                    sort_strs.append(
-                        String(result_key.as_string().unsafe_get(UInt(i)))
-                    )
+            _marrow_agg_sort_keep(keep, result_key, num_groups)
 
-            # Insertion sort on keep indices — G is typically small.
-            for i in range(1, len(keep)):
-                var j = i
-                while j > 0:
-                    var a = keep[j - 1]
-                    var b = keep[j]
-                    var should_swap = (
-                        sort_vals[a]
-                        > sort_vals[b] if use_numeric else sort_strs[a]
-                        > sort_strs[b]
-                    )
-                    if should_swap:
-                        keep[j - 1] = b
-                        keep[j] = a
-                        j -= 1
-                    else:
-                        break
+        var idx = _marrow_agg_build_index(result_key, keep)
 
-        var n_keep = len(keep)
-
-        # Build ColumnIndex from the key column.
-        var idx: ColumnIndex
-        if result_key.dtype() == _m_int64:
-            var int_keys = List[Int64]()
-            for i in range(n_keep):
-                int_keys.append(
-                    rebind[Int64](result_key.as_int64().unsafe_get(keep[i]))
-                )
-            idx = ColumnIndex(int_keys^)
-        elif result_key.dtype() == _m_float64:
-            var flt_keys = List[Float64]()
-            for i in range(n_keep):
-                flt_keys.append(
-                    rebind[Float64](result_key.as_float64().unsafe_get(keep[i]))
-                )
-            idx = ColumnIndex(flt_keys^)
-        else:
-            var str_keys = List[String]()
-            for i in range(n_keep):
-                str_keys.append(
-                    String(result_key.as_string().unsafe_get(UInt(keep[i])))
-                )
-            idx = ColumnIndex(Index(str_keys^))
-
-        # Build result columns.
         var result_cols = List[Column]()
         for v in range(len(value_names)):
             var rb_col = rb.column(v + 1).copy()  # +1 to skip key column.
             var is_count = agg == "count"
             var orig_is_int = value_dtypes[v].is_integer()
 
-            # Determine whether to produce int64 or float64 result.
             if is_count or (orig_is_int and agg != "mean"):
-                # int64 result: count always int64; sum/min/max of int -> int64.
-                var vals = List[Int64]()
-                var null_mask = NullMask()
-                for i in range(n_keep):
-                    var ri = keep[i]
-                    if not rb_col.is_valid(ri):
-                        vals.append(Int64(0))
-                        null_mask.append_null()
-                    elif is_count:
-                        vals.append(
-                            rebind[Int64](rb_col.as_int64().unsafe_get(ri))
-                        )
-                        null_mask.append_valid()
-                    else:
-                        # sum/min/max of integer col: marrow stores as float64.
-                        vals.append(
-                            Int64(Float64(rb_col.as_float64().unsafe_get(ri)))
-                        )
-                        null_mask.append_valid()
-                var col = Column(value_names[v], vals^, int64, idx.copy())
-                col._index_name = key_col_name
-                if null_mask.has_nulls():
-                    col.set_null_mask(null_mask^)
-                result_cols.append(col^)
+                result_cols.append(
+                    _marrow_agg_build_int_col(
+                        value_names[v],
+                        rb_col,
+                        keep,
+                        idx,
+                        key_col_name,
+                        is_count,
+                    )
+                )
             else:
-                # float64 result: mean, or float col sum/min/max.
-                var vals = List[Float64]()
-                var null_mask = NullMask()
-                for i in range(n_keep):
-                    var ri = keep[i]
-                    if not rb_col.is_valid(ri):
-                        vals.append(Float64(0))
-                        null_mask.append_null()
-                    else:
-                        vals.append(
-                            rebind[Float64](rb_col.as_float64().unsafe_get(ri))
-                        )
-                        null_mask.append_valid()
-                var col = Column(value_names[v], vals^, float64, idx.copy())
-                col._index_name = key_col_name
-                if null_mask.has_nulls():
-                    col.set_null_mask(null_mask^)
-                result_cols.append(col^)
+                result_cols.append(
+                    _marrow_agg_build_float_col(
+                        value_names[v], rb_col, keep, idx, key_col_name
+                    )
+                )
 
         return DataFrame(result_cols^)
 
@@ -6869,17 +7047,14 @@ struct DataFrameGroupBy:
         var skip = Dict[String, Bool]()
         for i in range(len(self._by)):
             skip[self._by[i]] = True
-        # Build row → group_key mapping by inverting _group_map.
         var n_rows = len(self._df._cols[0])
-        var row_key = List[String]()
-        for _ in range(n_rows):
-            row_key.append(String(""))
-        for j in range(len(self._group_keys)):
-            var key = self._group_keys[j]
-            ref indices = self._group_map[key]
-            for k in range(len(indices)):
-                row_key[indices[k]] = key
-        # Dtype-preserving broadcast for first/last.
+        var row_key = _gb_row_key_map(self._group_keys, self._group_map, n_rows)
+        # DataFrameGroupBy uses the empty-string sentinel to mark rows that
+        # were dropped from the group_map by ``dropna``.
+        var excluded = List[Bool]()
+        for r in range(n_rows):
+            excluded.append(row_key[r] == "")
+
         if func == "first" or func == "last":
             var want_first = func == "first"
             var result_cols = List[Column]()
@@ -6887,39 +7062,19 @@ struct DataFrameGroupBy:
                 ref col = self._df._cols[i]
                 if col.name.value() in skip:
                     continue
-                var key_to_idx = Dict[String, Int]()
-                for j in range(len(self._group_keys)):
-                    var key = self._group_keys[j]
-                    ref indices = self._group_map[key]
-                    var found = -1
-                    var start = 0 if want_first else len(indices) - 1
-                    var stop = len(indices) if want_first else -1
-                    var step = 1 if want_first else -1
-                    var ii = start
-                    while ii != stop:
-                        if col.is_valid(indices[ii]):
-                            found = indices[ii]
-                            break
-                        ii += step
-                    key_to_idx[key] = found
-                var selected = List[Int]()
-                for r in range(n_rows):
-                    if row_key[r] != "":
-                        selected.append(key_to_idx[row_key[r]])
-                    else:
-                        # Row was excluded by dropna — emit null.
-                        selected.append(-1)
-                var result_col = col.take_with_nulls(selected)
-                result_col.name = col.name
-                result_cols.append(result_col^)
+                result_cols.append(
+                    _gb_transform_first_last_col(
+                        col,
+                        self._group_keys,
+                        self._group_map,
+                        row_key,
+                        excluded,
+                        want_first,
+                    )
+                )
             return DataFrame(result_cols^)
-        # Detect whether any row has no group key (dropna null-key row).
-        var any_null_row = False
-        for r in range(n_rows):
-            if row_key[r] == "":
-                any_null_row = True
-                break
-        # Scalar-broadcast functions (float64 or int64-preserving).
+
+        var any_null_row = _gb_any_true(excluded)
         var needs_numeric = (
             func == "sum"
             or func == "mean"
@@ -6938,57 +7093,27 @@ struct DataFrameGroupBy:
                 col.dtype.is_integer() or col.dtype.is_float()
             ):
                 continue
-            # Integer-preserving path: only when no null rows can arise.
             if int_preserving and col.dtype.is_integer() and not any_null_row:
-                var key_to_int = Dict[String, Int64]()
-                for j in range(len(self._group_keys)):
-                    var key = self._group_keys[j]
-                    var sub = col.take(self._group_map[key])
-                    if func == "sum":
-                        key_to_int[key] = sub.sum_int64()
-                    elif func == "min":
-                        key_to_int[key] = sub.min_int64()
-                    else:  # max
-                        key_to_int[key] = sub.max_int64()
-                var int_vals = List[Int64]()
-                for r in range(n_rows):
-                    int_vals.append(key_to_int[row_key[r]])
-                result_cols.append(Column(col.name, int_vals^, int64))
+                result_cols.append(
+                    _gb_transform_int_col(
+                        col,
+                        self._group_keys,
+                        self._group_map,
+                        row_key,
+                        func,
+                    )
+                )
                 continue
-            var key_to_val = Dict[String, Float64]()
-            for j in range(len(self._group_keys)):
-                var key = self._group_keys[j]
-                var sub = col.take(self._group_map[key])
-                if func == "sum":
-                    key_to_val[key] = sub.sum()
-                elif func == "mean":
-                    key_to_val[key] = sub.mean()
-                elif func == "min":
-                    key_to_val[key] = sub.min()
-                elif func == "max":
-                    key_to_val[key] = sub.max()
-                elif func == "std":
-                    key_to_val[key] = sub.std()
-                elif func == "var":
-                    key_to_val[key] = sub.var()
-                elif func == "count":
-                    key_to_val[key] = Float64(sub.count())
-                # No else needed: first/last are handled in the separate branch above.
-            var nan = Float64(0) / Float64(0)
-            var vals = List[Float64]()
-            var null_mask = NullMask()
-            for r in range(n_rows):
-                if row_key[r] != "":
-                    vals.append(key_to_val[row_key[r]])
-                    null_mask.append_valid()
-                else:
-                    # Row was excluded by dropna — emit NaN.
-                    vals.append(nan)
-                    null_mask.append_null()
-            var result_col = Column(col.name, vals^, float64)
-            if null_mask.has_nulls():
-                result_col.set_null_mask(null_mask^)
-            result_cols.append(result_col^)
+            result_cols.append(
+                _gb_transform_float_col(
+                    col,
+                    self._group_keys,
+                    self._group_map,
+                    row_key,
+                    excluded,
+                    func,
+                )
+            )
         return DataFrame(result_cols^)
 
     def apply(self, func: String) raises -> DataFrame:
@@ -7000,6 +7125,192 @@ struct DataFrameGroupBy:
         return DataFrame.from_pandas(
             self._pd_groupby().filter(Python.evaluate(func))
         )
+
+
+# ------------------------------------------------------------------
+# groupby transform helpers (shared by DataFrameGroupBy / SeriesGroupBy)
+# ------------------------------------------------------------------
+
+
+def _gb_row_key_map(
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    n_rows: Int,
+) raises -> List[String]:
+    """Invert *group_map* to a row→group-key array.
+
+    Rows excluded by ``dropna`` are left as the empty string — the caller
+    uses ``""`` as a sentinel to emit NaN / null for those rows.
+    """
+    var row_key = List[String]()
+    for _ in range(n_rows):
+        row_key.append(String(""))
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        ref indices = group_map[key]
+        for k in range(len(indices)):
+            row_key[indices[k]] = key
+    return row_key^
+
+
+def _gb_any_true(flags: List[Bool]) -> Bool:
+    """Return True if any element of *flags* is True."""
+    for r in range(len(flags)):
+        if flags[r]:
+            return True
+    return False
+
+
+def _gb_transform_first_last_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    excluded: List[Bool],
+    want_first: Bool,
+) raises -> Column:
+    """Dtype-preserving first/last broadcast for one column.
+
+    Rows where ``excluded[r]`` is True are emitted as null; all other rows
+    take the first/last non-null value from their group.
+    """
+    var key_to_idx = Dict[String, Int]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        ref indices = group_map[key]
+        var found = -1
+        var start = 0 if want_first else len(indices) - 1
+        var stop = len(indices) if want_first else -1
+        var step = 1 if want_first else -1
+        var ii = start
+        while ii != stop:
+            if col.is_valid(indices[ii]):
+                found = indices[ii]
+                break
+            ii += step
+        key_to_idx[key] = found
+    var selected = List[Int]()
+    var n_rows = len(row_key)
+    for r in range(n_rows):
+        if excluded[r]:
+            selected.append(-1)
+        else:
+            selected.append(key_to_idx[row_key[r]])
+    var result_col = col.take_with_nulls(selected)
+    result_col.name = col.name
+    return result_col^
+
+
+def _gb_transform_int_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    func: String,
+) raises -> Column:
+    """Integer-preserving sum/min/max broadcast (no excluded rows)."""
+    var key_to_int = Dict[String, Int64]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        var sub = col.take(group_map[key])
+        if func == "sum":
+            key_to_int[key] = sub.sum_int64()
+        elif func == "min":
+            key_to_int[key] = sub.min_int64()
+        else:  # max
+            key_to_int[key] = sub.max_int64()
+    var int_vals = List[Int64]()
+    for r in range(len(row_key)):
+        int_vals.append(key_to_int[row_key[r]])
+    return Column(col.name, int_vals^, int64)
+
+
+def _gb_transform_float_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    excluded: List[Bool],
+    func: String,
+) raises -> Column:
+    """Float64 broadcast for sum/mean/min/max/std/var/count.
+
+    Rows where ``excluded[r]`` is True emit NaN.
+    """
+    var key_to_val = Dict[String, Float64]()
+    for j in range(len(group_keys)):
+        var key = group_keys[j]
+        var sub = col.take(group_map[key])
+        if func == "sum":
+            key_to_val[key] = sub.sum()
+        elif func == "mean":
+            key_to_val[key] = sub.mean()
+        elif func == "min":
+            key_to_val[key] = sub.min()
+        elif func == "max":
+            key_to_val[key] = sub.max()
+        elif func == "std":
+            key_to_val[key] = sub.std()
+        elif func == "var":
+            key_to_val[key] = sub.var()
+        elif func == "count":
+            key_to_val[key] = Float64(sub.count())
+    var nan = Float64(0) / Float64(0)
+    var vals = List[Float64]()
+    var null_mask = NullMask()
+    for r in range(len(row_key)):
+        if excluded[r]:
+            vals.append(nan)
+            null_mask.append_null()
+        else:
+            vals.append(key_to_val[row_key[r]])
+            null_mask.append_valid()
+    var result_col = Column(col.name, vals^, float64)
+    if null_mask.has_nulls():
+        result_col.set_null_mask(null_mask^)
+    return result_col^
+
+
+def _sgb_transform_count_size_col(
+    col: Column,
+    group_keys: List[String],
+    group_map: Dict[String, List[Int]],
+    row_key: List[String],
+    excluded: List[Bool],
+    func: String,
+) raises -> Column:
+    """count / size transform for a Series groupby.
+
+    Returns int64 when no rows are excluded, float64 with NaN otherwise
+    (to represent the excluded rows as nulls).
+    """
+    var key_to_agg = Dict[String, Int64]()
+    for i in range(len(group_keys)):
+        var key = group_keys[i]
+        if func == "count":
+            var sub = col.take(group_map[key])
+            key_to_agg[key] = Int64(sub.count())
+        else:  # size
+            key_to_agg[key] = Int64(len(group_map[key]))
+    var any_excluded = _gb_any_true(excluded)
+    if any_excluded:
+        var nan = Float64(0) / Float64(0)
+        var result_vals = List[Float64]()
+        var null_mask = NullMask()
+        for i in range(len(row_key)):
+            if excluded[i]:
+                result_vals.append(nan)
+                null_mask.append_null()
+            else:
+                result_vals.append(Float64(key_to_agg[row_key[i]]))
+                null_mask.append_valid()
+        var result_col = Column(col.name, result_vals^, float64)
+        result_col.set_null_mask(null_mask^)
+        return result_col^
+    var result_vals = List[Int64]()
+    for i in range(len(row_key)):
+        result_vals.append(key_to_agg[row_key[i]])
+    return Column(col.name, result_vals^, int64)
 
 
 struct SeriesGroupBy:
@@ -7362,48 +7673,30 @@ struct SeriesGroupBy:
 
     def transform(self, func: String) raises -> Series:
         var n = len(self._series._col)
-        var nan = Float64(0) / Float64(0)
-        # Detect whether any row is null-labelled and excluded by dropna.
-        var any_excluded_row = False
-        if self._dropna:
-            for i in range(n):
-                if self._by_null_mask.is_null(i):
-                    any_excluded_row = True
-                    break
-        # Build row → group_key mapping by inverting _group_map.
-        var row_key = List[String]()
-        for _ in range(n):
-            row_key.append(String(""))
-        for j in range(len(self._group_keys)):
-            var key = self._group_keys[j]
-            ref indices = self._group_map[key]
-            for k in range(len(indices)):
-                row_key[indices[k]] = key
-        # Integer-preserving scalar-broadcast path for sum / min / max.
+        var row_key = _gb_row_key_map(self._group_keys, self._group_map, n)
+        # SeriesGroupBy distinguishes an "excluded" row from a row whose
+        # legitimate group key happens to be the empty string — track
+        # exclusion via the dropna-aware by_null_mask.
+        var excluded = List[Bool]()
+        for i in range(n):
+            excluded.append(self._by_null_mask.is_null(i) and self._dropna)
+        var any_excluded_row = _gb_any_true(excluded)
+        ref src_col = self._series._col
+
         var int_preserving = func == "sum" or func == "min" or func == "max"
         if (
             int_preserving
-            and self._series._col.dtype.is_integer()
+            and src_col.dtype.is_integer()
             and not any_excluded_row
         ):
-            var key_to_int = Dict[String, Int64]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                var sub = self._series._col.take(self._group_map[key])
-                if func == "sum":
-                    key_to_int[key] = sub.sum_int64()
-                elif func == "min":
-                    key_to_int[key] = sub.min_int64()
-                else:  # max
-                    key_to_int[key] = sub.max_int64()
-            var int_vals = List[Int64]()
-            for i in range(n):
-                int_vals.append(key_to_int[row_key[i]])
-            var result_col = Column(self._series.name, int_vals^, int64)
-            result_col._index = self._series._col._index.copy()
-            result_col._index_name = self._series._col._index_name
+            var result_col = _gb_transform_int_col(
+                src_col, self._group_keys, self._group_map, row_key, func
+            )
+            result_col.name = self._series.name
+            result_col._index = src_col._index.copy()
+            result_col._index_name = src_col._index_name
             return Series(result_col^)
-        # Float64-returning scalar-broadcast functions
+
         if (
             func == "sum"
             or func == "mean"
@@ -7412,101 +7705,48 @@ struct SeriesGroupBy:
             or func == "std"
             or func == "var"
         ):
-            var key_to_agg = Dict[String, Float64]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                var sub = self._series._col.take(self._group_map[key])
-                if func == "sum":
-                    key_to_agg[key] = sub.sum()
-                elif func == "mean":
-                    key_to_agg[key] = sub.mean()
-                elif func == "min":
-                    key_to_agg[key] = sub.min()
-                elif func == "max":
-                    key_to_agg[key] = sub.max()
-                elif func == "std":
-                    key_to_agg[key] = sub.std()
-                elif func == "var":
-                    key_to_agg[key] = sub.var()
-            var result_vals = List[Float64]()
-            var null_mask = NullMask()
-            for i in range(n):
-                if self._by_null_mask.is_null(i) and self._dropna:
-                    result_vals.append(nan)
-                    null_mask.append_null()
-                else:
-                    result_vals.append(key_to_agg[row_key[i]])
-                    null_mask.append_valid()
-            var result_col = Column(self._series.name, result_vals^, float64)
-            if null_mask.has_nulls():
-                result_col.set_null_mask(null_mask^)
-            result_col._index = self._series._col._index.copy()
-            result_col._index_name = self._series._col._index_name
-            return Series(result_col^)
-        # Int64-returning scalar-broadcast functions
-        if func == "count" or func == "size":
-            var key_to_agg = Dict[String, Int64]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                if func == "count":
-                    var sub = self._series._col.take(self._group_map[key])
-                    key_to_agg[key] = Int64(sub.count())
-                else:
-                    key_to_agg[key] = Int64(len(self._group_map[key]))
-            if any_excluded_row:
-                var result_vals = List[Float64]()
-                var null_mask = NullMask()
-                for i in range(n):
-                    if self._by_null_mask.is_null(i) and self._dropna:
-                        result_vals.append(nan)
-                        null_mask.append_null()
-                    else:
-                        result_vals.append(Float64(key_to_agg[row_key[i]]))
-                        null_mask.append_valid()
-                var result_col = Column(
-                    self._series.name, result_vals^, float64
-                )
-                result_col.set_null_mask(null_mask^)
-                result_col._index = self._series._col._index.copy()
-                result_col._index_name = self._series._col._index_name
-                return Series(result_col^)
-            var result_vals = List[Int64]()
-            for i in range(n):
-                result_vals.append(key_to_agg[row_key[i]])
-            var result_col = Column(self._series.name, result_vals^, int64)
-            result_col._index = self._series._col._index.copy()
-            result_col._index_name = self._series._col._index_name
-            return Series(result_col^)
-        # Dtype-preserving broadcast functions (first/last)
-        if func == "first" or func == "last":
-            ref col = self._series._col
-            var want_first = func == "first"
-            var key_to_idx = Dict[String, Int]()
-            for i in range(len(self._group_keys)):
-                var key = self._group_keys[i]
-                ref indices = self._group_map[key]
-                var found = -1
-                var start = 0 if want_first else len(indices) - 1
-                var stop = len(indices) if want_first else -1
-                var step = 1 if want_first else -1
-                var j = start
-                while j != stop:
-                    if col.is_valid(indices[j]):
-                        found = indices[j]
-                        break
-                    j += step
-                key_to_idx[key] = found
-            var selected = List[Int]()
-            for i in range(n):
-                if self._by_null_mask.is_null(i) and self._dropna:
-                    selected.append(-1)
-                else:
-                    selected.append(key_to_idx[row_key[i]])
-            var result_col = col.take_with_nulls(selected)
+            var result_col = _gb_transform_float_col(
+                src_col,
+                self._group_keys,
+                self._group_map,
+                row_key,
+                excluded,
+                func,
+            )
             result_col.name = self._series.name
-            result_col._index = col._index.copy()
-            result_col._index_name = col._index_name
+            result_col._index = src_col._index.copy()
+            result_col._index_name = src_col._index_name
             return Series(result_col^)
+
+        if func == "count" or func == "size":
+            var result_col = _sgb_transform_count_size_col(
+                src_col,
+                self._group_keys,
+                self._group_map,
+                row_key,
+                excluded,
+                func,
+            )
+            result_col.name = self._series.name
+            result_col._index = src_col._index.copy()
+            result_col._index_name = src_col._index_name
+            return Series(result_col^)
+
+        if func == "first" or func == "last":
+            var want_first = func == "first"
+            var result_col = _gb_transform_first_last_col(
+                src_col,
+                self._group_keys,
+                self._group_map,
+                row_key,
+                excluded,
+                want_first,
+            )
+            result_col.name = self._series.name
+            result_col._index = src_col._index.copy()
+            result_col._index_name = src_col._index_name
+            return Series(result_col^)
+
         return Series.from_pandas(self._pd_groupby().transform(func))
 
     def apply(self, func: String) raises -> Series:
