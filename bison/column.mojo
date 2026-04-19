@@ -5508,7 +5508,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             ref a = self._storage[AnyArray].as_bool()
             var result = List[Bool](capacity=len(indices))
             for k in range(len(indices)):
-                result.append(Bool(a.unsafe_get(indices[k])))
+                result.append(rebind[Bool](a.unsafe_get(indices[k])))
             col = Column(self.name, ColumnData(result^), self.dtype)
         elif self._storage.isa[AnyArray]() and self.is_string():
             ref a = self._storage[AnyArray].as_string()

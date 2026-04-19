@@ -169,12 +169,11 @@ def test_getitem_bool_mask_string_eq() raises:
 def test_getitem_bool_mask_mixed_dtype() raises:
     """Boolean mask keeps row order across mixed AnyArray-backed dtypes."""
     var pd = Python.import_module("pandas")
+    var data = Python.evaluate(
+        "{'i': [10, 20, 30, 40, 50], 'f': [1.0, 2.0, 3.0, 4.0, 5.0], 'b': [True, False, True, False, True], 's': ['a', 'b', 'c', 'd', 'e'], 'sel': [0, 1, 0, 1, 1]}"
+    )
     var df = DataFrame(
-        pd.DataFrame(
-            Python.evaluate(
-                "{'i': [10, 20, 30, 40, 50], 'f': [1.0, 2.0, 3.0, 4.0, 5.0], 'b': [True, False, True, False, True], 's': ['a', 'b', 'c', 'd', 'e'], 'sel': [0, 1, 0, 1, 1]}"
-            )
-        )
+        pd.DataFrame(data)
     )
     var result = df[df["sel"].__gt__(0.0)]
     assert_equal(result.shape()[0], 3)
