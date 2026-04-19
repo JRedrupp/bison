@@ -5514,7 +5514,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             ref a = self._storage[AnyArray].as_string()
             var result = List[String](capacity=len(indices))
             for k in range(len(indices)):
-                result.append(String(a.unsafe_get(UInt(indices[k]))))
+                # StringArray.unsafe_get expects UInt indexing.
+                var idx = indices[k]
+                result.append(String(a.unsafe_get(UInt(idx))))
             col = Column(self.name, ColumnData(result^), self.dtype)
         elif self._storage.isa[AnyArray]() and self.is_float():
             ref a = self._storage[AnyArray].as_float64()
