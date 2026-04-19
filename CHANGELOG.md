@@ -6,6 +6,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Restore `DataFrame.query()` and `DataFrame.eval()` as fully native Mojo
+  (issue #716). The `bison.expr` package (tokenizer, AST, parser, evaluator)
+  is restored. The evaluator is rewritten to use a plain recursive
+  `_eval_node` function instead of the original generic visitor pattern,
+  working around Mojo compiler bug #642 without re-introducing typed caches.
+
 ## [0.1.0-alpha] - 2026-04-19
 
 ### Added
@@ -28,12 +35,6 @@ Versions follow [Semantic Versioning](https://semver.org/).
   for `datetime64_ns` / `timedelta64_ns` columns, matching pandas
   `dtype == object` semantics. Closes #644.
 
-### Removed
-- `DataFrame.query()` and `DataFrame.eval()` along with the `bison.expr`
-  parser/evaluator module. Removing the query evaluator unblocked removal of
-  the dual-backend `Column` storage (typed caches kept as a Mojo compiler
-  deadlock workaround — see #642). Query/eval will be re-added once the
-  compiler bug is fixed; see #716.
 
 ## [0.1.0] - 2026-03-08
 

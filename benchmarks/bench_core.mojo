@@ -24,7 +24,7 @@ from std.time import perf_counter_ns
 # ---------------------------------------------------------------------------
 
 comptime FAST_ITERS = 100  # <1 ms per call  (sum, mean, iloc, fillna, apply)
-comptime MED_ITERS = 20  # 1–20 ms per call (groupby)
+comptime MED_ITERS = 20  # 1–20 ms per call (groupby, query/eval)
 comptime SLOW_ITERS = 3  # >20 ms per call  (sort, merge)
 comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 
@@ -108,8 +108,16 @@ def main() raises:
     var pd_df = _fixtures[0]
     var pd_df2 = _fixtures[1]
 
+    # Smaller fixtures for query size-sweep (1 K and 10 K rows)
+    var _fixtures_1k = _make_fixtures(1_000)
+    var pd_df_1k = _fixtures_1k[0]
+    var _fixtures_10k = _make_fixtures(10_000)
+    var pd_df_10k = _fixtures_10k[0]
+
     var df = DataFrame.from_pandas(pd_df)
     var df2 = DataFrame.from_pandas(pd_df2)
+    var df_1k = DataFrame.from_pandas(pd_df_1k)
+    var df_10k = DataFrame.from_pandas(pd_df_10k)
 
     var np = Python.import_module("numpy")
     var pd = Python.import_module("pandas")
@@ -128,6 +136,8 @@ def main() raises:
     g["pd_df"] = pd_df
     g["pd_df2"] = pd_df2
     g["pd_df_klookup"] = pd_df_klookup
+    g["pd_df_1k"] = pd_df_1k
+    g["pd_df_10k"] = pd_df_10k
     g["np"] = np
 
     # ------------------------------------------------------------------
@@ -197,6 +207,137 @@ def main() raises:
     else:
         results.append(
             BenchResult("groupby_sum", bison_ms, pandas_ms, MED_ITERS)
+        )
+
+    # ------------------------------------------------------------------
+    # query_simple  (native single-condition filter via df.query)
+    #
+    # Uses the native parse+eval+mask pipeline; no pandas round-trip.
+    # Comparison baseline uses boolean-index pandas (not pd.query) so
+    # both sides use the cheapest available path.
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.query("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df[pd_df['a'] > 0.5]", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("query_simple"))
+    else:
+        results.append(
+            BenchResult("query_simple", bison_ms, pandas_ms, MED_ITERS)
+        )
+
+    # ------------------------------------------------------------------
+    # query_and  (native two-condition AND filter via df.query)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.query("a > 0.5 and b < 0.3")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas(
+        "pd_df[(pd_df['a'] > 0.5) & (pd_df['b'] < 0.3)]", g, MED_ITERS
+    )
+    if skipped:
+        results.append(BenchResult.skipped_result("query_and"))
+    else:
+        results.append(BenchResult("query_and", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # query_or  (native two-condition OR filter via df.query)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.query("a > 0.8 or b > 0.8")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas(
+        "pd_df[(pd_df['a'] > 0.8) | (pd_df['b'] > 0.8)]", g, MED_ITERS
+    )
+    if skipped:
+        results.append(BenchResult.skipped_result("query_or"))
+    else:
+        results.append(BenchResult("query_or", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # eval_expr  (native df.eval returning a boolean Series)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df.eval("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df['a'] > 0.5", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("eval_expr"))
+    else:
+        results.append(BenchResult("eval_expr", bison_ms, pandas_ms, MED_ITERS))
+
+    # ------------------------------------------------------------------
+    # query_size_1k / query_size_10k  (size sweep for the native filter)
+    # ------------------------------------------------------------------
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df_1k.query("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df_1k[pd_df_1k['a'] > 0.5]", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("query_size_1k"))
+    else:
+        results.append(
+            BenchResult("query_size_1k", bison_ms, pandas_ms, MED_ITERS)
+        )
+
+    skipped = False
+    try:
+        var t0 = perf_counter_ns()
+        for _ in range(MED_ITERS):
+            _ = df_10k.query("a > 0.5")
+        bison_ms = _elapsed_ms(t0, MED_ITERS)
+    except e:
+        if "not implemented" in String(e):
+            skipped = True
+        else:
+            raise e^
+    pandas_ms = _time_pandas("pd_df_10k[pd_df_10k['a'] > 0.5]", g, MED_ITERS)
+    if skipped:
+        results.append(BenchResult.skipped_result("query_size_10k"))
+    else:
+        results.append(
+            BenchResult("query_size_10k", bison_ms, pandas_ms, MED_ITERS)
         )
 
     # ------------------------------------------------------------------

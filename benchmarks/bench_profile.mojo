@@ -37,6 +37,7 @@ from std.time import perf_counter_ns
 comptime SORT_ITERS = 30
 comptime GROUPBY_ITERS = 50
 comptime MERGE_ITERS = 30
+comptime QUERY_ITERS = 100
 comptime CSV_ITERS = 10
 comptime LOC_SLICE_ITERS = 5000
 
@@ -90,6 +91,16 @@ def _profile_merge(df: DataFrame, df2: DataFrame, iters: Int) raises:
     print(" ", ms, "ms/call")
 
 
+def _profile_query(df: DataFrame, iters: Int) raises:
+    """Profile DataFrame.query with a compound expression."""
+    print("  query (a > 0.5 and b < 0.3) ...", end="")
+    var t0 = perf_counter_ns()
+    for _ in range(iters):
+        _ = df.query("a > 0.5 and b < 0.3")
+    var ms = _elapsed_ms(t0, iters)
+    print(" ", ms, "ms/call")
+
+
 def _profile_csv(df: DataFrame, iters: Int) raises:
     """Profile CSV round-trip (to_csv + read_csv)."""
     print("  csv_roundtrip ...", end="")
@@ -127,6 +138,7 @@ def main() raises:
         results.append(BenchResult.skipped_result("profile_sort"))
         results.append(BenchResult.skipped_result("profile_groupby"))
         results.append(BenchResult.skipped_result("profile_merge"))
+        results.append(BenchResult.skipped_result("profile_query"))
         results.append(BenchResult.skipped_result("profile_csv"))
         print_json(results)
         return
@@ -173,6 +185,8 @@ def main() raises:
         _profile_groupby(df, GROUPBY_ITERS)
     if op == "merge" or op == "all":
         _profile_merge(df, df2, MERGE_ITERS)
+    if op == "query" or op == "all":
+        _profile_query(df, QUERY_ITERS)
     if op == "csv" or op == "all":
         _profile_csv(df, CSV_ITERS)
     if op == "loc_slice":
