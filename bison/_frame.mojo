@@ -1214,35 +1214,6 @@ comptime _CUM_MIN = 2
 comptime _CUM_MAX = 3
 
 
-struct _RowKeyVisitor(ColumnDataVisitorRaises, Copyable, Movable):
-    """Visitor that serialises a single row element from a ColumnData arm to a
-    String.  Used by ``DataFrame._row_key_str`` to build per-row hash keys
-    without raw ``isa`` chains.
-    """
-
-    var row: Int
-    var result: String
-
-    def __init__(out self, row: Int):
-        self.row = row
-        self.result = String()
-
-    def on_int64(mut self, data: List[Int64]) raises:
-        self.result = String(Int(data[self.row]))
-
-    def on_float64(mut self, data: List[Float64]) raises:
-        self.result = String(data[self.row])
-
-    def on_bool(mut self, data: List[Bool]) raises:
-        self.result = "1" if data[self.row] else "0"
-
-    def on_str(mut self, data: List[String]) raises:
-        self.result = data[self.row]
-
-    def on_obj(mut self, data: List[PythonObject]) raises:
-        self.result = String(data[self.row])
-
-
 struct _ColDataView(Copyable, Movable):
     """Pre-materialised typed data for a single key column.
 
@@ -1318,8 +1289,8 @@ def _build_col_views(
 def _row_key_from_views(views: List[_ColDataView], row: Int) raises -> String:
     """Build the row-key string for *row* from pre-materialised column views.
 
-    Uses the same length-prefixed encoding as ``DataFrame._row_key_str`` for
-    multi-column keys so existing hash maps remain compatible.
+    Uses length-prefixed encoding for multi-column keys so existing hash maps
+    remain compatible.
     """
     var n_keys = len(views)
     if n_keys == 1:
@@ -5275,40 +5246,6 @@ struct DataFrame(Copyable, Movable):
     # ------------------------------------------------------------------
     # Combining
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _row_key_str(
-        df: DataFrame,
-        key_cols: List[String],
-        row: Int,
-        col_idx: Dict[String, Int],
-    ) raises -> String:
-        """Serialise the key column values at *row* to a single String for hashing.
-
-        *col_idx* must be a pre-built name→column-index map for *df* so that
-        each key lookup is O(1) rather than O(n_cols).
-
-        For multi-column keys, uses length-prefixed encoding (``len:value``)
-        for each component so that values containing arbitrary characters
-        never cause collisions.  For example, (``"a|b"``, ``"c"``) encodes
-        as ``"3:a|b1:c"`` while (``"a"``, ``"b|c"``) encodes as
-        ``"1:a3:b|c"`` — always distinct.
-
-        Single-column keys return the raw stringified value (no encoding
-        needed since there is no inter-column delimiter to collide with).
-        """
-        var n_keys = len(key_cols)
-        var key = String()
-        var visitor = _RowKeyVisitor(row)
-        for k in range(n_keys):
-            var i = col_idx[key_cols[k]]
-            visitor.result = String()
-            df._cols[i]._visit_raises(visitor)
-            var part = visitor.result
-            if n_keys == 1:
-                return part
-            key += String(part.byte_length()) + ":" + part
-        return key
 
     def merge(
         self,

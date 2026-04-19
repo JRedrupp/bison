@@ -145,7 +145,7 @@ kcachegrind profile_results/callgrind.out.sort
 
 - **Ir** (instruction reads) is the primary cost metric. Higher Ir = more time.
 - Functions are listed in descending Ir order. Look for bison functions
-  like `sort_perm`, `take`, `_row_key_str`, `_groupby_indices`.
+  like `sort_perm`, `take`, `_row_key_from_views`, `_groupby_indices`.
 - Line-level annotation shows which specific lines within a function are
   most expensive.
 
@@ -233,7 +233,7 @@ perf report -i profile_results/sort.perf.data
 |----------|-----------|--------------|
 | `sort_perm` | `sort_values` | Merge-sort to produce permutation array |
 | `take` | `sort_values`, `groupby` | Reorder column data by index array |
-| `_row_key_str` | `merge`, `groupby` | Serialize row values to string key |
+| `_row_key_from_views` | `merge`, `groupby` | Serialize row values to string key |
 | `_groupby_indices` | `groupby` | Build key-to-row-index mapping |
 | `take_with_nulls` | `merge` | Reorder with null insertion for outer joins |
 | `_merge_sort_perm_comparable` | `sort_perm` | The actual sort kernel |
