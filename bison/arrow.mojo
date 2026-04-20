@@ -107,89 +107,20 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
 
 
 def marrow_array_to_column(arr: AnyArray, name: String) raises -> Column:
-    """Convert a marrow AnyArray to a bison Column.
+    """Wrap a marrow AnyArray in a bison Column (O(1) ref-bump).
 
-    Arrow null elements (validity bit = 0) are recorded via the column's
-    null mask. A fully-valid array leaves the mask empty (bison's
-    no-nulls sentinel). Only int64, float64, bool, and string Arrow
-    types are supported.
-
-    The input ``arr`` is also stored directly on the returned column's
-    ``_storage`` field (zero-copy via ArcPointer ref-bump) so
-    dual-backend readers can use the marrow representation immediately.
+    Nulls are encoded in the Arrow validity bitmap; no side-table NullMask
+    is built.  Only int64, float64, bool, and string are supported.
     """
     var dt = arr.dtype()
-    var n = arr.length()
-
     if dt == _m_int64:
-        ref src = arr.as_int64()
-        var data = List[Int64]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if not arr.is_valid(i):
-                data.append(Int64(0))
-                null_mask.append_null()
-            else:
-                data.append(rebind[Int64](src.unsafe_get(i)))
-                null_mask.append_valid()
-        var col = Column(name, data^, int64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        col._storage = ColumnStorage(arr.copy())
-        return col^
-
+        return Column(name, arr.copy(), int64)
     elif dt == _m_float64:
-        ref src = arr.as_float64()
-        var data = List[Float64]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if not arr.is_valid(i):
-                data.append(Float64(0))
-                null_mask.append_null()
-            else:
-                data.append(rebind[Float64](src.unsafe_get(i)))
-                null_mask.append_valid()
-        var col = Column(name, data^, float64)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        col._storage = ColumnStorage(arr.copy())
-        return col^
-
+        return Column(name, arr.copy(), float64)
     elif dt == _m_bool_:
-        ref src = arr.as_bool()
-        var data = List[Bool]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if not arr.is_valid(i):
-                data.append(False)
-                null_mask.append_null()
-            else:
-                data.append(src[i].value())
-                null_mask.append_valid()
-        var col = Column(name, data^, bool_)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        col._storage = ColumnStorage(arr.copy())
-        return col^
-
+        return Column(name, arr.copy(), bool_)
     elif dt == _m_string:
-        ref src = arr.as_string()
-        var data = List[String]()
-        var null_mask = NullMask()
-        for i in range(n):
-            if not arr.is_valid(i):
-                data.append("")
-                null_mask.append_null()
-            else:
-                data.append(String(src.unsafe_get(UInt(i))))
-                null_mask.append_valid()
-        # #644: string-backed columns carry string_ dtype.
-        var col = Column(name, data^, string_)
-        if null_mask.has_nulls():
-            col.set_null_mask(null_mask^)
-        col._storage = ColumnStorage(arr.copy())
-        return col^
-
+        return Column(name, arr.copy(), string_)
     else:
         raise Error(
             "marrow_array_to_column: unsupported Arrow type — only"

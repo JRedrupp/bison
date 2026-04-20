@@ -67,6 +67,8 @@ Key rules to remember:
 - Writes go through `_flush_int64_list` / `_flush_float64_list` / `_flush_bool_list` / `_flush_str_list` — extract the typed list, mutate, flush.
 - New element-wise math operations should follow the `_apply[F]` pattern.
 - Window computation kernels live in `bison/window/_kernels.mojo` as pure functions; window structs live in `_frame.mojo` (after GroupBy).
+- To wrap a marrow `AnyArray` directly in a `Column`, use `Column(name, arr.copy(), dtype)` — no `List[T]` needed. `AnyArray.copy()` is O(1) (ArcPointer ref-bump, not a data copy).
+- Numeric/bool/string columns are always `AnyArray`-backed; `LegacyObjectData` is only for object/datetime/timedelta. `is_null(i)` reads from the Arrow validity bitmap for `AnyArray` columns.
 
 ## Versioning
 
