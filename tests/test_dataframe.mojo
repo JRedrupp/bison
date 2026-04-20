@@ -413,6 +413,25 @@ def test_sort_values_basic() raises:
     assert_true(r["a"].iloc(2)[Int64] == 3)
 
 
+def test_sort_values_single_key_reorders_other_columns_stably() raises:
+    var pd = Python.import_module("pandas")
+    var df = DataFrame(
+        pd.DataFrame(Python.evaluate("{'a': [2, 1, 2, 1], 'b': [10, 20, 30, 40]}"))
+    )
+    var by = List[String]()
+    by.append("a")
+    var r = df.sort_values(by)
+    assert_true(r["a"].iloc(0)[Int64] == 1)
+    assert_true(r["a"].iloc(1)[Int64] == 1)
+    assert_true(r["a"].iloc(2)[Int64] == 2)
+    assert_true(r["a"].iloc(3)[Int64] == 2)
+    # Stable sort keeps original order within ties.
+    assert_true(r["b"].iloc(0)[Int64] == 20)
+    assert_true(r["b"].iloc(1)[Int64] == 40)
+    assert_true(r["b"].iloc(2)[Int64] == 10)
+    assert_true(r["b"].iloc(3)[Int64] == 30)
+
+
 def test_sort_values_na_last_default() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [3.0, None, 1.0]}")))
