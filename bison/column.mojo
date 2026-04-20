@@ -2868,6 +2868,32 @@ def _fused_cmp_and_scalar(
     )
 
 
+def _fused_cmp_and_bool_list(
+    col_a: Column,
+    op_a: Int,
+    scalar_a: Float64,
+    col_b: Column,
+    op_b: Int,
+    scalar_b: Float64,
+) raises -> List[Bool]:
+    """Fast path for (col_a op_a scalar_a) AND (col_b op_b scalar_b).
+
+    Both columns must be no-null float64 AnyArray. Caller is responsible for
+    verifying eligibility. Returns a ``List[Bool]`` directly — avoids the
+    marrow bitmap roundtrip when the caller only needs the raw bool values.
+    """
+    var n = len(col_a)
+    var result = List[Bool](capacity=n)
+    ref a = col_a._storage[AnyArray].as_float64()
+    ref b = col_b._storage[AnyArray].as_float64()
+    for i in range(n):
+        result.append(
+            _cmp_f64_op(rebind[Float64](a.unsafe_get(i)), op_a, scalar_a)
+            and _cmp_f64_op(rebind[Float64](b.unsafe_get(i)), op_b, scalar_b)
+        )
+    return result^
+
+
 def _fused_cmp_or_scalar(
     col_a: Column,
     op_a: Int,

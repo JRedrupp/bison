@@ -34,6 +34,7 @@ from ..column import (
     Column,
     _col_is_numeric_anyarray,
     _fused_cmp_and_scalar,
+    _fused_cmp_and_bool_list,
     _fused_cmp_or_scalar,
     _str_op_to_cmp_int,
 )
@@ -394,3 +395,71 @@ def eval_expr(parsed: ParsedExpr, df: DataFrame) raises -> Series:
     precedence are handled by the parser.
     """
     return _eval_node(parsed.root, parsed, df)
+
+
+struct FusedAndBoolListResult(Movable):
+    """Result of ``try_eval_fused_and_bool_list``.
+
+    *eligible* is False when the expression is not a fusible no-null AND;
+    the caller should fall back to ``eval_expr`` in that case.
+    When *eligible* is True, *mask* holds the row-by-row bool values.
+    """
+
+    var eligible: Bool
+    var mask: List[Bool]
+
+    def __init__(out self):
+        self.eligible = False
+        self.mask = List[Bool]()
+
+    def __init__(out self, *, deinit take: Self):
+        self.eligible = take.eligible
+        self.mask = take.mask^
+
+
+def try_eval_fused_and_bool_list(
+    parsed: ParsedExpr, df: DataFrame
+) raises -> FusedAndBoolListResult:
+    """Try to evaluate a fused AND expression directly to ``List[Bool]``.
+
+    Returns an eligible result when the expression is a top-level AND of two
+    no-null float64 scalar comparisons — the common ``query_and`` hot path.
+    Returns non-eligible for all other expression shapes; the caller should
+    fall back to ``eval_expr``.
+
+    Skips the marrow bitmap roundtrip: the caller can iterate the returned
+    mask directly without creating or unpacking a bool Column.
+    """
+    var out = FusedAndBoolListResult()
+    var node = parsed.node_at(parsed.root)
+    if node.kind != NK_AND:
+        return out^
+    if (
+        parsed.node_at(node.left).kind != NK_COMPARE
+        or parsed.node_at(node.right).kind != NK_COMPARE
+    ):
+        return out^
+    var a_info = _try_extract_fuse_cmp(node.left, parsed)
+    var b_info = _try_extract_fuse_cmp(node.right, parsed)
+    if not a_info.eligible or not b_info.eligible:
+        return out^
+    var a_col = _resolve_ident(a_info.col_name, df)._col
+    var b_col = _resolve_ident(b_info.col_name, df)._col
+    if not _col_is_numeric_anyarray(a_col) or not _col_is_numeric_anyarray(
+        b_col
+    ):
+        return out^
+    if not a_col.is_float() or not b_col.is_float():
+        return out^
+    if a_col.has_nulls() or b_col.has_nulls():
+        return out^
+    out.eligible = True
+    out.mask = _fused_cmp_and_bool_list(
+        a_col,
+        a_info.op_int,
+        a_info.scalar,
+        b_col,
+        b_info.op_int,
+        b_info.scalar,
+    )
+    return out^

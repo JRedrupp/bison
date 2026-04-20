@@ -36,4 +36,8 @@ from ._ast import (
     NK_OR,
 )
 from ._parser import parse
-from ._eval import eval_expr
+from ._eval import (
+    eval_expr,
+    try_eval_fused_and_bool_list,
+    FusedAndBoolListResult,
+)
