@@ -2740,6 +2740,212 @@ comptime _BOOL_XOR = 2
 
 
 # ------------------------------------------------------------------
+# Fused scalar-comparison kernels (used by expr/_eval.mojo)
+# ------------------------------------------------------------------
+
+
+def _col_is_numeric_anyarray(col: Column) -> Bool:
+    """Return True if *col* has numeric/bool AnyArray storage (fuse-eligible).
+    """
+    return col._storage.isa[AnyArray]() and (
+        col.is_int() or col.is_float() or col.is_bool()
+    )
+
+
+def _str_op_to_cmp_int(op: String) raises -> Int:
+    """Convert an operator string to a _CMP_* integer constant."""
+    if op == "<":
+        return _CMP_LT
+    elif op == "<=":
+        return _CMP_LE
+    elif op == ">":
+        return _CMP_GT
+    elif op == ">=":
+        return _CMP_GE
+    elif op == "==":
+        return _CMP_EQ
+    elif op == "!=":
+        return _CMP_NE
+    raise Error("unknown comparison operator: '" + op + "'")
+
+
+def _cmp_f64_op(elem: Float64, op: Int, scalar: Float64) -> Bool:
+    """Apply a runtime _CMP_* op between a Float64 element and scalar."""
+    if op == _CMP_LT:
+        return elem < scalar
+    elif op == _CMP_LE:
+        return elem <= scalar
+    elif op == _CMP_GT:
+        return elem > scalar
+    elif op == _CMP_GE:
+        return elem >= scalar
+    elif op == _CMP_EQ:
+        return elem == scalar
+    else:
+        return elem != scalar
+
+
+def _fused_cmp_and_scalar(
+    col_a: Column,
+    op_a: Int,
+    scalar_a: Float64,
+    col_b: Column,
+    op_b: Int,
+    scalar_b: Float64,
+) raises -> Column:
+    """Evaluate ``(col_a op_a scalar_a) AND (col_b op_b scalar_b)`` in one pass.
+
+    ``op_a`` / ``op_b`` are ``_CMP_*`` integer constants.  Both columns must
+    have numeric / bool ``AnyArray`` storage (the caller is responsible for
+    verifying this before calling).  Kleene three-valued null semantics are
+    preserved: ``null AND False → False``, ``null AND True → null``.
+
+    Returns a boolean Column.
+    """
+    var n = len(col_a)
+    var result = List[Bool](capacity=n)
+    var result_mask = List[Bool]()
+    var a_has_nulls = col_a.has_nulls()
+    var b_has_nulls = col_b.has_nulls()
+    var has_any_null = False
+
+    ref a_arr = col_a._storage[AnyArray]
+    ref b_arr = col_b._storage[AnyArray]
+    var a_dt = a_arr.dtype()
+    var b_dt = b_arr.dtype()
+
+    # Hot path: both columns are float64 with no nulls (most common case).
+    if (
+        a_dt == _m_float64
+        and b_dt == _m_float64
+        and not a_has_nulls
+        and not b_has_nulls
+    ):
+        ref a = a_arr.as_float64()
+        ref b = b_arr.as_float64()
+        for i in range(n):
+            result.append(
+                _cmp_f64_op(rebind[Float64](a.unsafe_get(i)), op_a, scalar_a)
+                and _cmp_f64_op(
+                    rebind[Float64](b.unsafe_get(i)), op_b, scalar_b
+                )
+            )
+        return col_a._build_result_col(ColumnData(result^), result_mask^, False)
+
+    # General path: any numeric dtype, handles nulls with Kleene AND semantics.
+    # result_mask must be the same length as result so we always append to it.
+    var a_f64 = col_a._f64_list()
+    var b_f64 = col_b._f64_list()
+    for i in range(n):
+        var a_null = a_has_nulls and col_a.is_null(i)
+        var b_null = b_has_nulls and col_b.is_null(i)
+        if not a_null and not b_null:
+            result.append(
+                _cmp_f64_op(a_f64[i], op_a, scalar_a)
+                and _cmp_f64_op(b_f64[i], op_b, scalar_b)
+            )
+            result_mask.append(False)
+        elif a_null:
+            # null AND b: False absorbs null; True → null
+            if not b_null and not _cmp_f64_op(b_f64[i], op_b, scalar_b):
+                result.append(False)
+                result_mask.append(False)
+            else:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+        else:
+            # a AND null: False absorbs null; True → null
+            if not _cmp_f64_op(a_f64[i], op_a, scalar_a):
+                result.append(False)
+                result_mask.append(False)
+            else:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+    return col_a._build_result_col(
+        ColumnData(result^), result_mask^, has_any_null
+    )
+
+
+def _fused_cmp_or_scalar(
+    col_a: Column,
+    op_a: Int,
+    scalar_a: Float64,
+    col_b: Column,
+    op_b: Int,
+    scalar_b: Float64,
+) raises -> Column:
+    """Evaluate ``(col_a op_a scalar_a) OR (col_b op_b scalar_b)`` in one pass.
+
+    Like ``_fused_cmp_and_scalar`` but uses Kleene OR semantics:
+    ``null OR True → True``, ``null OR False → null``.
+    """
+    var n = len(col_a)
+    var result = List[Bool](capacity=n)
+    var result_mask = List[Bool]()
+    var a_has_nulls = col_a.has_nulls()
+    var b_has_nulls = col_b.has_nulls()
+    var has_any_null = False
+
+    ref a_arr = col_a._storage[AnyArray]
+    ref b_arr = col_b._storage[AnyArray]
+    var a_dt = a_arr.dtype()
+    var b_dt = b_arr.dtype()
+
+    # Hot path: both columns are float64 with no nulls.
+    if (
+        a_dt == _m_float64
+        and b_dt == _m_float64
+        and not a_has_nulls
+        and not b_has_nulls
+    ):
+        ref a = a_arr.as_float64()
+        ref b = b_arr.as_float64()
+        for i in range(n):
+            result.append(
+                _cmp_f64_op(rebind[Float64](a.unsafe_get(i)), op_a, scalar_a)
+                or _cmp_f64_op(rebind[Float64](b.unsafe_get(i)), op_b, scalar_b)
+            )
+        return col_a._build_result_col(ColumnData(result^), result_mask^, False)
+
+    # General path: any numeric dtype, handles nulls with Kleene OR semantics.
+    # result_mask must be the same length as result so we always append to it.
+    var a_f64 = col_a._f64_list()
+    var b_f64 = col_b._f64_list()
+    for i in range(n):
+        var a_null = a_has_nulls and col_a.is_null(i)
+        var b_null = b_has_nulls and col_b.is_null(i)
+        if not a_null and not b_null:
+            result.append(
+                _cmp_f64_op(a_f64[i], op_a, scalar_a)
+                or _cmp_f64_op(b_f64[i], op_b, scalar_b)
+            )
+            result_mask.append(False)
+        elif a_null:
+            # null OR b: True absorbs null; False → null
+            if not b_null and _cmp_f64_op(b_f64[i], op_b, scalar_b):
+                result.append(True)
+                result_mask.append(False)
+            else:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+        else:
+            # a OR null: True absorbs null; False → null
+            if _cmp_f64_op(a_f64[i], op_a, scalar_a):
+                result.append(True)
+                result_mask.append(False)
+            else:
+                result.append(False)
+                result_mask.append(True)
+                has_any_null = True
+    return col_a._build_result_col(
+        ColumnData(result^), result_mask^, has_any_null
+    )
+
+
+# ------------------------------------------------------------------
 # Comparison visitor — dispatches on self's ColumnData arm and stores
 # the RHS column's data to handle the Bool-Bool fast path internally.
 # ------------------------------------------------------------------
@@ -6480,36 +6686,90 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         ``op`` is a compile-time constant (``_CMP_*``) that selects the
         operation.  Null propagation: null elements produce a null result.
         """
-        # Storage-aware fast path using Float64 list extracted from storage.
+        # Storage-aware fast path: dispatch once on dtype, then loop reading
+        # directly from the AnyArray without an intermediate List[Float64] copy.
         if self._storage.isa[AnyArray]() and (
             self.is_int() or self.is_float() or self.is_bool()
         ):
-            var data = self._f64_list()
-            var n = len(data)
+            ref arr = self._storage[AnyArray]
+            var dt = arr.dtype()
+            var n = arr.length()
             var result = List[Bool](capacity=n)
             var result_mask = List[Bool]()
             var has_any_null = self.has_nulls()
-            for i in range(n):
-                if has_any_null and self.is_null(i):
-                    result.append(False)
-                    result_mask.append(True)
-                else:
-                    var v: Bool
-                    comptime if op == _CMP_EQ:
-                        v = data[i] == scalar
-                    elif op == _CMP_NE:
-                        v = data[i] != scalar
-                    elif op == _CMP_LT:
-                        v = data[i] < scalar
-                    elif op == _CMP_LE:
-                        v = data[i] <= scalar
-                    elif op == _CMP_GT:
-                        v = data[i] > scalar
+            if dt == _m_float64:
+                ref a = arr.as_float64()
+                for i in range(n):
+                    if has_any_null and self.is_null(i):
+                        result.append(False)
+                        result_mask.append(True)
                     else:
-                        v = data[i] >= scalar
-                    result.append(v)
-                    if has_any_null:
-                        result_mask.append(False)
+                        var elem = rebind[Float64](a.unsafe_get(i))
+                        var v: Bool
+                        comptime if op == _CMP_EQ:
+                            v = elem == scalar
+                        elif op == _CMP_NE:
+                            v = elem != scalar
+                        elif op == _CMP_LT:
+                            v = elem < scalar
+                        elif op == _CMP_LE:
+                            v = elem <= scalar
+                        elif op == _CMP_GT:
+                            v = elem > scalar
+                        else:
+                            v = elem >= scalar
+                        result.append(v)
+                        if has_any_null:
+                            result_mask.append(False)
+            elif dt == _m_int64:
+                ref a = arr.as_int64()
+                for i in range(n):
+                    if has_any_null and self.is_null(i):
+                        result.append(False)
+                        result_mask.append(True)
+                    else:
+                        var elem = Float64(rebind[Int64](a.unsafe_get(i)))
+                        var v: Bool
+                        comptime if op == _CMP_EQ:
+                            v = elem == scalar
+                        elif op == _CMP_NE:
+                            v = elem != scalar
+                        elif op == _CMP_LT:
+                            v = elem < scalar
+                        elif op == _CMP_LE:
+                            v = elem <= scalar
+                        elif op == _CMP_GT:
+                            v = elem > scalar
+                        else:
+                            v = elem >= scalar
+                        result.append(v)
+                        if has_any_null:
+                            result_mask.append(False)
+            else:
+                ref a = arr.as_bool()
+                var view = a.values()
+                for i in range(n):
+                    if has_any_null and self.is_null(i):
+                        result.append(False)
+                        result_mask.append(True)
+                    else:
+                        var elem = 1.0 if view.test(a.offset + i) else 0.0
+                        var v: Bool
+                        comptime if op == _CMP_EQ:
+                            v = elem == scalar
+                        elif op == _CMP_NE:
+                            v = elem != scalar
+                        elif op == _CMP_LT:
+                            v = elem < scalar
+                        elif op == _CMP_LE:
+                            v = elem <= scalar
+                        elif op == _CMP_GT:
+                            v = elem > scalar
+                        else:
+                            v = elem >= scalar
+                        result.append(v)
+                        if has_any_null:
+                            result_mask.append(False)
             return self._build_result_col(
                 ColumnData(result^), result_mask^, has_any_null
             )

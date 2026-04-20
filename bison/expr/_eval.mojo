@@ -30,6 +30,13 @@ from ._ast import (
 )
 from ..series import Series
 from ..dataframe import DataFrame
+from ..column import (
+    Column,
+    _col_is_numeric_anyarray,
+    _fused_cmp_and_scalar,
+    _fused_cmp_or_scalar,
+    _str_op_to_cmp_int,
+)
 
 
 # ------------------------------------------------------------------
@@ -235,6 +242,73 @@ def _eval_compare(
 # ------------------------------------------------------------------
 
 
+struct _FuseCmpInfo(Copyable, Movable):
+    """Result of attempting to extract a fusible scalar comparison.
+
+    *eligible* is False when the node cannot participate in a fused kernel
+    (e.g. string/null scalar, col-vs-col, or non-numeric AnyArray storage).
+    When *eligible* is True, *col_name*, *op_int*, and *scalar* are valid.
+    """
+
+    var eligible: Bool
+    var col_name: String
+    var op_int: Int
+    var scalar: Float64
+
+    def __init__(out self):
+        self.eligible = False
+        self.col_name = String("")
+        self.op_int = 0
+        self.scalar = Float64(0.0)
+
+
+def _try_extract_fuse_cmp(
+    cmp_node_idx: Int, parsed: ParsedExpr
+) raises -> _FuseCmpInfo:
+    """Attempt to extract (col_name, op_int, scalar) from an NK_COMPARE node.
+
+    Sets *eligible = True* only when the comparison is (identifier op numeric),
+    which covers NK_FLOAT / NK_INT / NK_BOOL scalar right-hand sides.  String
+    and null literals are excluded.  Column-vs-column comparisons are excluded.
+    AnyArray eligibility is checked separately in ``_eval_node`` after column
+    resolution.
+    """
+    var info = _FuseCmpInfo()
+    var cmp_node = parsed.node_at(cmp_node_idx)
+    var lhs = parsed.node_at(cmp_node.left)
+    var rhs = parsed.node_at(cmp_node.right)
+
+    # Normalise to (identifier, op, scalar_node) form.
+    var col_name: String
+    var op_str: String
+    var scalar_node: ASTNode
+    if lhs.kind == NK_IDENT and rhs.kind != NK_IDENT:
+        col_name = lhs.value
+        op_str = cmp_node.value
+        scalar_node = rhs
+    elif rhs.kind == NK_IDENT and lhs.kind != NK_IDENT:
+        col_name = rhs.value
+        op_str = _flip_op(cmp_node.value)
+        scalar_node = lhs
+    else:
+        return info^  # col vs col, or no identifier — not fusible
+
+    # Only numeric literals are eligible (not strings or None).
+    if scalar_node.kind == NK_FLOAT:
+        info.scalar = atof(scalar_node.value)
+    elif scalar_node.kind == NK_INT:
+        info.scalar = Float64(Int(scalar_node.value))
+    elif scalar_node.kind == NK_BOOL:
+        info.scalar = 1.0 if scalar_node.value == "True" else 0.0
+    else:
+        return info^  # string / None scalar — fall back to generic path
+
+    info.col_name = col_name
+    info.op_int = _str_op_to_cmp_int(op_str)
+    info.eligible = True
+    return info^
+
+
 def _eval_node(
     node_idx: Int, parsed: ParsedExpr, df: DataFrame
 ) raises -> Series:
@@ -248,10 +322,56 @@ def _eval_node(
     elif node.kind == NK_NOT:
         return _eval_node(node.left, parsed, df).__invert__()
     elif node.kind == NK_AND:
+        # Fast path: fuse (col_a op scalar_a) AND (col_b op scalar_b).
+        if (
+            parsed.node_at(node.left).kind == NK_COMPARE
+            and parsed.node_at(node.right).kind == NK_COMPARE
+        ):
+            var a_info = _try_extract_fuse_cmp(node.left, parsed)
+            var b_info = _try_extract_fuse_cmp(node.right, parsed)
+            if a_info.eligible and b_info.eligible:
+                var a_col = _resolve_ident(a_info.col_name, df)._col
+                var b_col = _resolve_ident(b_info.col_name, df)._col
+                if _col_is_numeric_anyarray(a_col) and _col_is_numeric_anyarray(
+                    b_col
+                ):
+                    return Series(
+                        _fused_cmp_and_scalar(
+                            a_col,
+                            a_info.op_int,
+                            a_info.scalar,
+                            b_col,
+                            b_info.op_int,
+                            b_info.scalar,
+                        )
+                    )
         var left_result = _eval_node(node.left, parsed, df)
         var right_result = _eval_node(node.right, parsed, df)
         return left_result.__and__(right_result)
     elif node.kind == NK_OR:
+        # Fast path: fuse (col_a op scalar_a) OR (col_b op scalar_b).
+        if (
+            parsed.node_at(node.left).kind == NK_COMPARE
+            and parsed.node_at(node.right).kind == NK_COMPARE
+        ):
+            var a_info = _try_extract_fuse_cmp(node.left, parsed)
+            var b_info = _try_extract_fuse_cmp(node.right, parsed)
+            if a_info.eligible and b_info.eligible:
+                var a_col = _resolve_ident(a_info.col_name, df)._col
+                var b_col = _resolve_ident(b_info.col_name, df)._col
+                if _col_is_numeric_anyarray(a_col) and _col_is_numeric_anyarray(
+                    b_col
+                ):
+                    return Series(
+                        _fused_cmp_or_scalar(
+                            a_col,
+                            a_info.op_int,
+                            a_info.scalar,
+                            b_col,
+                            b_info.op_int,
+                            b_info.scalar,
+                        )
+                    )
         var left_result = _eval_node(node.left, parsed, df)
         var right_result = _eval_node(node.right, parsed, df)
         return left_result.__or__(right_result)
