@@ -38,7 +38,12 @@ from .column import (
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
-from .expr import parse as _parse_expr, eval_expr as _eval_expr
+from .expr import (
+    parse as _parse_expr,
+    eval_expr as _eval_expr,
+    try_eval_fused_and_bool_list as _try_fused_and_bool_list,
+    FusedAndBoolListResult as _FusedAndBoolListResult,
+)
 from .arrow import column_to_marrow_array, marrow_array_to_column
 from marrow.arrays import AnyArray
 from marrow.builders import StringBuilder as _MarrowStringBuilder
@@ -1964,10 +1969,23 @@ struct DataFrame(Copyable, Movable):
             )
         var indices = List[Int]()
         if mask._col.is_bool():
-            var d = mask._col._bool_list()
-            for i in range(mask_len):
-                if mask._col.is_valid(i) and d[i]:
-                    indices.append(i)
+            if not mask._col.has_nulls() and mask._col._storage.isa[AnyArray]():
+                ref a = mask._col._storage[AnyArray].as_bool()
+                var view = a.values()
+                var off = a.offset
+                for i in range(mask_len):
+                    if view.test(off + i):
+                        indices.append(i)
+            else:
+                var d = mask._col._bool_list()
+                if not mask._col.has_nulls():
+                    for i in range(mask_len):
+                        if d[i]:
+                            indices.append(i)
+                else:
+                    for i in range(mask_len):
+                        if mask._col.is_valid(i) and d[i]:
+                            indices.append(i)
         else:
             raise Error(
                 "DataFrame.__getitem__: mask Series must have bool dtype"
@@ -3263,6 +3281,17 @@ struct DataFrame(Copyable, Movable):
 
     def query(self, expr: String) raises -> DataFrame:
         var parsed = _parse_expr(expr)
+        var fused = _try_fused_and_bool_list(parsed, self)
+        if fused.eligible:
+            ref d = fused.mask
+            var indices = List[Int]()
+            for i in range(len(d)):
+                if d[i]:
+                    indices.append(i)
+            var result_cols = List[Column]()
+            for i in range(len(self._cols)):
+                result_cols.append(self._cols[i].take(indices))
+            return DataFrame(result_cols^)
         var mask = _eval_expr(parsed, self)
         return self[mask]
 
