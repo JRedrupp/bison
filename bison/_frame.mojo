@@ -3569,11 +3569,17 @@ struct DataFrame(Copyable, Movable):
         while k >= 0:
             var asc = ascending[k] if k < len(ascending) else True
             var col_idx = _df_col_index(self, by[k])
-            var sub_perm = self._cols[col_idx].sort_perm(
-                asc, na_position == "last"
-            ) if k == len(by) - 1 else self._cols[col_idx].take(perm).sort_perm(
-                asc, na_position == "last"
-            )
+            var sub_perm = List[Int]()
+            if k == len(by) - 1:
+                sub_perm = self._cols[col_idx].sort_perm(
+                    asc, na_position == "last"
+                )
+            else:
+                sub_perm = (
+                    self._cols[col_idx]
+                    .take(perm)
+                    .sort_perm(asc, na_position == "last")
+                )
             var new_perm = List[Int]()
             for j in range(n_rows):
                 new_perm.append(perm[sub_perm[j]])
