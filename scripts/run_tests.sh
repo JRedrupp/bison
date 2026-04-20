@@ -5,11 +5,30 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TESTS_DIR="$REPO_ROOT/tests"
 CACHE_DIR="$REPO_ROOT/.bison-cache"
 PKG_FILE="$CACHE_DIR/bison.mojopkg"
+BIN_DIR="$CACHE_DIR/bin"
 TMP_DIR="$(mktemp -d)"
 PKG_TMP="$TMP_DIR/bison.mojopkg"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$CACHE_DIR"
+mkdir -p "$CACHE_DIR" "$BIN_DIR"
+
+# Parse optional test file filter.
+# Accepts: "test_dataframe", "test_dataframe.mojo", or a full path.
+FILTER_FILE=""
+if [ $# -ge 1 ] && [ -n "$1" ]; then
+    arg="$1"
+    if [[ "$arg" == /* ]]; then
+        FILTER_FILE="$arg"
+    elif [[ "$arg" == *.mojo ]]; then
+        FILTER_FILE="$TESTS_DIR/$arg"
+    else
+        FILTER_FILE="$TESTS_DIR/${arg}.mojo"
+    fi
+    if [ ! -f "$FILTER_FILE" ]; then
+        echo "Error: test file not found: $FILTER_FILE" >&2
+        exit 1
+    fi
+fi
 
 # Rebuild the bison package if it is missing or any source file is newer.
 needs_package_rebuild() {
@@ -27,10 +46,18 @@ else
     echo "Package up to date: bison.mojopkg"
 fi
 
-BIN_DIR="$TMP_DIR/bin"
+# A cached test binary is valid when it is newer than both its source file and the package.
+needs_binary_rebuild() {
+    local src="$1" bin="$2"
+    [ ! -f "$bin" ] && return 0
+    [ "$src" -nt "$bin" ] && return 0
+    [ "$PKG_FILE" -nt "$bin" ] && return 0
+    return 1
+}
+
 COMPILE_RESULT_DIR="$TMP_DIR/compile_results"
 LOG_DIR="$TMP_DIR/logs"
-mkdir -p "$BIN_DIR" "$COMPILE_RESULT_DIR" "$LOG_DIR"
+mkdir -p "$COMPILE_RESULT_DIR" "$LOG_DIR"
 
 # Leave at least one core free so the machine stays responsive.
 MAX_JOBS=$(( $(nproc) - 1 ))
@@ -41,28 +68,42 @@ echo "Compiling tests ..."
 echo ""
 
 files=()
+if [ -n "$FILTER_FILE" ]; then
+    files=("$FILTER_FILE")
+else
+    for f in "$TESTS_DIR"/test_*.mojo; do
+        files+=("$f")
+    done
+fi
+
 pids=()
 running=0
 
-for f in "$TESTS_DIR"/test_*.mojo; do
+for f in "${files[@]}"; do
     name="$(basename "$f" .mojo)"
+    bin="$BIN_DIR/$name"
     compile_result="$COMPILE_RESULT_DIR/$name"
     log_file="$LOG_DIR/$name.log"
-    files+=("$f")
-    echo "  Compiling $(basename "$f") ..."
-    (
-        if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" -Xlinker -lm "$f" -o "$BIN_DIR/$name" >"$log_file" 2>&1; then
-            echo "pass" > "$compile_result"
-        else
-            echo "fail" > "$compile_result"
-        fi
-    ) &
-    pids+=($!)
-    running=$(( running + 1 ))
 
-    if [ "$running" -ge "$MAX_JOBS" ]; then
-        wait "${pids[$(( ${#pids[@]} - running ))]}" || true
-        running=$(( running - 1 ))
+    if needs_binary_rebuild "$f" "$bin"; then
+        echo "  Compiling $(basename "$f") ..."
+        (
+            if mojo build -I "$CACHE_DIR" -I "$REPO_ROOT" -Xlinker -lm "$f" -o "$bin" >"$log_file" 2>&1; then
+                echo "pass" > "$compile_result"
+            else
+                echo "fail" > "$compile_result"
+            fi
+        ) &
+        pids+=($!)
+        running=$(( running + 1 ))
+
+        if [ "$running" -ge "$MAX_JOBS" ]; then
+            wait "${pids[$(( ${#pids[@]} - running ))]}" || true
+            running=$(( running - 1 ))
+        fi
+    else
+        echo "  SKIP $(basename "$f") (cached)"
+        echo "pass" > "$compile_result"
     fi
 done
 

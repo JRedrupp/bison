@@ -99,7 +99,10 @@ Rules:
 
 See [`docs/testing.md`](docs/testing.md) for the full test file map, helper utilities, caching behavior, and how to write new tests.
 
-Quick reference: `pixi run test` runs the full suite. `mojo run tests/test_<area>.mojo` runs a single file.
+Quick reference:
+- `pixi run test` — full suite (compiled binaries cached in `.bison-cache/bin/`; subsequent runs skip recompilation and finish in ~7s when nothing changed)
+- `pixi run test test_dataframe` — run a single file (also accepts `test_dataframe.mojo` or a full path)
+- `rm -rf .bison-cache/bin/` — force a full recompile (e.g. after a toolchain upgrade)
 
 ## CI, benchmarks, and profiling
 
