@@ -3558,9 +3558,10 @@ struct DataFrame(Copyable, Movable):
         # Build the sort permutation using a stable multi-key approach:
         # process keys in reverse order (last key first) so that when a
         # higher-priority key is applied next it dominates via the stable
-        # insertion sort.  Each step reorders the key column by the current
-        # permutation, sorts the reordered values to produce a sub-perm, then
-        # composes: new_perm[j] = perm[sub_perm[j]].
+        # insertion sort.  For the first pass perm is identity, so sort the key
+        # column directly; subsequent passes reorder the key by the current
+        # permutation before sorting.  Compose each pass as:
+        # new_perm[j] = perm[sub_perm[j]].
         var perm = List[Int]()
         for i in range(n_rows):
             perm.append(i)
@@ -3568,10 +3569,11 @@ struct DataFrame(Copyable, Movable):
         while k >= 0:
             var asc = ascending[k] if k < len(ascending) else True
             var col_idx = _df_col_index(self, by[k])
-            var sub_perm = (
-                self._cols[col_idx]
-                .take(perm)
-                .sort_perm(asc, na_position == "last")
+            var key_col = self._cols[col_idx]
+            var sub_perm = key_col.sort_perm(
+                asc, na_position == "last"
+            ) if k == len(by) - 1 else key_col.take(perm).sort_perm(
+                asc, na_position == "last"
             )
             var new_perm = List[Int]()
             for j in range(n_rows):
