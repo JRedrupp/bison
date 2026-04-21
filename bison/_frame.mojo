@@ -35,6 +35,13 @@ from .column import (
     _FillnaVisitor,
     _FfillVisitor,
     _BfillVisitor,
+    _col_sqrt_or_copy,
+    _col_exp_or_copy,
+    _col_log_or_copy,
+    _col_log10_or_copy,
+    _col_ceil_or_copy,
+    _col_floor_or_copy,
+    _col_neg_or_copy,
 )
 from .accessors.str_accessor import StringMethods
 from .accessors.dt_accessor import DatetimeMethods
@@ -1218,6 +1225,21 @@ comptime _CUM_SUM = 0
 comptime _CUM_PROD = 1
 comptime _CUM_MIN = 2
 comptime _CUM_MAX = 3
+
+
+# Module-level ColumnTransformFn wrappers used by DataFrame._map_cols[F] (#746).
+# _col_isna/_col_notna live here (not column.mojo) because Series is defined
+# in _frame.mojo and would create an import cycle otherwise.
+def _col_abs(col: Column) raises -> Column:
+    return col._abs()
+
+
+def _col_isna(col: Column) raises -> Column:
+    return Series(col.copy()).isna()._col.copy()
+
+
+def _col_notna(col: Column) raises -> Column:
+    return Series(col.copy()).notna()._col.copy()
 
 
 struct _ColDataView(Copyable, Movable):
@@ -2507,81 +2529,47 @@ struct DataFrame(Copyable, Movable):
             values.append(self._cols[i].quantile(q, skipna))
         return Series(Column(None, values^, float64))
 
-    def abs(self) raises -> DataFrame:
+    def _map_cols[
+        F: def(Column) raises thin -> Column
+    ](self) raises -> DataFrame:
+        """Apply a compile-time ColumnTransformFn over each column.
+
+        Internal helper for parameterless column-wise DataFrame transforms
+        (issue #746). ``F`` must be a module-level ``def`` satisfying
+        ``ColumnTransformFn`` (see bison/column.mojo). Parameterised
+        siblings (shift, cumsum, round, ...) cannot use this helper
+        because Mojo does not yet support capturing closures in comptime
+        parameter constraints when the argument is a struct — see
+        docs/mojo-patterns.md.
+        """
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
-            result_cols.append(self._cols[i]._abs())
+            result_cols.append(F(self._cols[i]))
         return DataFrame(result_cols^)
+
+    def abs(self) raises -> DataFrame:
+        return self._map_cols[_col_abs]()
 
     def sqrt(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._sqrt())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_sqrt_or_copy]()
 
     def exp(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._exp())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_exp_or_copy]()
 
     def log(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._log())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_log_or_copy]()
 
     def log10(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._log10())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_log10_or_copy]()
 
     def ceil(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._ceil())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_ceil_or_copy]()
 
     def floor(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._floor())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_floor_or_copy]()
 
     def neg(self) raises -> DataFrame:
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
-                result_cols.append(col._neg())
-            else:
-                result_cols.append(col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_neg_or_copy]()
 
     def _cum_axis1[op: Int](self, skipna: Bool) raises -> DataFrame:
         """Shared axis=1 kernel for cumsum, cumprod, cummin, and cummax.
@@ -3330,12 +3318,7 @@ struct DataFrame(Copyable, Movable):
 
     def isna(self) raises -> DataFrame:
         """Return a boolean DataFrame that is True where values are null/NaN."""
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            var s = Series(self._cols[i].copy())
-            var bool_s = s.isna()
-            result_cols.append(bool_s._col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_isna]()
 
     def isnull(self) raises -> DataFrame:
         """Alias for isna()."""
@@ -3344,12 +3327,7 @@ struct DataFrame(Copyable, Movable):
     def notna(self) raises -> DataFrame:
         """Return a boolean DataFrame that is True where values are not null/NaN.
         """
-        var result_cols = List[Column]()
-        for i in range(len(self._cols)):
-            var s = Series(self._cols[i].copy())
-            var bool_s = s.notna()
-            result_cols.append(bool_s._col.copy())
-        return DataFrame(result_cols^)
+        return self._map_cols[_col_notna]()
 
     def notnull(self) raises -> DataFrame:
         """Alias for notna()."""
