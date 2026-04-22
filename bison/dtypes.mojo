@@ -42,6 +42,10 @@ struct BisonDtype(ImplicitlyCopyable, Movable):
         """
         return self.name == "float32" or self.name == "float64"
 
+    def is_numeric(self) -> Bool:
+        """Return True if this dtype is any integer or floating-point family."""
+        return self.is_integer() or self.is_float()
+
 
 comptime int8 = BisonDtype("int8", 1)
 comptime int16 = BisonDtype("int16", 2)

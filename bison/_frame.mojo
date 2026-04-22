@@ -2233,7 +2233,7 @@ struct DataFrame(Copyable, Movable):
         var nan = Float64(0) / Float64(0)
         for ci in range(len(self._cols)):
             ref col = self._cols[ci]
-            if not (col.dtype.is_integer() or col.dtype.is_float()):
+            if not col.dtype.is_numeric():
                 continue
             if col.is_null(row):
                 if not skipna:
@@ -2485,7 +2485,7 @@ struct DataFrame(Copyable, Movable):
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             var dt = self._cols[i].dtype
-            if not (dt.is_integer() or dt.is_float()):
+            if not dt.is_numeric():
                 continue
             var values = List[Float64]()
             values.append(Float64(self._cols[i].count()))
@@ -2589,7 +2589,7 @@ struct DataFrame(Copyable, Movable):
         var col_vals = List[List[Float64]]()
         for ci in range(ncols):
             ref col = self._cols[ci]
-            if col.dtype.is_integer() or col.dtype.is_float():
+            if col.dtype.is_numeric():
                 col_vals.append(col._f64_list())
             else:
                 col_vals.append(List[Float64]())
@@ -2601,9 +2601,7 @@ struct DataFrame(Copyable, Movable):
             var propagate_nan = False
             for ci in range(ncols):
                 ref col = self._cols[ci]
-                if col.is_null(i) or not (
-                    col.dtype.is_integer() or col.dtype.is_float()
-                ):
+                if col.is_null(i) or not col.dtype.is_numeric():
                     if not skipna:
                         propagate_nan = True
                     result_lists[ci].append(nan if propagate_nan else running)
@@ -2911,9 +2909,7 @@ struct DataFrame(Copyable, Movable):
                         null_mask.append_null()
                 else:
                     ref src_col = self._cols[src_j]
-                    if not (
-                        src_col.dtype.is_integer() or src_col.dtype.is_float()
-                    ):
+                    if not src_col.dtype.is_numeric():
                         raise Error(
                             "DataFrame.shift(axis=1) requires numeric columns"
                         )
@@ -2965,15 +2961,11 @@ struct DataFrame(Copyable, Movable):
                 else:
                     ref cur_col = self._cols[j]
                     ref src_col = self._cols[src_j]
-                    if not (
-                        cur_col.dtype.is_integer() or cur_col.dtype.is_float()
-                    ):
+                    if not cur_col.dtype.is_numeric():
                         raise Error(
                             "DataFrame.diff(axis=1) requires numeric columns"
                         )
-                    if not (
-                        src_col.dtype.is_integer() or src_col.dtype.is_float()
-                    ):
+                    if not src_col.dtype.is_numeric():
                         raise Error(
                             "DataFrame.diff(axis=1) requires numeric columns"
                         )
@@ -3030,16 +3022,12 @@ struct DataFrame(Copyable, Movable):
                 else:
                     ref cur_col = self._cols[j]
                     ref src_col = self._cols[src_j]
-                    if not (
-                        cur_col.dtype.is_integer() or cur_col.dtype.is_float()
-                    ):
+                    if not cur_col.dtype.is_numeric():
                         raise Error(
                             "DataFrame.pct_change(axis=1) requires numeric"
                             " columns"
                         )
-                    if not (
-                        src_col.dtype.is_integer() or src_col.dtype.is_float()
-                    ):
+                    if not src_col.dtype.is_numeric():
                         raise Error(
                             "DataFrame.pct_change(axis=1) requires numeric"
                             " columns"
@@ -3170,7 +3158,7 @@ struct DataFrame(Copyable, Movable):
         var result_cols = List[Column]()
         for i in range(len(self._cols)):
             ref col = self._cols[i]
-            if col.dtype.is_integer() or col.dtype.is_float():
+            if col.dtype.is_numeric():
                 result_cols.append(col._apply[F]())
             else:
                 result_cols.append(col.copy())
@@ -6930,7 +6918,7 @@ struct DataFrameGroupBy:
                 if col.is_object():
                     continue
             else:
-                if not (col.dtype.is_integer() or col.dtype.is_float()):
+                if not col.dtype.is_numeric():
                     continue
             marrow_values.append(column_to_marrow_array(col))
             marrow_aggs.append(agg)
@@ -7008,9 +6996,7 @@ struct DataFrameGroupBy:
             if col.name.value() in skip:
                 continue
             var is_count = name == "count"
-            if not is_count and not (
-                col.dtype.is_integer() or col.dtype.is_float()
-            ):
+            if not is_count and not col.dtype.is_numeric():
                 continue
             var col_name = col.name
             if is_count:
@@ -7279,9 +7265,7 @@ struct DataFrameGroupBy:
             ref col = self._df._cols[i]
             if col.name.value() in skip:
                 continue
-            if needs_numeric and not (
-                col.dtype.is_integer() or col.dtype.is_float()
-            ):
+            if needs_numeric and not col.dtype.is_numeric():
                 continue
             if int_preserving and col.dtype.is_integer() and not any_null_row:
                 result_cols.append(
