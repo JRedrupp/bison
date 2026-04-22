@@ -3472,6 +3472,11 @@ struct _BoolOpVisitor[op: Int](ColumnDataVisitorRaises, Copyable, Movable):
 comptime FloatTransformFn = def(Float64) thin -> Float64
 
 
+# Compile-time function type for element-wise Column transforms
+# (DataFrame._map_cols kernel; see issue #746).
+comptime ColumnTransformFn = def(Column) raises thin -> Column
+
+
 # Element-wise FloatTransformFn definitions for _apply[F] (#606)
 def _sqrt_fn(v: Float64) -> Float64:
     return sqrt(v)
@@ -3499,6 +3504,51 @@ def _floor_fn(v: Float64) -> Float64:
 
 def _neg_fn(v: Float64) -> Float64:
     return -v
+
+
+# Module-level ColumnTransformFn wrappers for DataFrame._map_cols[F] (#746).
+# Each runs the numeric transform on int/float columns and falls back to
+# .copy() for non-numeric arms (String/Object/Bool/datetime).
+def _col_sqrt_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._sqrt()
+    return col.copy()
+
+
+def _col_exp_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._exp()
+    return col.copy()
+
+
+def _col_log_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._log()
+    return col.copy()
+
+
+def _col_log10_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._log10()
+    return col.copy()
+
+
+def _col_ceil_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._ceil()
+    return col.copy()
+
+
+def _col_floor_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._floor()
+    return col.copy()
+
+
+def _col_neg_or_copy(col: Column) raises -> Column:
+    if col.dtype.is_integer() or col.dtype.is_float():
+        return col._neg()
+    return col.copy()
 
 
 # ------------------------------------------------------------------
