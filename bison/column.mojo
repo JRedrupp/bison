@@ -4672,14 +4672,11 @@ struct NullMask(Copyable, Movable, Sized):
             self._builder.unsafe_set(self._length - 1)
             self._has_nulls = True
         elif self._has_nulls:
-            # Already allocated — must explicitly write a 0 bit so a
-            # previously-set bit at this index doesn't leak through after
-            # a resize.  ``resize`` zero-fills new bytes so growing alone
-            # is safe; this only matters when ``_length`` was reduced and
-            # is now growing back into reused capacity, but we keep the
-            # branch defensive.
-            if self._length <= self._capacity:
-                self._builder.unsafe_clear(self._length - 1)
+            # Grow the bitmap if needed before writing the valid bit.
+            # Without this, appending valid entries beyond the current
+            # capacity leaves uninitialized bits that read back as null.
+            self._ensure_capacity(self._length)
+            self._builder.unsafe_clear(self._length - 1)
 
     def append_null(mut self) raises:
         """Append a null marker to the mask."""
