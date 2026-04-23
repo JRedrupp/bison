@@ -249,10 +249,6 @@ def test_series_fillna_works() raises:
 # NullMask.append capacity growth
 # ------------------------------------------------------------------
 
-# ------------------------------------------------------------------
-# NullMask.append capacity growth
-# ------------------------------------------------------------------
-
 def test_null_mask_append_valid_grows_capacity() raises:
     """NullMask must maintain _length <= _capacity after valid appends.
 
