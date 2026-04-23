@@ -8,7 +8,7 @@ No dependency on DataFrame / Series / Column — that wiring lives in
 _frame.mojo.
 """
 
-from std.collections import Optional
+from std.collections import Deque, Optional
 from std.math import sqrt, exp, log
 
 
@@ -235,7 +235,7 @@ def rolling_min(
     null_mask: List[Bool],
     window: Int,
     min_periods: Int,
-) -> WindowResult:
+) raises -> WindowResult:
     """O(n) rolling minimum using a monotonic deque."""
     var n = len(data)
     var nan = _nan()
@@ -245,7 +245,7 @@ def rolling_min(
 
     # Monotonic deque: stores indices of potential minimums in increasing
     # value order. Front of deque is always the current minimum.
-    var deque = List[Int]()
+    var deque = Deque[Int]()
     var valid_count = 0
 
     for i in range(n):
@@ -263,13 +263,9 @@ def rolling_min(
             var leaving = i - window
             if not _is_null(null_mask, leaving):
                 valid_count -= 1
-            # Pop front if it has left the window
+            # O(1) pop-front for indices no longer in the window
             while len(deque) > 0 and deque[0] <= i - window:
-                # Shift elements left (pop front)
-                var new_deque = List[Int]()
-                for j in range(1, len(deque)):
-                    new_deque.append(deque[j])
-                deque = new_deque^
+                _ = deque.popleft()
 
         if valid_count < min_periods:
             result.append(nan)
@@ -292,7 +288,7 @@ def rolling_max(
     null_mask: List[Bool],
     window: Int,
     min_periods: Int,
-) -> WindowResult:
+) raises -> WindowResult:
     """O(n) rolling maximum using a monotonic deque."""
     var n = len(data)
     var nan = _nan()
@@ -302,7 +298,7 @@ def rolling_max(
 
     # Monotonic deque: stores indices of potential maximums in decreasing
     # value order. Front of deque is always the current maximum.
-    var deque = List[Int]()
+    var deque = Deque[Int]()
     var valid_count = 0
 
     for i in range(n):
@@ -320,11 +316,9 @@ def rolling_max(
             var leaving = i - window
             if not _is_null(null_mask, leaving):
                 valid_count -= 1
+            # O(1) pop-front for indices no longer in the window
             while len(deque) > 0 and deque[0] <= i - window:
-                var new_deque = List[Int]()
-                for j in range(1, len(deque)):
-                    new_deque.append(deque[j])
-                deque = new_deque^
+                _ = deque.popleft()
 
         if valid_count < min_periods:
             result.append(nan)
