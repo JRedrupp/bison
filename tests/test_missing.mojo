@@ -1,7 +1,7 @@
 """Tests for DataFrame missing-data handling."""
 from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
-from bison import DataFrame, Series, DFScalar
+from bison import DataFrame, Series, DFScalar, NullMask
 
 
 # ------------------------------------------------------------------
@@ -243,6 +243,28 @@ def test_series_fillna_works() raises:
     var s = Series(pd.Series(Python.evaluate("[1.0, None, 2.0]")))
     var filled = s.fillna(DFScalar(Float64(0.0)))
     assert_true(filled.size() == 3)
+
+
+# ------------------------------------------------------------------
+# NullMask.append capacity growth
+# ------------------------------------------------------------------
+
+def test_null_mask_append_valid_grows_capacity() raises:
+    """NullMask must maintain _length <= _capacity after valid appends.
+
+    One null activates _has_nulls and sets capacity to 64.
+    100 subsequent valid appends must grow capacity to stay in sync.
+    Before the fix, _ensure_capacity was never called in the valid branch,
+    so _capacity stayed at 64 while _length grew to 101.
+    """
+    var mask = NullMask()
+    mask.append_null()
+    for i in range(100):
+        mask.append_valid()
+    assert_true(mask._length <= mask._capacity)
+    assert_true(mask.is_null(0))
+    for i in range(1, 101):
+        assert_true(mask.is_valid(i))
 
 
 def main() raises:

@@ -321,5 +321,21 @@ def test_rolling_window_1() raises:
     _assert_frame_close(result, expected)
 
 
+def test_series_rolling_large_window_no_false_nan() raises:
+    """rolling(200).min() on 1000 elements must not produce false NaN.
+
+    The initial NullMask capacity is 64 bits; the rolling result has 800
+    valid entries. Before the fix, null_mask_copy() left bits beyond
+    capacity uninitialized, causing false NaN at index ~519 and beyond.
+    """
+    var pd = Python.import_module("pandas")
+    var vals = Python.evaluate("[float(i % 17) for i in range(1000)]")
+    var pd_s = pd.Series(vals, name="x")
+    var s = Series(pd_s, "x")
+    var result = s.rolling(200).min().to_pandas()
+    var expected = pd_s.rolling(200).min()
+    _assert_series_close(result, expected)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
