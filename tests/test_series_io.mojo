@@ -157,7 +157,7 @@ def test_to_csv_returns_string() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
     var csv = s.to_csv()
-    assert_true(len(csv) > 0)
+    assert_true(csv.byte_length() > 0)
     # Default: "0,1\n1,2\n2,3\n"
     assert_true(csv.find("1") >= 0)
     assert_true(csv.find("2") >= 0)
@@ -182,14 +182,14 @@ def test_to_csv_writes_file() raises:
     # Read back and verify content
     var builtins = Python.import_module("builtins")
     var content = String(builtins.open(path).read())
-    assert_true(len(content) > 0)
+    assert_true(content.byte_length() > 0)
 
 
 def test_to_json_returns_string() raises:
     var pd = Python.import_module("pandas")
     var s = Series(pd.Series(Python.evaluate("[1, 2, 3]"), dtype="int64"))
     var js = s.to_json()
-    assert_true(len(js) > 0)
+    assert_true(js.byte_length() > 0)
     assert_true(js.find('"0"') >= 0)
     assert_true(js.find('"1"') >= 0)
     assert_true(js.find('"2"') >= 0)
