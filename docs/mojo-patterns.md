@@ -110,3 +110,27 @@ from algorithm import sort as _sort_list
 
 _sort_list(my_list)   # NOT sort(my_list) — would shadow the built-in
 ```
+
+## `mojo package`/`precompile` rejects any `def main()` file anywhere in the tree
+
+As of the current nightly, `mojo package` (and its replacement `mojo
+precompile`) aborts the whole compile with `'main()' is not supported within
+packages` if it encounters ANY `.mojo` file containing `def main()`, anywhere
+in the directory tree passed as input — even files that are never imported by
+the package's public modules. Neither command exposes an exclude flag.
+
+This bit the vendored `vendor/marrow/marrow` submodule: its `tests/`,
+`kernels/tests/`, and `expr/tests/` directories all contain `def main()` by
+design (marrow's own `TestSuite.run`/`BenchSuite.run` convention — those files
+are compiled individually by marrow's own test harness, never packaged as a
+whole). Packaging `vendor/marrow/marrow` directly now fails immediately on
+those files.
+
+The fix (`scripts/build_marrow.sh`, invoked by the `build-marrow` pixi task):
+rsync a filtered mirror of the submodule into `.bison-cache/marrow-lib/marrow/`
+with `--exclude 'tests/'` (matches the directory name `tests` anywhere in the
+tree, so it catches all three offending directories in one flag), then run
+`mojo package` against the mirror instead of the raw submodule path. If a
+future Mojo release adds a real exclude mechanism, or marrow's test layout
+changes, this workaround can be simplified or removed — see the corresponding
+entry in `SESSION.md`.

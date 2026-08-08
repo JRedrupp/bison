@@ -20,7 +20,7 @@ python = ">=3.11"
 
 [tasks]
 gen-version   = "python scripts/gen_version.py"
-build-marrow  = "mojo package vendor/marrow/marrow -o .pixi/envs/default/lib/mojo/marrow.mojopkg"
+build-marrow  = "bash scripts/build_marrow.sh"
 test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
 fmt           = "mojo format bison/"
 check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
