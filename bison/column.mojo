@@ -4434,8 +4434,8 @@ def _merge_sort_perm_comparable[
             var li = lo
             var ri = mid_idx
             while li < mid_idx and ri < hi:
-                var lv = pp[li]
-                var rv = pp[ri]
+                var lv = pp[unsafe_offset=li]
+                var rv = pp[unsafe_offset=ri]
                 var lnull = has_mask and null_mask[lv]
                 var rnull = has_mask and null_mask[rv]
                 var take_right: Bool
@@ -4446,26 +4446,26 @@ def _merge_sort_perm_comparable[
                 elif rnull:
                     take_right = not na_last
                 elif ascending:
-                    take_right = dp[rv] < dp[lv]
+                    take_right = dp[unsafe_offset=rv] < dp[unsafe_offset=lv]
                 else:
-                    take_right = dp[rv] > dp[lv]
+                    take_right = dp[unsafe_offset=rv] > dp[unsafe_offset=lv]
                 if take_right:
-                    sp[k] = rv
+                    sp[unsafe_offset=k] = rv
                     ri += 1
                 else:
-                    sp[k] = lv
+                    sp[unsafe_offset=k] = lv
                     li += 1
                 k += 1
             while li < mid_idx:
-                sp[k] = pp[li]
+                sp[unsafe_offset=k] = pp[unsafe_offset=li]
                 li += 1
                 k += 1
             while ri < hi:
-                sp[k] = pp[ri]
+                sp[unsafe_offset=k] = pp[unsafe_offset=ri]
                 ri += 1
                 k += 1
             for j in range(lo, hi):
-                pp[j] = sp[j]
+                pp[unsafe_offset=j] = sp[unsafe_offset=j]
             lo += 2 * width
         width *= 2
 
