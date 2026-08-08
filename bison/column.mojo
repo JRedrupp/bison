@@ -1019,9 +1019,7 @@ def _init_storage_from_column_data(
         for i in range(len(src)):
             vals.append(src[i])
         try:
-            col._storage = ColumnStorage(
-                _float64_any_array(vals^)
-            )
+            col._storage = ColumnStorage(_float64_any_array(vals^))
         except:
             col._storage = ColumnStorage(
                 LegacyObjectData(List[PythonObject](), NullMask())
@@ -5375,9 +5373,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                     vals.append(None)
                 else:
                     vals.append(src[i])
-            self._storage = ColumnStorage(
-                _float64_any_array(vals^)
-            )
+            self._storage = ColumnStorage(_float64_any_array(vals^))
         elif self.is_bool():
             var src = self._bool_list()
             var vals = List[Optional[Bool]](capacity=n)
@@ -5444,7 +5440,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 vals.append(None)
             else:
                 vals.append(Int(data[i]))
-        self._storage = ColumnStorage(AnyArray(_marrow_array[Int64Type](vals^, Int64Type())))
+        self._storage = ColumnStorage(
+            AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
+        )
 
     def _flush_float64_list(mut self, var data: List[Float64]) raises:
         """Replace this column's storage with a float64 AnyArray built from
@@ -5458,9 +5456,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 vals.append(None)
             else:
                 vals.append(data[i])
-        self._storage = ColumnStorage(
-            _float64_any_array(vals^)
-        )
+        self._storage = ColumnStorage(_float64_any_array(vals^))
 
     def _flush_bool_list(mut self, var data: List[Bool]) raises:
         """Replace this column's storage with a bool AnyArray built from
