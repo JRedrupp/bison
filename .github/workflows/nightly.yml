@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: pixi run test
 
+      - name: DELIBERATE TEST FAILURE (temporary, will be reverted)
+        run: exit 1
+
       - name: File or update tracking issue on failure
         if: failure()
         uses: actions/github-script@v7
