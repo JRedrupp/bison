@@ -199,3 +199,28 @@ changelogs.
   `int64` variant instead. This is a real contract change in a dependency,
   not a bug to route around — read the result back as the dtype the
   operation now actually returns.
+
+## Pinning to a stable/RC build instead of a dev nightly snapshot (26.5.0rc1)
+
+bison was briefly bumped from a `26.5.0.dev<timestamp>` nightly snapshot to
+`26.5.0rc1` (a release candidate, still on the `max-nightly` channel but a
+fixed, tagged build rather than a rolling dev snapshot) — a few days'
+further drift surfaced two more gotchas:
+
+- **`std.gpu.host` stopped re-exporting `DeviceContext`/`DeviceBuffer`/
+  `HostBuffer`.** These moved to `max.gpu.host` earlier in the migration
+  (see the `elementwise`/`Coord`/`DeviceContext` entry above), but
+  `std.gpu.host` kept re-exporting them for a while during the transition.
+  That re-export is now gone — import from `max.gpu.host` directly.
+- **`UnsafePointer` is now deprecated in favor of `Pointer`** for the
+  common "typed handle to a value with a tracked origin" use case (as
+  opposed to genuinely unsafe/untracked pointer arithmetic, which still
+  needs `UnsafePointer`). `Pointer[T, O]` and `UnsafePointer[T, O]` share
+  the same construction (`Pointer(to=x)`) and dereference (`ptr[]`) surface
+  for this pattern, so it's a mechanical rename at call sites that only
+  ever construct-and-dereference.
+
+Also confirms the `ImplicitlyDeletable`/`Deinitable` trait-name churn noted
+earlier in this doc is still ongoing at 26.5.0rc1 (flipped back to
+`Deinitable` again) — treat any pin bump, even a small one, as needing a
+full `pixi run check` before assuming it's a no-op.
