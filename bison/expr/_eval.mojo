@@ -412,9 +412,9 @@ struct FusedAndBoolListResult(Movable):
         self.eligible = False
         self.mask = List[Bool]()
 
-    def __init__(out self, *, deinit take: Self):
-        self.eligible = take.eligible
-        self.mask = take.mask^
+    def __init__(out self, *, deinit move: Self):
+        self.eligible = move.eligible
+        self.mask = move.mask^
 
 
 def try_eval_fused_and_bool_list(

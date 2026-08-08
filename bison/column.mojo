@@ -118,9 +118,9 @@ struct LegacyObjectData(Copyable, Movable):
         self.data = copy.data.copy()
         self.null_mask = copy.null_mask.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self.data = take.data^
-        self.null_mask = take.null_mask^
+    def __init__(out self, *, deinit move: Self):
+        self.data = move.data^
+        self.null_mask = move.null_mask^
 
 
 # New storage Variant — Phase 2+ visitor dispatch will branch on this.
@@ -175,8 +175,8 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
     def __init__(out self, *, copy: Self):
         self._v = copy._v
 
-    def __init__(out self, *, deinit take: Self):
-        self._v = take._v^
+    def __init__(out self, *, deinit move: Self):
+        self._v = move._v^
 
     @staticmethod
     def null() -> Self:
@@ -266,8 +266,8 @@ struct SeriesScalar(Copyable, ImplicitlyCopyable, Movable):
     def __init__(out self, *, copy: Self):
         self._v = copy._v
 
-    def __init__(out self, *, deinit take: Self):
-        self._v = take._v^
+    def __init__(out self, *, deinit move: Self):
+        self._v = move._v^
 
     def isa[T: Copyable & Movable](self) -> Bool:
         return self._v.isa[T]()
@@ -4634,11 +4634,11 @@ struct NullMask(Copyable, Movable, Sized):
                 copy._builder.view(0, copy._length), 0, copy._length
             )
 
-    def __init__(out self, *, deinit take: Self):
-        self._builder = take._builder^
-        self._length = take._length
-        self._capacity = take._capacity
-        self._has_nulls = take._has_nulls
+    def __init__(out self, *, deinit move: Self):
+        self._builder = move._builder^
+        self._length = move._length
+        self._capacity = move._capacity
+        self._has_nulls = move._has_nulls
 
     def _ensure_capacity(mut self, min_bits: Int) raises:
         """Grow ``_builder`` so it can hold at least ``min_bits`` bits.
@@ -4956,13 +4956,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = copy._index_name
         self._storage = copy._storage.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self.name = take.name^
-        self.dtype = take.dtype^
-        self._index = take._index^
-        self._index_names = take._index_names^
-        self._index_name = take._index_name^
-        self._storage = take._storage^
+    def __init__(out self, *, deinit move: Self):
+        self.name = move.name^
+        self.dtype = move.dtype^
+        self._index = move._index^
+        self._index_names = move._index_names^
+        self._index_name = move._index_name^
+        self._storage = move._storage^
 
     # ------------------------------------------------------------------
     # Typed list accessors — extract a fresh ``List[T]`` from the active

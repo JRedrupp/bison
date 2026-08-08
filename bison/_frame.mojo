@@ -190,9 +190,9 @@ struct Series(Copyable, ImplicitlyCopyable, Movable):
         self._col = copy._col.copy()
         self.name = copy.name
 
-    def __init__(out self, *, deinit take: Self):
-        self._col = take._col^
-        self.name = take.name^
+    def __init__(out self, *, deinit move: Self):
+        self._col = move._col^
+        self.name = move.name^
 
     @staticmethod
     def from_pandas(pd_s: PythonObject) raises -> Series:
@@ -1727,8 +1727,8 @@ struct DataFrame(Copyable, Movable):
     def __init__(out self, *, copy: Self):
         self._cols = copy._cols.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self._cols = take._cols^
+    def __init__(out self, *, deinit move: Self):
+        self._cols = move._cols^
 
     @staticmethod
     def from_pandas(pd_df: PythonObject) raises -> DataFrame:

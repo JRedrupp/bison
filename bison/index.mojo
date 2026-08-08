@@ -16,9 +16,9 @@ struct Index(Copyable, Movable):
         self._data = copy._data.copy()
         self.name = copy.name
 
-    def __init__(out self, *, deinit take: Self):
-        self._data = take._data^
-        self.name = take.name^
+    def __init__(out self, *, deinit move: Self):
+        self._data = move._data^
+        self.name = move.name^
 
     def __len__(self) -> Int:
         return len(self._data)

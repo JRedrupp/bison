@@ -10,9 +10,9 @@ struct BisonDtype(ImplicitlyCopyable, Movable):
         self.name = copy.name
         self.itemsize = copy.itemsize
 
-    def __init__(out self, *, deinit take: Self):
-        self.name = take.name^
-        self.itemsize = take.itemsize
+    def __init__(out self, *, deinit move: Self):
+        self.name = move.name^
+        self.itemsize = move.itemsize
 
     def __str__(self) -> String:
         return self.name
