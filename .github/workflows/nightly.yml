@@ -15,16 +15,17 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      issues: write
 
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
 
-      - name: Switch to Mojo nightly channel
+      - name: Float to latest nightly MAX build
         run: |
           sed -i \
-            's|https://conda.modular.com/max"|https://conda.modular.com/max-nightly"|g' \
+            -E 's|max = "==[^"]+"|max = "*"|; s|mblack = "==[^"]+"|mblack = "*"|' \
             pixi.toml
 
       - uses: prefix-dev/setup-pixi@v0.9.5
@@ -36,3 +37,34 @@ jobs:
 
       - name: Run tests
         run: pixi run test
+
+      - name: File or update tracking issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'nightly-broken';
+            const title = 'Nightly build is broken against latest Mojo/MAX';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            });
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `Still failing: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                labels: [label],
+                body: `The scheduled nightly build failed against the latest MAX nightly.\n\nRun: ${runUrl}`,
+              });
+            }
