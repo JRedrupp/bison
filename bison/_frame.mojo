@@ -6305,7 +6305,7 @@ struct DataFrame(Copyable, Movable):
 
 
 def _insertion_sort_keys_by[
-    T: Comparable & Copyable & ImplicitlyCopyable
+    T: Comparable & Copyable & ImplicitlyCopyable & ImplicitlyDeletable
 ](
     mut group_keys: List[String],
     group_map: Dict[String, List[Int]],
