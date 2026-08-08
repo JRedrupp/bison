@@ -1,5 +1,6 @@
 from std.python import Python, PythonObject
 from std.utils import Variant
+from std.os import abort
 from std.memory import bitcast
 from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor, ceil, exp, log, log10
@@ -191,10 +192,14 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
         return self._v.isa[T]()
 
     def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
-        return self._v[T]
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
     def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
-        return self._v[T]
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
 
 struct DictSplitResult(Copyable, Movable):
@@ -273,10 +278,14 @@ struct SeriesScalar(Copyable, ImplicitlyCopyable, Movable):
         return self._v.isa[T]()
 
     def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
-        return self._v[T]
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
     def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
-        return self._v[T]
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
 
 # ------------------------------------------------------------------
@@ -4589,7 +4598,7 @@ struct NullMask(Copyable, Movable, Sized):
         self._has_nulls = False
 
     @staticmethod
-    def from_list(read mask: List[Bool]) -> Self:
+    def from_list(imm mask: List[Bool]) -> Self:
         """Explicit conversion from ``List[Bool]``.
 
         Used by ``_build_result_col`` and other internal call sites that still
@@ -5198,7 +5207,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         verify the column is in the LegacyObjectData arm — i.e. the dtype
         is ``object_``, ``datetime64_ns``, or ``timedelta64_ns``.
         """
-        return self._storage[LegacyObjectData]
+        if not self._storage.isa[LegacyObjectData]():
+            abort("get: wrong variant type")
+        return self._storage.unsafe_get[LegacyObjectData]()
 
     # The four typed-array accessors below return a *copy* of the typed
     # marrow array held in ``_storage[AnyArray]``.  ``PrimitiveArray[T]`` and
@@ -5490,16 +5501,24 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._index.isa[List[PythonObject]]()
 
     def _str_index(ref self) -> ref[self._index] Index:
-        return self._index[Index]
+        if not self._index.isa[Index]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[Index]()
 
     def _int_index_data(ref self) -> ref[self._index] List[Int64]:
-        return self._index[List[Int64]]
+        if not self._index.isa[List[Int64]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[Int64]]()
 
     def _float_index_data(ref self) -> ref[self._index] List[Float64]:
-        return self._index[List[Float64]]
+        if not self._index.isa[List[Float64]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[Float64]]()
 
     def _obj_index_data(ref self) -> ref[self._index] List[PythonObject]:
-        return self._index[List[PythonObject]]
+        if not self._index.isa[List[PythonObject]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[PythonObject]]()
 
     # ------------------------------------------------------------------
     # Cache-aware visitor dispatch (#619 Phase 6c)
