@@ -136,7 +136,7 @@ def test_to_csv_returns_string() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var csv_str = df.to_csv()
-    assert_true(len(csv_str) > 0)
+    assert_true(csv_str.byte_length() > 0)
     assert_true(csv_str.find("a") >= 0)
     assert_true(csv_str.find("b") >= 0)
 
@@ -263,7 +263,7 @@ def test_to_json_records() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'a': [1, 2], 'b': [3, 4]}")))
     var json_str = df.to_json(orient="records")
-    assert_true(len(json_str) > 0)
+    assert_true(json_str.byte_length() > 0)
     assert_true(json_str.find('"a"') >= 0)
     assert_true(json_str.find('"b"') >= 0)
 
@@ -945,7 +945,7 @@ def test_to_string_contains_headers() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'alpha': [1, 2], 'beta': [3, 4]}")))
     var s = df.to_string()
-    assert_true(len(s) > 0)
+    assert_true(s.byte_length() > 0)
     assert_true(s.find("alpha") >= 0)
     assert_true(s.find("beta") >= 0)
 
@@ -990,7 +990,7 @@ def test_to_markdown_structure() raises:
     var pd = Python.import_module("pandas")
     var df = DataFrame(pd.DataFrame(Python.evaluate("{'col1': [1, 2], 'col2': [3, 4]}")))
     var m = df.to_markdown()
-    assert_true(len(m) > 0)
+    assert_true(m.byte_length() > 0)
     assert_true(m.find("|") >= 0)
     assert_true(m.find("---") >= 0)
     assert_true(m.find("col1") >= 0)

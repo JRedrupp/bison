@@ -1,5 +1,6 @@
 from std.python import Python, PythonObject
 from std.utils import Variant
+from std.os import abort
 from std.memory import bitcast
 from std.collections import Dict, Set, Optional
 from std.math import sqrt, floor, ceil, exp, log, log10
@@ -14,6 +15,7 @@ from marrow.arrays import (
 from marrow.buffers import Bitmap
 from marrow.builders import (
     array as _marrow_array,
+    PrimitiveBuilder,
 )
 from marrow.dtypes import (
     bool_ as _m_bool_,
@@ -118,9 +120,9 @@ struct LegacyObjectData(Copyable, Movable):
         self.data = copy.data.copy()
         self.null_mask = copy.null_mask.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self.data = take.data^
-        self.null_mask = take.null_mask^
+    def __init__(out self, *, deinit move: Self):
+        self.data = move.data^
+        self.null_mask = move.null_mask^
 
 
 # New storage Variant — Phase 2+ visitor dispatch will branch on this.
@@ -175,8 +177,8 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
     def __init__(out self, *, copy: Self):
         self._v = copy._v
 
-    def __init__(out self, *, deinit take: Self):
-        self._v = take._v^
+    def __init__(out self, *, deinit move: Self):
+        self._v = move._v^
 
     @staticmethod
     def null() -> Self:
@@ -187,14 +189,18 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
         """Return True if this scalar represents a missing / null value."""
         return self._v.isa[_Null]()
 
-    def isa[T: Copyable & Movable](self) -> Bool:
+    def isa[T: Copyable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
-        return self._v[T]
+    def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
-        return self._v[T]
+    def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
 
 struct DictSplitResult(Copyable, Movable):
@@ -266,17 +272,21 @@ struct SeriesScalar(Copyable, ImplicitlyCopyable, Movable):
     def __init__(out self, *, copy: Self):
         self._v = copy._v
 
-    def __init__(out self, *, deinit take: Self):
-        self._v = take._v^
+    def __init__(out self, *, deinit move: Self):
+        self._v = move._v^
 
-    def isa[T: Copyable & Movable](self) -> Bool:
+    def isa[T: Copyable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
-        return self._v[T]
+    def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
-        return self._v[T]
+    def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
+        if not self._v.isa[T]():
+            abort("get: wrong variant type")
+        return self._v.unsafe_get[T]()
 
 
 # ------------------------------------------------------------------
@@ -996,7 +1006,7 @@ def _init_storage_from_column_data(
             vals.append(Int(src[i]))
         try:
             col._storage = ColumnStorage(
-                AnyArray(_marrow_array[Int64Type](vals^))
+                AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
             )
         except:
             col._storage = ColumnStorage(
@@ -1009,9 +1019,7 @@ def _init_storage_from_column_data(
         for i in range(len(src)):
             vals.append(src[i])
         try:
-            col._storage = ColumnStorage(
-                AnyArray(_marrow_array[Float64Type](vals^))
-            )
+            col._storage = ColumnStorage(_float64_any_array(vals^))
         except:
             col._storage = ColumnStorage(
                 LegacyObjectData(List[PythonObject](), NullMask())
@@ -1050,6 +1058,19 @@ def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
         return Float64(scalar.as_primitive[Float64Type]().value())
     else:
         return Float64(scalar.as_primitive[Int64Type]().value())
+
+
+def _float64_any_array(var vals: List[Optional[Float64]]) raises -> AnyArray:
+    """Convert a List[Optional[Float64]] to an AnyArray, avoiding marrow's
+    ambiguous Float64Type overload resolution."""
+    var b = PrimitiveBuilder[Float64Type](len(vals))
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v:
+            b.unsafe_append(Scalar[DType.float64](v.value()))
+        else:
+            b.append_null()
+    return AnyArray(b.finish())
 
 
 # ------------------------------------------------------------------
@@ -4386,7 +4407,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 def _merge_sort_perm_comparable[
-    T: Comparable & Copyable & Movable
+    T: Comparable & Copyable
 ](
     mut perm: List[Int],
     data: List[T],
@@ -4434,8 +4455,8 @@ def _merge_sort_perm_comparable[
             var li = lo
             var ri = mid_idx
             while li < mid_idx and ri < hi:
-                var lv = pp[li]
-                var rv = pp[ri]
+                var lv = pp[unsafe_offset=li]
+                var rv = pp[unsafe_offset=ri]
                 var lnull = has_mask and null_mask[lv]
                 var rnull = has_mask and null_mask[rv]
                 var take_right: Bool
@@ -4446,26 +4467,26 @@ def _merge_sort_perm_comparable[
                 elif rnull:
                     take_right = not na_last
                 elif ascending:
-                    take_right = dp[rv] < dp[lv]
+                    take_right = dp[unsafe_offset=rv] < dp[unsafe_offset=lv]
                 else:
-                    take_right = dp[rv] > dp[lv]
+                    take_right = dp[unsafe_offset=rv] > dp[unsafe_offset=lv]
                 if take_right:
-                    sp[k] = rv
+                    sp[unsafe_offset=k] = rv
                     ri += 1
                 else:
-                    sp[k] = lv
+                    sp[unsafe_offset=k] = lv
                     li += 1
                 k += 1
             while li < mid_idx:
-                sp[k] = pp[li]
+                sp[unsafe_offset=k] = pp[unsafe_offset=li]
                 li += 1
                 k += 1
             while ri < hi:
-                sp[k] = pp[ri]
+                sp[unsafe_offset=k] = pp[unsafe_offset=ri]
                 ri += 1
                 k += 1
             for j in range(lo, hi):
-                pp[j] = sp[j]
+                pp[unsafe_offset=j] = sp[unsafe_offset=j]
             lo += 2 * width
         width *= 2
 
@@ -4589,7 +4610,7 @@ struct NullMask(Copyable, Movable, Sized):
         self._has_nulls = False
 
     @staticmethod
-    def from_list(read mask: List[Bool]) -> Self:
+    def from_list(imm mask: List[Bool]) -> Self:
         """Explicit conversion from ``List[Bool]``.
 
         Used by ``_build_result_col`` and other internal call sites that still
@@ -4634,11 +4655,11 @@ struct NullMask(Copyable, Movable, Sized):
                 copy._builder.view(0, copy._length), 0, copy._length
             )
 
-    def __init__(out self, *, deinit take: Self):
-        self._builder = take._builder^
-        self._length = take._length
-        self._capacity = take._capacity
-        self._has_nulls = take._has_nulls
+    def __init__(out self, *, deinit move: Self):
+        self._builder = move._builder^
+        self._length = move._length
+        self._capacity = move._capacity
+        self._has_nulls = move._has_nulls
 
     def _ensure_capacity(mut self, min_bits: Int) raises:
         """Grow ``_builder`` so it can hold at least ``min_bits`` bits.
@@ -4956,13 +4977,13 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         self._index_name = copy._index_name
         self._storage = copy._storage.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self.name = take.name^
-        self.dtype = take.dtype^
-        self._index = take._index^
-        self._index_names = take._index_names^
-        self._index_name = take._index_name^
-        self._storage = take._storage^
+    def __init__(out self, *, deinit move: Self):
+        self.name = move.name^
+        self.dtype = move.dtype^
+        self._index = move._index^
+        self._index_names = move._index_names^
+        self._index_name = move._index_name^
+        self._storage = move._storage^
 
     # ------------------------------------------------------------------
     # Typed list accessors — extract a fresh ``List[T]`` from the active
@@ -5198,7 +5219,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         verify the column is in the LegacyObjectData arm — i.e. the dtype
         is ``object_``, ``datetime64_ns``, or ``timedelta64_ns``.
         """
-        return self._storage[LegacyObjectData]
+        if not self._storage.isa[LegacyObjectData]():
+            abort("get: wrong variant type")
+        return self._storage.unsafe_get[LegacyObjectData]()
 
     # The four typed-array accessors below return a *copy* of the typed
     # marrow array held in ``_storage[AnyArray]``.  ``PrimitiveArray[T]`` and
@@ -5340,7 +5363,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 else:
                     vals.append(Int(src[i]))
             self._storage = ColumnStorage(
-                AnyArray(_marrow_array[Int64Type](vals^))
+                AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
             )
         elif self.is_float():
             var src = self._float64_list()
@@ -5350,9 +5373,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                     vals.append(None)
                 else:
                     vals.append(src[i])
-            self._storage = ColumnStorage(
-                AnyArray(_marrow_array[Float64Type](vals^))
-            )
+            self._storage = ColumnStorage(_float64_any_array(vals^))
         elif self.is_bool():
             var src = self._bool_list()
             var vals = List[Optional[Bool]](capacity=n)
@@ -5419,7 +5440,9 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 vals.append(None)
             else:
                 vals.append(Int(data[i]))
-        self._storage = ColumnStorage(AnyArray(_marrow_array[Int64Type](vals^)))
+        self._storage = ColumnStorage(
+            AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
+        )
 
     def _flush_float64_list(mut self, var data: List[Float64]) raises:
         """Replace this column's storage with a float64 AnyArray built from
@@ -5433,9 +5456,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 vals.append(None)
             else:
                 vals.append(data[i])
-        self._storage = ColumnStorage(
-            AnyArray(_marrow_array[Float64Type](vals^))
-        )
+        self._storage = ColumnStorage(_float64_any_array(vals^))
 
     def _flush_bool_list(mut self, var data: List[Bool]) raises:
         """Replace this column's storage with a bool AnyArray built from
@@ -5490,16 +5511,24 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._index.isa[List[PythonObject]]()
 
     def _str_index(ref self) -> ref[self._index] Index:
-        return self._index[Index]
+        if not self._index.isa[Index]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[Index]()
 
     def _int_index_data(ref self) -> ref[self._index] List[Int64]:
-        return self._index[List[Int64]]
+        if not self._index.isa[List[Int64]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[Int64]]()
 
     def _float_index_data(ref self) -> ref[self._index] List[Float64]:
-        return self._index[List[Float64]]
+        if not self._index.isa[List[Float64]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[Float64]]()
 
     def _obj_index_data(ref self) -> ref[self._index] List[PythonObject]:
-        return self._index[List[PythonObject]]
+        if not self._index.isa[List[PythonObject]]():
+            abort("get: wrong variant type")
+        return self._index.unsafe_get[List[PythonObject]]()
 
     # ------------------------------------------------------------------
     # Cache-aware visitor dispatch (#619 Phase 6c)
@@ -7319,7 +7348,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._apply[_neg_fn]()
 
     def _isin_kernel[
-        T: Comparable & Copyable & Movable
+        T: Comparable & Copyable
     ](self, d: List[T], values: List[T]) raises -> Column:
         """Shared kernel for all _isin_* methods.
 

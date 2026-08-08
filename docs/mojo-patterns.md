@@ -110,3 +110,92 @@ from algorithm import sort as _sort_list
 
 _sort_list(my_list)   # NOT sort(my_list) — would shadow the built-in
 ```
+
+## `mojo package`/`precompile` rejects any `def main()` file anywhere in the tree
+
+As of the current nightly, `mojo package` (and its replacement `mojo
+precompile`) aborts the whole compile with `'main()' is not supported within
+packages` if it encounters ANY `.mojo` file containing `def main()`, anywhere
+in the directory tree passed as input — even files that are never imported by
+the package's public modules. Neither command exposes an exclude flag.
+
+This bit the vendored `vendor/marrow/marrow` submodule: its `tests/`,
+`kernels/tests/`, and `expr/tests/` directories all contain `def main()` by
+design (marrow's own `TestSuite.run`/`BenchSuite.run` convention — those files
+are compiled individually by marrow's own test harness, never packaged as a
+whole). Packaging `vendor/marrow/marrow` directly now fails immediately on
+those files.
+
+The fix (`scripts/build_marrow.sh`, invoked by the `build-marrow` pixi task):
+rsync a filtered mirror of the submodule into `.bison-cache/marrow-lib/marrow/`
+with `--exclude 'tests/'` (matches the directory name `tests` anywhere in the
+tree, so it catches all three offending directories in one flag), then run
+`mojo package` against the mirror instead of the raw submodule path. If a
+future Mojo release adds a real exclude mechanism, or marrow's test layout
+changes, this workaround can be simplified or removed — see the corresponding
+entry in `SESSION.md`.
+
+## Mojo nightly 26.5 migration gotchas (bison/marrow fork bump)
+
+These surfaced while bumping `max`/`mblack` to `26.5.0.dev2026080206` and
+fixing the resulting breaks across bison and the `JRedrupp/marrow` fork.
+Each was independently verified against the real compiler, not guessed from
+changelogs.
+
+- **`deinit` move-constructor parameter must be named `move`.** A custom
+  `deinit` overload used for move construction must name its parameter
+  `move`, not an arbitrary name like `take` — the compiler now recognizes
+  the move-constructor shape by that parameter name specifically.
+
+- **`Copyable` / `Comparable & Copyable` now imply `Movable`.** Composing
+  `& Movable` explicitly alongside either of these is now a compile error
+  (redundant trait composition), where it previously compiled fine.
+
+- **Raw pointer subscripting requires `unsafe_offset=`.** Positional
+  `ptr[i]` no longer resolves for `UnsafePointer.__getitem__`; use
+  `ptr[unsafe_offset=i]`.
+
+- **`read` argument-passing convention is now spelled `imm`.** `def f(read
+  x: T)` should be written `def f(imm x: T)`.
+
+- **`Variant.__getitem__[T]`/`__getitem_param__[T]` subscript syntax has an
+  origin-inference bug when returned through a `ref[...]`-annotated return
+  type.** A function shaped like:
+
+  ```mojo
+  def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
+      return self._v[T]
+  ```
+
+  fails with `cannot return reference with incompatible origin`. The
+  documented fix (`ref result = self._v[T]; return result`) does **not**
+  work either — the error just moves to the `return result` line. This
+  reproduces on a bare `Variant` with no struct field projection involved,
+  so it isn't specific to this shape of code — it's a real compiler
+  limitation on this toolchain. The working alternative is to call
+  `Variant.unsafe_get[T]()` directly (what `__getitem_param__` calls
+  internally after its own `isa[T]()` check), replicating the same
+  check-then-access sequence inline:
+
+  ```mojo
+  def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
+      if not self._v.isa[T]():
+          abort("get: wrong variant type")
+      return self._v.unsafe_get[T]()
+  ```
+
+- **`std.time.perf_counter_ns()`'s return type changed from `UInt` to
+  `Int`** at some point in the 26.5 dev cycle. Code that stored its result
+  in an explicitly `UInt`-typed variable or passed it to a function with a
+  `UInt` parameter now fails to compile; update the annotation to `Int`.
+
+- **marrow's fused groupby-aggregate kernel's accumulator dtype for
+  integer `sum`/`min`/`max` changed from `float64` to `int64`** (upstream
+  marrow commit `f95df48`, to avoid silent precision loss above 2^53 for
+  large `int64` sums). Any code built against marrow's aggregate result
+  columns that assumed a `float64` result for integer input columns will
+  now hit a hard process abort (`AnyArray._as[T]()`'s "wrong variant type"
+  check) rather than a catchable error, since the column now holds an
+  `int64` variant instead. This is a real contract change in a dependency,
+  not a bug to route around — read the result back as the dtype the
+  operation now actually returns.

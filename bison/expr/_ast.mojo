@@ -45,11 +45,11 @@ struct ASTNode(Copyable, ImplicitlyCopyable, Movable):
         self.left = copy.left
         self.right = copy.right
 
-    def __init__(out self, *, deinit take: Self):
-        self.kind = take.kind
-        self.value = take.value^
-        self.left = take.left
-        self.right = take.right
+    def __init__(out self, *, deinit move: Self):
+        self.kind = move.kind
+        self.value = move.value^
+        self.left = move.left
+        self.right = move.right
 
 
 struct ParsedExpr(Movable):
@@ -69,9 +69,9 @@ struct ParsedExpr(Movable):
         self.nodes = nodes^
         self.root = root
 
-    def __init__(out self, *, deinit take: Self):
-        self.nodes = take.nodes^
-        self.root = take.root
+    def __init__(out self, *, deinit move: Self):
+        self.nodes = move.nodes^
+        self.root = move.root
 
     def node_at(self, i: Int) -> ASTNode:
         """Return the node at arena index *i*."""

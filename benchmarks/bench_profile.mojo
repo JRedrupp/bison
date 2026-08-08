@@ -46,7 +46,7 @@ comptime LOC_SLICE_ITERS = 5000
 # ---------------------------------------------------------------------------
 
 
-def _elapsed_ms(t0: UInt, iters: Int) -> Float64:
+def _elapsed_ms(t0: Int, iters: Int) -> Float64:
     return Float64(perf_counter_ns() - t0) / Float64(iters) / 1_000_000.0
 
 

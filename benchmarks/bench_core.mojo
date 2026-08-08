@@ -33,7 +33,7 @@ comptime IO_ITERS = 5  # I/O-bound        (csv round-trip)
 # ---------------------------------------------------------------------------
 
 
-def _elapsed_ms(t0: UInt, iters: Int) -> Float64:
+def _elapsed_ms(t0: Int, iters: Int) -> Float64:
     """Return mean milliseconds per call given a start timestamp and count."""
     return Float64(perf_counter_ns() - t0) / Float64(iters) / 1_000_000.0
 

@@ -35,9 +35,9 @@ struct Token(Copyable, ImplicitlyCopyable, Movable):
         self.kind = copy.kind
         self.value = copy.value
 
-    def __init__(out self, *, deinit take: Self):
-        self.kind = take.kind
-        self.value = take.value^
+    def __init__(out self, *, deinit move: Self):
+        self.kind = move.kind
+        self.value = move.value^
 
 
 struct Tokenizer:

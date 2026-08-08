@@ -24,7 +24,7 @@ comptime ITERS = 200
 comptime PARSE_ITERS = 10_000
 
 
-def _ms(t0: UInt, iters: Int) -> Float64:
+def _ms(t0: Int, iters: Int) -> Float64:
     return Float64(perf_counter_ns() - t0) / Float64(iters) / 1_000_000.0
 
 
