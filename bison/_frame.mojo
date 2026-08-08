@@ -6611,8 +6611,9 @@ def _marrow_agg_build_int_col(
 ) raises -> Column:
     """Build an Int64 result column for count / int-preserving sum/min/max.
 
-    When *is_count* is false, the marrow kernel stored the result as float64
-    (the current accumulator type) — cast back to int64 here.
+    marrow's fused groupby-aggregate kernel uses an int64 accumulator (not
+    float64) for sum/min/max on integer inputs, same as count — so both
+    cases read the result back as int64 here.
     """
     var vals = List[Int64]()
     var null_mask = NullMask()
@@ -6621,11 +6622,8 @@ def _marrow_agg_build_int_col(
         if not rb_col.is_valid(ri):
             vals.append(Int64(0))
             null_mask.append_null()
-        elif is_count:
-            vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
-            null_mask.append_valid()
         else:
-            vals.append(Int64(Float64(rb_col.as_float64().unsafe_get(ri))))
+            vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
             null_mask.append_valid()
     var col = Column(name, vals^, int64, idx.copy())
     col._index_name = key_col_name
@@ -7642,6 +7640,9 @@ struct SeriesGroupBy:
         var orig_is_int = self._series._col.dtype.is_integer()
 
         if is_count or (orig_is_int and agg != "mean"):
+            # marrow's fused groupby-aggregate kernel uses an int64
+            # accumulator (not float64) for sum/min/max on integer inputs,
+            # same as count — so both cases read the result back as int64.
             var vals = List[Int64]()
             var null_mask = NullMask()
             for i in range(n_keep):
@@ -7649,13 +7650,8 @@ struct SeriesGroupBy:
                 if not rb_col.is_valid(ri):
                     vals.append(Int64(0))
                     null_mask.append_null()
-                elif is_count:
-                    vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
-                    null_mask.append_valid()
                 else:
-                    vals.append(
-                        Int64(Float64(rb_col.as_float64().unsafe_get(ri)))
-                    )
+                    vals.append(rebind[Int64](rb_col.as_int64().unsafe_get(ri)))
                     null_mask.append_valid()
             var col = Column(self._series.name, vals^, int64, idx^)
             if null_mask.has_nulls():
