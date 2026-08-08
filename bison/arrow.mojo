@@ -14,7 +14,7 @@ Public API
 - table_to_dataframe       — Table → DataFrame
 """
 from marrow.arrays import AnyArray, StringArray
-from marrow.builders import array, StringBuilder
+from marrow.builders import array, StringBuilder, PrimitiveBuilder
 from marrow.dtypes import (
     int64 as _m_int64,
     float64 as _m_float64,
@@ -27,7 +27,7 @@ from marrow.dtypes import (
 )
 from marrow.schema import Schema as _MarrowSchema
 from marrow.tabular import RecordBatch, Table
-from .column import Column, ColumnStorage, NullMask
+from .column import Column, ColumnStorage, NullMask, _float64_any_array
 from .dataframe import DataFrame
 from .dtypes import int64, float64, bool_, object_, string_
 
@@ -67,7 +67,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(Int(src[i]))
-        return AnyArray(array[Int64Type](vals^))
+        return AnyArray(array[Int64Type](vals^, Int64Type()))
 
     elif col.is_float():
         var src = col._float64_data()
@@ -77,7 +77,7 @@ def column_to_marrow_array(col: Column) raises -> AnyArray:
                 vals.append(None)
             else:
                 vals.append(src[i])
-        return AnyArray(array[Float64Type](vals^))
+        return _float64_any_array(vals^)
 
     elif col.is_bool():
         var src = col._bool_data()

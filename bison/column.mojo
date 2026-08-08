@@ -15,6 +15,7 @@ from marrow.arrays import (
 from marrow.buffers import Bitmap
 from marrow.builders import (
     array as _marrow_array,
+    PrimitiveBuilder,
 )
 from marrow.dtypes import (
     bool_ as _m_bool_,
@@ -1005,7 +1006,7 @@ def _init_storage_from_column_data(
             vals.append(Int(src[i]))
         try:
             col._storage = ColumnStorage(
-                AnyArray(_marrow_array[Int64Type](vals^))
+                AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
             )
         except:
             col._storage = ColumnStorage(
@@ -1019,7 +1020,7 @@ def _init_storage_from_column_data(
             vals.append(src[i])
         try:
             col._storage = ColumnStorage(
-                AnyArray(_marrow_array[Float64Type](vals^))
+                _float64_any_array(vals^)
             )
         except:
             col._storage = ColumnStorage(
@@ -1059,6 +1060,19 @@ def _marrow_scalar_to_float64(scalar: AnyScalar) -> Float64:
         return Float64(scalar.as_primitive[Float64Type]().value())
     else:
         return Float64(scalar.as_primitive[Int64Type]().value())
+
+
+def _float64_any_array(var vals: List[Optional[Float64]]) raises -> AnyArray:
+    """Convert a List[Optional[Float64]] to an AnyArray, avoiding marrow's
+    ambiguous Float64Type overload resolution."""
+    var b = PrimitiveBuilder[Float64Type](len(vals))
+    for i in range(len(vals)):
+        var v = vals[i]
+        if v:
+            b.unsafe_append(Scalar[DType.float64](v.value()))
+        else:
+            b.append_null()
+    return AnyArray(b.finish())
 
 
 # ------------------------------------------------------------------
@@ -5351,7 +5365,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 else:
                     vals.append(Int(src[i]))
             self._storage = ColumnStorage(
-                AnyArray(_marrow_array[Int64Type](vals^))
+                AnyArray(_marrow_array[Int64Type](vals^, Int64Type()))
             )
         elif self.is_float():
             var src = self._float64_list()
@@ -5362,7 +5376,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 else:
                     vals.append(src[i])
             self._storage = ColumnStorage(
-                AnyArray(_marrow_array[Float64Type](vals^))
+                _float64_any_array(vals^)
             )
         elif self.is_bool():
             var src = self._bool_list()
@@ -5430,7 +5444,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
                 vals.append(None)
             else:
                 vals.append(Int(data[i]))
-        self._storage = ColumnStorage(AnyArray(_marrow_array[Int64Type](vals^)))
+        self._storage = ColumnStorage(AnyArray(_marrow_array[Int64Type](vals^, Int64Type())))
 
     def _flush_float64_list(mut self, var data: List[Float64]) raises:
         """Replace this column's storage with a float64 AnyArray built from
@@ -5445,7 +5459,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
             else:
                 vals.append(data[i])
         self._storage = ColumnStorage(
-            AnyArray(_marrow_array[Float64Type](vals^))
+            _float64_any_array(vals^)
         )
 
     def _flush_bool_list(mut self, var data: List[Bool]) raises:
