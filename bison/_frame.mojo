@@ -108,9 +108,7 @@ struct _RankVisitor(ColumnDataVisitorRaises, Copyable, Movable):
         self.n_non_null = n_non_null
         self.ranks = ranks.copy()
 
-    def _rank_numeric[
-        T: Comparable & Copyable & Movable
-    ](mut self, data: List[T]) raises:
+    def _rank_numeric[T: Comparable & Copyable](mut self, data: List[T]) raises:
         var i = 0
         while i < self.n_non_null:
             var j = i
@@ -6307,7 +6305,7 @@ struct DataFrame(Copyable, Movable):
 
 
 def _insertion_sort_keys_by[
-    T: Comparable & Copyable & Movable & ImplicitlyCopyable
+    T: Comparable & Copyable & ImplicitlyCopyable
 ](
     mut group_keys: List[String],
     group_map: Dict[String, List[Int]],

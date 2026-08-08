@@ -187,13 +187,13 @@ struct DFScalar(Copyable, ImplicitlyCopyable, Movable):
         """Return True if this scalar represents a missing / null value."""
         return self._v.isa[_Null]()
 
-    def isa[T: Copyable & Movable](self) -> Bool:
+    def isa[T: Copyable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
+    def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
         return self._v[T]
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
+    def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
         return self._v[T]
 
 
@@ -269,13 +269,13 @@ struct SeriesScalar(Copyable, ImplicitlyCopyable, Movable):
     def __init__(out self, *, deinit move: Self):
         self._v = move._v^
 
-    def isa[T: Copyable & Movable](self) -> Bool:
+    def isa[T: Copyable](self) -> Bool:
         return self._v.isa[T]()
 
-    def __getitem__[T: Copyable & Movable](ref self) -> ref[self._v] T:
+    def __getitem__[T: Copyable](ref self) -> ref[self._v] T:
         return self._v[T]
 
-    def __getitem_param__[T: Copyable & Movable](ref self) -> ref[self._v] T:
+    def __getitem_param__[T: Copyable](ref self) -> ref[self._v] T:
         return self._v[T]
 
 
@@ -4386,7 +4386,7 @@ struct _ToColumnIndexVisitor(ColumnDataVisitorRaises, Copyable, Movable):
 
 
 def _merge_sort_perm_comparable[
-    T: Comparable & Copyable & Movable
+    T: Comparable & Copyable
 ](
     mut perm: List[Int],
     data: List[T],
@@ -7319,7 +7319,7 @@ struct Column(Copyable, ImplicitlyCopyable, Movable, Sized):
         return self._apply[_neg_fn]()
 
     def _isin_kernel[
-        T: Comparable & Copyable & Movable
+        T: Comparable & Copyable
     ](self, d: List[T], values: List[T]) raises -> Column:
         """Shared kernel for all _isin_* methods.
 
