@@ -6,6 +6,48 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0-alpha] - 2026-08-09
+
+### Changed
+- Revived the project on a current Mojo/MAX toolchain after several months
+  on an unmaintainable pin. Bumped `max`/`mblack` from `26.3.0.dev2026041520`
+  through several nightly builds to `26.5.0rc1`, a tagged release candidate
+  rather than a rolling dev snapshot.
+- Forked the vendored `marrow` dependency ([JRedrupp/marrow](https://github.com/JRedrupp/marrow))
+  to fix Mojo-nightly compatibility breaks the upstream project hadn't yet
+  addressed, and upstreamed the accumulated fixes back to
+  [kszucs/marrow](https://github.com/kszucs/marrow).
+- Fixed the nightly CI drift-detector: the previous version's channel-switch
+  step was a no-op, so the daily nightly job had been silently re-testing
+  the same pinned build instead of catching new breaks. It now floats to
+  the latest nightly and files a tracking issue on failure.
+
+### Fixed
+- `DataFrame.groupby()`/`Series.groupby()` `sum()`/`min()`/`max()` on
+  integer columns via the marrow-accelerated fast path no longer crashes.
+  Caused by an upstream marrow change to the fused aggregate kernel's
+  accumulator dtype (float64 → int64 for integer inputs, to avoid precision
+  loss above 2^53) that this project's own code hadn't been updated to match.
+- `NullMask` bitmap now grows correctly on a valid append beyond its current
+  capacity (#758).
+- Mechanical fixes for ~15 categories of Mojo-nightly API drift across
+  `bison/` and the `marrow` fork: `deinit` move-parameter naming,
+  `Movable`/`Copyable` trait composition, pointer subscript syntax,
+  `read`→`imm` argument passing, `Variant` subscript origin inference,
+  `perf_counter_ns()`'s `UInt`→`Int` return type change, and
+  `UnsafePointer`→`Pointer` for tracked-origin pointer usage, among others
+  — see `docs/mojo-patterns.md` for the full reference.
+
+### Performance
+- `rolling_min`/`rolling_max`: replaced an O(n) deque pop-front with
+  `std.collections.Deque` (#757).
+- `DataFrame.sort_values`: avoid redundant key-column materialization on
+  the first pass (#738).
+- `query`/`eval`: eliminate an unnecessary `_f64_list()` copy in scalar
+  comparisons and fuse two-predicate AND/OR evaluation (#740); eliminate a
+  marrow bool round-trip and redundant `is_valid()` overhead in `query_and`
+  (#741).
+
 ## [0.1.0-alpha] - 2026-04-20
 
 ### Added
