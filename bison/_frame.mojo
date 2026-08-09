@@ -3,7 +3,6 @@ from std.collections import Optional, Dict
 from std.utils import Variant
 from std.builtin.sort import sort as _sort_list
 from std.math import sqrt
-from std.memory import UnsafePointer
 from ._errors import _not_implemented
 from .dtypes import (
     BisonDtype,
@@ -1948,7 +1947,7 @@ struct DataFrame(Copyable, Movable):
         Note: Mojo does not yet support ``@property``, so this must be called
         as ``df.iloc()`` rather than the pandas-compatible ``df.iloc``.
         """
-        return ILocIndexer(UnsafePointer(to=self))
+        return ILocIndexer(Pointer(to=self))
 
     def loc(mut self) -> LocIndexer[origin_of(self)]:
         """Label-based row indexer.
@@ -1960,7 +1959,7 @@ struct DataFrame(Copyable, Movable):
         Note: Mojo does not yet support ``@property``, so this must be called
         as ``df.loc()`` rather than the pandas-compatible ``df.loc``.
         """
-        return LocIndexer(UnsafePointer(to=self))
+        return LocIndexer(Pointer(to=self))
 
     def __getitem__(self, key: String) raises -> Series:
         for i in range(len(self._cols)):
@@ -6305,7 +6304,7 @@ struct DataFrame(Copyable, Movable):
 
 
 def _insertion_sort_keys_by[
-    T: Comparable & Copyable & ImplicitlyCopyable & ImplicitlyDeletable
+    T: Comparable & Copyable & ImplicitlyCopyable & Deinitable
 ](
     mut group_keys: List[String],
     group_map: Dict[String, List[Int]],
@@ -8612,7 +8611,7 @@ struct LocIndexer[O: MutOrigin]:
     """Label-based row indexer (.loc).
 
     Obtain via ``df.loc()`` (preferred) or
-    ``LocIndexer(UnsafePointer(to=df))`` where *df* is a mutable
+    ``LocIndexer(Pointer(to=df))`` where *df* is a mutable
     ``DataFrame``.  The pointer must remain valid for the lifetime of
     the indexer.
 
@@ -8621,9 +8620,9 @@ struct LocIndexer[O: MutOrigin]:
     end bound inclusive for label-based slicing.
     """
 
-    var _df: UnsafePointer[DataFrame, Self.O]
+    var _df: Pointer[DataFrame, Self.O]
 
-    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: Pointer[DataFrame, Self.O]):
         self._df = ptr
 
     def __getitem__(self, key: String) raises -> Series:
@@ -8693,12 +8692,12 @@ struct ILocIndexer[O: MutOrigin]:
     """Integer-position-based row indexer (.iloc).
 
     Obtain via ``df.iloc()`` (preferred) or
-    ``ILocIndexer(UnsafePointer(to=df))``.
+    ``ILocIndexer(Pointer(to=df))``.
     """
 
-    var _df: UnsafePointer[DataFrame, Self.O]
+    var _df: Pointer[DataFrame, Self.O]
 
-    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: Pointer[DataFrame, Self.O]):
         self._df = ptr
 
     def __getitem__(self, key: Int) raises -> Series:
@@ -8782,12 +8781,12 @@ struct ILocIndexer[O: MutOrigin]:
 struct AtIndexer[O: MutOrigin]:
     """Label-based scalar accessor (.at).
 
-    Obtain via ``AtIndexer(UnsafePointer(to=df))``.
+    Obtain via ``AtIndexer(Pointer(to=df))``.
     """
 
-    var _df: UnsafePointer[DataFrame, Self.O]
+    var _df: Pointer[DataFrame, Self.O]
 
-    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: Pointer[DataFrame, Self.O]):
         self._df = ptr
 
     def __getitem__(self, row: String, col: String) raises -> DFScalar:
@@ -8808,12 +8807,12 @@ struct AtIndexer[O: MutOrigin]:
 struct IAtIndexer[O: MutOrigin]:
     """Integer-based scalar accessor (.iat).
 
-    Obtain via ``IAtIndexer(UnsafePointer(to=df))``.
+    Obtain via ``IAtIndexer(Pointer(to=df))``.
     """
 
-    var _df: UnsafePointer[DataFrame, Self.O]
+    var _df: Pointer[DataFrame, Self.O]
 
-    def __init__(out self, ptr: UnsafePointer[DataFrame, Self.O]):
+    def __init__(out self, ptr: Pointer[DataFrame, Self.O]):
         self._df = ptr
 
     def __getitem__(self, row: Int, col: Int) raises -> DFScalar:
