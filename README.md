@@ -228,6 +228,7 @@ in the meantime.
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — installation, first DataFrame, core operations
+- [Using bison as a dependency](docs/using-as-a-dependency.md) — vendoring bison into your own Mojo project
 - [Migrating from pandas](docs/migrating-from-pandas.md) — step-by-step guide for porting pandas scripts
 - [API reference](docs/api-reference.md) — full method listing with native/stub status
 - [Architecture](docs/architecture.md) — column storage, type predicates, marrow integration
