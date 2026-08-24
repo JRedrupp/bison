@@ -8,7 +8,7 @@ channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
 platforms = ["linux-64", "osx-arm64"]
 
 [dependencies]
-max = "==26.5.0rc1"
+max = "==26.5.0"
 mblack = "==26.5.0rc1"
 
 [feature.dev.dependencies]
