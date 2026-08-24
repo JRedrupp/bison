@@ -5,9 +5,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BENCH_DIR="$REPO_ROOT/benchmarks"
 RESULTS_DIR="$REPO_ROOT/results"
 CACHE_DIR="$REPO_ROOT/.bison-cache"
-PKG_FILE="$CACHE_DIR/bison.mojopkg"
+PKG_FILE="$CACHE_DIR/bison.mojoc"
 TMP_DIR="$(mktemp -d)"
-PKG_TMP="$TMP_DIR/bison.mojopkg"
+PKG_TMP="$TMP_DIR/bison.mojoc"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p "$CACHE_DIR" "$RESULTS_DIR"
@@ -21,10 +21,10 @@ needs_package_rebuild() {
 
 if needs_package_rebuild; then
     echo "Packaging bison/ -> $PKG_FILE ..."
-    mojo package "$REPO_ROOT/bison" -o "$PKG_TMP"
+    mojo precompile "$REPO_ROOT/bison" -o "$PKG_TMP"
     mv "$PKG_TMP" "$PKG_FILE"
 else
-    echo "Package up to date: bison.mojopkg"
+    echo "Package up to date: bison.mojoc"
 fi
 
 # Collect git metadata for the result envelope.

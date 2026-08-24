@@ -18,7 +18,7 @@ Enforced by `.pre-commit-config.yaml`:
 - YAML, TOML, merge-conflict checks
 - No bare `raise Error("not yet implemented")` — must use `_not_implemented()`
 - `mojo format` auto-formatting
-- `mojo package --Werror` — zero warnings policy
+- `mojo precompile --Werror` — zero warnings policy
 
 Run all hooks manually:
 
@@ -29,7 +29,7 @@ pixi run lint
 ## Zero warnings policy
 
 The project enforces zero compiler warnings. `pixi run check` runs
-`mojo package bison/ --Werror` and must pass before any PR can merge. CI runs
+`mojo precompile bison/ --Werror` and must pass before any PR can merge. CI runs
 this automatically on every push and pull request.
 
 ## Pixi tasks
@@ -40,7 +40,7 @@ All development tasks run through Pixi:
 pixi run gen-version    # write bison/_version.mojo from pixi.toml
 pixi run test           # regenerates version then runs all tests
 pixi run fmt            # mojo format bison/
-pixi run check          # mojo package bison/ --Werror (no warnings allowed)
+pixi run check          # mojo precompile bison/ --Werror (no warnings allowed)
 pixi run check-compile  # compile-check all test and benchmark entry points
 pixi run lint           # pre-commit run --all-files
 pixi run bench          # run benchmarks (depends on gen-version)

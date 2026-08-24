@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# build_marrow.sh — package the vendored marrow submodule into a .mojopkg.
+# build_marrow.sh — package the vendored marrow submodule into a .mojoc.
 #
-# Under the current Mojo nightly, `mojo package` (and `mojo precompile`)
+# `mojo precompile` (formerly `mojo package`, now deprecated as of Mojo 1.0)
 # rejects the entire compile with "'main()' is not supported within
 # packages" if ANY .mojo file anywhere in the given directory tree contains
 # `def main()` — even if that file would never be imported. This is new,
@@ -14,7 +14,7 @@ set -euo pipefail
 # marrow's tests/, kernels/tests/, and expr/tests/ directories all contain
 # `def main()` by design (marrow's own TestSuite.run/BenchSuite.run
 # convention — they're meant to be compiled individually by marrow's own
-# test harness, never packaged as a whole). Since `mojo package` has no
+# test harness, never packaged as a whole). Since `mojo precompile` has no
 # exclude flag, we rsync a filtered mirror of the submodule (test
 # directories stripped) into .bison-cache/ and package that instead.
 #
@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_DIR="$REPO_ROOT/vendor/marrow/marrow"
 CACHE_DIR="$REPO_ROOT/.bison-cache/marrow-lib"
 MIRROR_DIR="$CACHE_DIR/marrow"
-OUT_FILE="$REPO_ROOT/.pixi/envs/default/lib/mojo/marrow.mojopkg"
+OUT_FILE="$REPO_ROOT/.pixi/envs/default/lib/mojo/marrow.mojoc"
 
 mkdir -p "$MIRROR_DIR"
 
@@ -40,4 +40,4 @@ mkdir -p "$MIRROR_DIR"
 rsync -a --delete --exclude 'tests/' "$SRC_DIR/" "$MIRROR_DIR/"
 
 mkdir -p "$(dirname "$OUT_FILE")"
-mojo package "$MIRROR_DIR" -o "$OUT_FILE"
+mojo precompile "$MIRROR_DIR" -o "$OUT_FILE"

@@ -5,7 +5,7 @@ set -euo pipefail
 # check_compile.sh — verify that all Mojo benchmark entry points compile.
 #
 # Catches import errors, type errors, and syntax issues in benchmark files
-# that `mojo package bison/ --Werror` (the pre-commit check) does not cover,
+# that `mojo precompile bison/ --Werror` (the pre-commit check) does not cover,
 # since those files live outside the bison package.
 #
 # Test files are intentionally excluded: they are already compiled and run by
@@ -26,21 +26,21 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CACHE_DIR="$REPO_ROOT/.bison-cache"
-PKG_FILE="$CACHE_DIR/bison.mojopkg"
+PKG_FILE="$CACHE_DIR/bison.mojoc"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p "$CACHE_DIR"
 
-# Build bison.mojopkg if needed.
+# Build bison.mojoc if needed.
 if [ ! -f "$PKG_FILE" ] || \
    find "$REPO_ROOT/bison" -name "*.mojo" -newer "$PKG_FILE" -print -quit | grep -q .; then
     echo "Packaging bison/ -> $PKG_FILE ..."
-    TMP_PKG="$TMP_DIR/bison.mojopkg"
-    mojo package "$REPO_ROOT/bison" -o "$TMP_PKG"
+    TMP_PKG="$TMP_DIR/bison.mojoc"
+    mojo precompile "$REPO_ROOT/bison" -o "$TMP_PKG"
     mv "$TMP_PKG" "$PKG_FILE"
 else
-    echo "Package up to date: bison.mojopkg"
+    echo "Package up to date: bison.mojoc"
 fi
 
 # Collect entry-point files: benchmarks only.
