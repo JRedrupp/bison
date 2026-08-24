@@ -35,7 +35,7 @@ bash scripts/run_tests.sh test_dataframe
 ## Test binary caching
 
 Compiled test binaries are cached in `.bison-cache/bin/`. A cached binary is
-reused when neither the test source file nor `bison.mojopkg` has changed since
+reused when neither the test source file nor `bison.mojoc` has changed since
 it was built, skipping the compilation phase entirely on subsequent runs.
 
 To force a full recompile (e.g. after a toolchain upgrade), delete the cache:
@@ -77,7 +77,7 @@ Helper utilities live in `tests/_helpers.mojo`:
 
 ## Test caching
 
-`scripts/run_tests.sh` rebuilds `bison.mojopkg` only when sources are newer
+`scripts/run_tests.sh` rebuilds `bison.mojoc` only when sources are newer
 than `.bison-cache/`. Tests run in parallel via background jobs; failures are
 collected and reported at the end.
 

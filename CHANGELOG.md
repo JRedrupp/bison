@@ -6,6 +6,28 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Moved off the nightly toolchain onto stable Mojo 1.0.0 / MAX 26.5.0.
+  `pixi.toml` now pins `max`/`mblack` to `==26.5.0` on the
+  `https://conda.modular.com/max` stable channel instead of `==26.5.0rc1`
+  on `max-nightly`. No source changes were needed in `bison/` — the RC
+  bison was already fixed up against was close enough to the final release
+  that `pixi run check` and the full test suite passed unmodified.
+- Switched every build script and pixi task off the now-deprecated `mojo
+  package` command to its replacement, `mojo precompile` (same flags), and
+  renamed the `.mojopkg` output extension to `.mojoc` to match the
+  convention the standard library and MAX packages already use.
+- `nightly.yml`'s channel-float step now also switches the `max`/`mblack`
+  channel from stable to `max-nightly` (previously only the version pins
+  were floated), and `ci.yml`'s `latest` matrix leg now loosens the exact
+  `==` version pin before running `pixi update max` — both were silent
+  no-ops that would have kept testing the pinned stable build instead of
+  tracking upstream.
+
+See `docs/mojo-patterns.md` for the full list of Mojo 1.0.0 migration
+gotchas, including deprecation warnings still outstanding in the vendored
+`marrow` fork (tracked in `SESSION.md`, non-blocking).
+
 ## [0.2.0-alpha] - 2026-08-09
 
 ### Changed

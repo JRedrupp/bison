@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CACHE_DIR="$REPO_ROOT/.bison-cache"
-PKG_FILE="$CACHE_DIR/bison.mojopkg"
+PKG_FILE="$CACHE_DIR/bison.mojoc"
 PROFILE_DIR="$REPO_ROOT/profile_results"
 BENCH_SRC="$REPO_ROOT/benchmarks/bench_profile.mojo"
 BIN_OUT="/tmp/bison_profile_$$"
@@ -118,7 +118,7 @@ elif [ "$TOOL" = "callgrind" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Build bison.mojopkg (reuses cache from run_benchmarks.sh)
+# Build bison.mojoc (reuses cache from run_benchmarks.sh)
 # ---------------------------------------------------------------------------
 mkdir -p "$CACHE_DIR" "$PROFILE_DIR"
 
@@ -130,11 +130,11 @@ needs_package_rebuild() {
 
 if needs_package_rebuild; then
     echo "Packaging bison/ -> $PKG_FILE ..."
-    TMP_PKG="$(mktemp -d)/bison.mojopkg"
-    mojo package "$REPO_ROOT/bison" -o "$TMP_PKG"
+    TMP_PKG="$(mktemp -d)/bison.mojoc"
+    mojo precompile "$REPO_ROOT/bison" -o "$TMP_PKG"
     mv "$TMP_PKG" "$PKG_FILE"
 else
-    echo "Package up to date: bison.mojopkg"
+    echo "Package up to date: bison.mojoc"
 fi
 
 # ---------------------------------------------------------------------------

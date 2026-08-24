@@ -170,7 +170,7 @@ encounter `SIGILL` errors, use perf (the default) instead.
 
 The `pixi run profile` command:
 
-1. Packages `bison/` into `bison.mojopkg` (cached)
+1. Packages `bison/` into `bison.mojoc` (cached)
 2. Compiles `benchmarks/bench_profile.mojo` with debug symbols:
    ```bash
    mojo build -g --debug-info-language C -o /tmp/bison_profile ...
@@ -191,7 +191,7 @@ For more control, you can compile and profile manually:
 # 1. Build the bison package
 pixi run build-marrow
 pixi run gen-version
-mojo package bison/ -o .bison-cache/bison.mojopkg
+mojo precompile bison/ -o .bison-cache/bison.mojoc
 
 # 2. Compile with debug symbols
 mojo build -I .bison-cache -I . benchmarks/bench_profile.mojo \

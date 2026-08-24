@@ -111,13 +111,13 @@ from algorithm import sort as _sort_list
 _sort_list(my_list)   # NOT sort(my_list) — would shadow the built-in
 ```
 
-## `mojo package`/`precompile` rejects any `def main()` file anywhere in the tree
+## `mojo precompile` rejects any `def main()` file anywhere in the tree
 
-As of the current nightly, `mojo package` (and its replacement `mojo
-precompile`) aborts the whole compile with `'main()' is not supported within
-packages` if it encounters ANY `.mojo` file containing `def main()`, anywhere
-in the directory tree passed as input — even files that are never imported by
-the package's public modules. Neither command exposes an exclude flag.
+`mojo precompile` (the replacement for the now-deprecated `mojo package` — see
+the Mojo 1.0.0 section below) aborts the whole compile with `'main()' is not
+supported within packages` if it encounters ANY `.mojo` file containing `def
+main()`, anywhere in the directory tree passed as input — even files that are
+never imported by the package's public modules. It exposes no exclude flag.
 
 This bit the vendored `vendor/marrow/marrow` submodule: its `tests/`,
 `kernels/tests/`, and `expr/tests/` directories all contain `def main()` by
@@ -130,7 +130,7 @@ The fix (`scripts/build_marrow.sh`, invoked by the `build-marrow` pixi task):
 rsync a filtered mirror of the submodule into `.bison-cache/marrow-lib/marrow/`
 with `--exclude 'tests/'` (matches the directory name `tests` anywhere in the
 tree, so it catches all three offending directories in one flag), then run
-`mojo package` against the mirror instead of the raw submodule path. If a
+`mojo precompile` against the mirror instead of the raw submodule path. If a
 future Mojo release adds a real exclude mechanism, or marrow's test layout
 changes, this workaround can be simplified or removed — see the corresponding
 entry in `SESSION.md`.
@@ -224,3 +224,52 @@ Also confirms the `ImplicitlyDeletable`/`Deinitable` trait-name churn noted
 earlier in this doc is still ongoing at 26.5.0rc1 (flipped back to
 `Deinitable` again) — treat any pin bump, even a small one, as needing a
 full `pixi run check` before assuming it's a no-op.
+
+## Mojo 1.0.0 / MAX 26.5.0 stable migration (moving off the nightly channel)
+
+Mojo 1.0 shipped August 11, 2026 as part of MAX 26.5.0 stable — the same
+`26.5` line bison was already tracking as a nightly/RC. Moving `pixi.toml`
+from `max = "==26.5.0rc1"` on the `https://conda.modular.com/max-nightly`
+channel to `max = "==26.5.0"` on the stable `https://conda.modular.com/max`
+channel required no source changes in `bison/` itself — the RC bison had
+already been fixed up against was close enough to final that `pixi run
+check` and the full `pixi run test` suite passed unmodified. Verify package
+availability with `pixi search -c <channel> <name>` rather than trusting
+scraped docs pages — a web summary of the install docs claimed a
+`max-26.5` channel URL and a `mojo`-package-based dependency set, both
+wrong; the real channel is `https://conda.modular.com/max` and `max ==
+26.5.0` (→ `max-core` → `mojo-compiler ==1.0.0`) is still the right
+dependency to pin, same shape as the nightly pin it replaced. `mblack`
+stays versioned to the MAX release train (`26.5.0`), not the Mojo compiler
+version (`1.0.0`) — the two version numbers diverge from 1.0 onward.
+
+Two mechanical fixes this repo's tooling needed, independent of bison's
+source:
+
+- **`mojo package` is deprecated in favor of `mojo precompile`.** Same
+  flags (`-o`, `--Werror`), but `mojo package` now prints `warning:
+  'package' is deprecated; use 'precompile' instead` on every invocation.
+  Under this project's `--Werror` policy that's build-breaking, so every
+  script and pixi task that shelled out to `mojo package` (`build_marrow.sh`,
+  `run_tests.sh`, `run_benchmarks.sh`, `run_profile.sh`, `check_compile.sh`,
+  the `check` pixi task) was switched to `mojo precompile`.
+- **The `.mojopkg` output extension is deprecated in favor of `.mojoc`.**
+  The standard library and MAX's own bundled packages (`std.mojoc`,
+  `max.mojoc`, etc. in `.pixi/envs/<env>/lib/mojo/`) already ship as
+  `.mojoc`; only bison's own build scripts were still emitting `.mojopkg`.
+  Renamed every `bison.mojopkg`/`marrow.mojopkg` reference to `.mojoc`.
+  Unlike the `package`→`precompile` warning, this one is emitted at the
+  CLI-argument level rather than as a compiler diagnostic, so it does
+  *not* trip `--Werror` — it's cosmetic, not build-breaking, but worth
+  fixing to stop printing it on every run.
+
+The vendored `vendor/marrow` submodule fared worse: `pixi run build-marrow`
+(which does not pass `--Werror`) surfaces 149 warnings on Mojo 1.0.0 —
+`UnsafePointer`→`Pointer`, `ImplicitlyDeletable`→`Deinitable`, `alloc[T]`
+without a `Layout`→`unsafe_alloc`, and a handful of implicit
+multiple-assignment declarations (`a, b = f()` now wants `var a, b = f()`).
+These don't block bison today (marrow ships as a precompiled `.mojoc` that
+bison imports; the warnings are internal to marrow's own build step), but
+they're real deprecations that need fixing upstream in `JRedrupp/marrow`
+before a future Mojo release removes the aliases and turns them into hard
+errors — see the corresponding `SESSION.md` entry.

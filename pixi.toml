@@ -4,12 +4,12 @@ version = "0.2.0-alpha"
 description = "A Mojo DataFrame library with a pandas-compatible API"
 license = "Apache-2.0"
 requires-pixi = ">=0.41.0"
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 platforms = ["linux-64", "osx-arm64"]
 
 [dependencies]
-max = "==26.5.0rc1"
-mblack = "==26.5.0rc1"
+max = "==26.5.0"
+mblack = "==26.5.0"
 
 [feature.dev.dependencies]
 pandas = ">=2.0"
@@ -23,7 +23,7 @@ gen-version   = "python scripts/gen_version.py"
 build-marrow  = "bash scripts/build_marrow.sh"
 test          = { cmd = "bash scripts/run_tests.sh", depends-on = ["gen-version", "build-marrow"] }
 fmt           = "mojo format bison/"
-check         = { cmd = "mojo package bison/ --Werror -o /tmp/bison.mojopkg", depends-on = ["build-marrow"] }
+check         = { cmd = "mojo precompile bison/ --Werror -o /tmp/bison.mojoc", depends-on = ["build-marrow"] }
 check-compile = { cmd = "bash scripts/check_compile.sh", depends-on = ["gen-version", "build-marrow"] }
 lint          = "pre-commit run --all-files"
 bench         = { cmd = "bash scripts/run_benchmarks.sh", depends-on = ["gen-version", "build-marrow"] }
