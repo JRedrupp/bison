@@ -31,7 +31,7 @@ jobs:
             -E 's|max = "==[^"]+"|max = ">=26.1"|; s|mblack = "==[^"]+"|mblack = "*"|' \
             pixi.toml
 
-      - uses: prefix-dev/setup-pixi@v0.10.1
+      - uses: prefix-dev/setup-pixi@v0.10.2
         with:
           locked: ${{ matrix.pixi-locked }}
 
@@ -78,7 +78,7 @@ jobs:
             -E 's|max = "==[^"]+"|max = ">=26.1"|; s|mblack = "==[^"]+"|mblack = "*"|' \
             pixi.toml
 
-      - uses: prefix-dev/setup-pixi@v0.10.1
+      - uses: prefix-dev/setup-pixi@v0.10.2
         with:
           locked: ${{ matrix.pixi-locked }}
 
